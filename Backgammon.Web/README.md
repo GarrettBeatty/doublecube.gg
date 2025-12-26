@@ -1,6 +1,6 @@
 # Backgammon.Web - SignalR Game Server
 
-ASP.NET Core SignalR server for multiplayer Backgammon games. Supports any client that can connect via SignalR (web browsers, mobile apps, desktop apps, console clients).
+ASP.NET Core SignalR server for multiplayer Backgammon games. This is the **server-only** backend - use **Backgammon.WebClient** for the web UI.
 
 ## Architecture
 
@@ -19,6 +19,15 @@ dotnet run
 ```
 
 Server runs on `http://localhost:5000` by default.
+
+### Run the Web Client (Separate Project)
+
+```bash
+cd ../Backgammon.WebClient
+dotnet run
+```
+
+Then open `http://localhost:3000` in your browser.
 
 ### Test the Server
 

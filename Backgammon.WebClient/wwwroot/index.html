@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backgammon Online</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Landing Page -->
+    <div id="landingPage" class="page">
+        <div class="landing-container">
+            <header class="landing-header">
+                <h1>🎲 Backgammon Online</h1>
+                <p class="tagline">Play the classic board game with friends online</p>
+                <div id="connectionIndicator" class="connection-dot offline"></div>
+            </header>
+
+            <div class="landing-content">
+                <div class="landing-actions">
+                    <button class="btn-large btn-primary" onclick="createGame()">
+                        <span class="btn-icon">➕</span>
+                        <span class="btn-text">Create New Game</span>
+                    </button>
+                    <button class="btn-large btn-secondary" onclick="quickMatch()">
+                        <span class="btn-icon">🎯</span>
+                        <span class="btn-text">Quick Match</span>
+                    </button>
+                </div>
+
+                <div class="games-section">
+                    <h2>🎮 Active Games</h2>
+                    <div id="gamesList" class="games-list">
+                        <div class="loading-games">Connecting to server...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Page -->
+    <div id="gamePage" class="page" style="display: none;">
+        <div class="game-container">
+            <header class="game-header">
+                <button class="btn-back" onclick="leaveGameAndReturn()">← Leave Game</button>
+                <div class="game-info-compact">
+                    <span class="game-id-label">Game ID: <strong id="gameIdDisplay">-</strong></span>
+                    <span class="player-turn" id="turnIndicator">-</span>
+                </div>
+                <div class="player-indicators">
+                    <div class="player-badge" id="whitePlayerBadge">
+                        <div class="badge-checker white">⚪</div>
+                        <span>White</span>
+                    </div>
+                    <div class="player-badge" id="redPlayerBadge">
+                        <div class="badge-checker red">🔴</div>
+                        <span>Red</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="game-layout">
+                <!-- Main Board Area -->
+                <main class="board-area">
+                    <div class="board-wrapper-game">
+                        <canvas id="boardCanvas" class="board-canvas"></canvas>
+                        <div id="boardPlaceholder" class="board-placeholder">
+                            Waiting for game to start...
+                        </div>
+                    </div>
+                    
+                    <div class="game-controls">
+                        <div class="dice-section-compact">
+                            <div class="dice-info">
+                                <label>Dice:</label>
+                                <div class="dice-display" id="diceDisplay">
+                                    <div class="die">?</div>
+                                </div>
+                            </div>
+                            <div class="dice-info">
+                                <label>Remaining:</label>
+                                <div class="dice-display" id="remainingMoves">
+                                    <div class="die">-</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="rollBtn" class="btn-roll" onclick="rollDice()" disabled>
+                            🎲 Roll Dice
+                        </button>
+                    </div>
+                </main>
+
+                <!-- Chat Sidebar -->
+                <aside class="chat-sidebar">
+                    <div class="chat-container">
+                        <h3>💬 Chat</h3>
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-welcome">Welcome! Chat with your opponent here.</div>
+                        </div>
+                        <div class="chat-input-area">
+                            <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatKeyPress(event)">
+                            <button onclick="sendChat()">Send</button>
+                        </div>
+                    </div>
+                    
+                    <div class="event-log">
+                        <h3>📜 Game Log</h3>
+                        <button class="btn-small" onclick="clearLog()">Clear</button>
+                        <div class="log-container" id="log"></div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Join Modal (hidden) -->
+    <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
+
+    <!-- SignalR JavaScript Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

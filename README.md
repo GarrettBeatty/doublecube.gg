@@ -1,6 +1,9 @@
 # Backgammon .NET
 
 [![Tests](https://github.com/garrett/Backgammon/actions/workflows/test.yml/badge.svg)](https://github.com/garrett/Backgammon/actions/workflows/test.yml)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
+[![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)](https://learn.microsoft.com/en-us/dotnet/csharp/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR**.
 
@@ -19,12 +22,19 @@ Backgammon/
 │   └── Point.cs              # Point (triangle) on the board
 ├── Backgammon.Console/       # Console interface
 │   └── Program.cs            # Text-based game interface
-├── Backgammon.Web/           # **NEW** SignalR multiplayer server
+├── Backgammon.Web/           # SignalR multiplayer server (backend only)
 │   ├── Hubs/                 # SignalR hub for real-time game
 │   ├── Services/             # Game session management
 │   ├── Models/               # DTOs and game state
-│   ├── TestClient/           # Example SignalR client
 │   └── Program.cs            # Web server startup
+├── Backgammon.WebClient/     # Web UI client (frontend)
+│   ├── wwwroot/              # Static HTML/CSS/JS files
+│   │   ├── index.html        # Main game interface
+│   │   ├── styles.css        # Modern responsive UI
+│   │   └── game.js           # SignalR client logic
+│   └── Program.cs            # Static file server
+├── TestClient/               # SignalR test client (console)
+│   └── Program.cs            # Example .NET SignalR client
 ├── Backgammon.AI/            # AI simulation framework
 │   ├── IBackgammonAI.cs      # AI player interface
 │   ├── RandomAI.cs           # Random move AI
@@ -77,17 +87,45 @@ Backgammon/
 
 ## How to Run
 
-### Console Application
+### 🌐 Web Multiplayer (Recommended)
+
+**Quick Start (One Command):**
+```bash
+./start-web.sh
+```
+This script starts both the server and client automatically. Open `http://localhost:3000` in your browser!
+
+**Manual Start:**
+
+**Terminal 1 - Start SignalR Server:**
+```bash
+cd Backgammon.Web
+dotnet run
+```
+Server runs on `http://localhost:5000`
+
+**Terminal 2 - Start Web Client:**
+```bash
+cd Backgammon.WebClient
+dotnet run
+```
+Web UI runs on `http://localhost:3000`
+
+Open `http://localhost:3000` in two browser windows/tabs to play against yourself or share the link!
+
+### 🎮 Console Application (Local Play)
 
 ```bash
-# Build the solution
-dotnet build
-
-# Run the console game (local play)
 cd Backgammon.Console
 dotnet run
+```
 
-# Run the multiplayer server
+### 🤖 AI Simulation
+
+```bash
+cd Backgammon.AI
+dotnet run
+```
 cd Backgammon.Web
 dotnet run
 # Server runs on http://localhost:5000

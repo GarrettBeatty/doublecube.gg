@@ -7,14 +7,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 
-// Add CORS for web clients (allows connections from any origin in development)
+// Add CORS for web clients (SignalR requires specific origins with credentials)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(
+                  "http://localhost:3000",
+                  "http://127.0.0.1:3000",
+                  "http://localhost:5173",  // Vite dev server
+                  "http://127.0.0.1:5173"
+              )
               .AllowAnyMethod()
-              .AllowAnyHeader();
+              .AllowAnyHeader()
+              .AllowCredentials();  // Required for SignalR
     });
 });
 
@@ -26,8 +32,9 @@ app.UseCors("AllowAll");
 // Map SignalR hub
 app.MapHub<GameHub>("/gamehub");
 
-// Health check endpoint
-app.MapGet("/", () => "Backgammon SignalR Server Running");
+// Health check endpoints
+app.MapGet("/", () => "Backgammon SignalR Server Running - Connect via /gamehub");
+app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow });
 
 // Game statistics endpoint
