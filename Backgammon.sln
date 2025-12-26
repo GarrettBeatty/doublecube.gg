@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Console", "Backg
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Tests", "Backgammon.Tests\Backgammon.Tests.csproj", "{0CADB9FB-C383-4308-9771-7A764563742E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.AI", "Backgammon.AI\Backgammon.AI.csproj", "{3E460503-741F-47CE-9132-A1489568B444}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{0CADB9FB-C383-4308-9771-7A764563742E}.Release|x64.Build.0 = Release|Any CPU
 		{0CADB9FB-C383-4308-9771-7A764563742E}.Release|x86.ActiveCfg = Release|Any CPU
 		{0CADB9FB-C383-4308-9771-7A764563742E}.Release|x86.Build.0 = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|x64.Build.0 = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Debug|x86.Build.0 = Debug|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|x64.ActiveCfg = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|x64.Build.0 = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|x86.ActiveCfg = Release|Any CPU
+		{3E460503-741F-47CE-9132-A1489568B444}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

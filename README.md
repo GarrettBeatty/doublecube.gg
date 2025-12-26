@@ -17,6 +17,12 @@ Backgammon/
 │   └── Point.cs              # Point (triangle) on the board
 ├── Backgammon.Console/       # Console interface
 │   └── Program.cs            # Text-based game interface
+├── Backgammon.AI/            # AI simulation framework
+│   ├── IBackgammonAI.cs      # AI player interface
+│   ├── RandomAI.cs           # Random move AI
+│   ├── GreedyAI.cs           # Greedy strategy AI
+│   ├── AISimulator.cs        # Game simulation engine
+│   └── Program.cs            # AI vs AI runner
 └── Backgammon.Tests/         # xUnit test project
     └── GameEngineTests.cs    # Unit tests for game logic
 ```
@@ -148,18 +154,47 @@ The project is split into two parts:
 - Interactive move selection
 - Turn-by-turn gameplay
 
+### Backgammon.AI (AI Framework)
+- **IBackgammonAI**: Interface for creating AI players
+- **RandomAI**: Baseline AI that makes random valid moves
+- **GreedyAI**: Strategy-based AI that prioritizes bearing off and hitting
+- **AISimulator**: Run games between two AIs and collect statistics
+- See [Backgammon.AI/README.md](Backgammon.AI/README.md) for details on creating your own AI
+
+## Getting Started
+
+### Play Human vs Human
+```bash
+cd Backgammon.Console
+dotnet run
+```
+
+### Run AI Simulations
+```bash
+cd Backgammon.AI
+dotnet run
+```
+Choose your AI matchup and number of games to simulate. The simulator will show win percentages and an example game.
+
+### Run Tests
+```bash
+cd Backgammon.Tests
+dotnet test
+```
+
 ## Future Enhancements
 
 Potential additions to the project:
 
 - [ ] GUI version (WPF, Blazor, or MAUI)
-- [ ] AI opponent with difficulty levels
+- [x] AI opponent framework
+- [ ] Advanced AI strategies (Monte Carlo, neural networks)
 - [ ] Network multiplayer
 - [ ] Move suggestion/hint system
 - [ ] Game replay and save/load functionality
 - [ ] Match play with Crawford rule
 - [ ] Statistics tracking
-- [ ] Undo/redo moves
+- [x] Undo/redo moves
 - [ ] Optional rules (automatic doubles, beavers, Jacoby rule)
 
 ## Technical Details
