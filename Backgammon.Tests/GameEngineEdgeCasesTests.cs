@@ -13,6 +13,8 @@ namespace Backgammon.Tests
             game.StartNewGame();
             // Place a white checker on the bar
             game.WhitePlayer.CheckersOnBar = 1;
+            // Ensure it's White's turn
+            game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
             game.Dice.SetDice(3, 4);
             game.RemainingMoves.Clear();
             game.RemainingMoves.AddRange(game.Dice.GetMoves());
