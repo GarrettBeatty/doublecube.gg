@@ -1,5 +1,7 @@
 # Backgammon .NET
 
+[![Tests](https://github.com/garrett/Backgammon/actions/workflows/test.yml/badge.svg)](https://github.com/garrett/Backgammon/actions/workflows/test.yml)
+
 A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR**.
 
 ## Project Structure
