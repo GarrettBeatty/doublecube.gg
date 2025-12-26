@@ -1,6 +1,6 @@
 # Backgammon .NET
 
-A complete implementation of the classic Backgammon board game in .NET, following the traditional rules of the game.
+A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR**.
 
 ## Project Structure
 
@@ -17,6 +17,12 @@ Backgammon/
 │   └── Point.cs              # Point (triangle) on the board
 ├── Backgammon.Console/       # Console interface
 │   └── Program.cs            # Text-based game interface
+├── Backgammon.Web/           # **NEW** SignalR multiplayer server
+│   ├── Hubs/                 # SignalR hub for real-time game
+│   ├── Services/             # Game session management
+│   ├── Models/               # DTOs and game state
+│   ├── TestClient/           # Example SignalR client
+│   └── Program.cs            # Web server startup
 ├── Backgammon.AI/            # AI simulation framework
 │   ├── IBackgammonAI.cs      # AI player interface
 │   ├── RandomAI.cs           # Random move AI
@@ -75,8 +81,17 @@ Backgammon/
 # Build the solution
 dotnet build
 
-# Run the console game
+# Run the console game (local play)
 cd Backgammon.Console
+dotnet run
+
+# Run the multiplayer server
+cd Backgammon.Web
+dotnet run
+# Server runs on http://localhost:5000
+
+# Run AI simulations
+cd Backgammon.AI
 dotnet run
 ```
 
@@ -90,7 +105,37 @@ dotnet test
 dotnet test --verbosity normal
 ```
 
-### Game Controls
+## Multiplayer Support 🌐
+
+The `Backgammon.Web` project provides a **SignalR server** that enables real-time multiplayer gameplay from any client platform:
+
+- ✅ **Web browsers** (JavaScript/TypeScript)
+- ✅ **Mobile apps** (iOS, Android via SignalR clients)
+- ✅ **Desktop apps** (.NET, Python, Java)
+- ✅ **Console clients** (included test client)
+
+**Key Features:**
+- Server-authoritative game logic (prevents cheating)
+- Automatic matchmaking or private games
+- Real-time bidirectional communication
+- Supports multiple simultaneous games
+- Works with any SignalR-compatible client
+
+See [Backgammon.Web/README.md](Backgammon.Web/README.md) for full documentation, client examples, and API reference.
+
+### Quick Start - Multiplayer
+
+```bash
+# Terminal 1: Start server
+cd Backgammon.Web
+dotnet run
+
+# Terminal 2: Test client
+cd Backgammon.Web/TestClient
+dotnet run
+```
+
+### Game Controls (Console)
 
 1. Press Enter to roll dice at the start of your turn
 2. Choose from the list of valid moves by entering the number
