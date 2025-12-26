@@ -9,10 +9,14 @@ namespace Backgammon.Web.Services;
 /// </summary>
 public class GameSession
 {
+    // Track spectator connections
+    private readonly HashSet<string> _spectatorConnections = new();
     public string Id { get; }
     public GameEngine Engine { get; }
     public string? WhitePlayerId { get; private set; }  // Persistent player ID
     public string? RedPlayerId { get; private set; }    // Persistent player ID
+    public string? WhitePlayerName { get; set; }  // Display name for White player
+    public string? RedPlayerName { get; set; }    // Display name for Red player
     public string? WhiteConnectionId { get; private set; }  // Current connection
     public string? RedConnectionId { get; private set; }    // Current connection
     public DateTime CreatedAt { get; }
@@ -25,6 +29,8 @@ public class GameSession
     {
         Id = id;
         Engine = new GameEngine();
+        // Initialize board with default checker positions so players can see them while waiting
+        Engine.Board.SetupInitialPosition();
         CreatedAt = DateTime.UtcNow;
         LastActivityAt = DateTime.UtcNow;
     }
@@ -40,12 +46,18 @@ public class GameSession
         if (WhitePlayerId == playerId)
         {
             WhiteConnectionId = connectionId;
+            // Set name if not already set (for existing games before this feature)
+            if (string.IsNullOrEmpty(WhitePlayerName))
+                WhitePlayerName = GenerateFriendlyName(playerId);
             return true;
         }
         
         if (RedPlayerId == playerId)
         {
             RedConnectionId = connectionId;
+            // Set name if not already set (for existing games before this feature)
+            if (string.IsNullOrEmpty(RedPlayerName))
+                RedPlayerName = GenerateFriendlyName(playerId);
             return true;
         }
         
@@ -54,6 +66,7 @@ public class GameSession
         {
             WhitePlayerId = playerId;
             WhiteConnectionId = connectionId;
+            WhitePlayerName = GenerateFriendlyName(playerId);
             return true;
         }
         
@@ -61,6 +74,7 @@ public class GameSession
         {
             RedPlayerId = playerId;
             RedConnectionId = connectionId;
+            RedPlayerName = GenerateFriendlyName(playerId);
             // Start game when both players joined (only if not already started)
             if (!Engine.GameStarted)
             {
@@ -70,6 +84,46 @@ public class GameSession
         }
         
         return false; // Game is full
+    }
+
+    /// <summary>
+    /// Add a spectator connection (not a player)
+    /// </summary>
+    public void AddSpectator(string connectionId)
+    {
+        _spectatorConnections.Add(connectionId);
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Remove a spectator connection
+    /// </summary>
+    public void RemoveSpectator(string connectionId)
+    {
+        _spectatorConnections.Remove(connectionId);
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Check if a connection is a spectator
+    /// </summary>
+    public bool IsSpectator(string connectionId)
+    {
+        return _spectatorConnections.Contains(connectionId);
+    }
+    
+    /// <summary>
+    /// Generate a friendly display name from a player ID
+    /// </summary>
+    private string GenerateFriendlyName(string playerId)
+    {
+        // Extract last 4 characters of the player ID for a short, readable name
+        if (playerId.Length >= 4)
+        {
+            var suffix = playerId.Substring(playerId.Length - 4);
+            return $"Player {suffix}";
+        }
+        return playerId;
     }
     
     /// <summary>
@@ -145,6 +199,8 @@ public class GameSession
             GameId = Id,
             WhitePlayerId = WhitePlayerId ?? "",
             RedPlayerId = RedPlayerId ?? "",
+            WhitePlayerName = WhitePlayerName ?? WhitePlayerId ?? "Waiting...",
+            RedPlayerName = RedPlayerName ?? RedPlayerId ?? "Waiting...",
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
             YourColor = playerColor,
             IsYourTurn = playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value,

@@ -29,7 +29,14 @@
                 </div>
 
                 <div class="games-section">
-                    <h2>🎮 Active Games</h2>
+                    <h2>� My Games</h2>
+                    <div id="myGamesList" class="games-list">
+                        <div class="loading-games">Loading your games...</div>
+                    </div>
+                </div>
+
+                <div class="games-section">
+                    <h2>�🎮 Active Games</h2>
                     <div id="gamesList" class="games-list">
                         <div class="loading-games">Connecting to server...</div>
                     </div>
@@ -45,6 +52,9 @@
                 <button class="btn-back" onclick="leaveGameAndReturn()">← Leave Game</button>
                 <div class="game-info-compact">
                     <span class="game-id-label">Game ID: <strong id="gameIdDisplay">-</strong></span>
+                    <button class="btn-share" onclick="shareGameUrl()" title="Share game link">
+                        <span>🔗 Share</span>
+                    </button>
                     <span class="player-turn" id="turnIndicator">-</span>
                 </div>
                 <div class="player-indicators">
@@ -63,9 +73,25 @@
                 <!-- Main Board Area -->
                 <main class="board-area">
                     <div class="board-wrapper-game">
+                        <!-- Top - Red player (their home board 19-24 is at top) -->
+                        <div class="player-name-top">
+                            <div class="player-name-label">
+                                <div class="player-color-indicator red">🔴</div>
+                                <span id="redPlayerName">Red Player</span>
+                            </div>
+                        </div>
+                        
                         <canvas id="boardCanvas" class="board-canvas"></canvas>
                         <div id="boardPlaceholder" class="board-placeholder">
                             Waiting for game to start...
+                        </div>
+                        
+                        <!-- Bottom - White player (their home board 1-6 is at bottom) -->
+                        <div class="player-name-bottom">
+                            <div class="player-name-label">
+                                <div class="player-color-indicator white">⚪</div>
+                                <span id="whitePlayerName">White Player</span>
+                            </div>
                         </div>
                     </div>
                     

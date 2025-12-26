@@ -11,6 +11,8 @@ public class GameState
     public string GameId { get; set; } = string.Empty;
     public string WhitePlayerId { get; set; } = string.Empty;
     public string RedPlayerId { get; set; } = string.Empty;
+    public string WhitePlayerName { get; set; } = string.Empty;
+    public string RedPlayerName { get; set; } = string.Empty;
     public CheckerColor CurrentPlayer { get; set; }
     public CheckerColor? YourColor { get; set; }  // Added: client's assigned color
     public bool IsYourTurn { get; set; }  // Added: convenience flag

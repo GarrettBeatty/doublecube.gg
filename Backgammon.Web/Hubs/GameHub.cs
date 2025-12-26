@@ -48,12 +48,19 @@ public class GameHub : Hub
         {
             var connectionId = Context.ConnectionId;
             var session = _sessionManager.JoinOrCreate(playerId, connectionId, gameId);
-            
-            // Add connection to SignalR group for this game
             await Groups.AddToGroupAsync(connectionId, session.Id);
-            
             _logger.LogInformation("Player {ConnectionId} joined game {GameId}", connectionId, session.Id);
-            
+
+            // Try to add as player; if full, add as spectator
+            if (!session.AddPlayer(playerId, connectionId))
+            {
+                session.AddSpectator(connectionId);
+                var spectatorState = session.GetState(null); // No color for spectators
+                await Clients.Caller.SendAsync("SpectatorJoined", spectatorState);
+                _logger.LogInformation("Spectator {ConnectionId} joined game {GameId}", connectionId, session.Id);
+                return;
+            }
+
             if (session.IsFull)
             {
                 // Game is ready to start - send personalized state to each player

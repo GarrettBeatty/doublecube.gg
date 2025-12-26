@@ -8,6 +8,29 @@ let selectedChecker = null; // { point: number, x: number, y: number }
 let validDestinations = [];
 let myPlayerId = null;  // Persistent player ID
 
+// ==== URL ROUTING ====
+function getGameIdFromUrl() {
+    const pathParts = window.location.pathname.split('/');
+    // Match /game/{gameId}
+    if (pathParts.length >= 3 && pathParts[1] === 'game') {
+        return pathParts[2];
+    }
+    return null;
+}
+
+function setGameUrl(gameId) {
+    const newUrl = `/game/${gameId}`;
+    if (window.location.pathname !== newUrl) {
+        window.history.pushState({ gameId }, '', newUrl);
+    }
+}
+
+function setHomeUrl() {
+    if (window.location.pathname !== '/') {
+        window.history.pushState({}, '', '/');
+    }
+}
+
 // ==== PLAYER ID MANAGEMENT ====
 function getOrCreatePlayerId() {
     let playerId = localStorage.getItem('backgammon_player_id');
@@ -22,8 +45,33 @@ function getOrCreatePlayerId() {
 // ==== INITIALIZATION ====
 window.addEventListener('load', async () => {
     myPlayerId = getOrCreatePlayerId();
-    showLandingPage();
-    await autoConnect();
+    
+    // Check if URL contains a game ID
+    const urlGameId = getGameIdFromUrl();
+    if (urlGameId) {
+        // Wait for connection before joining
+        await autoConnect();
+        await joinSpecificGame(urlGameId);
+    } else {
+        showLandingPage();
+        await autoConnect();
+    }
+});
+
+// Handle browser back/forward buttons
+window.addEventListener('popstate', (event) => {
+    const gameId = getGameIdFromUrl();
+    if (gameId) {
+        // User navigated to a game URL
+        if (currentGameId !== gameId) {
+            joinSpecificGame(gameId);
+        }
+    } else {
+        // User navigated back to home
+        if (currentGameId) {
+            leaveGameAndReturn();
+        }
+    }
 });
 
 async function autoConnect() {
@@ -53,15 +101,10 @@ async function autoConnect() {
         updateConnectionStatus(true);
         log('✅ Connected to server', 'success');
         
-        // Check if we should auto-rejoin a game
-        const savedGameId = localStorage.getItem('currentGameId');
-        if (savedGameId) {
-            log('🔄 Rejoining previous game...', 'info');
-            await joinGameById(savedGameId);
-        } else {
-            refreshGamesList();
-            gameRefreshInterval = setInterval(refreshGamesList, 3000);
-        }
+        // Always start on landing page and refresh games list
+        // User can manually rejoin games from "My Games" section
+        refreshGamesList();
+        gameRefreshInterval = setInterval(refreshGamesList, 3000);
     } catch (err) {
         updateConnectionStatus(false);
         log(`❌ Connection failed: ${err}`, 'error');
@@ -70,6 +113,12 @@ async function autoConnect() {
 }
 
 function setupEventHandlers() {
+        connection.on("SpectatorJoined", (gameState) => {
+            log('👀 You are spectating this game.', 'info');
+            updateGameState(gameState, true); // pass spectator flag
+            showGamePage();
+            window.isSpectator = true;
+        });
     connection.on("GameUpdate", (gameState) => {
         updateGameState(gameState);
     });
@@ -81,6 +130,9 @@ function setupEventHandlers() {
 
     connection.on("WaitingForOpponent", (gameId) => {
         log(`⏳ Waiting for opponent... Game ID: ${gameId}`, 'info');
+        currentGameId = gameId;
+        localStorage.setItem('currentGameId', gameId);
+        setGameUrl(gameId);
     });
 
     connection.on("OpponentJoined", (opponentId) => {
@@ -113,6 +165,7 @@ function setupEventHandlers() {
 function showLandingPage() {
     document.getElementById('landingPage').style.display = 'block';
     document.getElementById('gamePage').style.display = 'none';
+    setHomeUrl();
     if (gameRefreshInterval) {
         clearInterval(gameRefreshInterval);
         gameRefreshInterval = setInterval(refreshGamesList, 3000);
@@ -137,22 +190,134 @@ async function refreshGamesList() {
     if (!connection || connection.state !== 'Connected') return;
     
     try {
-        const response = await fetch('http://localhost:5000/stats');
+        // Fetch all games list
+        const response = await fetch('http://localhost:5000/api/games');
         const data = await response.json();
         
-        // For now, show placeholder - in future we'd get actual game list from server
         const gamesListEl = document.getElementById('gamesList');
-        if (data.totalGames === 0) {
-            gamesListEl.innerHTML = '<div class="loading-games">No active games. Create one to get started!</div>';
+        
+        if (data.waitingGames.length === 0 && data.activeGames.length === 0) {
+            gamesListEl.innerHTML = '<div class="loading-games">No games available. Create one to get started!</div>';
         } else {
-            gamesListEl.innerHTML = `
-                <div class="loading-games">
-                    ${data.activeGames} active game(s) • ${data.waitingGames} waiting for players
+            let html = '<div class="games-stats">' +
+                `${data.activeGames.length} active game(s) • ${data.waitingGames.length} waiting for players` +
+                '</div>';
+            
+            // Show waiting games (available to join)
+            if (data.waitingGames.length > 0) {
+                html += '<div class="game-section"><h3>⏳ Waiting for Opponent</h3>';
+                data.waitingGames.forEach(game => {
+                    const waitTime = game.minutesWaiting < 1 ? 'just now' : 
+                                    game.minutesWaiting === 1 ? '1 min ago' : 
+                                    `${game.minutesWaiting} mins ago`;
+                    html += `
+                        <div class="game-item waiting">
+                            <div class="game-item-info">
+                                <div class="game-item-player">👤 ${game.playerName}</div>
+                                <div class="game-item-time">Created ${waitTime}</div>
+                            </div>
+                            <button class="btn-join" onclick="joinSpecificGame('${game.gameId}')">Join Game</button>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            // Show active games (spectate only - future feature)
+            if (data.activeGames.length > 0) {
+                html += '<div class="game-section"><h3>🎮 Games in Progress</h3>';
+                data.activeGames.forEach(game => {
+                    html += `
+                        <div class="game-item active">
+                            <div class="game-item-info">
+                                <div class="game-item-players">⚪ ${game.whitePlayer} vs 🔴 ${game.redPlayer}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            }
+            
+            gamesListEl.innerHTML = html;
+        }
+        
+        // Fetch player's active games
+        await refreshMyGames();
+    } catch (err) {
+        console.error('Failed to fetch games list:', err);
+    }
+}
+
+async function refreshMyGames() {
+    try {
+        const response = await fetch(`http://localhost:5000/api/player/${myPlayerId}/active-games`);
+        const myGames = await response.json();
+        
+        const myGamesListEl = document.getElementById('myGamesList');
+        
+        if (myGames.length === 0) {
+            myGamesListEl.innerHTML = '<div class="loading-games">You have no active games</div>';
+            return;
+        }
+        
+        let html = '';
+        myGames.forEach(game => {
+            const turnIndicator = game.isMyTurn ? '🟢 Your Turn' : '⏳ Waiting';
+            const opponentStatus = game.isFull ? game.opponent : 'Waiting for opponent';
+            const timeAgo = getTimeAgo(new Date(game.lastActivity));
+            
+            html += `
+                <div class="game-item my-game ${game.isMyTurn ? 'my-turn' : ''}">
+                    <div class="game-item-info">
+                        <div class="game-item-player">
+                            ${game.myColor === 'White' ? '⚪' : '🔴'} You vs ${opponentStatus}
+                        </div>
+                        <div class="game-item-status">
+                            <span class="turn-badge">${turnIndicator}</span>
+                            <span class="game-item-time">Active ${timeAgo}</span>
+                        </div>
+                    </div>
+                    <button class="btn-join ${game.isMyTurn ? 'btn-join-urgent' : ''}" onclick="joinSpecificGame('${game.gameId}')">
+                        ${game.isMyTurn ? '▶️ Play' : '👁️ View'}
+                    </button>
                 </div>
             `;
-        }
+        });
+        
+        myGamesListEl.innerHTML = html;
     } catch (err) {
-        // Server might not have stats endpoint ready
+        console.error('Failed to fetch my games:', err);
+        document.getElementById('myGamesList').innerHTML = '<div class="loading-games">Error loading your games</div>';
+    }
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+async function joinSpecificGame(gameId) {
+    if (!connection || connection.state !== 'Connected') {
+        alert('Not connected to server. Please wait...');
+        return;
+    }
+
+    try {
+        currentGameId = gameId;
+        localStorage.setItem('currentGameId', gameId);
+        setGameUrl(gameId);
+        await connection.invoke("JoinGame", myPlayerId, gameId);
+        log(`🎮 Joining game ${gameId}...`, 'info');
+        showGamePage();
+    } catch (err) {
+        log(`❌ Failed to join game: ${err}`, 'error');
     }
 }
 
@@ -318,9 +483,18 @@ function clearLog() {
 }
 
 // ==== GAME STATE ====
-function updateGameState(state) {
+function updateGameState(state, isSpectator = false) {
     console.log('Game State:', state);
+    console.log('Player Names - White:', state.whitePlayerName, 'Red:', state.redPlayerName);
+
     currentGameState = state; // Store for click handling
+    // Spectator mode UI
+    if (isSpectator || window.isSpectator) {
+        document.body.classList.add('spectator-mode');
+        // Optionally disable move controls here
+    } else {
+        document.body.classList.remove('spectator-mode');
+    }
 
     // Update game ID
     const gameIdEl = document.getElementById('gameIdDisplay');
@@ -355,6 +529,20 @@ function updateGameState(state) {
         // currentPlayer is 0 for White, 1 for Red
         whiteBadge.classList.toggle('active', state.currentPlayer === 0);
         redBadge.classList.toggle('active', state.currentPlayer === 1);
+    }
+
+    // Update player names next to board
+    const whiteNameEl = document.getElementById('whitePlayerName');
+    const redNameEl = document.getElementById('redPlayerName');
+    if (whiteNameEl) {
+        const isYou = state.yourColor === 0; // White = 0
+        const name = state.whitePlayerName || state.WhitePlayerName || 'White Player';
+        whiteNameEl.textContent = name + (isYou ? ' (You)' : '');
+    }
+    if (redNameEl) {
+        const isYou = state.yourColor === 1; // Red = 1
+        const name = state.redPlayerName || state.RedPlayerName || 'Red Player';
+        redNameEl.textContent = name + (isYou ? ' (You)' : '');
     }
 
     // Update dice (use currentDice alias if available, otherwise dice)
@@ -395,12 +583,14 @@ function updateGameState(state) {
     const hasRemainingMoves = state.remainingMoves && state.remainingMoves.length > 0;
     const hasDice = state.dice && state.dice.length > 0 && (state.dice[0] > 0 || state.dice[1] > 0);
     const movesMade = state.movesMadeThisTurn || 0;
+    const isWaitingForPlayer = state.status === 0; // GameStatus.WaitingForPlayer = 0
     
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
         // Can only roll at the START of your turn (no dice rolled yet)
         // Once you roll, you must end turn before rolling again
-        rollBtn.disabled = !isMyTurn || hasDice;
+        // Also disable if waiting for another player to join
+        rollBtn.disabled = isWaitingForPlayer || !isMyTurn || hasDice;
     }
     
     const undoBtn = document.getElementById('undoBtn');
@@ -533,7 +723,7 @@ function renderBoard(state) {
     const playableWidth = width - (2 * sideMargin) - barWidth;
     const pointWidth = playableWidth / 12;
     const pointHeight = height * 0.42;
-    const checkerRadius = pointWidth * 0.38;
+    const checkerRadius = pointWidth * 0.32;
     const padding = height * 0.03;
     
     // Clear canvas

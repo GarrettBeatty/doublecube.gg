@@ -1,3 +1,4 @@
+using System.Linq;
 using Backgammon.Web.Models;
 
 namespace Backgammon.Web.Services;
@@ -33,6 +34,11 @@ public interface IGameSessionManager
     /// Get all active game sessions
     /// </summary>
     IEnumerable<GameSession> GetAllGames();
+    
+    /// <summary>
+    /// Get all active games for a specific player
+    /// </summary>
+    IEnumerable<GameSession> GetPlayerGames(string playerId);
     
     /// <summary>
     /// Clean up old/abandoned games
@@ -93,6 +99,23 @@ public class GameSessionManager : IGameSessionManager
                 {
                     playerGame.UpdatePlayerConnection(playerId, connectionId);
                     return playerGame; // Already in this game
+                }
+            }
+            
+            // Check if this player already has an active game (different connection - e.g., multiple tabs)
+            // This prevents the same player from creating multiple waiting games
+            if (string.IsNullOrEmpty(gameId))
+            {
+                var existingPlayerGame = _games.Values.FirstOrDefault(g => 
+                    (g.WhitePlayerId == playerId || g.RedPlayerId == playerId) && 
+                    g.Engine.Winner == null); // Only consider non-finished games
+                    
+                if (existingPlayerGame != null)
+                {
+                    // Player already in a game - reconnect them to it
+                    existingPlayerGame.UpdatePlayerConnection(playerId, connectionId);
+                    _playerToGame[connectionId] = existingPlayerGame.Id;
+                    return existingPlayerGame;
                 }
             }
             
@@ -172,6 +195,16 @@ public class GameSessionManager : IGameSessionManager
         lock (_lock)
         {
             return _games.Values.ToList();
+        }
+    }
+    
+    public IEnumerable<GameSession> GetPlayerGames(string playerId)
+    {
+        lock (_lock)
+        {
+            return _games.Values
+                .Where(g => (g.WhitePlayerId == playerId || g.RedPlayerId == playerId) && g.Engine.Winner == null)
+                .ToList();
         }
     }
     

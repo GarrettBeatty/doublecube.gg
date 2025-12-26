@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Backgammon.Core;
 using Backgammon.Web.Hubs;
 using Backgammon.Web.Services;
 using MongoDB.Driver;
@@ -59,6 +60,56 @@ app.MapGet("/stats", (IGameSessionManager sessionManager) =>
         waitingGames = games.Count(g => !g.IsFull),
         completedGames = games.Count(g => g.Engine.Winner != null)
     };
+}).RequireCors("AllowAll");
+
+// Game list endpoint - returns list of games available to join
+app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
+{
+    var allGames = sessionManager.GetAllGames().ToList();
+    
+    return new
+    {
+        activeGames = allGames
+            .Where(g => g.IsFull && g.Engine.Winner == null)
+            .Select(g => new
+            {
+                gameId = g.Id,
+                whitePlayer = g.WhitePlayerName ?? "Player 1",
+                redPlayer = g.RedPlayerName ?? "Player 2",
+                status = "playing",
+                createdAt = g.CreatedAt
+            })
+            .ToList(),
+        waitingGames = allGames
+            .Where(g => !g.IsFull && g.Engine.Winner == null)
+            .Select(g => new
+            {
+                gameId = g.Id,
+                playerName = g.WhitePlayerName ?? g.RedPlayerName ?? "Waiting player",
+                waitingSince = g.CreatedAt,
+                minutesWaiting = (int)(DateTime.UtcNow - g.CreatedAt).TotalMinutes
+            })
+            .ToList()
+    };
+}).RequireCors("AllowAll");
+
+// My games endpoint - returns active games for a specific player
+app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSessionManager sessionManager) =>
+{
+    var playerGames = sessionManager.GetPlayerGames(playerId).ToList();
+    
+    return playerGames.Select(g => new
+    {
+        gameId = g.Id,
+        myColor = g.WhitePlayerId == playerId ? "White" : "Red",
+        opponent = g.WhitePlayerId == playerId 
+            ? (g.RedPlayerName ?? "Waiting for opponent") 
+            : (g.WhitePlayerName ?? "Waiting for opponent"),
+        isFull = g.IsFull,
+        isMyTurn = g.Engine.CurrentPlayer?.Color == (g.WhitePlayerId == playerId ? CheckerColor.White : CheckerColor.Red),
+        createdAt = g.CreatedAt,
+        lastActivity = g.LastActivityAt
+    }).ToList();
 }).RequireCors("AllowAll");
 
 // Database statistics endpoint
