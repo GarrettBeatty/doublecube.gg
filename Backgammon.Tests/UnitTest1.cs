@@ -13,20 +13,25 @@ public class GameEngineTests
         // Act
         game.StartNewGame();
         
-        // Assert - White's positions
-        Assert.Equal(2, game.Board.GetPoint(1).Count);
-        Assert.Equal(CheckerColor.White, game.Board.GetPoint(1).Color);
-        Assert.Equal(5, game.Board.GetPoint(12).Count);
-        Assert.Equal(CheckerColor.White, game.Board.GetPoint(12).Color);
-        Assert.Equal(3, game.Board.GetPoint(17).Count);
-        Assert.Equal(5, game.Board.GetPoint(19).Count);
-        
-        // Assert - Red's positions
+        // Assert - White's positions (moves 24->1)
         Assert.Equal(2, game.Board.GetPoint(24).Count);
-        Assert.Equal(CheckerColor.Red, game.Board.GetPoint(24).Color);
+        Assert.Equal(CheckerColor.White, game.Board.GetPoint(24).Color);
         Assert.Equal(5, game.Board.GetPoint(13).Count);
+        Assert.Equal(CheckerColor.White, game.Board.GetPoint(13).Color);
         Assert.Equal(3, game.Board.GetPoint(8).Count);
+        Assert.Equal(CheckerColor.White, game.Board.GetPoint(8).Color);
         Assert.Equal(5, game.Board.GetPoint(6).Count);
+        Assert.Equal(CheckerColor.White, game.Board.GetPoint(6).Color);
+        
+        // Assert - Red's positions (moves 1->24)
+        Assert.Equal(2, game.Board.GetPoint(1).Count);
+        Assert.Equal(CheckerColor.Red, game.Board.GetPoint(1).Color);
+        Assert.Equal(5, game.Board.GetPoint(12).Count);
+        Assert.Equal(CheckerColor.Red, game.Board.GetPoint(12).Color);
+        Assert.Equal(3, game.Board.GetPoint(17).Count);
+        Assert.Equal(CheckerColor.Red, game.Board.GetPoint(17).Color);
+        Assert.Equal(5, game.Board.GetPoint(19).Count);
+        Assert.Equal(CheckerColor.Red, game.Board.GetPoint(19).Color);
     }
 
     [Fact]
