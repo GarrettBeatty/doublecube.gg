@@ -169,3 +169,6 @@ var cleanupTask = Task.Run(async () =>
 });
 
 app.Run();
+
+// Expose Program class for integration testing
+public partial class Program { }

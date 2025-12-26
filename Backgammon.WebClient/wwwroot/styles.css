@@ -396,18 +396,25 @@ body {
     display: flex;
     flex-direction: column;
     background: #2d5016;
-    padding: 20px;
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
 }
 
 .board-wrapper-game {
-    flex: 1;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     position: relative;
     min-height: 0;
-    gap: 15px;
+    gap: 2vw;
+    width: 80vw;
+    max-width: 80vw;
 }
 
 .player-name-top,
@@ -452,12 +459,16 @@ body {
 }
 
 .board-canvas {
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 8px;
+    width: 100%;
+    height: calc(80vw * 0.566); /* 600/1060 = 0.566 for 16:9-ish board */
+    max-width: 80vw;
+    max-height: 80vh;
+    border-radius: 1.2vw;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
     cursor: pointer;
     transition: filter 0.2s;
+    background: #2d5016;
+    display: block;
 }
 
 .board-canvas:hover {
@@ -486,36 +497,39 @@ body {
 
 .dice-section-compact {
     display: flex;
-    gap: 30px;
+    gap: 2vw;
+    justify-content: center;
+    align-items: center;
+    margin-top: 2vw;
 }
 
 .dice-info label {
-    display: block;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.9em;
-    margin-bottom: 8px;
-    font-weight: 600;
+    display: none;
 }
 
 .dice-display {
     display: flex;
-    gap: 6px;
+    gap: 2px;
     flex-wrap: wrap;
 }
 
 .die {
-    width: 45px;
-    height: 45px;
+    width: 5vw;
+    height: 5vw;
+    min-width: 48px;
+    min-height: 48px;
+    max-width: 96px;
+    max-height: 96px;
     background: white;
-    border: 2px solid var(--primary);
-    border-radius: 6px;
+    border: 0.4vw solid var(--primary);
+    border-radius: 1vw;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 2.5vw;
     font-weight: bold;
     color: var(--primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
 .btn-roll {

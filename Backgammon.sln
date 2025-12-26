@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.AppHost", "Backg
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.ServiceDefaults", "Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj", "{928D9070-0F38-42C3-9F10-C8D28C3A2BD4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.IntegrationTests", "Backgammon.IntegrationTests\Backgammon.IntegrationTests.csproj", "{A1B2C3D4-1234-5678-ABCD-1234567890AB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
