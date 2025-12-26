@@ -37,17 +37,17 @@ public class Board
             _points[i].Checkers.Clear();
         }
 
-        // White's initial position
-        AddCheckers(1, CheckerColor.White, 2);   // White's 24 point
-        AddCheckers(12, CheckerColor.White, 5);  // White's 13 point
-        AddCheckers(17, CheckerColor.White, 3);  // White's 8 point
-        AddCheckers(19, CheckerColor.White, 5);  // White's 6 point
+        // White's initial position (moves from high to low: 24->1)
+        AddCheckers(24, CheckerColor.White, 2);  // Far from home
+        AddCheckers(13, CheckerColor.White, 5);  // Mid-board
+        AddCheckers(8, CheckerColor.White, 3);   // Getting closer
+        AddCheckers(6, CheckerColor.White, 5);   // Just outside home
 
-        // Red's initial position (opposite)
-        AddCheckers(24, CheckerColor.Red, 2);    // Red's 24 point
-        AddCheckers(13, CheckerColor.Red, 5);    // Red's 13 point
-        AddCheckers(8, CheckerColor.Red, 3);     // Red's 8 point
-        AddCheckers(6, CheckerColor.Red, 5);     // Red's 6 point
+        // Red's initial position (moves from low to high: 1->24)
+        AddCheckers(1, CheckerColor.Red, 2);     // Far from home
+        AddCheckers(12, CheckerColor.Red, 5);    // Mid-board
+        AddCheckers(17, CheckerColor.Red, 3);    // Getting closer
+        AddCheckers(19, CheckerColor.Red, 5);    // Just outside home
     }
 
     /// <summary>
