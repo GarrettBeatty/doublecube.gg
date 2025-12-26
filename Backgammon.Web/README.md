@@ -49,7 +49,10 @@ curl http://localhost:5000/stats
 |--------|-----------|-------------|
 | `JoinGame` | `string? gameId` | Join specific game or use matchmaking (null) |
 | `RollDice` | - | Roll dice to start turn |
+| `GetValidSources` | - | Get list of points with movable checkers |
+| `GetValidDestinations` | `int fromPoint` | Get valid moves from a specific point |
 | `MakeMove` | `int from, int to` | Execute a move |
+| `UndoMove` | - | Undo the last move made this turn |
 | `EndTurn` | - | End current turn, switch players |
 | `GetGameState` | - | Request current game state |
 | `LeaveGame` | - | Leave current game |

@@ -312,6 +312,12 @@ body {
     max-height: 100%;
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+
+.board-canvas:hover {
+    filter: brightness(1.05);
 }
 
 .board-placeholder {
@@ -330,6 +336,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
 }
 
 .dice-section-compact {
@@ -388,6 +396,64 @@ body {
     background: #9ca3af;
     cursor: not-allowed;
     box-shadow: none;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.btn-undo {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.4);
+}
+
+.btn-undo:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(107, 114, 128, 0.6);
+    background: linear-gradient(135deg, #4b5563, #374151);
+}
+
+.btn-undo:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.5;
+}
+
+.btn-end-turn {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-end-turn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+    background: linear-gradient(135deg, #059669, #047857);
+}
+
+.btn-end-turn:disabled {
+    background: #d1d5db;
+    cursor: not-allowed;
+    box-shadow: none;
+    opacity: 0.5;
 }
 
 .chat-sidebar {

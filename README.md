@@ -5,12 +5,25 @@
 [![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)](https://learn.microsoft.com/en-us/dotnet/csharp/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR**.
+A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR** with **MongoDB persistence**.
+
+## Quick Start with .NET Aspire 🚀
+
+Run the entire stack (MongoDB + Backend + Frontend) with one command:
+
+```bash
+cd Backgammon.AppHost
+dotnet run
+```
+
+Opens Aspire Dashboard with observability for all services. See [ASPIRE_SETUP.md](ASPIRE_SETUP.md) for details.
 
 ## Project Structure
 
 ```
 Backgammon/
+├── Backgammon.AppHost/       # .NET Aspire orchestrator
+├── Backgammon.ServiceDefaults/ # Shared Aspire configuration
 ├── Backgammon.Core/          # Game logic library
 │   ├── Board.cs              # Game board with 24 points
 │   ├── CheckerColor.cs       # Enum for White/Red
@@ -22,9 +35,9 @@ Backgammon/
 │   └── Point.cs              # Point (triangle) on the board
 ├── Backgammon.Console/       # Console interface
 │   └── Program.cs            # Text-based game interface
-├── Backgammon.Web/           # SignalR multiplayer server (backend only)
+├── Backgammon.Web/           # SignalR multiplayer server
 │   ├── Hubs/                 # SignalR hub for real-time game
-│   ├── Services/             # Game session management
+│   ├── Services/             # Game session management + MongoDB
 │   ├── Models/               # DTOs and game state
 │   └── Program.cs            # Web server startup
 ├── Backgammon.WebClient/     # Web UI client (frontend)
@@ -46,8 +59,6 @@ Backgammon/
 ```
 
 ## Features
-
-### Implemented Rules
 - ✅ Standard board setup with initial checker positions
 - ✅ Dice rolling and turn management
 - ✅ Checker movement in correct directions

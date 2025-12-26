@@ -22,7 +22,7 @@ public interface IGameSessionManager
     /// <summary>
     /// Join an existing game or create a new one in matchmaking queue
     /// </summary>
-    GameSession JoinOrCreate(string connectionId, string? gameId = null);
+    GameSession JoinOrCreate(string playerId, string connectionId, string? gameId = null);
     
     /// <summary>
     /// Remove a player from their current game
@@ -82,16 +82,27 @@ public class GameSessionManager : IGameSessionManager
         }
     }
     
-    public GameSession JoinOrCreate(string connectionId, string? gameId = null)
+    public GameSession JoinOrCreate(string playerId, string connectionId, string? gameId = null)
     {
         lock (_lock)
         {
+            // Check if player is already in a game (reconnection scenario)
+            if (_playerToGame.TryGetValue(connectionId, out var existingGameId))
+            {
+                if (_games.TryGetValue(existingGameId, out var playerGame))
+                {
+                    playerGame.UpdatePlayerConnection(playerId, connectionId);
+                    return playerGame; // Already in this game
+                }
+            }
+            
             // If specific game ID provided, try to join that game
             if (!string.IsNullOrEmpty(gameId))
             {
                 if (_games.TryGetValue(gameId, out var existingGame))
                 {
-                    if (existingGame.AddPlayer(connectionId))
+                    // Try to join/reconnect to existing game
+                    if (existingGame.AddPlayer(playerId, connectionId))
                     {
                         _playerToGame[connectionId] = gameId;
                         return existingGame;
@@ -101,7 +112,7 @@ public class GameSessionManager : IGameSessionManager
                 
                 // Create the game with the specified ID
                 var newGame = CreateGame(gameId);
-                newGame.AddPlayer(connectionId);
+                newGame.AddPlayer(playerId, connectionId);
                 _playerToGame[connectionId] = gameId;
                 return newGame;
             }
@@ -110,7 +121,7 @@ public class GameSessionManager : IGameSessionManager
             if (_waitingGame != null && !_waitingGame.IsFull)
             {
                 var game = _waitingGame;
-                game.AddPlayer(connectionId);
+                game.AddPlayer(playerId, connectionId);
                 _playerToGame[connectionId] = game.Id;
                 
                 if (game.IsFull)
@@ -123,7 +134,7 @@ public class GameSessionManager : IGameSessionManager
             
             // Create new waiting game
             var waitingGame = CreateGame();
-            waitingGame.AddPlayer(connectionId);
+            waitingGame.AddPlayer(playerId, connectionId);
             _playerToGame[connectionId] = waitingGame.Id;
             _waitingGame = waitingGame;
             return waitingGame;

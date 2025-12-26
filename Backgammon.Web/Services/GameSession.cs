@@ -11,13 +11,15 @@ public class GameSession
 {
     public string Id { get; }
     public GameEngine Engine { get; }
-    public string? WhitePlayerId { get; private set; }
-    public string? RedPlayerId { get; private set; }
+    public string? WhitePlayerId { get; private set; }  // Persistent player ID
+    public string? RedPlayerId { get; private set; }    // Persistent player ID
+    public string? WhiteConnectionId { get; private set; }  // Current connection
+    public string? RedConnectionId { get; private set; }    // Current connection
     public DateTime CreatedAt { get; }
     public DateTime LastActivityAt { get; private set; }
     
     public bool IsFull => WhitePlayerId != null && RedPlayerId != null;
-    public bool IsStarted => IsFull && Engine.CurrentPlayer != null;
+    public bool IsStarted => IsFull && Engine.GameStarted;
     
     public GameSession(string id)
     {
@@ -30,21 +32,40 @@ public class GameSession
     /// <summary>
     /// Add a player to the game session
     /// </summary>
-    public bool AddPlayer(string connectionId)
+    public bool AddPlayer(string playerId, string connectionId)
     {
         LastActivityAt = DateTime.UtcNow;
         
+        // Check if player is already in this game (reconnection)
+        if (WhitePlayerId == playerId)
+        {
+            WhiteConnectionId = connectionId;
+            return true;
+        }
+        
+        if (RedPlayerId == playerId)
+        {
+            RedConnectionId = connectionId;
+            return true;
+        }
+        
+        // Add as new player
         if (WhitePlayerId == null)
         {
-            WhitePlayerId = connectionId;
+            WhitePlayerId = playerId;
+            WhiteConnectionId = connectionId;
             return true;
         }
         
         if (RedPlayerId == null)
         {
-            RedPlayerId = connectionId;
-            // Start game when both players joined
-            Engine.StartNewGame();
+            RedPlayerId = playerId;
+            RedConnectionId = connectionId;
+            // Start game when both players joined (only if not already started)
+            if (!Engine.GameStarted)
+            {
+                Engine.StartNewGame();
+            }
             return true;
         }
         
@@ -52,14 +73,36 @@ public class GameSession
     }
     
     /// <summary>
+    /// Update player's connection ID (for reconnection scenarios)
+    /// </summary>
+    public bool UpdatePlayerConnection(string playerId, string newConnectionId)
+    {
+        if (WhitePlayerId == playerId)
+        {
+            WhiteConnectionId = newConnectionId;
+            LastActivityAt = DateTime.UtcNow;
+            return true;
+        }
+        
+        if (RedPlayerId == playerId)
+        {
+            RedConnectionId = newConnectionId;
+            LastActivityAt = DateTime.UtcNow;
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
     /// Remove a player from the game session
     /// </summary>
     public void RemovePlayer(string connectionId)
     {
-        if (WhitePlayerId == connectionId)
-            WhitePlayerId = null;
-        if (RedPlayerId == connectionId)
-            RedPlayerId = null;
+        if (WhiteConnectionId == connectionId)
+            WhiteConnectionId = null;
+        if (RedConnectionId == connectionId)
+            RedConnectionId = null;
             
         LastActivityAt = DateTime.UtcNow;
     }
@@ -69,9 +112,9 @@ public class GameSession
     /// </summary>
     public CheckerColor? GetPlayerColor(string connectionId)
     {
-        if (connectionId == WhitePlayerId)
+        if (connectionId == WhiteConnectionId)
             return CheckerColor.White;
-        if (connectionId == RedPlayerId)
+        if (connectionId == RedConnectionId)
             return CheckerColor.Red;
         return null;
     }
@@ -88,16 +131,26 @@ public class GameSession
     /// <summary>
     /// Convert the current engine state to a DTO for clients
     /// </summary>
-    public GameState GetState()
+    /// <param name="forConnectionId">Optional connection ID to provide player-specific information</param>
+    public GameState GetState(string? forConnectionId = null)
     {
+        CheckerColor? playerColor = null;
+        if (forConnectionId != null)
+        {
+            playerColor = GetPlayerColor(forConnectionId);
+        }
+        
         var state = new GameState
         {
             GameId = Id,
             WhitePlayerId = WhitePlayerId ?? "",
             RedPlayerId = RedPlayerId ?? "",
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
+            YourColor = playerColor,
+            IsYourTurn = playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value,
             Dice = new[] { Engine.Dice.Die1, Engine.Dice.Die2 },
             RemainingMoves = Engine.RemainingMoves.ToArray(),
+            MovesMadeThisTurn = Engine.MoveHistory.Count,
             Board = GetBoardState(),
             WhiteCheckersOnBar = Engine.WhitePlayer.CheckersOnBar,
             RedCheckersOnBar = Engine.RedPlayer.CheckersOnBar,

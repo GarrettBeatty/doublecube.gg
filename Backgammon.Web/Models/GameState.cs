@@ -12,8 +12,12 @@ public class GameState
     public string WhitePlayerId { get; set; } = string.Empty;
     public string RedPlayerId { get; set; } = string.Empty;
     public CheckerColor CurrentPlayer { get; set; }
+    public CheckerColor? YourColor { get; set; }  // Added: client's assigned color
+    public bool IsYourTurn { get; set; }  // Added: convenience flag
     public int[] Dice { get; set; } = Array.Empty<int>();
+    public int[] CurrentDice => Dice;  // Added: alias for backwards compatibility
     public int[] RemainingMoves { get; set; } = Array.Empty<int>();
+    public int MovesMadeThisTurn { get; set; }  // Number of moves made during current turn
     public List<MoveDto> ValidMoves { get; set; } = new();
     public PointState[] Board { get; set; } = Array.Empty<PointState>();
     public int WhiteCheckersOnBar { get; set; }
@@ -51,4 +55,15 @@ public enum GameStatus
     WaitingForPlayer,
     InProgress,
     Completed
+}
+
+/// <summary>
+/// Player session information for tracking across reconnections
+/// </summary>
+public class PlayerSession
+{
+    public string PlayerId { get; set; } = string.Empty;  // Persistent player ID
+    public string ConnectionId { get; set; } = string.Empty;  // Current SignalR connection
+    public string? Username { get; set; }  // Optional username (for future)
+    public DateTime LastSeen { get; set; }
 }

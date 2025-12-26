@@ -3,15 +3,42 @@ let connection = null;
 let myColor = null;
 let currentGameId = null;
 let gameRefreshInterval = null;
+let currentGameState = null;
+let selectedChecker = null; // { point: number, x: number, y: number }
+let validDestinations = [];
+let myPlayerId = null;  // Persistent player ID
+
+// ==== PLAYER ID MANAGEMENT ====
+function getOrCreatePlayerId() {
+    let playerId = localStorage.getItem('backgammon_player_id');
+    if (!playerId) {
+        playerId = 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('backgammon_player_id', playerId);
+        log(`🆔 Created new player ID: ${playerId}`, 'info');
+    }
+    return playerId;
+}
 
 // ==== INITIALIZATION ====
-window.addEventListener('load', () => {
+window.addEventListener('load', async () => {
+    myPlayerId = getOrCreatePlayerId();
     showLandingPage();
-    autoConnect();
+    await autoConnect();
 });
 
 async function autoConnect() {
-    const serverUrl = document.getElementById('serverUrl').value;
+    // Fetch SignalR URL from Aspire service discovery
+    let serverUrl;
+    try {
+        const response = await fetch('/api/config');
+        const config = await response.json();
+        serverUrl = config.signalrUrl;
+        log(`📡 Using SignalR URL: ${serverUrl}`, 'info');
+    } catch (error) {
+        // Fallback to hardcoded URL if config endpoint fails
+        serverUrl = document.getElementById('serverUrl').value;
+        log(`⚠️ Using fallback URL: ${serverUrl}`, 'warning');
+    }
     
     connection = new signalR.HubConnectionBuilder()
         .withUrl(serverUrl)
@@ -25,8 +52,16 @@ async function autoConnect() {
         await connection.start();
         updateConnectionStatus(true);
         log('✅ Connected to server', 'success');
-        refreshGamesList();
-        gameRefreshInterval = setInterval(refreshGamesList, 3000);
+        
+        // Check if we should auto-rejoin a game
+        const savedGameId = localStorage.getItem('currentGameId');
+        if (savedGameId) {
+            log('🔄 Rejoining previous game...', 'info');
+            await joinGameById(savedGameId);
+        } else {
+            refreshGamesList();
+            gameRefreshInterval = setInterval(refreshGamesList, 3000);
+        }
     } catch (err) {
         updateConnectionStatus(false);
         log(`❌ Connection failed: ${err}`, 'error');
@@ -130,7 +165,8 @@ async function createGame() {
 
     try {
         currentGameId = null;
-        await connection.invoke("JoinGame", null);
+        localStorage.removeItem('currentGameId'); // Clear any old game
+        await connection.invoke("JoinGame", myPlayerId, null);
         log('🎮 Creating new game...', 'info');
         showGamePage();
     } catch (err) {
@@ -146,7 +182,8 @@ async function quickMatch() {
 
     try {
         currentGameId = null;
-        await connection.invoke("JoinGame", null);
+        localStorage.removeItem('currentGameId'); // Clear any old game
+        await connection.invoke("JoinGame", myPlayerId, null);
         log('🎯 Finding match...', 'info');
         showGamePage();
     } catch (err) {
@@ -162,7 +199,7 @@ async function joinGameById(gameId) {
 
     try {
         currentGameId = gameId;
-        await connection.invoke("JoinGame", gameId);
+        await connection.invoke("JoinGame", myPlayerId, gameId);
         log(`🎮 Joining game: ${gameId}`, 'info');
         showGamePage();
     } catch (err) {
@@ -178,6 +215,7 @@ async function leaveGameAndReturn() {
         log('👋 Left game', 'info');
         currentGameId = null;
         myColor = null;
+        localStorage.removeItem('currentGameId'); // Clear saved game
         resetGameUI();
         showLandingPage();
     } catch (err) {
@@ -192,6 +230,30 @@ async function rollDice() {
         log('🎲 Rolling dice...', 'info');
     } catch (err) {
         log(`❌ Failed to roll dice: ${err}`, 'error');
+    }
+}
+
+async function undoMove() {
+    try {
+        await connection.invoke("UndoMove");
+        log('↶ Undoing last move...', 'info');
+        // Clear selection state
+        selectedChecker = null;
+        validDestinations = [];
+    } catch (err) {
+        log(`❌ Failed to undo: ${err}`, 'error');
+    }
+}
+
+async function endTurn() {
+    try {
+        await connection.invoke("EndTurn");
+        log('✓ Ending turn...', 'info');
+        // Clear selection state
+        selectedChecker = null;
+        validDestinations = [];
+    } catch (err) {
+        log(`❌ Failed to end turn: ${err}`, 'error');
     }
 }
 
@@ -258,39 +320,56 @@ function clearLog() {
 // ==== GAME STATE ====
 function updateGameState(state) {
     console.log('Game State:', state);
+    currentGameState = state; // Store for click handling
 
     // Update game ID
     const gameIdEl = document.getElementById('gameIdDisplay');
     if (gameIdEl) {
         gameIdEl.textContent = state.gameId || '-';
         currentGameId = state.gameId;
+        // Save to localStorage for reconnection
+        if (state.gameId) {
+            localStorage.setItem('currentGameId', state.gameId);
+        }
     }
 
     // Update turn indicator
     const turnEl = document.getElementById('turnIndicator');
     if (turnEl) {
         const isMyTurn = state.isYourTurn;
-        turnEl.textContent = isMyTurn ? "Your Turn!" : `${state.currentPlayer}'s Turn`;
+        const currentPlayerName = state.currentPlayer === 0 ? 'White' : 'Red';
+        turnEl.textContent = isMyTurn ? "Your Turn!" : `${currentPlayerName}'s Turn`;
         turnEl.style.fontWeight = isMyTurn ? '700' : '400';
     }
 
     // Store player color
-    myColor = state.yourColor;
+    if (state.yourColor !== null && state.yourColor !== undefined) {
+        myColor = state.yourColor === 0 ? 'White' : 'Red';
+        console.log('My color:', myColor);
+    }
 
     // Update player badges
     const whiteBadge = document.getElementById('whitePlayerBadge');
     const redBadge = document.getElementById('redPlayerBadge');
     if (whiteBadge && redBadge) {
-        whiteBadge.classList.toggle('active', state.currentPlayer === 'White');
-        redBadge.classList.toggle('active', state.currentPlayer === 'Red');
+        // currentPlayer is 0 for White, 1 for Red
+        whiteBadge.classList.toggle('active', state.currentPlayer === 0);
+        redBadge.classList.toggle('active', state.currentPlayer === 1);
     }
 
-    // Update dice
+    // Update dice (use currentDice alias if available, otherwise dice)
+    const diceData = state.currentDice || state.dice;
     const diceDisplay = document.getElementById('diceDisplay');
-    if (diceDisplay && state.currentDice && state.currentDice.length > 0) {
-        diceDisplay.innerHTML = state.currentDice
-            .map(die => `<div class="die">${die}</div>`)
-            .join('');
+    if (diceDisplay && diceData && diceData.length > 0) {
+        // Show - for unrolled dice (0 values)
+        const hasRolled = diceData.some(die => die > 0);
+        if (hasRolled) {
+            diceDisplay.innerHTML = diceData
+                .map(die => `<div class="die">${die}</div>`)
+                .join('');
+        } else {
+            diceDisplay.innerHTML = '<div class="die">-</div><div class="die">-</div>';
+        }
     }
 
     // Update remaining moves
@@ -308,19 +387,51 @@ function updateGameState(state) {
     // Render board
     if (state.board) {
         renderBoard(state);
+        setupBoardClickHandler(); // Enable click interactions
     }
 
     // Update controls
+    const isMyTurn = state.isYourTurn;
+    const hasRemainingMoves = state.remainingMoves && state.remainingMoves.length > 0;
+    const hasDice = state.dice && state.dice.length > 0 && (state.dice[0] > 0 || state.dice[1] > 0);
+    const movesMade = state.movesMadeThisTurn || 0;
+    
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
-        const isMyTurn = state.isYourTurn;
-        const hasRemainingMoves = state.remainingMoves && state.remainingMoves.length > 0;
-        rollBtn.disabled = !isMyTurn || hasRemainingMoves;
+        // Can only roll at the START of your turn (no dice rolled yet)
+        // Once you roll, you must end turn before rolling again
+        rollBtn.disabled = !isMyTurn || hasDice;
+    }
+    
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        // Can undo only if you've made at least one move this turn
+        // Check movesMadeThisTurn or fallback to comparing dice vs remaining
+        const movesMadeFromState = state.movesMadeThisTurn || 0;
+        const totalDice = state.dice && state.dice[0] === state.dice[1] ? 4 : 2;
+        const remainingCount = state.remainingMoves ? state.remainingMoves.length : 0;
+        const movesMadeFromDice = hasDice ? (totalDice - remainingCount) : 0;
+        const actualMovesMade = Math.max(movesMadeFromState, movesMadeFromDice);
+        
+        const canUndo = isMyTurn && (actualMovesMade > 0);
+        undoBtn.disabled = !canUndo;
+    }
+    
+    const endTurnBtn = document.getElementById('endTurnBtn');
+    if (endTurnBtn) {
+        // Can end turn only if:
+        // 1. You've rolled dice (hasDice is true), AND
+        // 2. All moves are made (no remaining moves), OR no valid moves are possible
+        const allMovesMade = !hasRemainingMoves;
+        const noValidMoves = !state.validMoves || state.validMoves.length === 0;
+        const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
+        endTurnBtn.disabled = !canEndTurn;
     }
 
     // Check for winner
     if (state.winner) {
         log(`🏆 Game Over! ${state.winner} wins!`, 'success');
+        localStorage.removeItem('currentGameId'); // Clear completed game
         setTimeout(() => {
             if (confirm(`Game Over! ${state.winner} wins! Return to lobby?`)) {
                 leaveGameAndReturn();
@@ -348,13 +459,23 @@ function resetGameUI() {
     }
 
     const rollBtn = document.getElementById('rollBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const endTurnBtn = document.getElementById('endTurnBtn');
+    
     if (rollBtn) rollBtn.disabled = true;
+    if (undoBtn) undoBtn.disabled = true;
+    if (endTurnBtn) endTurnBtn.disabled = true;
 }
 
 // ==== BOARD RENDERING ====
 function renderBoard(state) {
     const canvas = document.getElementById('boardCanvas');
     const placeholder = document.getElementById('boardPlaceholder');
+    
+    if (!canvas || !placeholder) {
+        console.error('Canvas or placeholder element not found');
+        return;
+    }
     
     if (!state.board || state.board.length === 0) {
         placeholder.style.display = 'block';
@@ -370,9 +491,18 @@ function renderBoard(state) {
     placeholder.style.display = 'none';
     canvas.style.display = 'block';
     
-    // Set canvas size
+    // Set canvas size - wait for layout if needed
     const containerWidth = canvas.parentElement.clientWidth;
     const containerHeight = canvas.parentElement.clientHeight;
+    
+    if (!containerWidth || !containerHeight || containerWidth <= 0 || containerHeight <= 0) {
+        console.warn('Container not ready, waiting for layout...', { containerWidth, containerHeight });
+        // Wait for next animation frame and try again
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => renderBoard(state));
+        });
+        return;
+    }
     const aspectRatio = 2;
     
     let width, height;
@@ -465,6 +595,119 @@ function renderBoard(state) {
         ctx.fillText(pointNum, x + pointWidth / 2, y + (direction * pointHeight * 0.2));
     }
     
+    // Highlight valid source points (checkers that can be moved)
+    if (state.isYourTurn && state.remainingMoves && state.remainingMoves.length > 0 && !selectedChecker) {
+        const validSources = new Set(state.validMoves.map(m => m.from));
+        
+        validSources.forEach(pointNum => {
+            if (pointNum === 0) return; // Bar handled separately
+            
+            const isTop = pointNum >= 13;
+            let positionIndex;
+            
+            if (isTop) {
+                if (pointNum >= 13 && pointNum <= 18) {
+                    positionIndex = pointNum - 13;
+                } else {
+                    positionIndex = pointNum - 19 + 6;
+                }
+            } else {
+                if (pointNum >= 7 && pointNum <= 12) {
+                    positionIndex = 12 - pointNum;
+                } else {
+                    positionIndex = 6 - pointNum + 6;
+                }
+            }
+            
+            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
+            const y = isTop ? padding : height - padding;
+            const direction = isTop ? 1 : -1;
+            
+            // Draw glow around valid checker
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + pointWidth, y);
+            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
+            ctx.closePath();
+            ctx.fill();
+        });
+    }
+    
+    // Highlight selected checker
+    if (selectedChecker !== null) {
+        const pointNum = selectedChecker.point;
+        if (pointNum !== 0) {
+            const isTop = pointNum >= 13;
+            let positionIndex;
+            
+            if (isTop) {
+                if (pointNum >= 13 && pointNum <= 18) {
+                    positionIndex = pointNum - 13;
+                } else {
+                    positionIndex = pointNum - 19 + 6;
+                }
+            } else {
+                if (pointNum >= 7 && pointNum <= 12) {
+                    positionIndex = 12 - pointNum;
+                } else {
+                    positionIndex = 6 - pointNum + 6;
+                }
+            }
+            
+            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
+            const y = isTop ? padding : height - padding;
+            const direction = isTop ? 1 : -1;
+            
+            // Draw bright highlight for selected
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + pointWidth, y);
+            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
+            ctx.closePath();
+            ctx.fill();
+        }
+    }
+    
+    // Highlight valid destinations
+    if (validDestinations.length > 0) {
+        validDestinations.forEach(move => {
+            const pointNum = move.to;
+            if (pointNum === 0 || pointNum === 25) return; // Skip bar/bear-off for now
+            
+            const isTop = pointNum >= 13;
+            let positionIndex;
+            
+            if (isTop) {
+                if (pointNum >= 13 && pointNum <= 18) {
+                    positionIndex = pointNum - 13;
+                } else {
+                    positionIndex = pointNum - 19 + 6;
+                }
+            } else {
+                if (pointNum >= 7 && pointNum <= 12) {
+                    positionIndex = 12 - pointNum;
+                } else {
+                    positionIndex = 6 - pointNum + 6;
+                }
+            }
+            
+            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
+            const y = isTop ? padding : height - padding;
+            const direction = isTop ? 1 : -1;
+            
+            // Draw blue highlight for valid destinations
+            ctx.fillStyle = move.isHit ? 'rgba(255, 0, 0, 0.4)' : 'rgba(0, 150, 255, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + pointWidth, y);
+            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
+            ctx.closePath();
+            ctx.fill();
+        });
+    }
+    
     // Draw checkers on points
     state.board.forEach(point => {
         if (point.count > 0 && point.position >= 1 && point.position <= 24) {
@@ -534,6 +777,12 @@ function renderBoard(state) {
 }
 
 function drawChecker(ctx, x, y, radius, color) {
+    // Validate inputs to prevent NaN errors
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(radius) || radius <= 0) {
+        console.error('Invalid checker parameters:', { x, y, radius });
+        return;
+    }
+    
     // Outer circle (shadow)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
@@ -601,4 +850,157 @@ function drawBornOff(ctx, x, y, radius, color, count) {
         ctx.textBaseline = 'middle';
         ctx.fillText(count, x, y);
     }
+}
+
+// ==== INTERACTIVE BOARD ====
+let boardClickHandlerSetup = false;
+
+function setupBoardClickHandler() {
+    const canvas = document.getElementById('boardCanvas');
+    if (!canvas || boardClickHandlerSetup) return;
+    
+    canvas.addEventListener('click', handleBoardClick);
+    boardClickHandlerSetup = true;
+}
+
+async function handleBoardClick(event) {
+    if (!currentGameState || !currentGameState.isYourTurn) return;
+    if (currentGameState.remainingMoves.length === 0) return;
+    
+    const canvas = event.target;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    
+    // Scale to canvas coordinates
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const canvasX = x * scaleX;
+    const canvasY = y * scaleY;
+    
+    const clickedPoint = getPointAtPosition(canvasX, canvasY, canvas.width, canvas.height);
+    
+    if (clickedPoint === null) {
+        // Clicked outside any point - deselect
+        selectedChecker = null;
+        validDestinations = [];
+        renderBoard(currentGameState);
+        return;
+    }
+    
+    // If we have a selection and clicked a valid destination
+    if (selectedChecker !== null && validDestinations.some(m => m.to === clickedPoint)) {
+        await executeMove(selectedChecker.point, clickedPoint);
+        selectedChecker = null;
+        validDestinations = [];
+        return;
+    }
+    
+    // Try to select this checker
+    await selectChecker(clickedPoint);
+}
+
+async function selectChecker(point) {
+    try {
+        // Check if this point has our checkers
+        const pointData = currentGameState.board.find(p => p.position === point);
+        const myColorValue = myColor === 'White' ? 0 : 1;
+        
+        // Special case: check bar
+        if (point === 0) {
+            const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+            if (onBar === 0) {
+                selectedChecker = null;
+                validDestinations = [];
+                renderBoard(currentGameState);
+                return;
+            }
+        } else if (!pointData || pointData.color !== myColorValue || pointData.count === 0) {
+            selectedChecker = null;
+            validDestinations = [];
+            renderBoard(currentGameState);
+            return;
+        }
+        
+        // Get valid destinations from this point
+        const destinations = await connection.invoke("GetValidDestinations", point);
+        
+        if (destinations.length === 0) {
+            log(`No valid moves from point ${point}`, 'info');
+            selectedChecker = null;
+            validDestinations = [];
+            renderBoard(currentGameState);
+            return;
+        }
+        
+        selectedChecker = { point };
+        validDestinations = destinations;
+        log(`Selected checker at point ${point}, ${destinations.length} valid move(s)`, 'info');
+        renderBoard(currentGameState);
+    } catch (err) {
+        console.error('Error selecting checker:', err);
+    }
+}
+
+async function executeMove(from, to) {
+    try {
+        await connection.invoke("MakeMove", from, to);
+        log(`Moved checker from ${from} to ${to}`, 'success');
+    } catch (err) {
+        log(`Failed to move: ${err}`, 'error');
+    }
+}
+
+function getPointAtPosition(x, y, canvasWidth, canvasHeight) {
+    const barWidth = canvasWidth * 0.08;
+    const sideMargin = canvasWidth * 0.03;
+    const playableWidth = canvasWidth - (2 * sideMargin) - barWidth;
+    const pointWidth = playableWidth / 12;
+    const pointHeight = canvasHeight * 0.42;
+    const padding = canvasHeight * 0.03;
+    const barX = sideMargin + (6 * pointWidth);
+    
+    // Check if in bar area
+    if (x >= barX && x <= barX + barWidth) {
+        const myColorValue = myColor === 'White' ? 0 : 1;
+        const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+        if (onBar > 0) {
+            return 0; // Bar point
+        }
+        return null;
+    }
+    
+    // Check top points (13-24)
+    if (y >= padding && y <= padding + pointHeight) {
+        let posIndex = -1;
+        if (x >= sideMargin && x < sideMargin + 6 * pointWidth) {
+            posIndex = Math.floor((x - sideMargin) / pointWidth);
+        } else if (x >= barX + barWidth && x < canvasWidth - sideMargin) {
+            posIndex = Math.floor((x - barX - barWidth) / pointWidth) + 6;
+        }
+        
+        if (posIndex >= 0 && posIndex < 6) {
+            return 13 + posIndex; // Points 13-18
+        } else if (posIndex >= 6 && posIndex < 12) {
+            return 19 + (posIndex - 6); // Points 19-24
+        }
+    }
+    
+    // Check bottom points (1-12)
+    if (y >= canvasHeight - padding - pointHeight && y <= canvasHeight - padding) {
+        let posIndex = -1;
+        if (x >= sideMargin && x < sideMargin + 6 * pointWidth) {
+            posIndex = Math.floor((x - sideMargin) / pointWidth);
+        } else if (x >= barX + barWidth && x < canvasWidth - sideMargin) {
+            posIndex = Math.floor((x - barX - barWidth) / pointWidth) + 6;
+        }
+        
+        if (posIndex >= 0 && posIndex < 6) {
+            return 12 - posIndex; // Points 12-7
+        } else if (posIndex >= 6 && posIndex < 12) {
+            return 6 - (posIndex - 6); // Points 6-1
+        }
+    }
+    
+    return null;
 }

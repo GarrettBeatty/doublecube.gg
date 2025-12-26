@@ -84,9 +84,17 @@
                                 </div>
                             </div>
                         </div>
-                        <button id="rollBtn" class="btn-roll" onclick="rollDice()" disabled>
-                            🎲 Roll Dice
-                        </button>
+                        <div class="action-buttons">
+                            <button id="rollBtn" class="btn-roll" onclick="rollDice()" disabled>
+                                🎲 Roll Dice
+                            </button>
+                            <button id="undoBtn" class="btn-undo" onclick="undoMove()" disabled>
+                                ↶ Undo
+                            </button>
+                            <button id="endTurnBtn" class="btn-end-turn" onclick="endTurn()" disabled>
+                                ✓ End Turn
+                            </button>
+                        </div>
                     </div>
                 </main>
 

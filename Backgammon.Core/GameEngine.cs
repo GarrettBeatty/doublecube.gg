@@ -12,6 +12,7 @@ public class GameEngine
     public Dice Dice { get; }
     public DoublingCube DoublingCube { get; }
     public List<int> RemainingMoves { get; private set; }
+    public List<Move> MoveHistory { get; private set; }
     public bool GameStarted { get; private set; }
     public bool GameOver { get; private set; }
     public Player? Winner { get; private set; }
@@ -25,6 +26,7 @@ public class GameEngine
         Dice = new Dice();
         DoublingCube = new DoublingCube();
         RemainingMoves = new List<int>();
+        MoveHistory = new List<Move>();
         GameStarted = false;
         GameOver = false;
     }
@@ -77,6 +79,7 @@ public class GameEngine
 
         Dice.Roll();
         RemainingMoves = new List<int>(Dice.GetMoves());
+        MoveHistory.Clear(); // Clear history for new turn
     }
 
     /// <summary>
@@ -133,6 +136,9 @@ public class GameEngine
 
         // Remove the used die from remaining moves
         RemainingMoves.Remove(move.DieValue);
+
+        // Track move in history
+        MoveHistory.Add(move);
 
         // Check for win condition
         if (CurrentPlayer.CheckersBornOff == 15)
@@ -298,11 +304,89 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Undo the last move made during this turn
+    /// </summary>
+    public bool UndoLastMove()
+    {
+        if (MoveHistory.Count == 0)
+            return false;
+
+        var lastMove = MoveHistory[MoveHistory.Count - 1];
+        MoveHistory.RemoveAt(MoveHistory.Count - 1);
+
+        // Determine the die value used
+        int dieValue = Math.Abs(lastMove.To - lastMove.From);
+        
+        // Special handling for bearing off with higher die
+        if (lastMove.To == 0 || lastMove.To == 25)
+        {
+            // For bear-off, use the exact die value
+            var homeBoard = CurrentPlayer.Color == CheckerColor.White ? 
+                Enumerable.Range(1, 6) : Enumerable.Range(19, 6);
+            var furthestPoint = homeBoard.Where(p => Board.GetPoint(p).Color == CurrentPlayer.Color)
+                                         .OrderBy(p => CurrentPlayer.Color == CheckerColor.White ? p : -p)
+                                         .FirstOrDefault();
+            if (furthestPoint > 0)
+            {
+                int exactDist = Math.Abs(furthestPoint - (CurrentPlayer.Color == CheckerColor.White ? 0 : 25));
+                // Find the die that was used (could be exact or higher)
+                if (Dice.Die1 >= exactDist && !RemainingMoves.Contains(Dice.Die1))
+                    dieValue = Dice.Die1;
+                else if (Dice.Die2 >= exactDist && !RemainingMoves.Contains(Dice.Die2))
+                    dieValue = Dice.Die2;
+            }
+        }
+
+        // Reverse the move on the board
+        if (lastMove.From == 0)
+        {
+            // Was entering from bar - put back on bar
+            CurrentPlayer.CheckersOnBar++;
+            var destPoint = Board.GetPoint(lastMove.To);
+            destPoint.RemoveChecker();
+        }
+        else if (lastMove.To == 0 || lastMove.To == 25)
+        {
+            // Was bearing off - put back on board
+            CurrentPlayer.CheckersBornOff--;
+            Board.GetPoint(lastMove.From).AddChecker(CurrentPlayer.Color);
+        }
+        else
+        {
+            // Regular move - reverse it
+            var fromPoint = Board.GetPoint(lastMove.From);
+            var toPoint = Board.GetPoint(lastMove.To);
+            
+            // Check if we hit an opponent (they'd be on bar now)
+            var opponent = GetOpponent();
+            if (opponent.CheckersOnBar > 0)
+            {
+                // Put opponent's checker back
+                opponent.CheckersOnBar--;
+                toPoint.AddChecker(opponent.Color);
+            }
+            
+            // Move our checker back
+            toPoint.RemoveChecker();
+            fromPoint.AddChecker(CurrentPlayer.Color);
+        }
+
+        // Restore the die to remaining moves
+        RemainingMoves.Add(dieValue);
+        RemainingMoves.Sort();
+        RemainingMoves.Reverse(); // Keep larger values first
+
+        return true;
+    }
+
+    /// <summary>
     /// End the current player's turn
     /// </summary>
     public void EndTurn()
     {
         RemainingMoves.Clear();
+        MoveHistory.Clear();
+        Dice.SetDice(0, 0); // Clear dice for next player
         CurrentPlayer = GetOpponent();
     }
 
