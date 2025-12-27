@@ -56,6 +56,31 @@ window.addEventListener('load', async () => {
         showLandingPage();
         await autoConnect();
     }
+
+    // Add Roll Dice button handler
+    const rollBtn = document.getElementById('rollBtn');
+    if (rollBtn) {
+        rollBtn.addEventListener('click', async () => {
+            rollBtn.disabled = true;
+            try {
+                await rollDice();
+            } catch (err) {
+                log(`❌ Failed to roll dice: ${err}`, 'error');
+            }
+        });
+    }
+    // Add End Turn button handler
+    const endTurnBtn = document.getElementById('endTurnBtn');
+    if (endTurnBtn) {
+        endTurnBtn.addEventListener('click', async () => {
+            endTurnBtn.disabled = true;
+            try {
+                await endTurn();
+            } catch (err) {
+                log(`❌ Failed to end turn: ${err}`, 'error');
+            }
+        });
+    }
 });
 
 // Handle browser back/forward buttons
