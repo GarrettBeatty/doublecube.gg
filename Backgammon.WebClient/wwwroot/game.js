@@ -280,6 +280,13 @@ function setupEventHandlers() {
         log(`❌ Error: ${errorMessage}`, 'error');
     });
 
+    connection.on("ReceiveChatMessage", (senderName, message, senderConnectionId) => {
+        // Determine if this message is from us
+        const isOwn = senderConnectionId === connection.connectionId;
+        const displayName = isOwn ? 'You' : senderName;
+        addChatMessage(displayName, message, isOwn);
+    });
+
     connection.onreconnecting(() => {
         updateConnectionStatus(false);
     });
@@ -308,6 +315,7 @@ function showLandingPage() {
 function showGamePage() {
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('gamePage').style.display = 'block';
+
     if (gameRefreshInterval) {
         clearInterval(gameRefreshInterval);
     }
@@ -686,18 +694,23 @@ function handleChatKeyPress(event) {
     }
 }
 
-function sendChat() {
+async function sendChat() {
     const input = document.getElementById('chatInput');
     const message = input.value.trim();
-    
+
     if (!message) return;
-    
-    // For now, just add to UI - in future would send via SignalR
-    addChatMessage('You', message, true);
+
+    // Clear input immediately for better UX
     input.value = '';
-    
-    // TODO: Implement SignalR chat message sending
-    // await connection.invoke("SendChatMessage", message);
+
+    try {
+        // Send via SignalR
+        await connection.invoke("SendChatMessage", message);
+    } catch (err) {
+        log(`Failed to send chat message: ${err}`, 'error');
+        // Optionally restore message to input on failure
+        input.value = message;
+    }
 }
 
 function addChatMessage(sender, text, isOwn) {
@@ -739,6 +752,37 @@ function clearLog() {
     if (logEl) logEl.innerHTML = '';
 }
 
+// ==== PIP COUNT CALCULATION ====
+function calculatePipCount(state, color) {
+    if (!state || !state.board) return 0;
+
+    let pips = 0;
+
+    // Count pips from checkers on board
+    state.board.forEach((point, index) => {
+        if (point.color === color && point.count > 0) {
+            const pointNum = index + 1; // board array is 0-indexed, points are 1-indexed
+
+            if (color === 0) {
+                // White moves 24→1, so distance is just the point number
+                pips += point.count * pointNum;
+            } else {
+                // Red moves 1→24, so distance is (25 - point number)
+                pips += point.count * (25 - pointNum);
+            }
+        }
+    });
+
+    // Add pips for checkers on bar (25 pips each)
+    if (color === 0) {
+        pips += (state.whiteCheckersOnBar || 0) * 25;
+    } else {
+        pips += (state.redCheckersOnBar || 0) * 25;
+    }
+
+    return pips;
+}
+
 // ==== GAME STATE ====
 function updateGameState(state, isSpectator = false) {
     console.log('Game State:', state);
@@ -753,31 +797,11 @@ function updateGameState(state, isSpectator = false) {
         document.body.classList.remove('spectator-mode');
     }
 
-    // Update game ID
-    const gameIdEl = document.getElementById('gameIdDisplay');
-    if (gameIdEl) {
-        gameIdEl.textContent = state.gameId || '-';
-        currentGameId = state.gameId;
-        // Save to localStorage for reconnection
-        if (state.gameId) {
-            localStorage.setItem('currentGameId', state.gameId);
-        }
-    }
-
-    // Update turn indicator
-    const turnEl = document.getElementById('turnIndicator');
-    if (turnEl) {
-        const isWaitingForPlayer = state.status === 0; // GameStatus.WaitingForPlayer = 0
-        const isMyTurn = state.isYourTurn;
-        const currentPlayerName = state.currentPlayer === 0 ? 'White' : 'Red';
-
-        if (isWaitingForPlayer) {
-            turnEl.textContent = "Waiting for opponent...";
-            turnEl.style.fontWeight = '400';
-        } else {
-            turnEl.textContent = isMyTurn ? "Your Turn!" : `${currentPlayerName}'s Turn`;
-            turnEl.style.fontWeight = isMyTurn ? '700' : '400';
-        }
+    // Update current game ID (no need to display it, it's in the URL)
+    currentGameId = state.gameId;
+    // Save to localStorage for reconnection
+    if (state.gameId) {
+        localStorage.setItem('currentGameId', state.gameId);
     }
 
     // Store player color
@@ -795,18 +819,42 @@ function updateGameState(state, isSpectator = false) {
         redBadge.classList.toggle('active', state.currentPlayer === 1);
     }
 
-    // Update player names next to board
+    // Update player names and IDs next to board
     const whiteNameEl = document.getElementById('whitePlayerName');
     const redNameEl = document.getElementById('redPlayerName');
+    const whiteIdEl = document.getElementById('whitePlayerId');
+    const redIdEl = document.getElementById('redPlayerId');
+
     if (whiteNameEl) {
         const isYou = state.yourColor === 0; // White = 0
         const name = state.whitePlayerName || state.WhitePlayerName || 'White Player';
         whiteNameEl.textContent = name + (isYou ? ' (You)' : '');
     }
+    if (whiteIdEl) {
+        const whiteId = state.whitePlayerId || state.WhitePlayerId || '-';
+        whiteIdEl.textContent = whiteId;
+    }
+
     if (redNameEl) {
         const isYou = state.yourColor === 1; // Red = 1
         const name = state.redPlayerName || state.RedPlayerName || 'Red Player';
         redNameEl.textContent = name + (isYou ? ' (You)' : '');
+    }
+    if (redIdEl) {
+        const redId = state.redPlayerId || state.RedPlayerId || '-';
+        redIdEl.textContent = redId;
+    }
+
+    // Update pip counts (prefer server values, fall back to client calculation)
+    const whitePipEl = document.getElementById('whitePipCount');
+    const redPipEl = document.getElementById('redPipCount');
+    if (whitePipEl) {
+        const pipCount = state.whitePipCount ?? state.WhitePipCount ?? calculatePipCount(state, 0);
+        whitePipEl.textContent = `Pips: ${pipCount}`;
+    }
+    if (redPipEl) {
+        const pipCount = state.redPipCount ?? state.RedPipCount ?? calculatePipCount(state, 1);
+        redPipEl.textContent = `Pips: ${pipCount}`;
     }
 
     // Dice are now rendered on the board via BoardSVG.renderDice()
@@ -887,13 +935,9 @@ function updateGameState(state, isSpectator = false) {
 }
 
 function resetGameUI() {
-    const gameIdEl = document.getElementById('gameIdDisplay');
-    const turnEl = document.getElementById('turnIndicator');
     const boardSvg = document.getElementById('boardSvg');
     const placeholder = document.getElementById('boardPlaceholder');
 
-    if (gameIdEl) gameIdEl.textContent = '-';
-    if (turnEl) turnEl.textContent = '-';
     if (boardSvg) boardSvg.style.display = 'none';
     if (placeholder) {
         placeholder.style.display = 'block';

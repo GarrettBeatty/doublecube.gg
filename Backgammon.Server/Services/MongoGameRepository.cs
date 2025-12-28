@@ -95,6 +95,14 @@ public class MongoGameRepository : IGameRepository
         {
             game.LastUpdatedAt = DateTime.UtcNow;
 
+            // Check if document already exists to preserve MongoDB _id
+            var existingGame = await GetGameByGameIdAsync(game.GameId);
+            if (existingGame != null)
+            {
+                // Preserve the MongoDB _id from existing document
+                game.Id = existingGame.Id;
+            }
+
             var filter = Builders<Game>.Filter.Eq(g => g.GameId, game.GameId);
             var options = new ReplaceOptions { IsUpsert = true };
 

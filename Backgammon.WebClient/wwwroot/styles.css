@@ -239,9 +239,10 @@ body.spectator-mode .btn-roll {
     justify-content: center;
     position: relative;
     min-height: 0;
-    gap: 2vw;
-    width: 80vw;
+    gap: 8px;
+    width: min(80vw, 100%);
     max-width: 80vw;
+    max-height: calc(100vh - 72px - 20px); /* Fit within viewport minus header and padding */
 }
 
 .board-canvas {
@@ -339,6 +340,16 @@ body.spectator-mode .btn-roll {
     gap: 12px;
     min-width: 150px;
     justify-content: center;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+/* Highlight active player's turn */
+.player-name-label.active {
+    background: rgba(76, 175, 80, 0.3);
+    border: 2px solid rgba(76, 175, 80, 0.8);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
+    animation: subtle-pulse 2s infinite;
 }
 
 .player-name-label span {
@@ -396,6 +407,7 @@ body.spectator-mode .btn-roll {
     .board-wrapper-game {
         width: 95vw;
         max-width: 95vw;
+        padding-bottom: 140px; /* Space for fixed controls */
     }
 
     .board-canvas,
@@ -407,6 +419,20 @@ body.spectator-mode .btn-roll {
         min-width: 40px;
         min-height: 40px;
     }
+
+    /* Sticky controls at bottom on mobile */
+    .game-controls-modern {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        margin-top: 0;
+        border-radius: 12px 12px 0 0;
+        z-index: 100;
+        max-height: 120px;
+        overflow-y: auto;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+    }
 }
 
 /* ===== SVG BOARD STYLES ===== */
@@ -414,9 +440,9 @@ body.spectator-mode .btn-roll {
 /* SVG Board container */
 .board-svg {
     width: 100%;
-    height: calc(80vw * 0.5);
-    max-width: 80vw;
-    max-height: 80vh;
+    height: auto;
+    max-width: min(80vw, 1200px);
+    max-height: min(calc(80vw * 0.5), calc(100vh - 350px)); /* Leave room for header, player names, controls */
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     cursor: pointer;

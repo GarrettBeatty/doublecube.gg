@@ -227,6 +227,8 @@ public class GameSession
             RedCheckersOnBar = Engine.RedPlayer.CheckersOnBar,
             WhiteBornOff = Engine.WhitePlayer.CheckersBornOff,
             RedBornOff = Engine.RedPlayer.CheckersBornOff,
+            WhitePipCount = CalculatePipCount(CheckerColor.White),
+            RedPipCount = CalculatePipCount(CheckerColor.Red),
             Status = IsFull ? (Engine.Winner != null ? GameStatus.Completed : GameStatus.InProgress) : GameStatus.WaitingForPlayer,
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
@@ -285,10 +287,50 @@ public class GameSession
         var targetPoint = Engine.Board.GetPoint(move.To);
         if (targetPoint.Color == null || targetPoint.Count == 0)
             return false;
-            
+
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
     }
-    
+
+    /// <summary>
+    /// Calculate pip count for a specific color.
+    /// Pip count is the total distance all checkers need to travel to bear off.
+    /// </summary>
+    private int CalculatePipCount(CheckerColor color)
+    {
+        int pips = 0;
+
+        // Count pips from checkers on board points
+        for (int pointNum = 1; pointNum <= 24; pointNum++)
+        {
+            var point = Engine.Board.GetPoint(pointNum);
+            if (point.Color == color && point.Count > 0)
+            {
+                if (color == CheckerColor.White)
+                {
+                    // White moves 24→1, so distance is just the point number
+                    pips += point.Count * pointNum;
+                }
+                else
+                {
+                    // Red moves 1→24, so distance is (25 - point number)
+                    pips += point.Count * (25 - pointNum);
+                }
+            }
+        }
+
+        // Add pips for checkers on bar (25 pips each)
+        if (color == CheckerColor.White)
+        {
+            pips += Engine.WhitePlayer.CheckersOnBar * 25;
+        }
+        else
+        {
+            pips += Engine.RedPlayer.CheckersOnBar * 25;
+        }
+
+        return pips;
+    }
+
     public void UpdateActivity()
     {
         LastActivityAt = DateTime.UtcNow;

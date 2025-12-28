@@ -792,6 +792,48 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Send a chat message to all players in the game
+    /// </summary>
+    public async Task SendChatMessage(string message)
+    {
+        try
+        {
+            // Validate message is not empty
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
+            // Get the game session
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            // Determine sender's color and name
+            var senderColor = session.GetPlayerColor(Context.ConnectionId);
+            if (senderColor == null)
+                return;
+
+            var senderName = senderColor == CheckerColor.White
+                ? (session.WhitePlayerName ?? "White")
+                : (session.RedPlayerName ?? "Red");
+
+            // Broadcast to all players in the game
+            await Clients.Group(session.Id).SendAsync("ReceiveChatMessage",
+                senderName, message, Context.ConnectionId);
+
+            _logger.LogInformation("Chat message from {Sender} in game {GameId}",
+                senderName, session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending chat message");
+            await Clients.Caller.SendAsync("Error", "Failed to send message");
+        }
+    }
+
+    /// <summary>
     /// Leave current game
     /// </summary>
     public async Task LeaveGame()

@@ -26,6 +26,8 @@ public class GameState
     public int RedCheckersOnBar { get; set; }
     public int WhiteBornOff { get; set; }
     public int RedBornOff { get; set; }
+    public int WhitePipCount { get; set; }
+    public int RedPipCount { get; set; }
     public GameStatus Status { get; set; }
     public CheckerColor? Winner { get; set; }
     public string? WinType { get; set; }

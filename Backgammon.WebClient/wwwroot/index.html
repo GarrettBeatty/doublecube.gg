@@ -96,15 +96,15 @@
                 <div class="game-container" style="min-height: calc(100vh - 72px); justify-content:center;align-items:center;">
                     <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
                         <div class="board-wrapper-game" style="gap:8px;">
-                            <!-- Game Info Bar -->
-                            <div class="game-info-bar">
-                                <div class="info-item">
-                                    <span class="text-sm opacity-70">Turn:</span>
-                                    <span id="turnIndicator" class="font-bold">Waiting...</span>
-                                </div>
-                                <div class="info-item">
-                                    <span class="text-sm opacity-70">Game:</span>
-                                    <span id="gameIdDisplay" class="font-mono text-xs">-</span>
+                            <!-- Red Player (Top) -->
+                            <div class="player-name-top">
+                                <div class="player-name-label" id="redPlayerBadge">
+                                    <span class="player-color-indicator red">🔴</span>
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                        <span id="redPlayerName">Red Player</span>
+                                        <span id="redPlayerId" style="font-size: 0.75em; opacity: 0.7; font-family: monospace;">-</span>
+                                        <span id="redPipCount" style="font-size: 0.75em; opacity: 0.8;">Pips: -</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -113,6 +113,18 @@
                             <div id="boardPlaceholder" class="board-placeholder">
                                 <div class="loading loading-spinner loading-lg text-primary"></div>
                                 <p class="mt-4">Waiting for game to start...</p>
+                            </div>
+
+                            <!-- White Player (Bottom) -->
+                            <div class="player-name-bottom">
+                                <div class="player-name-label" id="whitePlayerBadge">
+                                    <span class="player-color-indicator white">⚪</span>
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                        <span id="whitePlayerName">White Player</span>
+                                        <span id="whitePlayerId" style="font-size: 0.75em; opacity: 0.7; font-family: monospace;">-</span>
+                                        <span id="whitePipCount" style="font-size: 0.75em; opacity: 0.8;">Pips: -</span>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Modern Game Controls -->
