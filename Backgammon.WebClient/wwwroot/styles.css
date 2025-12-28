@@ -198,7 +198,8 @@ body.spectator-mode .btn-roll {
         max-width: 95vw;
     }
 
-    .board-canvas {
+    .board-canvas,
+    .board-svg {
         max-width: 95vw;
     }
 
@@ -206,4 +207,211 @@ body.spectator-mode .btn-roll {
         min-width: 40px;
         min-height: 40px;
     }
+}
+
+/* ===== SVG BOARD STYLES ===== */
+
+/* SVG Board container */
+.board-svg {
+    width: 100%;
+    height: calc(80vw * 0.5);
+    max-width: 80vw;
+    max-height: 80vh;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    display: block;
+    background: #4A3728;
+}
+
+/* Board background */
+.board-background {
+    fill: #4A3728;
+}
+
+.board-border {
+    stroke: #2D1F15;
+}
+
+/* Point triangles - flat design */
+.point-triangle {
+    transition: filter 0.15s ease;
+}
+
+.point-triangle.point-light {
+    fill: #D4C4B0;
+}
+
+.point-triangle.point-dark {
+    fill: #8B7355;
+}
+
+.point:hover .point-triangle {
+    filter: brightness(1.1);
+}
+
+/* Point highlights */
+.point-highlight {
+    fill: transparent;
+    opacity: 0;
+    transition: opacity 0.2s ease, fill 0.2s ease;
+    pointer-events: none;
+}
+
+.point.valid-source .point-highlight {
+    fill: rgba(255, 213, 79, 0.5);
+    opacity: 1;
+}
+
+.point.selected .point-highlight {
+    fill: rgba(76, 175, 80, 0.6);
+    opacity: 1;
+}
+
+.point.valid-destination .point-highlight {
+    fill: rgba(33, 150, 243, 0.5);
+    opacity: 1;
+}
+
+.point.valid-destination.capture .point-highlight {
+    fill: rgba(244, 67, 54, 0.5);
+    opacity: 1;
+}
+
+/* Bar styling */
+.bar-background {
+    fill: #3D2E22;
+}
+
+#bar.valid-source .bar-background {
+    fill: rgba(255, 213, 79, 0.4);
+}
+
+#bar.selected .bar-background {
+    fill: rgba(76, 175, 80, 0.5);
+}
+
+/* Bear-off styling */
+.bearoff-background {
+    fill: #3D2E22;
+}
+
+.bearoff-divider {
+    stroke: #5D4037;
+    stroke-width: 2;
+}
+
+#bearoff.valid-destination .bearoff-background {
+    fill: rgba(33, 150, 243, 0.4);
+}
+
+/* Checker styling - flat modern design */
+.checker {
+    transition: transform 0.15s ease, filter 0.15s ease;
+    cursor: pointer;
+}
+
+.checker-white {
+    fill: #F5F5F5;
+    stroke: #BDBDBD;
+    stroke-width: 2;
+}
+
+.checker-red {
+    fill: #D32F2F;
+    stroke: #B71C1C;
+    stroke-width: 2;
+}
+
+/* Checker hover effect */
+.checker:hover {
+    filter: brightness(1.15);
+    transform: scale(1.05);
+}
+
+/* Checker selection highlight */
+.checker.selected {
+    filter: drop-shadow(0 0 12px rgba(76, 175, 80, 0.9));
+    stroke: #4CAF50;
+    stroke-width: 3;
+}
+
+/* Checker count text */
+.checker-count {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    pointer-events: none;
+}
+
+.checker-count.count-dark {
+    fill: #37474F;
+}
+
+.checker-count.count-light {
+    fill: #FFFFFF;
+}
+
+/* Bear-off count */
+.bearoff-count {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    fill: #FFFFFF;
+}
+
+/* Animation for moving pieces */
+.checker.animating {
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Point number labels (optional, for debugging) */
+.point-label {
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 10px;
+    fill: rgba(255, 255, 255, 0.3);
+    text-anchor: middle;
+    pointer-events: none;
+}
+
+/* Smooth transitions for all highlights */
+.point, #bar, #bearoff {
+    transition: all 0.2s ease;
+}
+
+/* ===== SVG DICE ON BOARD ===== */
+
+.board-die {
+    transition: opacity 0.3s ease;
+}
+
+.die-face {
+    fill: #FFFFFF;
+    stroke: #5C6BC0;
+    stroke-width: 3;
+    filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
+    transition: fill 0.3s ease, stroke 0.3s ease, opacity 0.3s ease;
+}
+
+.die-value {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    fill: #5C6BC0;
+    transition: fill 0.3s ease;
+}
+
+/* Used die state - greyed out with reduced opacity */
+.board-die.used {
+    opacity: 0.4;
+}
+
+.board-die.used .die-face {
+    fill: #E0E0E0;
+    stroke: #9E9E9E;
+}
+
+.board-die.used .die-value {
+    fill: #757575;
 }

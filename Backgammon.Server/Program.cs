@@ -89,6 +89,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Load active games from database on startup (restore from previous session)
+Console.WriteLine("=== Loading active games from database ===");
+var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
+var gameRepository = app.Services.GetRequiredService<IGameRepository>();
+await sessionManager.LoadActiveGamesAsync(gameRepository);
+Console.WriteLine("=== Game loading complete ===\n");
+
 // MUST be first - CORS middleware needs to run before Aspire endpoints
 app.UseCors("AllowAll");
 
@@ -172,8 +179,8 @@ app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSession
 // Database statistics endpoint
 app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
 {
-    var totalGames = await gameRepository.GetTotalGameCountAsync();
-    var recentGames = await gameRepository.GetRecentGamesAsync(5);
+    var totalGames = await gameRepository.GetTotalGameCountAsync("Completed");
+    var recentGames = await gameRepository.GetRecentGamesAsync("Completed", 5);
 
     return new
     {
@@ -193,7 +200,7 @@ app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
 // Player game history endpoint
 app.MapGet("/api/player/{playerId}/games", async (string playerId, IGameRepository gameRepository, int limit = 20, int skip = 0) =>
 {
-    var games = await gameRepository.GetPlayerGamesAsync(playerId, limit, skip);
+    var games = await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip);
     return games;
 }).RequireCors("AllowAll");
 
@@ -207,7 +214,7 @@ app.MapGet("/api/player/{playerId}/stats", async (string playerId, IGameReposito
 // Get specific game by ID
 app.MapGet("/api/game/{gameId}", async (string gameId, IGameRepository gameRepository) =>
 {
-    var game = await gameRepository.GetGameByIdAsync(gameId);
+    var game = await gameRepository.GetGameByGameIdAsync(gameId);
     if (game == null)
         return Results.NotFound(new { error = "Game not found" });
 
@@ -396,7 +403,30 @@ var cleanupTask = Task.Run(async () =>
     while (true)
     {
         await Task.Delay(TimeSpan.FromMinutes(5));
+
         var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
+        var gameRepository = app.Services.GetRequiredService<IGameRepository>();
+
+        // Get all games before cleanup to identify abandoned ones
+        var allGames = sessionManager.GetAllGames();
+        var cutoff = DateTime.UtcNow - TimeSpan.FromHours(1);
+        var inactiveGames = allGames.Where(g => g.LastActivityAt < cutoff && g.Engine.Winner == null).ToList();
+
+        // Mark abandoned games in database
+        foreach (var abandonedGame in inactiveGames)
+        {
+            try
+            {
+                await gameRepository.UpdateGameStatusAsync(abandonedGame.Id, "Abandoned");
+                Console.WriteLine($"[Cleanup] Marked game {abandonedGame.Id} as Abandoned");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Cleanup] Failed to mark game {abandonedGame.Id} as abandoned: {ex.Message}");
+            }
+        }
+
+        // Clean up from memory
         sessionManager.CleanupInactiveGames(TimeSpan.FromHours(1));
     }
 });

@@ -600,32 +600,8 @@ function updateGameState(state, isSpectator = false) {
         redNameEl.textContent = name + (isYou ? ' (You)' : '');
     }
 
-    // Update dice (use currentDice alias if available, otherwise dice)
-    const diceData = state.currentDice || state.dice;
-    const diceDisplay = document.getElementById('diceDisplay');
-    if (diceDisplay && diceData && diceData.length > 0) {
-        // Show - for unrolled dice (0 values)
-        const hasRolled = diceData.some(die => die > 0);
-        if (hasRolled) {
-            diceDisplay.innerHTML = diceData
-                .map(die => `<div class="die">${die}</div>`)
-                .join('');
-        } else {
-            diceDisplay.innerHTML = '<div class="die">-</div><div class="die">-</div>';
-        }
-    }
-
-    // Update remaining moves
-    const remainingMovesDisplay = document.getElementById('remainingMoves');
-    if (remainingMovesDisplay) {
-        if (state.remainingMoves && state.remainingMoves.length > 0) {
-            remainingMovesDisplay.innerHTML = state.remainingMoves
-                .map(move => `<div class="die">${move}</div>`)
-                .join('');
-        } else {
-            remainingMovesDisplay.innerHTML = '<div class="die">-</div>';
-        }
-    }
+    // Dice are now rendered on the board via BoardSVG.renderDice()
+    // (called from renderBoard)
 
     // Render board
     if (state.board) {
@@ -688,16 +664,12 @@ function updateGameState(state, isSpectator = false) {
 function resetGameUI() {
     const gameIdEl = document.getElementById('gameIdDisplay');
     const turnEl = document.getElementById('turnIndicator');
-    const diceDisplay = document.getElementById('diceDisplay');
-    const remainingMovesDisplay = document.getElementById('remainingMoves');
-    const canvas = document.getElementById('boardCanvas');
+    const boardSvg = document.getElementById('boardSvg');
     const placeholder = document.getElementById('boardPlaceholder');
 
     if (gameIdEl) gameIdEl.textContent = '-';
     if (turnEl) turnEl.textContent = '-';
-    if (diceDisplay) diceDisplay.innerHTML = '<div class="die">?</div>';
-    if (remainingMovesDisplay) remainingMovesDisplay.innerHTML = '<div class="die">-</div>';
-    if (canvas) canvas.style.display = 'none';
+    if (boardSvg) boardSvg.style.display = 'none';
     if (placeholder) {
         placeholder.style.display = 'block';
         placeholder.textContent = 'Waiting for game to start...';
@@ -706,7 +678,7 @@ function resetGameUI() {
     const rollBtn = document.getElementById('rollBtn');
     const undoBtn = document.getElementById('undoBtn');
     const endTurnBtn = document.getElementById('endTurnBtn');
-    
+
     if (rollBtn) rollBtn.disabled = true;
     if (undoBtn) undoBtn.disabled = true;
     if (endTurnBtn) endTurnBtn.disabled = true;
@@ -714,311 +686,44 @@ function resetGameUI() {
 
 // ==== BOARD RENDERING ====
 function renderBoard(state) {
-    const canvas = document.getElementById('boardCanvas');
+    const boardSvg = document.getElementById('boardSvg');
     const placeholder = document.getElementById('boardPlaceholder');
-    
-    if (!canvas || !placeholder) {
-        console.error('Canvas or placeholder element not found');
+
+    if (!boardSvg || !placeholder) {
+        console.error('SVG board or placeholder element not found');
         return;
     }
-    
+
     if (!state.board || state.board.length === 0) {
         placeholder.style.display = 'block';
-        canvas.style.display = 'none';
+        boardSvg.style.display = 'none';
         return;
     }
-    
-    // Debug: log board state
-    console.log('Board data:', state.board);
-    console.log('White on bar:', state.whiteCheckersOnBar, 'Red on bar:', state.redCheckersOnBar);
-    console.log('White born off:', state.whiteBornOff, 'Red born off:', state.redBornOff);
-    
+
     placeholder.style.display = 'none';
-    canvas.style.display = 'block';
-    
-    // Set canvas size - wait for layout if needed
-    const containerWidth = canvas.parentElement.clientWidth;
-    const containerHeight = canvas.parentElement.clientHeight;
-    
-    if (!containerWidth || !containerHeight || containerWidth <= 0 || containerHeight <= 0) {
-        console.warn('Container not ready, waiting for layout...', { containerWidth, containerHeight });
-        // Wait for next animation frame and try again
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => renderBoard(state));
-        });
-        return;
+    boardSvg.style.display = 'block';
+
+    // Initialize SVG board if not already done
+    if (!BoardSVG.isInitialized()) {
+        BoardSVG.init('boardSvg');
     }
-    const aspectRatio = 2;
-    
-    let width, height;
-    if (containerWidth / containerHeight > aspectRatio) {
-        height = containerHeight;
-        width = height * aspectRatio;
-    } else {
-        width = containerWidth;
-        height = width / aspectRatio;
-    }
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Colors
-    const boardBg = '#8b4513';
-    const pointLight = '#d2b48c';
-    const pointDark = '#654321';
-    const barColor = '#654321';
-    const whiteChecker = '#ffffff';
-    const redChecker = '#8b0000';
-    
-    // Dimensions
-    const barWidth = width * 0.08;
-    const sideMargin = width * 0.03;
-    const playableWidth = width - (2 * sideMargin) - barWidth;
-    const pointWidth = playableWidth / 12;
-    const pointHeight = height * 0.42;
-    const checkerRadius = pointWidth * 0.32;
-    const padding = height * 0.03;
-    
-    // Clear canvas
-    ctx.fillStyle = boardBg;
-    ctx.fillRect(0, 0, width, height);
-    
-    // Draw border
-    ctx.strokeStyle = '#2d1810';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(0, 0, width, height);
-    
-    // Draw bar
-    ctx.fillStyle = barColor;
-    const barX = sideMargin + (6 * pointWidth);
-    ctx.fillRect(barX, 0, barWidth, height);
-    
-    // Draw points (triangles)
-    // Standard backgammon layout:
-    // Bottom row (white's perspective): 12,11,10,9,8,7 | BAR | 6,5,4,3,2,1
-    // Top row (red's perspective):    13,14,15,16,17,18 | BAR | 19,20,21,22,23,24
-    for (let pointNum = 1; pointNum <= 24; pointNum++) {
-        const isTop = pointNum >= 13;
-        let positionIndex;
-        
-        if (isTop) {
-            // Top row: 13-18 on left, 19-24 on right
-            if (pointNum >= 13 && pointNum <= 18) {
-                positionIndex = pointNum - 13; // 13->0, 14->1, ..., 18->5
-            } else {
-                positionIndex = pointNum - 19 + 6; // 19->6, 20->7, ..., 24->11
-            }
-        } else {
-            // Bottom row: 12-7 on left, 6-1 on right  
-            if (pointNum >= 7 && pointNum <= 12) {
-                positionIndex = 12 - pointNum; // 12->0, 11->1, ..., 7->5
-            } else {
-                positionIndex = 6 - pointNum + 6; // 6->6, 5->7, ..., 1->11
-            }
-        }
-        
-        // Calculate x position (add bar width after first 6 points)
-        const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
-        const y = isTop ? padding : height - padding;
-        const direction = isTop ? 1 : -1;
-        
-        // Draw triangle
-        ctx.fillStyle = (pointNum % 2 === 0) ? pointDark : pointLight;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + pointWidth, y);
-        ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
-        ctx.closePath();
-        ctx.fill();
-        
-        // Draw point number
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.font = `${pointWidth * 0.3}px Arial`;
-        ctx.textAlign = 'center';
-        ctx.fillText(pointNum, x + pointWidth / 2, y + (direction * pointHeight * 0.2));
-    }
-    
-    // Highlight valid source points (checkers that can be moved)
+
+    // Get valid source points for highlighting
+    let validSources = [];
     if (state.isYourTurn && state.remainingMoves && state.remainingMoves.length > 0 && !selectedChecker) {
-        const validSources = new Set(state.validMoves.map(m => m.from));
-        
-        validSources.forEach(pointNum => {
-            if (pointNum === 0) return; // Bar handled separately
-            
-            const isTop = pointNum >= 13;
-            let positionIndex;
-            
-            if (isTop) {
-                if (pointNum >= 13 && pointNum <= 18) {
-                    positionIndex = pointNum - 13;
-                } else {
-                    positionIndex = pointNum - 19 + 6;
-                }
-            } else {
-                if (pointNum >= 7 && pointNum <= 12) {
-                    positionIndex = 12 - pointNum;
-                } else {
-                    positionIndex = 6 - pointNum + 6;
-                }
-            }
-            
-            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
-            const y = isTop ? padding : height - padding;
-            const direction = isTop ? 1 : -1;
-            
-            // Draw glow around valid checker
-            ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + pointWidth, y);
-            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
-            ctx.closePath();
-            ctx.fill();
-        });
-    }
-    
-    // Highlight selected checker
-    if (selectedChecker !== null) {
-        const pointNum = selectedChecker.point;
-        if (pointNum !== 0) {
-            const isTop = pointNum >= 13;
-            let positionIndex;
-            
-            if (isTop) {
-                if (pointNum >= 13 && pointNum <= 18) {
-                    positionIndex = pointNum - 13;
-                } else {
-                    positionIndex = pointNum - 19 + 6;
-                }
-            } else {
-                if (pointNum >= 7 && pointNum <= 12) {
-                    positionIndex = 12 - pointNum;
-                } else {
-                    positionIndex = 6 - pointNum + 6;
-                }
-            }
-            
-            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
-            const y = isTop ? padding : height - padding;
-            const direction = isTop ? 1 : -1;
-            
-            // Draw bright highlight for selected
-            ctx.fillStyle = 'rgba(0, 255, 0, 0.4)';
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + pointWidth, y);
-            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
-            ctx.closePath();
-            ctx.fill();
+        if (state.validMoves && state.validMoves.length > 0) {
+            validSources = [...new Set(state.validMoves.map(m => m.from))];
         }
     }
-    
-    // Highlight valid destinations
-    if (validDestinations.length > 0) {
-        validDestinations.forEach(move => {
-            const pointNum = move.to;
-            if (pointNum === 0 || pointNum === 25) return; // Skip bar/bear-off for now
-            
-            const isTop = pointNum >= 13;
-            let positionIndex;
-            
-            if (isTop) {
-                if (pointNum >= 13 && pointNum <= 18) {
-                    positionIndex = pointNum - 13;
-                } else {
-                    positionIndex = pointNum - 19 + 6;
-                }
-            } else {
-                if (pointNum >= 7 && pointNum <= 12) {
-                    positionIndex = 12 - pointNum;
-                } else {
-                    positionIndex = 6 - pointNum + 6;
-                }
-            }
-            
-            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
-            const y = isTop ? padding : height - padding;
-            const direction = isTop ? 1 : -1;
-            
-            // Draw blue highlight for valid destinations
-            ctx.fillStyle = move.isHit ? 'rgba(255, 0, 0, 0.4)' : 'rgba(0, 150, 255, 0.4)';
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + pointWidth, y);
-            ctx.lineTo(x + pointWidth / 2, y + (direction * pointHeight));
-            ctx.closePath();
-            ctx.fill();
-        });
-    }
-    
-    // Draw checkers on points
-    state.board.forEach(point => {
-        if (point.count > 0 && point.position >= 1 && point.position <= 24) {
-            const pointNum = point.position;
-            const isTop = pointNum >= 13;
-            let positionIndex;
-            
-            if (isTop) {
-                if (pointNum >= 13 && pointNum <= 18) {
-                    positionIndex = pointNum - 13;
-                } else {
-                    positionIndex = pointNum - 19 + 6;
-                }
-            } else {
-                if (pointNum >= 7 && pointNum <= 12) {
-                    positionIndex = 12 - pointNum;
-                } else {
-                    positionIndex = 6 - pointNum + 6;
-                }
-            }
-            
-            const x = sideMargin + (positionIndex < 6 ? positionIndex : positionIndex + (barWidth / pointWidth)) * pointWidth;
-            const centerX = x + pointWidth / 2;
-            const baseY = isTop ? padding : height - padding;
-            const direction = isTop ? 1 : -1;
-            
-            console.log(`Point ${pointNum}: ${point.count} ${point.color} checkers at position index ${positionIndex}`);
-            
-            // Color is sent as enum value: 0 = White, 1 = Red
-            const color = point.color === 0 ? whiteChecker : redChecker;
-            
-            // Draw up to 5 checkers visually, show count if more
-            const displayCount = Math.min(point.count, 5);
-            for (let j = 0; j < displayCount; j++) {
-                const checkerY = baseY + (direction * (checkerRadius * 0.8 + j * checkerRadius * 1.9));
-                drawChecker(ctx, centerX, checkerY, checkerRadius, color);
-            }
-            
-            // Show count if more than 5
-            if (point.count > 5) {
-                const textY = baseY + (direction * (checkerRadius * 1.1 + 4 * checkerRadius * 2));
-                ctx.fillStyle = color === whiteChecker ? '#000' : '#fff';
-                ctx.font = `bold ${checkerRadius * 1.2}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(point.count, centerX, textY);
-            }
-        }
-    });
-    
-    // Draw checkers on bar
-    if (state.whiteCheckersOnBar > 0) {
-        drawBarCheckers(ctx, barX, barWidth, height, checkerRadius, whiteChecker, state.whiteCheckersOnBar, true);
-    }
-    if (state.redCheckersOnBar > 0) {
-        drawBarCheckers(ctx, barX, barWidth, height, checkerRadius, redChecker, state.redCheckersOnBar, false);
-    }
-    
-    // Draw borne off checkers
-    const bornOffX = width - sideMargin / 2;
-    if (state.whiteBornOff > 0) {
-        drawBornOff(ctx, bornOffX, height - padding, checkerRadius, whiteChecker, state.whiteBornOff);
-    }
-    if (state.redBornOff > 0) {
-        drawBornOff(ctx, bornOffX, padding, checkerRadius, redChecker, state.redBornOff);
-    }
+
+    // Build dice state for rendering on board
+    const diceState = {
+        dice: state.currentDice || state.dice || [],
+        remainingMoves: state.remainingMoves || []
+    };
+
+    // Render the board with current state
+    BoardSVG.render(state, selectedChecker, validDestinations, validSources, diceState);
 }
 
 function drawChecker(ctx, x, y, radius, color) {
@@ -1101,30 +806,20 @@ function drawBornOff(ctx, x, y, radius, color, count) {
 let boardClickHandlerSetup = false;
 
 function setupBoardClickHandler() {
-    const canvas = document.getElementById('boardCanvas');
-    if (!canvas || boardClickHandlerSetup) return;
-    
-    canvas.addEventListener('click', handleBoardClick);
+    const boardSvg = document.getElementById('boardSvg');
+    if (!boardSvg || boardClickHandlerSetup) return;
+
+    boardSvg.addEventListener('click', handleBoardClick);
     boardClickHandlerSetup = true;
 }
 
 async function handleBoardClick(event) {
     if (!currentGameState || !currentGameState.isYourTurn) return;
     if (currentGameState.remainingMoves.length === 0) return;
-    
-    const canvas = event.target;
-    const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    
-    // Scale to canvas coordinates
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const canvasX = x * scaleX;
-    const canvasY = y * scaleY;
-    
-    const clickedPoint = getPointAtPosition(canvasX, canvasY, canvas.width, canvas.height);
-    
+
+    // Get clicked point from SVG coordinates
+    const clickedPoint = BoardSVG.getPointAtPosition(event.clientX, event.clientY);
+
     if (clickedPoint === null) {
         // Clicked outside any point - deselect
         selectedChecker = null;
@@ -1132,7 +827,7 @@ async function handleBoardClick(event) {
         renderBoard(currentGameState);
         return;
     }
-    
+
     // If we have a selection and clicked a valid destination
     if (selectedChecker !== null && validDestinations.some(m => m.to === clickedPoint)) {
         await executeMove(selectedChecker.point, clickedPoint);
@@ -1140,7 +835,7 @@ async function handleBoardClick(event) {
         validDestinations = [];
         return;
     }
-    
+
     // Try to select this checker
     await selectChecker(clickedPoint);
 }

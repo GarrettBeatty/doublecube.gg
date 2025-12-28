@@ -90,23 +90,11 @@
         <div class="game-container" style="justify-content:center;align-items:center;">
             <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
                 <div class="board-wrapper-game" style="gap:8px;">
-                    <canvas id="boardCanvas" class="board-canvas"></canvas>
+                    <svg id="boardSvg" class="board-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
                     <div id="boardPlaceholder" class="board-placeholder">Waiting for game to start...</div>
-                    <div class="dice-section-compact" style="margin-top:10px;justify-content:center;">
-                        <div class="dice-info" style="margin:0;">
-                            <div class="dice-display" id="diceDisplay">
-                                <div class="die">?</div>
-                            </div>
-                        </div>
-                        <div class="dice-info" style="margin:0;">
-                            <div class="dice-display" id="remainingMoves">
-                                <div class="die">-</div>
-                            </div>
-                        </div>
-                        <div class="game-controls" style="margin-top:12px;display:flex;gap:8px;justify-content:center;">
-                            <button id="rollBtn" class="btn-primary" disabled>Roll Dice</button>
-                            <button id="endTurnBtn" class="btn-primary" disabled>End Turn</button>
-                        </div>
+                    <div class="game-controls" style="margin-top:16px;display:flex;gap:12px;justify-content:center;">
+                        <button id="rollBtn" class="btn btn-primary btn-lg" disabled>Roll Dice</button>
+                        <button id="endTurnBtn" class="btn btn-secondary btn-lg" disabled>End Turn</button>
                     </div>
                 </div>
             </main>
@@ -234,6 +222,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
     <script src="auth.js"></script>
     <script src="friends.js"></script>
+    <script src="board-svg.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

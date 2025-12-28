@@ -3,44 +3,65 @@ using Backgammon.Server.Models;
 namespace Backgammon.Server.Services;
 
 /// <summary>
-/// Storage abstraction for completed backgammon games.
+/// Storage abstraction for backgammon games (both in-progress and completed).
 /// Allows swapping database implementations (MongoDB, DynamoDB, CosmosDB, etc.)
 /// without changing business logic.
 /// </summary>
 public interface IGameRepository
 {
     /// <summary>
-    /// Save a completed game to persistent storage
+    /// Save or update a game (in-progress or completed) to persistent storage
+    /// Uses upsert - creates if doesn't exist, updates if it does
     /// </summary>
-    Task SaveCompletedGameAsync(CompletedGame game);
-    
+    Task SaveGameAsync(Game game);
+
     /// <summary>
-    /// Retrieve a specific game by its ID
+    /// Retrieve a specific game by its game ID
     /// </summary>
-    Task<CompletedGame?> GetGameByIdAsync(string gameId);
-    
+    Task<Game?> GetGameByGameIdAsync(string gameId);
+
+    /// <summary>
+    /// Get all active (in-progress) games for server restart loading
+    /// </summary>
+    Task<List<Game>> GetActiveGamesAsync();
+
+    /// <summary>
+    /// Update the status of a game (e.g., mark as Completed or Abandoned)
+    /// </summary>
+    Task UpdateGameStatusAsync(string gameId, string status);
+
     /// <summary>
     /// Get all games for a specific player (as either color)
     /// </summary>
     /// <param name="playerId">Player identifier</param>
+    /// <param name="status">Optional status filter ("InProgress", "Completed", "Abandoned")</param>
     /// <param name="limit">Maximum number of games to return</param>
     /// <param name="skip">Number of games to skip (for pagination)</param>
-    Task<List<CompletedGame>> GetPlayerGamesAsync(string playerId, int limit = 50, int skip = 0);
-    
+    Task<List<Game>> GetPlayerGamesAsync(string playerId, string? status = null, int limit = 50, int skip = 0);
+
     /// <summary>
     /// Get player statistics (wins, losses, stakes earned)
+    /// Only counts completed games
     /// </summary>
     Task<PlayerStats> GetPlayerStatsAsync(string playerId);
-    
+
     /// <summary>
     /// Get recent games across all players
     /// </summary>
-    Task<List<CompletedGame>> GetRecentGamesAsync(int limit = 20);
-    
+    /// <param name="status">Optional status filter</param>
+    /// <param name="limit">Maximum number of games to return</param>
+    Task<List<Game>> GetRecentGamesAsync(string? status = "Completed", int limit = 20);
+
     /// <summary>
     /// Count total games in database
     /// </summary>
-    Task<long> GetTotalGameCountAsync();
+    /// <param name="status">Optional status filter</param>
+    Task<long> GetTotalGameCountAsync(string? status = null);
+
+    /// <summary>
+    /// Delete a game from the database (use sparingly - prefer status updates)
+    /// </summary>
+    Task DeleteGameAsync(string gameId);
 }
 
 /// <summary>

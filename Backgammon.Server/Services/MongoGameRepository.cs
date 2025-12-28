@@ -7,21 +7,21 @@ namespace Backgammon.Server.Services;
 
 /// <summary>
 /// MongoDB implementation of game storage.
-/// Handles persistence and queries for completed backgammon games.
+/// Handles persistence and queries for both in-progress and completed backgammon games.
 /// </summary>
 public class MongoGameRepository : IGameRepository
 {
-    private readonly IMongoCollection<CompletedGame> _games;
+    private readonly IMongoCollection<Game> _games;
     private readonly ILogger<MongoGameRepository> _logger;
 
     public MongoGameRepository(IMongoClient mongoClient, IConfiguration configuration, ILogger<MongoGameRepository> logger)
     {
         _logger = logger;
-        
+
         var databaseName = configuration["MongoDB:DatabaseName"] ?? "backgammon";
         var database = mongoClient.GetDatabase(databaseName);
-        _games = database.GetCollection<CompletedGame>("games");
-        
+        _games = database.GetCollection<Game>("games");
+
         // Create indexes for efficient queries
         CreateIndexes().Wait();
     }
@@ -30,38 +30,57 @@ public class MongoGameRepository : IGameRepository
     {
         try
         {
-            // Index on gameId for fast lookups
+            // Index on gameId for fast lookups (unique)
             await _games.Indexes.CreateOneAsync(
-                new CreateIndexModel<CompletedGame>(
-                    Builders<CompletedGame>.IndexKeys.Ascending(g => g.GameId),
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys.Ascending(g => g.GameId),
                     new CreateIndexOptions { Unique = true }
                 )
             );
-            
-            // Compound index for player queries
+
+            // Index on status for filtering active/completed games
             await _games.Indexes.CreateOneAsync(
-                new CreateIndexModel<CompletedGame>(
-                    Builders<CompletedGame>.IndexKeys
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys.Ascending(g => g.Status)
+                )
+            );
+
+            // Compound index for player queries (white player + status + completion time)
+            await _games.Indexes.CreateOneAsync(
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys
                         .Ascending(g => g.WhitePlayerId)
-                        .Descending(g => g.CompletedAt)
+                        .Ascending(g => g.Status)
+                        .Descending(g => g.LastUpdatedAt)
                 )
             );
-            
+
+            // Compound index for player queries (red player + status + completion time)
             await _games.Indexes.CreateOneAsync(
-                new CreateIndexModel<CompletedGame>(
-                    Builders<CompletedGame>.IndexKeys
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys
                         .Ascending(g => g.RedPlayerId)
-                        .Descending(g => g.CompletedAt)
+                        .Ascending(g => g.Status)
+                        .Descending(g => g.LastUpdatedAt)
                 )
             );
-            
+
             // Index for recent games
             await _games.Indexes.CreateOneAsync(
-                new CreateIndexModel<CompletedGame>(
-                    Builders<CompletedGame>.IndexKeys.Descending(g => g.CompletedAt)
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys.Descending(g => g.LastUpdatedAt)
                 )
             );
-            
+
+            // Index for completed games sorted by completion time
+            await _games.Indexes.CreateOneAsync(
+                new CreateIndexModel<Game>(
+                    Builders<Game>.IndexKeys
+                        .Ascending(g => g.Status)
+                        .Descending(g => g.CompletedAt)
+                )
+            );
+
             _logger.LogInformation("MongoDB indexes created successfully");
         }
         catch (Exception ex)
@@ -70,12 +89,17 @@ public class MongoGameRepository : IGameRepository
         }
     }
 
-    public async Task SaveCompletedGameAsync(CompletedGame game)
+    public async Task SaveGameAsync(Game game)
     {
         try
         {
-            await _games.InsertOneAsync(game);
-            _logger.LogInformation("Saved completed game {GameId} to MongoDB", game.GameId);
+            game.LastUpdatedAt = DateTime.UtcNow;
+
+            var filter = Builders<Game>.Filter.Eq(g => g.GameId, game.GameId);
+            var options = new ReplaceOptions { IsUpsert = true };
+
+            await _games.ReplaceOneAsync(filter, game, options);
+            _logger.LogDebug("Saved game {GameId} with status {Status}", game.GameId, game.Status);
         }
         catch (Exception ex)
         {
@@ -84,11 +108,11 @@ public class MongoGameRepository : IGameRepository
         }
     }
 
-    public async Task<CompletedGame?> GetGameByIdAsync(string gameId)
+    public async Task<Game?> GetGameByGameIdAsync(string gameId)
     {
         try
         {
-            var filter = Builders<CompletedGame>.Filter.Eq(g => g.GameId, gameId);
+            var filter = Builders<Game>.Filter.Eq(g => g.GameId, gameId);
             return await _games.Find(filter).FirstOrDefaultAsync();
         }
         catch (Exception ex)
@@ -98,17 +122,63 @@ public class MongoGameRepository : IGameRepository
         }
     }
 
-    public async Task<List<CompletedGame>> GetPlayerGamesAsync(string playerId, int limit = 50, int skip = 0)
+    public async Task<List<Game>> GetActiveGamesAsync()
     {
         try
         {
-            var filter = Builders<CompletedGame>.Filter.Or(
-                Builders<CompletedGame>.Filter.Eq(g => g.WhitePlayerId, playerId),
-                Builders<CompletedGame>.Filter.Eq(g => g.RedPlayerId, playerId)
+            var filter = Builders<Game>.Filter.Eq(g => g.Status, "InProgress");
+            var games = await _games.Find(filter).ToListAsync();
+            _logger.LogInformation("Retrieved {Count} active games from database", games.Count);
+            return games;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve active games");
+            return new List<Game>();
+        }
+    }
+
+    public async Task UpdateGameStatusAsync(string gameId, string status)
+    {
+        try
+        {
+            var filter = Builders<Game>.Filter.Eq(g => g.GameId, gameId);
+            var update = Builders<Game>.Update
+                .Set(g => g.Status, status)
+                .Set(g => g.LastUpdatedAt, DateTime.UtcNow);
+
+            if (status == "Completed")
+            {
+                update = update.Set(g => g.CompletedAt, DateTime.UtcNow);
+            }
+
+            await _games.UpdateOneAsync(filter, update);
+            _logger.LogInformation("Updated game {GameId} status to {Status}", gameId, status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update status for game {GameId}", gameId);
+            throw;
+        }
+    }
+
+    public async Task<List<Game>> GetPlayerGamesAsync(string playerId, string? status = null, int limit = 50, int skip = 0)
+    {
+        try
+        {
+            var playerFilter = Builders<Game>.Filter.Or(
+                Builders<Game>.Filter.Eq(g => g.WhitePlayerId, playerId),
+                Builders<Game>.Filter.Eq(g => g.RedPlayerId, playerId)
             );
-            
+
+            var filter = status != null
+                ? Builders<Game>.Filter.And(
+                    playerFilter,
+                    Builders<Game>.Filter.Eq(g => g.Status, status))
+                : playerFilter;
+
             return await _games.Find(filter)
-                .SortByDescending(g => g.CompletedAt)
+                .SortByDescending(g => g.LastUpdatedAt)
                 .Skip(skip)
                 .Limit(limit)
                 .ToListAsync();
@@ -116,7 +186,7 @@ public class MongoGameRepository : IGameRepository
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to retrieve games for player {PlayerId}", playerId);
-            return new List<CompletedGame>();
+            return new List<Game>();
         }
     }
 
@@ -124,43 +194,50 @@ public class MongoGameRepository : IGameRepository
     {
         try
         {
-            var filter = Builders<CompletedGame>.Filter.Or(
-                Builders<CompletedGame>.Filter.Eq(g => g.WhitePlayerId, playerId),
-                Builders<CompletedGame>.Filter.Eq(g => g.RedPlayerId, playerId)
+            var filter = Builders<Game>.Filter.And(
+                Builders<Game>.Filter.Or(
+                    Builders<Game>.Filter.Eq(g => g.WhitePlayerId, playerId),
+                    Builders<Game>.Filter.Eq(g => g.RedPlayerId, playerId)
+                ),
+                Builders<Game>.Filter.Eq(g => g.Status, "Completed")
             );
-            
+
             var games = await _games.Find(filter).ToListAsync();
-            
+
             var stats = new PlayerStats
             {
                 PlayerId = playerId,
                 TotalGames = games.Count,
-                Wins = games.Count(g => 
+                Wins = games.Count(g =>
                     (g.Winner == "White" && g.WhitePlayerId == playerId) ||
                     (g.Winner == "Red" && g.RedPlayerId == playerId)
                 ),
-                Losses = games.Count(g => 
+                Losses = games.Count(g =>
                     (g.Winner == "White" && g.RedPlayerId == playerId) ||
                     (g.Winner == "Red" && g.WhitePlayerId == playerId)
                 )
             };
-            
-            // Calculate stakes (only for wins)
+
+            // Calculate stakes and win types (only for wins)
             foreach (var game in games)
             {
                 bool isWinner = (game.Winner == "White" && game.WhitePlayerId == playerId) ||
                                 (game.Winner == "Red" && game.RedPlayerId == playerId);
-                
+
                 if (isWinner)
                 {
                     stats.TotalStakes += game.Stakes;
-                    
-                    if (game.Stakes == 1) stats.NormalWins++;
-                    else if (game.Stakes == 2) stats.GammonWins++;
-                    else if (game.Stakes == 3) stats.BackgammonWins++;
+
+                    // Determine win type based on stakes/doubling cube
+                    // Stakes includes doubling cube, so divide by cube value to get base multiplier
+                    var baseMultiplier = game.DoublingCubeValue > 0 ? game.Stakes / game.DoublingCubeValue : game.Stakes;
+
+                    if (baseMultiplier == 1) stats.NormalWins++;
+                    else if (baseMultiplier == 2) stats.GammonWins++;
+                    else if (baseMultiplier == 3) stats.BackgammonWins++;
                 }
             }
-            
+
             return stats;
         }
         catch (Exception ex)
@@ -170,32 +247,55 @@ public class MongoGameRepository : IGameRepository
         }
     }
 
-    public async Task<List<CompletedGame>> GetRecentGamesAsync(int limit = 20)
+    public async Task<List<Game>> GetRecentGamesAsync(string? status = "Completed", int limit = 20)
     {
         try
         {
-            return await _games.Find(_ => true)
-                .SortByDescending(g => g.CompletedAt)
+            var filter = status != null
+                ? Builders<Game>.Filter.Eq(g => g.Status, status)
+                : Builders<Game>.Filter.Empty;
+
+            return await _games.Find(filter)
+                .SortByDescending(g => g.CompletedAt ?? g.LastUpdatedAt)
                 .Limit(limit)
                 .ToListAsync();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to retrieve recent games");
-            return new List<CompletedGame>();
+            return new List<Game>();
         }
     }
 
-    public async Task<long> GetTotalGameCountAsync()
+    public async Task<long> GetTotalGameCountAsync(string? status = null)
     {
         try
         {
-            return await _games.CountDocumentsAsync(_ => true);
+            var filter = status != null
+                ? Builders<Game>.Filter.Eq(g => g.Status, status)
+                : Builders<Game>.Filter.Empty;
+
+            return await _games.CountDocumentsAsync(filter);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to count total games");
             return 0;
+        }
+    }
+
+    public async Task DeleteGameAsync(string gameId)
+    {
+        try
+        {
+            var filter = Builders<Game>.Filter.Eq(g => g.GameId, gameId);
+            await _games.DeleteOneAsync(filter);
+            _logger.LogInformation("Deleted game {GameId}", gameId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to delete game {GameId}", gameId);
+            throw;
         }
     }
 }

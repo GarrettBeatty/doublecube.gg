@@ -84,6 +84,21 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
+            // Reconnection logic: If no gameId specified, check for existing in-progress games
+            if (string.IsNullOrEmpty(gameId))
+            {
+                var existingGames = _sessionManager.GetPlayerGames(effectivePlayerId);
+                var activeGame = existingGames.FirstOrDefault(g => g.Engine.Winner == null);
+
+                if (activeGame != null)
+                {
+                    _logger.LogInformation(
+                        "Player {PlayerId} reconnecting to existing game {GameId}",
+                        effectivePlayerId, activeGame.Id);
+                    gameId = activeGame.Id;
+                }
+            }
+
             var session = _sessionManager.JoinOrCreate(effectivePlayerId, connectionId, gameId);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
@@ -118,6 +133,10 @@ public class GameHub : Hub
                     var redState = session.GetState(session.RedConnectionId);
                     await Clients.Client(session.RedConnectionId).SendAsync("GameStart", redState);
                 }
+
+                // Save game state when game starts (progressive save)
+                await SaveGameStateAsync(session);
+
                 _logger.LogInformation("Game {GameId} started with both players", session.Id);
             }
             else
@@ -250,8 +269,11 @@ public class GameHub : Hub
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
             }
-            
-            _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}", 
+
+            // Save game state after dice roll (progressive save)
+            await SaveGameStateAsync(session);
+
+            _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}",
                 Context.ConnectionId, session.Id);
         }
         catch (Exception ex)
@@ -303,7 +325,10 @@ public class GameHub : Hub
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
             }
-            
+
+            // Save game state after move (progressive save)
+            await SaveGameStateAsync(session);
+
             // Check if game is over
             if (session.Engine.Winner != null)
             {
@@ -311,51 +336,27 @@ public class GameHub : Hub
                 // Use group send for game over since it's the same for both players
                 var finalState = session.GetState();
                 await Clients.Group(session.Id).SendAsync("GameOver", finalState);
-                _logger.LogInformation("Game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})", 
+                _logger.LogInformation("Game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
                     session.Id, session.Engine.Winner.Name, stakes);
-                
-                // Persist completed game to database
+
+                // Update game status to Completed and update user stats
                 _ = Task.Run(async () =>
                 {
                     try
                     {
-                        // Determine if players are authenticated users
-                        var whiteUserId = IsRegisteredUserId(session.WhitePlayerId) ? session.WhitePlayerId : null;
-                        var redUserId = IsRegisteredUserId(session.RedPlayerId) ? session.RedPlayerId : null;
+                        // Save final game state with Status="Completed" (already done by SaveGameStateAsync above)
+                        // Update status explicitly to ensure CompletedAt timestamp is set
+                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                        var completedGame = new CompletedGame
-                        {
-                            GameId = session.Id,
-                            WhitePlayerId = session.WhitePlayerId ?? "unknown",
-                            RedPlayerId = session.RedPlayerId ?? "unknown",
-                            WhiteUserId = whiteUserId,
-                            RedUserId = redUserId,
-                            WhiteDisplayName = session.WhitePlayerName,
-                            RedDisplayName = session.RedPlayerName,
-                            Moves = session.Engine.MoveHistory
-                                .Select(m => m.IsBearOff ? $"{m.From}/off" :
-                                             m.From == 0 ? $"bar/{m.To}" :
-                                             $"{m.From}/{m.To}")
-                                .ToList(),
-                            DiceRolls = new List<string>(), // TODO: Track dice rolls per turn
-                            Winner = session.Engine.Winner.Color.ToString(),
-                            Stakes = stakes,
-                            TurnCount = 0, // TODO: Track turn count
-                            MoveCount = session.Engine.MoveHistory.Count,
-                            CreatedAt = session.CreatedAt,
-                            CompletedAt = DateTime.UtcNow,
-                            DurationSeconds = (int)(DateTime.UtcNow - session.CreatedAt).TotalSeconds
-                        };
+                        // Update user statistics if players are registered
+                        var game = GameEngineMapper.ToGame(session);
+                        await UpdateUserStatsAfterGame(game);
 
-                        await _gameRepository.SaveCompletedGameAsync(completedGame);
-                        _logger.LogInformation("Persisted game {GameId} to database", session.Id);
-
-                        // Update user stats if players are registered
-                        await UpdateUserStatsAfterGame(completedGame);
+                        _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to persist game {GameId}", session.Id);
+                        _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
                     }
                 });
             }
@@ -465,8 +466,11 @@ public class GameHub : Hub
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
             }
-            
-            _logger.LogInformation("Turn ended in game {GameId}. Current player: {Player}", 
+
+            // Save game state after turn end (progressive save)
+            await SaveGameStateAsync(session);
+
+            _logger.LogInformation("Turn ended in game {GameId}. Current player: {Player}",
                 session.Id, session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
         }
         catch (Exception ex)
@@ -541,6 +545,26 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Save current game state to database (progressive save).
+    /// Uses GameEngineMapper to serialize the complete game state.
+    /// Fire-and-forget pattern - does not throw exceptions to avoid blocking game flow.
+    /// </summary>
+    private async Task SaveGameStateAsync(GameSession session)
+    {
+        try
+        {
+            var game = GameEngineMapper.ToGame(session);
+            await _gameRepository.SaveGameAsync(game);
+            _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save game state for {GameId}", session.Id);
+            // Fire-and-forget - don't throw to avoid disrupting gameplay
+        }
+    }
+
+    /// <summary>
     /// Check if a player ID looks like a registered user ID (GUID format)
     /// Anonymous IDs have format "player_timestamp_random"
     /// </summary>
@@ -556,7 +580,7 @@ public class GameHub : Hub
     /// <summary>
     /// Update user statistics after a game is completed
     /// </summary>
-    private async Task UpdateUserStatsAfterGame(CompletedGame game)
+    private async Task UpdateUserStatsAfterGame(Game game)
     {
         try
         {

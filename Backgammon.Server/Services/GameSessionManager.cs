@@ -54,6 +54,11 @@ public interface IGameSessionManager
     /// Get a game session by ID (alias for GetGame for clarity)
     /// </summary>
     GameSession? GetSession(string gameId);
+
+    /// <summary>
+    /// Load all active games from the database on server startup
+    /// </summary>
+    Task LoadActiveGamesAsync(IGameRepository repository);
 }
 
 public class GameSessionManager : IGameSessionManager
@@ -254,5 +259,45 @@ public class GameSessionManager : IGameSessionManager
     public GameSession? GetSession(string gameId)
     {
         return GetGame(gameId);
+    }
+
+    public async Task LoadActiveGamesAsync(IGameRepository repository)
+    {
+        lock (_lock)
+        {
+            var activeGames = repository.GetActiveGamesAsync().Result; // Sync wait inside lock
+
+            Console.WriteLine($"[GameSessionManager] Loading {activeGames.Count} active games from database...");
+
+            int successCount = 0;
+            int failureCount = 0;
+
+            foreach (var gameData in activeGames)
+            {
+                try
+                {
+                    var session = GameEngineMapper.FromGame(gameData);
+
+                    // Add to in-memory storage
+                    _games[session.Id] = session;
+
+                    // Note: Connection IDs are empty - players must reconnect
+                    // The _playerToGame mapping will be populated when players reconnect via JoinGame
+
+                    successCount++;
+                    Console.WriteLine($"  ✓ Loaded game {session.Id}: " +
+                                    $"White={session.WhitePlayerName ?? "waiting"}, " +
+                                    $"Red={session.RedPlayerName ?? "waiting"}, " +
+                                    $"Current={session.Engine.CurrentPlayer?.Name ?? "unknown"}");
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    Console.WriteLine($"  ✗ Failed to load game {gameData.GameId}: {ex.Message}");
+                }
+            }
+
+            Console.WriteLine($"[GameSessionManager] Successfully loaded {successCount} games ({failureCount} failures)");
+        }
     }
 }
