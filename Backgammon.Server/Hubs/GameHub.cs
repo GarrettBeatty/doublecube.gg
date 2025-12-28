@@ -691,6 +691,39 @@ public class GameHub : Hub
                 return;
             }
 
+            // Check if game is still waiting for opponent
+            var currentState = session.GetState();
+            var isWaitingForPlayer = currentState.Status == GameStatus.WaitingForPlayer;
+
+            if (isWaitingForPlayer)
+            {
+                // No opponent yet - just cancel the game
+                var gameId = session.Id;
+
+                // Remove player from group
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
+
+                // Remove game completely from session manager
+                _sessionManager.RemoveGame(gameId);
+
+                _logger.LogInformation("Game {GameId} abandoned by player while waiting for opponent", gameId);
+
+                // Update database to mark as abandoned but don't update stats
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _gameRepository.UpdateGameStatusAsync(gameId, "Abandoned");
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to update abandoned game {GameId}", gameId);
+                    }
+                });
+
+                return;
+            }
+
             var abandoningPlayer = abandoningColor == CheckerColor.White
                 ? session.Engine.WhitePlayer
                 : session.Engine.RedPlayer;
@@ -838,6 +871,15 @@ public class GameHub : Hub
     {
         try
         {
+            // Only update stats if game actually had two players
+            if (game.Status == "WaitingForPlayer" ||
+                string.IsNullOrEmpty(game.RedPlayerId) ||
+                string.IsNullOrEmpty(game.WhitePlayerId))
+            {
+                _logger.LogInformation("Skipping stats update for game {GameId} - no opponent joined", game.GameId);
+                return;
+            }
+
             // Update white player stats if registered
             if (!string.IsNullOrEmpty(game.WhiteUserId))
             {

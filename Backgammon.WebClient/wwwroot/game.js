@@ -577,11 +577,25 @@ async function endTurn() {
 
 // ==== ABANDON GAME ====
 function showAbandonConfirm() {
-    // Display current stakes in modal
-    if (currentGameState && currentGameState.doublingCubeValue) {
-        document.getElementById('abandonStakes').textContent =
-            `${currentGameState.doublingCubeValue}x`;
+    const isWaitingForPlayer = currentGameState && currentGameState.status === 0; // GameStatus.WaitingForPlayer = 0
+    const abandonMessage = document.getElementById('abandonMessage');
+    const abandonStakesMessage = document.getElementById('abandonStakesMessage');
+
+    if (isWaitingForPlayer) {
+        // No opponent yet - show different message
+        abandonMessage.textContent = 'Cancel this game?';
+        abandonStakesMessage.textContent = 'This game will not count.';
+    } else {
+        // Has opponent - show forfeit message
+        abandonMessage.textContent = 'Your opponent will win if you abandon this game.';
+        if (currentGameState && currentGameState.doublingCubeValue) {
+            document.getElementById('abandonStakes').textContent =
+                `${currentGameState.doublingCubeValue}x`;
+        }
+        abandonStakesMessage.innerHTML = 'This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">' +
+            (currentGameState && currentGameState.doublingCubeValue ? currentGameState.doublingCubeValue : 1) + 'x</span>';
     }
+
     document.getElementById('abandonConfirmModal').showModal();
 }
 
@@ -591,9 +605,19 @@ function cancelAbandon() {
 
 async function confirmAbandon() {
     try {
+        const wasWaitingForPlayer = currentGameState && currentGameState.status === 0; // GameStatus.WaitingForPlayer = 0
+
         await connection.invoke("AbandonGame");
-        log('Game abandoned. Opponent wins.', 'info');
         document.getElementById('abandonConfirmModal').close();
+
+        if (wasWaitingForPlayer) {
+            // No opponent yet - just return to lobby
+            log('Game cancelled.', 'info');
+            leaveGameAndReturn();
+        } else {
+            // Had an opponent - they win
+            log('Game abandoned. Opponent wins.', 'info');
+        }
     } catch (err) {
         log(`Failed to abandon: ${err}`, 'error');
         document.getElementById('abandonConfirmModal').close();
@@ -743,10 +767,17 @@ function updateGameState(state, isSpectator = false) {
     // Update turn indicator
     const turnEl = document.getElementById('turnIndicator');
     if (turnEl) {
+        const isWaitingForPlayer = state.status === 0; // GameStatus.WaitingForPlayer = 0
         const isMyTurn = state.isYourTurn;
         const currentPlayerName = state.currentPlayer === 0 ? 'White' : 'Red';
-        turnEl.textContent = isMyTurn ? "Your Turn!" : `${currentPlayerName}'s Turn`;
-        turnEl.style.fontWeight = isMyTurn ? '700' : '400';
+
+        if (isWaitingForPlayer) {
+            turnEl.textContent = "Waiting for opponent...";
+            turnEl.style.fontWeight = '400';
+        } else {
+            turnEl.textContent = isMyTurn ? "Your Turn!" : `${currentPlayerName}'s Turn`;
+            turnEl.style.fontWeight = isMyTurn ? '700' : '400';
+        }
     }
 
     // Store player color

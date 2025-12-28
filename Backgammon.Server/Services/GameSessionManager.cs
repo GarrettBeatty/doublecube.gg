@@ -29,7 +29,12 @@ public interface IGameSessionManager
     /// Remove a player from their current game
     /// </summary>
     void RemovePlayer(string connectionId);
-    
+
+    /// <summary>
+    /// Remove a game session completely
+    /// </summary>
+    void RemoveGame(string gameId);
+
     /// <summary>
     /// Get all active game sessions
     /// </summary>
@@ -154,19 +159,37 @@ public class GameSessionManager : IGameSessionManager
                 if (_games.TryGetValue(gameId, out var game))
                 {
                     game.RemovePlayer(connectionId);
-                    
+
                     // If game is now empty, remove it
                     if (game.WhitePlayerId == null && game.RedPlayerId == null)
                     {
                         _games.Remove(gameId);
                     }
                 }
-                
+
                 _playerToGame.Remove(connectionId);
             }
         }
     }
-    
+
+    public void RemoveGame(string gameId)
+    {
+        lock (_lock)
+        {
+            if (_games.TryGetValue(gameId, out var game))
+            {
+                // Remove player-to-game mappings
+                if (game.WhiteConnectionId != null)
+                    _playerToGame.Remove(game.WhiteConnectionId);
+                if (game.RedConnectionId != null)
+                    _playerToGame.Remove(game.RedConnectionId);
+
+                // Remove game from dictionary
+                _games.Remove(gameId);
+            }
+        }
+    }
+
     public IEnumerable<GameSession> GetAllGames()
     {
         lock (_lock)
