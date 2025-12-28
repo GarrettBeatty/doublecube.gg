@@ -90,17 +90,73 @@
 
     <!-- Game Page -->
     <div id="gamePage" class="page" style="display: none;">
-        <div class="game-container" style="justify-content:center;align-items:center;">
-            <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
-                <div class="board-wrapper-game" style="gap:8px;">
-                    <svg id="boardSvg" class="board-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
-                    <div id="boardPlaceholder" class="board-placeholder">Waiting for game to start...</div>
-                    <div class="game-controls" style="margin-top:16px;display:flex;gap:12px;justify-content:center;">
-                        <button id="rollBtn" class="btn btn-primary btn-lg" disabled>Roll Dice</button>
-                        <button id="endTurnBtn" class="btn btn-secondary btn-lg" disabled>End Turn</button>
+        <div class="game-layout-with-chat">
+            <!-- Left: Board Area -->
+            <div class="board-section">
+                <div class="game-container" style="min-height: calc(100vh - 72px); justify-content:center;align-items:center;">
+                    <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
+                        <div class="board-wrapper-game" style="gap:8px;">
+                            <!-- Game Info Bar -->
+                            <div class="game-info-bar">
+                                <div class="info-item">
+                                    <span class="text-sm opacity-70">Turn:</span>
+                                    <span id="turnIndicator" class="font-bold">Waiting...</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="text-sm opacity-70">Game:</span>
+                                    <span id="gameIdDisplay" class="font-mono text-xs">-</span>
+                                </div>
+                            </div>
+
+                            <!-- Board -->
+                            <svg id="boardSvg" class="board-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
+                            <div id="boardPlaceholder" class="board-placeholder">
+                                <div class="loading loading-spinner loading-lg text-primary"></div>
+                                <p class="mt-4">Waiting for game to start...</p>
+                            </div>
+
+                            <!-- Modern Game Controls -->
+                            <div class="game-controls-modern">
+                                <button id="rollBtn" class="btn btn-primary btn-lg gap-2" disabled>
+                                    🎲 Roll Dice
+                                </button>
+                                <button id="undoBtn" class="btn btn-warning btn-lg gap-2" disabled>
+                                    ↩️ Undo
+                                </button>
+                                <button id="endTurnBtn" class="btn btn-success btn-lg gap-2" disabled>
+                                    ✓ End Turn
+                                </button>
+                                <button class="btn btn-ghost btn-sm gap-2" onclick="leaveGameAndReturn()">
+                                    ← Leave
+                                </button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+
+            <!-- Right: Chat Sidebar -->
+            <aside class="chat-sidebar" id="chatSidebar">
+                <div class="chat-sidebar-header" onclick="toggleChatSidebar()">
+                    <h3 class="font-bold text-white">💬 Chat</h3>
+                    <span id="chatToggle" class="text-sm cursor-pointer">◀</span>
+                </div>
+                <div id="chatMessages" class="chat-messages">
+                    <div class="chat-welcome text-center text-sm opacity-70 py-4">
+                        Send a message to your opponent...
                     </div>
                 </div>
-            </main>
+                <div class="chat-input-area">
+                    <input type="text"
+                           id="chatInput"
+                           placeholder="Type a message..."
+                           class="input input-bordered input-sm w-full"
+                           onkeypress="handleChatKeyPress(event)">
+                    <button onclick="sendChat()" class="btn btn-primary btn-sm">
+                        Send
+                    </button>
+                </div>
+            </aside>
         </div>
     </div>
 

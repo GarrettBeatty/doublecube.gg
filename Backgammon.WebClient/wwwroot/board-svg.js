@@ -618,8 +618,8 @@ const BoardSVG = (function() {
         // Highlight valid destinations
         if (validDestinations && validDestinations.length > 0) {
             validDestinations.forEach(dest => {
-                const pointNum = dest.point || dest;
-                const isCapture = dest.isCapture || false;
+                const pointNum = dest.to || dest.point || dest;
+                const isCapture = dest.isHit || false;
 
                 if (pointNum === 25) {
                     // Bear-off highlight

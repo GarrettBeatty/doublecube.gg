@@ -124,6 +124,18 @@ window.addEventListener('load', async () => {
             }
         });
     }
+    // Add Undo button handler
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', async () => {
+            undoBtn.disabled = true;
+            try {
+                await undoMove();
+            } catch (err) {
+                log(`Failed to undo move: ${err}`, 'error');
+            }
+        });
+    }
     // Add End Turn button handler
     const endTurnBtn = document.getElementById('endTurnBtn');
     if (endTurnBtn) {
@@ -207,11 +219,19 @@ function setupEventHandlers() {
         });
     connection.on("GameUpdate", (gameState) => {
         updateGameState(gameState);
+        // Update URL to reflect current game
+        if (gameState.gameId) {
+            setGameUrl(gameState.gameId);
+        }
     });
 
     connection.on("GameStart", (gameState) => {
         log('🎮 Game started! Both players connected.', 'success');
         updateGameState(gameState);
+        // Update URL to reflect current game
+        if (gameState.gameId) {
+            setGameUrl(gameState.gameId);
+        }
     });
 
     connection.on("WaitingForOpponent", (gameId) => {
@@ -530,6 +550,19 @@ async function endTurn() {
 }
 
 // ==== CHAT ====
+function toggleChatSidebar() {
+    const chatSidebar = document.getElementById('chatSidebar');
+    const chatToggle = document.getElementById('chatToggle');
+
+    if (chatSidebar.classList.contains('collapsed')) {
+        chatSidebar.classList.remove('collapsed');
+        chatToggle.textContent = '◀';
+    } else {
+        chatSidebar.classList.add('collapsed');
+        chatToggle.textContent = '▶';
+    }
+}
+
 function handleChatKeyPress(event) {
     if (event.key === 'Enter') {
         sendChat();
@@ -885,6 +918,7 @@ async function handleBoardClick(event) {
         await executeMove(selectedChecker.point, clickedPoint);
         selectedChecker = null;
         validDestinations = [];
+        renderBoard(currentGameState);
         return;
     }
 

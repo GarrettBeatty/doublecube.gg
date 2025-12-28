@@ -21,7 +21,7 @@ public interface IGameSessionManager
     GameSession? GetGameByPlayer(string connectionId);
     
     /// <summary>
-    /// Join an existing game or create a new one in matchmaking queue
+    /// Join an existing game by ID, or create a new game (no matchmaking)
     /// </summary>
     GameSession JoinOrCreate(string playerId, string connectionId, string? gameId = null);
     
@@ -66,7 +66,6 @@ public class GameSessionManager : IGameSessionManager
     private readonly Dictionary<string, GameSession> _games = new();
     private readonly Dictionary<string, string> _playerToGame = new();
     private readonly object _lock = new object();
-    private GameSession? _waitingGame = null;
     
     public GameSession CreateGame(string? gameId = null)
     {
@@ -117,23 +116,6 @@ public class GameSessionManager : IGameSessionManager
                 }
             }
             
-            // Check if this player already has an active game (different connection - e.g., multiple tabs)
-            // This prevents the same player from creating multiple waiting games
-            if (string.IsNullOrEmpty(gameId))
-            {
-                var existingPlayerGame = _games.Values.FirstOrDefault(g => 
-                    (g.WhitePlayerId == playerId || g.RedPlayerId == playerId) && 
-                    g.Engine.Winner == null); // Only consider non-finished games
-                    
-                if (existingPlayerGame != null)
-                {
-                    // Player already in a game - reconnect them to it
-                    existingPlayerGame.UpdatePlayerConnection(playerId, connectionId);
-                    _playerToGame[connectionId] = existingPlayerGame.Id;
-                    return existingPlayerGame;
-                }
-            }
-            
             // If specific game ID provided, try to join that game
             if (!string.IsNullOrEmpty(gameId))
             {
@@ -155,27 +137,11 @@ public class GameSessionManager : IGameSessionManager
                 return newGame;
             }
             
-            // Matchmaking: join waiting game or create new one
-            if (_waitingGame != null && !_waitingGame.IsFull)
-            {
-                var game = _waitingGame;
-                game.AddPlayer(playerId, connectionId);
-                _playerToGame[connectionId] = game.Id;
-                
-                if (game.IsFull)
-                {
-                    _waitingGame = null; // Game is full, clear waiting slot
-                }
-                
-                return game;
-            }
-            
-            // Create new waiting game
-            var waitingGame = CreateGame();
-            waitingGame.AddPlayer(playerId, connectionId);
-            _playerToGame[connectionId] = waitingGame.Id;
-            _waitingGame = waitingGame;
-            return waitingGame;
+            // When gameId is null, ALWAYS create a new game (no matchmaking)
+            var game = CreateGame();
+            game.AddPlayer(playerId, connectionId);
+            _playerToGame[connectionId] = game.Id;
+            return game;
         }
     }
     
@@ -193,10 +159,6 @@ public class GameSessionManager : IGameSessionManager
                     if (game.WhitePlayerId == null && game.RedPlayerId == null)
                     {
                         _games.Remove(gameId);
-                        if (_waitingGame?.Id == gameId)
-                        {
-                            _waitingGame = null;
-                        }
                     }
                 }
                 
@@ -238,9 +200,6 @@ public class GameSessionManager : IGameSessionManager
                     _playerToGame.Remove(game.WhitePlayerId);
                 if (game.RedPlayerId != null)
                     _playerToGame.Remove(game.RedPlayerId);
-
-                if (_waitingGame?.Id == gameId)
-                    _waitingGame = null;
             }
         }
     }
