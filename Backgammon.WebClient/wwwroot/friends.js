@@ -192,29 +192,35 @@ function renderFriendsList() {
     if (!container) return;
 
     if (friendsList.length === 0) {
-        container.innerHTML = '<p class="empty-friends">No friends yet. Search for users to add!</p>';
+        container.innerHTML = '<p class="text-base-content/60 text-center py-4 italic">No friends yet. Search for users to add!</p>';
         return;
     }
 
-    container.innerHTML = friendsList.map(friend => `
-        <div class="friend-item ${friend.isOnline ? 'online' : ''}">
-            <div class="friend-info">
-                <span class="online-indicator ${friend.isOnline ? 'online' : ''}"></span>
-                <span class="friend-name">${escapeHtml(friend.displayName)}</span>
-                <span class="friend-username">@${escapeHtml(friend.username)}</span>
+    container.innerHTML = '<div class="space-y-2">' + friendsList.map(friend => `
+        <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg ${friend.isOnline ? 'border-l-4 border-success' : ''}">
+            <div class="flex items-center gap-3">
+                <div class="avatar placeholder ${friend.isOnline ? 'online' : 'offline'}">
+                    <div class="bg-neutral text-neutral-content rounded-full w-8">
+                        <span class="text-xs">${escapeHtml(friend.displayName.charAt(0).toUpperCase())}</span>
+                    </div>
+                </div>
+                <div>
+                    <p class="font-semibold text-sm">${escapeHtml(friend.displayName)}</p>
+                    <p class="text-xs text-base-content/60">@${escapeHtml(friend.username)}</p>
+                </div>
             </div>
-            <div class="friend-actions">
+            <div class="flex gap-2">
                 ${friend.isOnline && currentGameId ? `
-                    <button onclick="inviteFriendToGame('${friend.userId}')" class="btn-small btn-invite" title="Invite to game">
+                    <button onclick="inviteFriendToGame('${friend.userId}')" class="btn btn-primary btn-xs" title="Invite to game">
                         Invite
                     </button>
                 ` : ''}
-                <button onclick="removeFriend('${friend.userId}')" class="btn-small btn-remove" title="Remove friend">
-                    &times;
+                <button onclick="removeFriend('${friend.userId}')" class="btn btn-ghost btn-xs text-error" title="Remove friend">
+                    ✕
                 </button>
             </div>
         </div>
-    `).join('');
+    `).join('') + '</div>';
 }
 
 /**
@@ -230,16 +236,23 @@ function renderFriendRequests() {
     }
 
     container.innerHTML = `
-        <h4>Friend Requests (${pendingRequests.length})</h4>
-        ${pendingRequests.map(req => `
-            <div class="friend-request">
-                <span class="request-name">${escapeHtml(req.displayName)}</span>
-                <div class="request-actions">
-                    <button onclick="acceptFriendRequest('${req.userId}')" class="btn-small btn-accept">Accept</button>
-                    <button onclick="declineFriendRequest('${req.userId}')" class="btn-small btn-decline">Decline</button>
-                </div>
+        <div class="mb-4">
+            <h4 class="font-semibold text-sm mb-2 flex items-center gap-2">
+                Friend Requests
+                <span class="badge badge-primary badge-sm">${pendingRequests.length}</span>
+            </h4>
+            <div class="space-y-2">
+                ${pendingRequests.map(req => `
+                    <div class="flex items-center justify-between p-3 bg-primary/10 rounded-lg border-l-4 border-primary">
+                        <span class="font-semibold">${escapeHtml(req.displayName)}</span>
+                        <div class="flex gap-2">
+                            <button onclick="acceptFriendRequest('${req.userId}')" class="btn btn-success btn-xs">Accept</button>
+                            <button onclick="declineFriendRequest('${req.userId}')" class="btn btn-ghost btn-xs">Decline</button>
+                        </div>
+                    </div>
+                `).join('')}
             </div>
-        `).join('')}
+        </div>
     `;
 }
 
@@ -251,7 +264,7 @@ function renderSearchResults() {
     if (!container) return;
 
     if (searchResults.length === 0) {
-        container.innerHTML = '<p class="no-results">No users found</p>';
+        container.innerHTML = '<p class="text-base-content/60 text-center py-4 italic">No users found</p>';
         return;
     }
 
@@ -264,21 +277,21 @@ function renderSearchResults() {
     });
 
     if (filteredResults.length === 0) {
-        container.innerHTML = '<p class="no-results">No new users found</p>';
+        container.innerHTML = '<p class="text-base-content/60 text-center py-4 italic">No new users found</p>';
         return;
     }
 
-    container.innerHTML = filteredResults.map(user => `
-        <div class="search-result">
-            <div class="result-info">
-                <span class="result-name">${escapeHtml(user.displayName)}</span>
-                <span class="result-username">@${escapeHtml(user.username)}</span>
+    container.innerHTML = '<div class="space-y-2 mb-4">' + filteredResults.map(user => `
+        <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
+            <div>
+                <p class="font-semibold text-sm">${escapeHtml(user.displayName)}</p>
+                <p class="text-xs text-base-content/60">@${escapeHtml(user.username)}</p>
             </div>
-            <button onclick="sendFriendRequest('${user.userId}')" class="btn-small btn-add">
+            <button onclick="sendFriendRequest('${user.userId}')" class="btn btn-success btn-xs">
                 Add Friend
             </button>
         </div>
-    `).join('');
+    `).join('') + '</div>';
 }
 
 // ==== HELPER FUNCTIONS ====

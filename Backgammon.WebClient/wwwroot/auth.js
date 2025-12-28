@@ -203,26 +203,30 @@ function updateAuthUI() {
 // ==== MODAL FUNCTIONS ====
 
 function showLoginModal() {
-    document.getElementById('loginModal').style.display = 'flex';
+    const modal = document.getElementById('loginModal');
+    modal.showModal();
     document.getElementById('loginUsername').focus();
     document.getElementById('loginError').textContent = '';
 }
 
 function hideLoginModal() {
-    document.getElementById('loginModal').style.display = 'none';
+    const modal = document.getElementById('loginModal');
+    modal.close();
     document.getElementById('loginUsername').value = '';
     document.getElementById('loginPassword').value = '';
     document.getElementById('loginError').textContent = '';
 }
 
 function showRegisterModal() {
-    document.getElementById('registerModal').style.display = 'flex';
+    const modal = document.getElementById('registerModal');
+    modal.showModal();
     document.getElementById('regUsername').focus();
     document.getElementById('registerError').textContent = '';
 }
 
 function hideRegisterModal() {
-    document.getElementById('registerModal').style.display = 'none';
+    const modal = document.getElementById('registerModal');
+    modal.close();
     document.getElementById('regUsername').value = '';
     document.getElementById('regDisplayName').value = '';
     document.getElementById('regPassword').value = '';
@@ -234,7 +238,8 @@ function hideRegisterModal() {
 function showProfileModal() {
     if (!currentUser) return;
 
-    document.getElementById('profileModal').style.display = 'flex';
+    const modal = document.getElementById('profileModal');
+    modal.showModal();
     document.getElementById('profileUsername').textContent = currentUser.username;
     document.getElementById('profileDisplayName').value = currentUser.displayName;
 
@@ -251,7 +256,8 @@ function showProfileModal() {
 }
 
 function hideProfileModal() {
-    document.getElementById('profileModal').style.display = 'none';
+    const modal = document.getElementById('profileModal');
+    modal.close();
 }
 
 // ==== FORM HANDLERS ====
@@ -379,23 +385,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Close modals on Escape key
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-            hideLoginModal();
-            hideRegisterModal();
-            hideProfileModal();
-        }
-    });
-
-    // Close modals when clicking outside
-    document.getElementById('loginModal')?.addEventListener('click', (e) => {
-        if (e.target.id === 'loginModal') hideLoginModal();
-    });
-    document.getElementById('registerModal')?.addEventListener('click', (e) => {
-        if (e.target.id === 'registerModal') hideRegisterModal();
-    });
-    document.getElementById('profileModal')?.addEventListener('click', (e) => {
-        if (e.target.id === 'profileModal') hideProfileModal();
-    });
+    // DaisyUI dialog handles Escape and backdrop clicks natively
 });

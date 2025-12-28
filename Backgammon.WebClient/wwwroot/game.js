@@ -227,66 +227,72 @@ function showGamePage() {
 }
 
 function updateConnectionStatus(isConnected) {
-    const dot = document.getElementById('connectionIndicator');
-    dot.className = `connection-dot ${isConnected ? 'online' : 'offline'}`;
+    const indicator = document.getElementById('connectionIndicator');
+    if (isConnected) {
+        indicator.innerHTML = '<div class="badge badge-success gap-1"><div class="w-2 h-2 rounded-full bg-success animate-pulse"></div>Online</div>';
+    } else {
+        indicator.innerHTML = '<span class="loading loading-ring loading-sm text-error"></span>';
+    }
 }
 
 // ==== GAME LIST ====
 async function refreshGamesList() {
     if (!connection || connection.state !== 'Connected') return;
-    
+
     try {
         // Fetch all games list
         const response = await fetch('http://localhost:5000/api/games');
         const data = await response.json();
-        
+
         const gamesListEl = document.getElementById('gamesList');
-        
+
         if (data.waitingGames.length === 0 && data.activeGames.length === 0) {
-            gamesListEl.innerHTML = '<div class="loading-games">No games available. Create one to get started!</div>';
+            gamesListEl.innerHTML = '<p class="text-base-content/60 text-center py-8 italic">No games available. Create one to get started!</p>';
         } else {
-            let html = '<div class="games-stats">' +
+            let html = '<div class="text-center py-3 px-4 bg-base-200 rounded-lg mb-4 font-medium">' +
                 `${data.activeGames.length} active game(s) • ${data.waitingGames.length} waiting for players` +
                 '</div>';
-            
+
             // Show waiting games (available to join)
             if (data.waitingGames.length > 0) {
-                html += '<div class="game-section"><h3>⏳ Waiting for Opponent</h3>';
+                html += '<div class="mb-6"><h3 class="font-semibold mb-3 text-base-content/80">Waiting for Opponent</h3><div class="space-y-2">';
                 data.waitingGames.forEach(game => {
-                    const waitTime = game.minutesWaiting < 1 ? 'just now' : 
-                                    game.minutesWaiting === 1 ? '1 min ago' : 
+                    const waitTime = game.minutesWaiting < 1 ? 'just now' :
+                                    game.minutesWaiting === 1 ? '1 min ago' :
                                     `${game.minutesWaiting} mins ago`;
                     html += `
-                        <div class="game-item waiting">
-                            <div class="game-item-info">
-                                <div class="game-item-player">👤 ${game.playerName}</div>
-                                <div class="game-item-time">Created ${waitTime}</div>
+                        <div class="card bg-base-200 shadow-sm hover:shadow-md transition-all border-l-4 border-warning">
+                            <div class="card-body p-4 flex-row justify-between items-center">
+                                <div>
+                                    <p class="font-semibold">👤 ${escapeHtml(game.playerName)}</p>
+                                    <p class="text-sm text-base-content/60">Created ${waitTime}</p>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="joinSpecificGame('${game.gameId}')">Join Game</button>
                             </div>
-                            <button class="btn-join" onclick="joinSpecificGame('${game.gameId}')">Join Game</button>
                         </div>
                     `;
                 });
-                html += '</div>';
+                html += '</div></div>';
             }
-            
+
             // Show active games (spectate only - future feature)
             if (data.activeGames.length > 0) {
-                html += '<div class="game-section"><h3>🎮 Games in Progress</h3>';
+                html += '<div><h3 class="font-semibold mb-3 text-base-content/80">Games in Progress</h3><div class="space-y-2">';
                 data.activeGames.forEach(game => {
                     html += `
-                        <div class="game-item active">
-                            <div class="game-item-info">
-                                <div class="game-item-players">⚪ ${game.whitePlayer} vs 🔴 ${game.redPlayer}</div>
+                        <div class="card bg-base-200 shadow-sm border-l-4 border-success">
+                            <div class="card-body p-4">
+                                <p class="font-semibold">⚪ ${escapeHtml(game.whitePlayer)} vs 🔴 ${escapeHtml(game.redPlayer)}</p>
                             </div>
                         </div>
                     `;
                 });
-                html += '</div>';
+                html += '</div></div>';
             }
-            
+
             gamesListEl.innerHTML = html;
         }
-        
+
         // Fetch player's active games
         await refreshMyGames();
     } catch (err) {
@@ -298,42 +304,45 @@ async function refreshMyGames() {
     try {
         const response = await fetch(`http://localhost:5000/api/player/${myPlayerId}/active-games`);
         const myGames = await response.json();
-        
+
         const myGamesListEl = document.getElementById('myGamesList');
-        
+
         if (myGames.length === 0) {
-            myGamesListEl.innerHTML = '<div class="loading-games">You have no active games</div>';
+            myGamesListEl.innerHTML = '<p class="text-base-content/60 text-center py-8 italic">You have no active games</p>';
             return;
         }
-        
+
         let html = '';
         myGames.forEach(game => {
-            const turnIndicator = game.isMyTurn ? '🟢 Your Turn' : '⏳ Waiting';
-            const opponentStatus = game.isFull ? game.opponent : 'Waiting for opponent';
+            const opponentStatus = game.isFull ? escapeHtml(game.opponent) : 'Waiting for opponent';
             const timeAgo = getTimeAgo(new Date(game.lastActivity));
-            
+            const borderColor = game.isMyTurn ? 'border-success' : 'border-info';
+            const bgColor = game.isMyTurn ? 'bg-success/10' : 'bg-base-200';
+
             html += `
-                <div class="game-item my-game ${game.isMyTurn ? 'my-turn' : ''}">
-                    <div class="game-item-info">
-                        <div class="game-item-player">
-                            ${game.myColor === 'White' ? '⚪' : '🔴'} You vs ${opponentStatus}
+                <div class="card ${bgColor} shadow-sm hover:shadow-md transition-all border-l-4 ${borderColor} ${game.isMyTurn ? 'animate-pulse' : ''}">
+                    <div class="card-body p-4 flex-row justify-between items-center">
+                        <div>
+                            <p class="font-semibold">
+                                ${game.myColor === 'White' ? '⚪' : '🔴'} You vs ${opponentStatus}
+                            </p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="badge ${game.isMyTurn ? 'badge-success' : 'badge-ghost'} badge-sm">${game.isMyTurn ? 'Your Turn' : 'Waiting'}</span>
+                                <span class="text-sm text-base-content/60">Active ${timeAgo}</span>
+                            </div>
                         </div>
-                        <div class="game-item-status">
-                            <span class="turn-badge">${turnIndicator}</span>
-                            <span class="game-item-time">Active ${timeAgo}</span>
-                        </div>
+                        <button class="btn ${game.isMyTurn ? 'btn-success' : 'btn-ghost'} btn-sm" onclick="joinSpecificGame('${game.gameId}')">
+                            ${game.isMyTurn ? '▶ Play' : '👁 View'}
+                        </button>
                     </div>
-                    <button class="btn-join ${game.isMyTurn ? 'btn-join-urgent' : ''}" onclick="joinSpecificGame('${game.gameId}')">
-                        ${game.isMyTurn ? '▶️ Play' : '👁️ View'}
-                    </button>
                 </div>
             `;
         });
-        
+
         myGamesListEl.innerHTML = html;
     } catch (err) {
         console.error('Failed to fetch my games:', err);
-        document.getElementById('myGamesList').innerHTML = '<div class="loading-games">Error loading your games</div>';
+        document.getElementById('myGamesList').innerHTML = '<p class="text-error text-center py-8">Error loading your games</p>';
     }
 }
 

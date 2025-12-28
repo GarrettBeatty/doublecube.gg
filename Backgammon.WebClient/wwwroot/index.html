@@ -1,71 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Backgammon Online</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Landing Page -->
-    <div id="landingPage" class="page">
-        <div class="landing-container">
-            <header class="landing-header">
-                <h1>Backgammon Online</h1>
-                <p class="tagline">Play the classic board game with friends online</p>
-                <div id="connectionIndicator" class="connection-dot offline"></div>
+    <div id="landingPage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <!-- Header -->
+            <header class="text-center text-white mb-12 relative">
+                <h1 class="text-5xl font-bold mb-2 drop-shadow-lg">Backgammon Online</h1>
+                <p class="text-xl opacity-90">Play the classic board game with friends online</p>
+
+                <!-- Connection Indicator -->
+                <div id="connectionIndicator" class="absolute top-0 right-0">
+                    <span class="loading loading-ring loading-sm text-error"></span>
+                </div>
 
                 <!-- Auth Area -->
-                <div class="auth-area">
-                    <div id="authSection">
-                        <button class="btn-auth" onclick="showLoginModal()">Login</button>
-                        <button class="btn-auth btn-register" onclick="showRegisterModal()">Sign Up</button>
+                <div class="absolute top-0 right-12 flex gap-2 items-center">
+                    <div id="authSection" class="flex gap-2">
+                        <button class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary" onclick="showLoginModal()">Login</button>
+                        <button class="btn btn-accent btn-sm" onclick="showRegisterModal()">Sign Up</button>
                     </div>
-                    <div id="userSection" style="display: none;">
-                        <span id="usernameDisplay" class="username-display"></span>
-                        <button class="btn-auth" onclick="showProfileModal()">Profile</button>
-                        <button class="btn-auth btn-logout" onclick="logout()">Logout</button>
+                    <div id="userSection" style="display: none;" class="flex items-center gap-2">
+                        <span id="usernameDisplay" class="font-semibold"></span>
+                        <button class="btn btn-ghost btn-sm text-white" onclick="showProfileModal()">Profile</button>
+                        <button class="btn btn-error btn-sm" onclick="logout()">Logout</button>
                     </div>
                 </div>
             </header>
 
-            <div class="landing-content">
-                <div class="landing-actions">
-                    <button class="btn-large btn-primary" onclick="createGame()">
-                        <span class="btn-icon">+</span>
-                        <span class="btn-text">Create New Game</span>
-                    </button>
-                    <button class="btn-large btn-secondary" onclick="quickMatch()">
-                        <span class="btn-icon">*</span>
-                        <span class="btn-text">Quick Match</span>
-                    </button>
-                </div>
-
-                <div class="games-section">
-                    <h2>My Games</h2>
-                    <div id="myGamesList" class="games-list">
-                        <div class="loading-games">Loading your games...</div>
+            <!-- Main Content Card -->
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body">
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <button class="btn btn-primary btn-lg h-auto py-6 flex-col gap-2" onclick="createGame()">
+                            <span class="text-3xl">+</span>
+                            <span class="text-lg">Create New Game</span>
+                        </button>
+                        <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="quickMatch()">
+                            <span class="text-3xl">&#9733;</span>
+                            <span class="text-lg">Quick Match</span>
+                        </button>
                     </div>
-                </div>
 
-                <!-- Friends Section (visible when logged in) -->
-                <div class="games-section" id="friendsSection" style="display: none;">
-                    <h2>Friends</h2>
-                    <div class="friends-search">
-                        <input type="text" id="friendSearch" placeholder="Search users to add...">
-                        <button onclick="performUserSearch()" class="btn-search">Search</button>
+                    <!-- My Games Section -->
+                    <div class="mb-8">
+                        <h2 class="text-xl font-bold mb-4">My Games</h2>
+                        <div id="myGamesList" class="space-y-2">
+                            <p class="text-base-content/60 text-center py-8 italic">Loading your games...</p>
+                        </div>
                     </div>
-                    <div id="userSearchResults"></div>
-                    <div id="friendRequests"></div>
-                    <div id="friendsList">
-                        <p class="empty-friends">No friends yet. Search for users to add!</p>
-                    </div>
-                </div>
 
-                <div class="games-section">
-                    <h2>Active Games</h2>
-                    <div id="gamesList" class="games-list">
-                        <div class="loading-games">Connecting to server...</div>
+                    <!-- Friends Section (visible when logged in) -->
+                    <div id="friendsSection" style="display: none;" class="mb-8">
+                        <h2 class="text-xl font-bold mb-4">Friends</h2>
+                        <div class="join w-full mb-4">
+                            <input type="text" id="friendSearch" placeholder="Search users to add..." class="input input-bordered join-item flex-1">
+                            <button onclick="performUserSearch()" class="btn btn-primary join-item">Search</button>
+                        </div>
+                        <div id="userSearchResults" class="space-y-2"></div>
+                        <div id="friendRequests" class="space-y-2"></div>
+                        <div id="friendsList">
+                            <p class="text-base-content/60 text-center py-4 italic">No friends yet. Search for users to add!</p>
+                        </div>
+                    </div>
+
+                    <!-- Active Games Section -->
+                    <div>
+                        <h2 class="text-xl font-bold mb-4">Active Games</h2>
+                        <div id="gamesList" class="space-y-2">
+                            <p class="text-base-content/60 text-center py-8 italic">Connecting to server...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -101,74 +114,118 @@
     </div>
 
     <!-- Login Modal -->
-    <div id="loginModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2>Login</h2>
-            <input type="text" id="loginUsername" placeholder="Username" autocomplete="username">
-            <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
-            <button onclick="performLogin()" class="btn-modal btn-primary">Login</button>
-            <button onclick="hideLoginModal()" class="btn-modal btn-secondary">Cancel</button>
-            <p id="loginError" class="error-message"></p>
-            <p class="modal-footer">Don't have an account? <a href="#" onclick="hideLoginModal(); showRegisterModal();">Sign up</a></p>
+    <dialog id="loginModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Login</h3>
+            <div class="form-control w-full">
+                <input type="text" id="loginUsername" placeholder="Username" class="input input-bordered w-full" autocomplete="username">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="loginPassword" placeholder="Password" class="input input-bordered w-full" autocomplete="current-password">
+            </div>
+            <p id="loginError" class="text-error text-sm mt-2 min-h-5"></p>
+            <div class="modal-action flex-col gap-2 mt-4">
+                <button onclick="performLogin()" class="btn btn-primary w-full">Login</button>
+                <button onclick="hideLoginModal()" class="btn btn-ghost w-full">Cancel</button>
+            </div>
+            <p class="text-center text-sm mt-4 text-base-content/70">
+                Don't have an account?
+                <a href="#" class="link link-primary" onclick="hideLoginModal(); showRegisterModal();">Sign up</a>
+            </p>
         </div>
-    </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 
     <!-- Register Modal -->
-    <div id="registerModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2>Create Account</h2>
-            <input type="text" id="regUsername" placeholder="Username (3-20 chars)" autocomplete="username">
-            <input type="text" id="regDisplayName" placeholder="Display Name (optional)">
-            <input type="password" id="regPassword" placeholder="Password (8+ chars)" autocomplete="new-password">
-            <input type="password" id="regPasswordConfirm" placeholder="Confirm Password" autocomplete="new-password">
-            <input type="email" id="regEmail" placeholder="Email (optional)">
-            <p class="claim-info">Your anonymous game history will be linked to this account.</p>
-            <button onclick="performRegister()" class="btn-modal btn-primary">Create Account</button>
-            <button onclick="hideRegisterModal()" class="btn-modal btn-secondary">Cancel</button>
-            <p id="registerError" class="error-message"></p>
-            <p class="modal-footer">Already have an account? <a href="#" onclick="hideRegisterModal(); showLoginModal();">Login</a></p>
+    <dialog id="registerModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create Account</h3>
+            <div class="form-control w-full">
+                <input type="text" id="regUsername" placeholder="Username (3-20 chars)" class="input input-bordered w-full" autocomplete="username">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="text" id="regDisplayName" placeholder="Display Name (optional)" class="input input-bordered w-full">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="regPassword" placeholder="Password (8+ chars)" class="input input-bordered w-full" autocomplete="new-password">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="regPasswordConfirm" placeholder="Confirm Password" class="input input-bordered w-full" autocomplete="new-password">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="email" id="regEmail" placeholder="Email (optional)" class="input input-bordered w-full">
+            </div>
+            <div class="alert alert-info mt-4 text-sm">
+                <span>Your anonymous game history will be linked to this account.</span>
+            </div>
+            <p id="registerError" class="text-error text-sm mt-2 min-h-5"></p>
+            <div class="modal-action flex-col gap-2 mt-4">
+                <button onclick="performRegister()" class="btn btn-primary w-full">Create Account</button>
+                <button onclick="hideRegisterModal()" class="btn btn-ghost w-full">Cancel</button>
+            </div>
+            <p class="text-center text-sm mt-4 text-base-content/70">
+                Already have an account?
+                <a href="#" class="link link-primary" onclick="hideRegisterModal(); showLoginModal();">Login</a>
+            </p>
         </div>
-    </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 
     <!-- Profile Modal -->
-    <div id="profileModal" class="modal" style="display: none;">
-        <div class="modal-content modal-profile">
-            <h2>Your Profile</h2>
+    <dialog id="profileModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box max-w-lg">
+            <h3 class="font-bold text-lg mb-6">Your Profile</h3>
 
-            <div class="profile-section">
-                <h3>Account Info</h3>
-                <p><strong>Username:</strong> <span id="profileUsername"></span></p>
-                <label>Display Name:
-                    <input type="text" id="profileDisplayName">
-                </label>
-                <button onclick="updateProfile()" class="btn-modal btn-primary">Update</button>
+            <!-- Account Info -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Account Info</h4>
+                <p class="mb-2"><span class="text-base-content/70">Username:</span> <span id="profileUsername" class="font-semibold"></span></p>
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Display Name</span>
+                    </label>
+                    <input type="text" id="profileDisplayName" class="input input-bordered w-full">
+                </div>
+                <button onclick="updateProfile()" class="btn btn-primary btn-sm mt-3">Update</button>
             </div>
 
-            <div class="profile-section">
-                <h3>Statistics</h3>
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <span class="stat-value" id="statTotalGames">0</span>
-                        <span class="stat-label">Games Played</span>
+            <div class="divider"></div>
+
+            <!-- Statistics -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Statistics</h4>
+                <div class="stats stats-vertical sm:stats-horizontal shadow w-full bg-base-200">
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Games</div>
+                        <div class="stat-value text-primary" id="statTotalGames">0</div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="statWins">0</span>
-                        <span class="stat-label">Wins</span>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Wins</div>
+                        <div class="stat-value text-success" id="statWins">0</div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="statWinRate">0%</span>
-                        <span class="stat-label">Win Rate</span>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Win Rate</div>
+                        <div class="stat-value" id="statWinRate">0%</div>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-value" id="statBestStreak">0</span>
-                        <span class="stat-label">Best Streak</span>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Best Streak</div>
+                        <div class="stat-value text-warning" id="statBestStreak">0</div>
                     </div>
                 </div>
             </div>
 
-            <button onclick="hideProfileModal()" class="btn-modal btn-secondary">Close</button>
+            <div class="modal-action">
+                <button onclick="hideProfileModal()" class="btn btn-ghost">Close</button>
+            </div>
         </div>
-    </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
 
     <!-- Quick Join Modal (hidden) -->
     <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
