@@ -6,7 +6,8 @@ const BoardSVG = (function() {
 
     // Configuration constants
     const CONFIG = {
-        viewBox: { width: 1000, height: 500 },
+        viewBox: { width: 1100, height: 500 }, // Extended width for sidebar
+        sidebarWidth: 80, // Left sidebar for doubling cube
         margin: 30,
         barWidth: 70,
         pointWidth: 72,
@@ -17,8 +18,11 @@ const BoardSVG = (function() {
         bearoffWidth: 50
     };
 
-    // Calculate bar X position (after 6 points + margin)
-    CONFIG.barX = CONFIG.margin + (6 * CONFIG.pointWidth);
+    // Calculate board start X (after sidebar)
+    CONFIG.boardStartX = CONFIG.sidebarWidth + CONFIG.margin;
+
+    // Calculate bar X position (after sidebar + 6 points + margin)
+    CONFIG.barX = CONFIG.boardStartX + (6 * CONFIG.pointWidth);
 
     // Color palette - Flat Modern Design
     const COLORS = {
@@ -57,7 +61,7 @@ const BoardSVG = (function() {
         for (let i = 0; i < 6; i++) {
             const pointNum = 13 + i;
             POINT_COORDS[pointNum] = {
-                x: CONFIG.margin + (i * CONFIG.pointWidth),
+                x: CONFIG.boardStartX + (i * CONFIG.pointWidth),
                 y: CONFIG.padding,
                 direction: 1
             };
@@ -78,7 +82,7 @@ const BoardSVG = (function() {
         for (let i = 0; i < 6; i++) {
             const pointNum = 12 - i;
             POINT_COORDS[pointNum] = {
-                x: CONFIG.margin + (i * CONFIG.pointWidth),
+                x: CONFIG.boardStartX + (i * CONFIG.pointWidth),
                 y: CONFIG.viewBox.height - CONFIG.padding,
                 direction: -1
             };
@@ -105,6 +109,7 @@ const BoardSVG = (function() {
     let barGroup = null;
     let bearoffGroup = null;
     let diceGroup = null;
+    let cubeGroup = null;
     let initialized = false;
     let clickHandler = null;
 
@@ -279,6 +284,29 @@ const BoardSVG = (function() {
         });
         svgElement.appendChild(border);
 
+        // Left sidebar for doubling cube
+        const sidebar = createSVGElement('rect', {
+            'class': 'cube-sidebar',
+            'x': 5,
+            'y': 5,
+            'width': CONFIG.sidebarWidth,
+            'height': CONFIG.viewBox.height - 10,
+            'rx': 4
+        });
+        svgElement.appendChild(sidebar);
+
+        // Sidebar divider line (right edge of sidebar)
+        const sidebarDivider = createSVGElement('line', {
+            'class': 'sidebar-divider',
+            'x1': CONFIG.sidebarWidth + 5,
+            'y1': 5,
+            'x2': CONFIG.sidebarWidth + 5,
+            'y2': CONFIG.viewBox.height - 5,
+            'stroke': COLORS.boardBorder,
+            'stroke-width': 2
+        });
+        svgElement.appendChild(sidebarDivider);
+
         // Bar
         barGroup = createSVGElement('g', { 'id': 'bar' });
         const barRect = createSVGElement('rect', {
@@ -325,6 +353,10 @@ const BoardSVG = (function() {
         diceGroup = createSVGElement('g', { 'id': 'dice' });
         svgElement.appendChild(diceGroup);
 
+        // Doubling cube group (in center bar)
+        cubeGroup = createSVGElement('g', { 'id': 'cube' });
+        svgElement.appendChild(cubeGroup);
+
         // Checkers group (rendered on top)
         checkersGroup = createSVGElement('g', { 'id': 'checkers' });
         svgElement.appendChild(checkersGroup);
@@ -365,12 +397,12 @@ const BoardSVG = (function() {
 
         // Render bar checkers
         if (gameState.whiteCheckersOnBar > 0) {
-            const maxVisible = Math.min(gameState.whiteCheckersOnBar, 3);
+            const maxVisible = Math.min(gameState.whiteCheckersOnBar, 2);
             for (let i = 0; i < maxVisible; i++) {
                 const isSelected = selectedChecker && selectedChecker.point === 0;
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 + 40 + (i * 50)
+                    y: CONFIG.viewBox.height / 2 + 100 + (i * 50) // Moved further down to avoid dice
                 };
                 const checker = createSVGElement('circle', {
                     'class': `checker checker-white ${isSelected ? 'selected' : ''}`,
@@ -382,10 +414,10 @@ const BoardSVG = (function() {
                 });
                 checkersGroup.appendChild(checker);
             }
-            if (gameState.whiteCheckersOnBar > 3) {
+            if (gameState.whiteCheckersOnBar > 2) {
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 + 40 + (2 * 50)
+                    y: CONFIG.viewBox.height / 2 + 100
                 };
                 const text = createSVGElement('text', {
                     'class': 'checker-count count-dark',
@@ -400,12 +432,12 @@ const BoardSVG = (function() {
         }
 
         if (gameState.redCheckersOnBar > 0) {
-            const maxVisible = Math.min(gameState.redCheckersOnBar, 3);
+            const maxVisible = Math.min(gameState.redCheckersOnBar, 2);
             for (let i = 0; i < maxVisible; i++) {
                 const isSelected = selectedChecker && selectedChecker.point === 0;
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 - 40 - (i * 50)
+                    y: CONFIG.viewBox.height / 2 - 100 - (i * 50) // Moved further up to avoid dice
                 };
                 const checker = createSVGElement('circle', {
                     'class': `checker checker-red ${isSelected ? 'selected' : ''}`,
@@ -417,10 +449,10 @@ const BoardSVG = (function() {
                 });
                 checkersGroup.appendChild(checker);
             }
-            if (gameState.redCheckersOnBar > 3) {
+            if (gameState.redCheckersOnBar > 2) {
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 - 40 - (2 * 50)
+                    y: CONFIG.viewBox.height / 2 - 100
                 };
                 const text = createSVGElement('text', {
                     'class': 'checker-count count-light',
@@ -577,6 +609,76 @@ const BoardSVG = (function() {
         });
     }
 
+    // Render doubling cube
+    function renderCube(gameState) {
+        if (!cubeGroup) return;
+
+        // Clear existing cube
+        cubeGroup.innerHTML = '';
+
+        if (!gameState) return;
+
+        const cubeValue = gameState.doublingCubeValue || 1;
+        const cubeOwner = gameState.doublingCubeOwner; // null, "White", or "Red"
+
+        // Position cube in left sidebar based on owner
+        let cubeX, cubeY;
+        const sidebarCenterX = 5 + CONFIG.sidebarWidth / 2; // Center of sidebar
+        const boardCenterY = CONFIG.viewBox.height / 2;
+
+        cubeX = sidebarCenterX; // Always centered in sidebar
+
+        if (cubeOwner === null) {
+            // Centered vertically when neutral
+            cubeY = boardCenterY;
+        } else if (cubeOwner === "White") {
+            // Bottom third (White's side)
+            cubeY = CONFIG.viewBox.height * 0.75;
+        } else if (cubeOwner === "Red") {
+            // Top third (Red's side)
+            cubeY = CONFIG.viewBox.height * 0.25;
+        }
+
+        const cubeSize = 60;
+        const cubeRadius = 8;
+
+        // Create cube (rounded square)
+        const cubeRect = createSVGElement('rect', {
+            'class': 'doubling-cube',
+            'x': cubeX - cubeSize / 2,
+            'y': cubeY - cubeSize / 2,
+            'width': cubeSize,
+            'height': cubeSize,
+            'rx': cubeRadius,
+            'ry': cubeRadius
+        });
+        cubeGroup.appendChild(cubeRect);
+
+        // Cube value text
+        const valueText = createSVGElement('text', {
+            'class': 'cube-value',
+            'x': cubeX,
+            'y': cubeY,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'central'
+        });
+        valueText.textContent = cubeValue;
+        cubeGroup.appendChild(valueText);
+
+        // Owner indicator text (small label)
+        if (cubeOwner !== null) {
+            const ownerText = createSVGElement('text', {
+                'class': 'cube-owner',
+                'x': cubeX,
+                'y': cubeY + cubeSize / 2 + 15,
+                'text-anchor': 'middle',
+                'dominant-baseline': 'central'
+            });
+            ownerText.textContent = `${cubeOwner}`;
+            cubeGroup.appendChild(ownerText);
+        }
+    }
+
     // Update highlights based on selection state
     function updateHighlights(validSources, selectedPoint, validDestinations) {
         if (!pointsGroup) return;
@@ -585,6 +687,10 @@ const BoardSVG = (function() {
         pointsGroup.querySelectorAll('.point').forEach(point => {
             point.classList.remove('valid-source', 'selected', 'valid-destination', 'capture');
         });
+
+        // Reset bar and bear-off highlights
+        barGroup?.classList.remove('valid-source', 'selected', 'valid-destination', 'capture');
+        bearoffGroup?.classList.remove('valid-destination');
 
         // Highlight valid source points
         if (validSources && validSources.length > 0) {
@@ -634,8 +740,6 @@ const BoardSVG = (function() {
                     }
                 }
             });
-        } else {
-            bearoffGroup?.classList.remove('valid-destination');
         }
     }
 
@@ -647,6 +751,7 @@ const BoardSVG = (function() {
         }
 
         renderCheckers(gameState, selectedChecker);
+        renderCube(gameState);
         renderDice(diceState);
         updateHighlights(
             validSources,
@@ -666,6 +771,11 @@ const BoardSVG = (function() {
         const x = (clientX - rect.left) * scaleX;
         const y = (clientY - rect.top) * scaleY;
 
+        // Ignore clicks on sidebar
+        if (x < CONFIG.sidebarWidth + 10) {
+            return null;
+        }
+
         // Check bar
         if (x >= CONFIG.barX && x <= CONFIG.barX + CONFIG.barWidth) {
             return 0; // Bar
@@ -682,31 +792,32 @@ const BoardSVG = (function() {
 
         let pointIndex;
         if (isLeftSide) {
-            pointIndex = Math.floor((x - CONFIG.margin) / CONFIG.pointWidth);
+            pointIndex = Math.floor((x - CONFIG.boardStartX) / CONFIG.pointWidth);
             if (pointIndex < 0 || pointIndex > 5) return null;
         } else {
             const rightStart = CONFIG.barX + CONFIG.barWidth;
             pointIndex = Math.floor((x - rightStart) / CONFIG.pointWidth);
             if (pointIndex < 0 || pointIndex > 5) return null;
-            pointIndex += 6;
         }
 
         // Map to point number
+        let result;
         if (isTop) {
             // Top row: 13-18 (left), 19-24 (right)
-            if (pointIndex < 6) {
-                return 13 + pointIndex;
+            if (isLeftSide) {
+                result = 13 + pointIndex;  // Points 13-18
             } else {
-                return 13 + pointIndex; // 19-24
+                result = 19 + pointIndex;  // Points 19-24
             }
         } else {
             // Bottom row: 12-7 (left), 6-1 (right)
-            if (pointIndex < 6) {
-                return 12 - pointIndex;
+            if (isLeftSide) {
+                result = 12 - pointIndex;  // Points 12-7
             } else {
-                return 12 - pointIndex; // 6-1
+                result = 6 - pointIndex;   // Points 6-1
             }
         }
+        return result;
     }
 
     // Animate checker movement

@@ -228,7 +228,9 @@ public class GameSession
             WhiteBornOff = Engine.WhitePlayer.CheckersBornOff,
             RedBornOff = Engine.RedPlayer.CheckersBornOff,
             Status = IsFull ? (Engine.Winner != null ? GameStatus.Completed : GameStatus.InProgress) : GameStatus.WaitingForPlayer,
-            Winner = Engine.Winner?.Color
+            Winner = Engine.Winner?.Color,
+            DoublingCubeValue = Engine.DoublingCube.Value,
+            DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString()
         };
         
         // Get valid moves for current player

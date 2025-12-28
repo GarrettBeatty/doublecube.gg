@@ -29,6 +29,8 @@ public class GameState
     public GameStatus Status { get; set; }
     public CheckerColor? Winner { get; set; }
     public string? WinType { get; set; }
+    public int DoublingCubeValue { get; set; }
+    public string? DoublingCubeOwner { get; set; }
 }
 
 /// <summary>

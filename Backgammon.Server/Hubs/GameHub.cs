@@ -175,27 +175,45 @@ public class GameHub : Hub
     {
         try
         {
+            _logger.LogInformation("GetValidDestinations called for point {FromPoint}", fromPoint);
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
+            {
+                _logger.LogWarning("No session found for player");
                 return new List<MoveDto>();
+            }
 
             if (!session.IsPlayerTurn(Context.ConnectionId))
+            {
+                _logger.LogWarning("Not player's turn");
                 return new List<MoveDto>();
+            }
 
             if (session.Engine.RemainingMoves.Count == 0)
+            {
+                _logger.LogWarning("No remaining moves");
                 return new List<MoveDto>();
+            }
 
-            var validMoves = session.Engine.GetValidMoves()
+            var allValidMoves = session.Engine.GetValidMoves();
+            _logger.LogInformation("Total valid moves: {Count}", allValidMoves.Count);
+            foreach (var m in allValidMoves)
+            {
+                _logger.LogInformation("  Valid move: {From} -> {To} (die: {Die})", m.From, m.To, m.DieValue);
+            }
+
+            var validMoves = allValidMoves
                 .Where(m => m.From == fromPoint)
                 .Select(m => new MoveDto
                 {
                     From = m.From,
                     To = m.To,
-                    DieValue = Math.Abs(m.To - m.From),
+                    DieValue = m.DieValue,
                     IsHit = WillHit(session.Engine, m)
                 })
                 .ToList();
-            
+
+            _logger.LogInformation("Filtered moves from point {FromPoint}: {Count}", fromPoint, validMoves.Count);
             return validMoves;
         }
         catch (Exception ex)
@@ -275,27 +293,49 @@ public class GameHub : Hub
     {
         try
         {
+            _logger.LogInformation("MakeMove called: from {From} to {To}", from, to);
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
+                _logger.LogWarning("No session found for player");
                 await Clients.Caller.SendAsync("Error", "Not in a game");
                 return;
             }
 
             if (!session.IsPlayerTurn(Context.ConnectionId))
             {
+                _logger.LogWarning("Not player's turn");
                 await Clients.Caller.SendAsync("Error", "Not your turn");
                 return;
             }
 
-            var dieValue = Math.Abs(to - from);
-            var move = new Move(from, to, dieValue);
-            
-            if (!session.Engine.ExecuteMove(move))
+            _logger.LogInformation("Current player: {Player}, Remaining moves: {Moves}",
+                session.Engine.CurrentPlayer.Name, string.Join(",", session.Engine.RemainingMoves));
+
+            // Find the correct die value from valid moves
+            var validMoves = session.Engine.GetValidMoves();
+            var matchingMove = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
+
+            if (matchingMove == null)
             {
+                _logger.LogWarning("No valid move found from {From} to {To}", from, to);
+                await Clients.Caller.SendAsync("Error", "Invalid move - no matching valid move");
+                return;
+            }
+
+            _logger.LogInformation("Found valid move with die value: {DieValue}", matchingMove.DieValue);
+
+            var isValid = session.Engine.IsValidMove(matchingMove);
+            _logger.LogInformation("Move validity check: {IsValid}", isValid);
+
+            if (!session.Engine.ExecuteMove(matchingMove))
+            {
+                _logger.LogWarning("ExecuteMove returned false - invalid move");
                 await Clients.Caller.SendAsync("Error", "Invalid move");
                 return;
             }
+
+            _logger.LogInformation("Move executed successfully");
 
             session.UpdateActivity();
             
@@ -461,6 +501,235 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error ending turn");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Offer to double the stakes to the opponent
+    /// </summary>
+    public async Task OfferDouble()
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            if (!session.IsPlayerTurn(Context.ConnectionId))
+            {
+                await Clients.Caller.SendAsync("Error", "Not your turn");
+                return;
+            }
+
+            // Can only double before rolling dice
+            if (session.Engine.RemainingMoves.Count > 0 || session.Engine.Dice.Die1 != 0)
+            {
+                await Clients.Caller.SendAsync("Error", "Can only double before rolling dice");
+                return;
+            }
+
+            // Check if player can offer double
+            if (!session.Engine.OfferDouble())
+            {
+                await Clients.Caller.SendAsync("Error", "Cannot offer double - opponent owns the cube");
+                return;
+            }
+
+            var currentValue = session.Engine.DoublingCube.Value;
+            var newValue = currentValue * 2;
+
+            // Notify opponent of the double offer
+            var opponentConnectionId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
+                ? session.RedConnectionId
+                : session.WhiteConnectionId;
+
+            if (opponentConnectionId != null)
+            {
+                await Clients.Client(opponentConnectionId).SendAsync("DoubleOffered", currentValue, newValue);
+                _logger.LogInformation("Player {ConnectionId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
+                    Context.ConnectionId, session.Id, currentValue, newValue);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error offering double");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Accept a double offer from the opponent
+    /// </summary>
+    public async Task AcceptDouble()
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            // Accept the double
+            session.Engine.AcceptDouble();
+            session.UpdateActivity();
+
+            // Send updated state to both players
+            if (session.WhiteConnectionId != null)
+            {
+                var whiteState = session.GetState(session.WhiteConnectionId);
+                await Clients.Client(session.WhiteConnectionId).SendAsync("DoubleAccepted", whiteState);
+            }
+            if (session.RedConnectionId != null)
+            {
+                var redState = session.GetState(session.RedConnectionId);
+                await Clients.Client(session.RedConnectionId).SendAsync("DoubleAccepted", redState);
+            }
+
+            // Save game state
+            await SaveGameStateAsync(session);
+
+            _logger.LogInformation("Player {ConnectionId} accepted double in game {GameId}. New stakes: {Stakes}x",
+                Context.ConnectionId, session.Id, session.Engine.DoublingCube.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting double");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Decline a double offer (opponent wins at current stakes)
+    /// </summary>
+    public async Task DeclineDouble()
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            // Determine declining player and opponent
+            var decliningColor = session.GetPlayerColor(Context.ConnectionId);
+            if (decliningColor == null)
+            {
+                await Clients.Caller.SendAsync("Error", "You are not a player in this game");
+                return;
+            }
+
+            var decliningPlayer = decliningColor == CheckerColor.White
+                ? session.Engine.WhitePlayer
+                : session.Engine.RedPlayer;
+            var opponentPlayer = decliningColor == CheckerColor.White
+                ? session.Engine.RedPlayer
+                : session.Engine.WhitePlayer;
+
+            // Forfeit game - opponent wins at current stakes
+            session.Engine.ForfeitGame(opponentPlayer);
+
+            // Get stakes from current cube value (before the proposed double)
+            var stakes = session.Engine.GetGameResult();
+
+            // Broadcast game over
+            var finalState = session.GetState();
+            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+            _logger.LogInformation("Game {GameId} ended - player declined double. Winner: {Winner} (Stakes: {Stakes})",
+                session.Id, opponentPlayer.Name, stakes);
+
+            // Update database and stats (async)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+                    var game = GameEngineMapper.ToGame(session);
+                    await UpdateUserStatsAfterGame(game);
+                    _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error declining double");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Abandon the current game. The opponent wins automatically.
+    /// </summary>
+    public async Task AbandonGame()
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            // Determine abandoning player and opponent
+            var abandoningColor = session.GetPlayerColor(Context.ConnectionId);
+            if (abandoningColor == null)
+            {
+                await Clients.Caller.SendAsync("Error", "You are not a player in this game");
+                return;
+            }
+
+            var abandoningPlayer = abandoningColor == CheckerColor.White
+                ? session.Engine.WhitePlayer
+                : session.Engine.RedPlayer;
+            var opponentPlayer = abandoningColor == CheckerColor.White
+                ? session.Engine.RedPlayer
+                : session.Engine.WhitePlayer;
+
+            // Forfeit game - set opponent as winner
+            session.Engine.ForfeitGame(opponentPlayer);
+
+            // Get stakes from doubling cube
+            var stakes = session.Engine.GetGameResult();
+
+            // Broadcast game over
+            var finalState = session.GetState();
+            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+            _logger.LogInformation("Game {GameId} abandoned by {Player}. Winner: {Winner} (Stakes: {Stakes})",
+                session.Id, abandoningPlayer.Name, opponentPlayer.Name, stakes);
+
+            // Update database and stats (async)
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
+                    var game = GameEngineMapper.ToGame(session);
+                    await UpdateUserStatsAfterGame(game);
+                    _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to update abandoned game {GameId}", session.Id);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error abandoning game");
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
     }

@@ -120,11 +120,17 @@
                                 <button id="rollBtn" class="btn btn-primary btn-lg gap-2" disabled>
                                     🎲 Roll Dice
                                 </button>
+                                <button id="doubleBtn" class="btn btn-warning btn-lg gap-2" disabled>
+                                    2x Double
+                                </button>
                                 <button id="undoBtn" class="btn btn-warning btn-lg gap-2" disabled>
                                     ↩️ Undo
                                 </button>
                                 <button id="endTurnBtn" class="btn btn-success btn-lg gap-2" disabled>
                                     ✓ End Turn
+                                </button>
+                                <button id="abandonBtn" class="btn btn-error btn-lg gap-2" onclick="showAbandonConfirm()">
+                                    ⚠️ Abandon Game
                                 </button>
                                 <button class="btn btn-ghost btn-sm gap-2" onclick="leaveGameAndReturn()">
                                     ← Leave
@@ -267,6 +273,65 @@
 
             <div class="modal-action">
                 <button onclick="hideProfileModal()" class="btn btn-ghost">Close</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Abandon Game Confirmation Modal -->
+    <dialog id="abandonConfirmModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4 text-error">Abandon Game?</h3>
+            <p class="mb-4">Your opponent will win if you abandon this game.</p>
+            <p class="mb-6 text-sm text-base-content/70">
+                This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">1x</span>
+            </p>
+            <div class="modal-action gap-2">
+                <button onclick="confirmAbandon()" class="btn btn-error">Abandon Game</button>
+                <button onclick="cancelAbandon()" class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Double Offer Modal -->
+    <dialog id="doubleOfferModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Double Offer</h3>
+            <p class="mb-2">Your opponent offers to double the stakes!</p>
+            <p class="mb-6">
+                Current stakes: <span id="doubleCurrentStakes" class="font-bold">1x</span><br/>
+                New stakes if accepted: <span id="doubleNewStakes" class="font-bold text-warning">2x</span>
+            </p>
+            <p class="text-sm text-base-content/70 mb-6">
+                Declining will concede the game at current stakes.
+            </p>
+            <div class="modal-action gap-2">
+                <button onclick="acceptDouble()" class="btn btn-success">Accept</button>
+                <button onclick="declineDouble()" class="btn btn-error">Decline (Lose)</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Double Confirm Modal -->
+    <dialog id="doubleConfirmModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Confirm Double</h3>
+            <p class="mb-2">You are offering to double the stakes.</p>
+            <p class="mb-6">
+                Current stakes: <span id="doubleConfirmCurrentStakes" class="font-bold">1x</span><br/>
+                New stakes if accepted: <span id="doubleConfirmNewStakes" class="font-bold text-warning">2x</span>
+            </p>
+            <p class="text-sm text-base-content/70 mb-6">
+                If your opponent declines, they lose at the current stakes.
+            </p>
+            <div class="modal-action gap-2">
+                <button onclick="confirmOfferDouble()" class="btn btn-success">Confirm Double</button>
+                <button onclick="cancelOfferDouble()" class="btn btn-ghost">Cancel</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">

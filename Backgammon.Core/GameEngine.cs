@@ -415,6 +415,18 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Forfeit the game, setting the specified player as the winner
+    /// </summary>
+    public void ForfeitGame(Player winner)
+    {
+        if (!GameStarted || GameOver)
+            throw new InvalidOperationException("Cannot forfeit - game is not in progress");
+
+        Winner = winner;
+        GameOver = true;
+    }
+
+    /// <summary>
     /// Calculate game result (normal, gammon, or backgammon)
     /// </summary>
     public int GetGameResult()

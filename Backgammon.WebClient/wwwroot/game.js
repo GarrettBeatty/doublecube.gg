@@ -148,6 +148,20 @@ window.addEventListener('load', async () => {
             }
         });
     }
+    // Add Double button handler
+    const doubleBtn = document.getElementById('doubleBtn');
+    if (doubleBtn) {
+        doubleBtn.addEventListener('click', () => {
+            // Show confirmation modal
+            if (currentGameState) {
+                const currentStakes = currentGameState.doublingCubeValue || 1;
+                const newStakes = currentStakes * 2;
+                document.getElementById('doubleConfirmCurrentStakes').textContent = `${currentStakes}x`;
+                document.getElementById('doubleConfirmNewStakes').textContent = `${newStakes}x`;
+            }
+            document.getElementById('doubleConfirmModal').showModal();
+        });
+    }
 });
 
 // Handle browser back/forward buttons
@@ -248,6 +262,18 @@ function setupEventHandlers() {
 
     connection.on("OpponentLeft", () => {
         log('👋 Opponent left the game', 'warning');
+    });
+
+    connection.on("DoubleOffered", (currentStakes, newStakes) => {
+        log(`🎲 Opponent offers to double! Stakes would be ${newStakes}x`, 'warning');
+        document.getElementById('doubleCurrentStakes').textContent = `${currentStakes}x`;
+        document.getElementById('doubleNewStakes').textContent = `${newStakes}x`;
+        document.getElementById('doubleOfferModal').showModal();
+    });
+
+    connection.on("DoubleAccepted", (gameState) => {
+        log(`✓ Double accepted! New stakes: ${gameState.doublingCubeValue}x`, 'success');
+        updateGameState(gameState);
     });
 
     connection.on("Error", (errorMessage) => {
@@ -549,6 +575,73 @@ async function endTurn() {
     }
 }
 
+// ==== ABANDON GAME ====
+function showAbandonConfirm() {
+    // Display current stakes in modal
+    if (currentGameState && currentGameState.doublingCubeValue) {
+        document.getElementById('abandonStakes').textContent =
+            `${currentGameState.doublingCubeValue}x`;
+    }
+    document.getElementById('abandonConfirmModal').showModal();
+}
+
+function cancelAbandon() {
+    document.getElementById('abandonConfirmModal').close();
+}
+
+async function confirmAbandon() {
+    try {
+        await connection.invoke("AbandonGame");
+        log('Game abandoned. Opponent wins.', 'info');
+        document.getElementById('abandonConfirmModal').close();
+    } catch (err) {
+        log(`Failed to abandon: ${err}`, 'error');
+        document.getElementById('abandonConfirmModal').close();
+    }
+}
+
+// ==== DOUBLING CUBE ====
+function confirmOfferDouble() {
+    offerDouble();
+}
+
+function cancelOfferDouble() {
+    document.getElementById('doubleConfirmModal').close();
+}
+
+async function offerDouble() {
+    try {
+        await connection.invoke("OfferDouble");
+        log('Double offered to opponent...', 'info');
+        document.getElementById('doubleConfirmModal').close();
+    } catch (err) {
+        log(`Failed to offer double: ${err}`, 'error');
+        document.getElementById('doubleConfirmModal').close();
+    }
+}
+
+async function acceptDouble() {
+    try {
+        await connection.invoke("AcceptDouble");
+        log('Double accepted!', 'success');
+        document.getElementById('doubleOfferModal').close();
+    } catch (err) {
+        log(`Failed to accept double: ${err}`, 'error');
+        document.getElementById('doubleOfferModal').close();
+    }
+}
+
+async function declineDouble() {
+    try {
+        await connection.invoke("DeclineDouble");
+        log('Double declined. You lose at current stakes.', 'warning');
+        document.getElementById('doubleOfferModal').close();
+    } catch (err) {
+        log(`Failed to decline double: ${err}`, 'error');
+        document.getElementById('doubleOfferModal').close();
+    }
+}
+
 // ==== CHAT ====
 function toggleChatSidebar() {
     const chatSidebar = document.getElementById('chatSidebar');
@@ -734,6 +827,22 @@ function updateGameState(state, isSpectator = false) {
         endTurnBtn.disabled = !canEndTurn;
     }
 
+    const doubleBtn = document.getElementById('doubleBtn');
+    if (doubleBtn) {
+        // Can offer double only if:
+        // 1. It's your turn
+        // 2. You haven't rolled dice yet (before rolling)
+        // 3. Game is in progress (not waiting for player)
+        // 4. You own the cube OR it's centered (null)
+        const myColorString = myColor === 0 ? "White" : "Red";
+        const canDouble = isMyTurn &&
+                          !hasDice &&
+                          !isWaitingForPlayer &&
+                          (state.doublingCubeOwner === null ||
+                           state.doublingCubeOwner === myColorString);
+        doubleBtn.disabled = !canDouble;
+    }
+
     // Check for winner
     if (state.winner) {
         log(`🏆 Game Over! ${state.winner} wins!`, 'success');
@@ -899,13 +1008,24 @@ function setupBoardClickHandler() {
 }
 
 async function handleBoardClick(event) {
-    if (!currentGameState || !currentGameState.isYourTurn) return;
-    if (currentGameState.remainingMoves.length === 0) return;
+    console.log('=== BOARD CLICK START ===');
+    if (!currentGameState || !currentGameState.isYourTurn) {
+        console.log('Not your turn or no game state');
+        return;
+    }
+    if (currentGameState.remainingMoves.length === 0) {
+        console.log('No remaining moves');
+        return;
+    }
 
     // Get clicked point from SVG coordinates
     const clickedPoint = BoardSVG.getPointAtPosition(event.clientX, event.clientY);
+    console.log('Clicked point:', clickedPoint);
+    console.log('Current selection:', selectedChecker);
+    console.log('Valid destinations:', JSON.stringify(validDestinations));
 
     if (clickedPoint === null) {
+        console.log('Clicked outside - deselecting');
         // Clicked outside any point - deselect
         selectedChecker = null;
         validDestinations = [];
@@ -914,7 +1034,11 @@ async function handleBoardClick(event) {
     }
 
     // If we have a selection and clicked a valid destination
-    if (selectedChecker !== null && validDestinations.some(m => m.to === clickedPoint)) {
+    const matchingDest = validDestinations.find(m => m.to === clickedPoint);
+    console.log('Matching destination:', matchingDest);
+
+    if (selectedChecker !== null && matchingDest) {
+        console.log('*** EXECUTING MOVE from', selectedChecker.point, 'to', clickedPoint);
         await executeMove(selectedChecker.point, clickedPoint);
         selectedChecker = null;
         validDestinations = [];
@@ -923,34 +1047,42 @@ async function handleBoardClick(event) {
     }
 
     // Try to select this checker
+    console.log('Trying to select checker at point', clickedPoint);
     await selectChecker(clickedPoint);
 }
 
 async function selectChecker(point) {
     try {
+        console.log('=== SELECT CHECKER at point', point, '===');
         // Check if this point has our checkers
         const pointData = currentGameState.board.find(p => p.position === point);
         const myColorValue = myColor === 'White' ? 0 : 1;
-        
+        console.log('Point data:', pointData, 'My color value:', myColorValue);
+
         // Special case: check bar
         if (point === 0) {
             const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+            console.log('Bar selection - checkers on bar:', onBar);
             if (onBar === 0) {
+                console.log('No checkers on bar - cannot select');
                 selectedChecker = null;
                 validDestinations = [];
                 renderBoard(currentGameState);
                 return;
             }
         } else if (!pointData || pointData.color !== myColorValue || pointData.count === 0) {
+            console.log('Point not selectable - wrong color or empty');
             selectedChecker = null;
             validDestinations = [];
             renderBoard(currentGameState);
             return;
         }
-        
+
         // Get valid destinations from this point
+        console.log('Invoking GetValidDestinations for point', point);
         const destinations = await connection.invoke("GetValidDestinations", point);
-        
+        console.log('Received destinations:', JSON.stringify(destinations));
+
         if (destinations.length === 0) {
             log(`No valid moves from point ${point}`, 'info');
             selectedChecker = null;
@@ -958,9 +1090,10 @@ async function selectChecker(point) {
             renderBoard(currentGameState);
             return;
         }
-        
+
         selectedChecker = { point };
         validDestinations = destinations;
+        console.log('Selected! validDestinations now:', JSON.stringify(validDestinations));
         log(`Selected checker at point ${point}, ${destinations.length} valid move(s)`, 'info');
         renderBoard(currentGameState);
     } catch (err) {
@@ -970,9 +1103,12 @@ async function selectChecker(point) {
 
 async function executeMove(from, to) {
     try {
+        console.log('=== EXECUTE MOVE from', from, 'to', to, '===');
         await connection.invoke("MakeMove", from, to);
+        console.log('Move successful!');
         log(`Moved checker from ${from} to ${to}`, 'success');
     } catch (err) {
+        console.error('Move failed:', err);
         log(`Failed to move: ${err}`, 'error');
     }
 }
