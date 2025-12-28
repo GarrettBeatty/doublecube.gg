@@ -1,6 +1,15 @@
 /* ===== GAME-SPECIFIC STYLES ===== */
 /* These styles are for the canvas board and game controls that aren't covered by DaisyUI */
 
+/* ===== SHARED HEADER ===== */
+#appHeader {
+    background: linear-gradient(135deg, var(--p) 0%, var(--s) 100%);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 /* Spectator mode */
 body.spectator-mode #turnIndicator::after {
     content: ' (Spectating)';
@@ -28,7 +37,7 @@ body.spectator-mode .btn-roll {
 .game-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    min-height: calc(100vh - 72px); /* Account for header height */
 }
 
 /* Board area */
@@ -41,7 +50,7 @@ body.spectator-mode .btn-roll {
     min-height: 0;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    min-height: calc(100vh - 72px); /* Account for header height */
 }
 
 .board-wrapper-game {
@@ -326,7 +335,6 @@ body.spectator-mode .btn-roll {
 /* Checker hover effect */
 .checker:hover {
     filter: brightness(1.15);
-    transform: scale(1.05);
 }
 
 /* Checker selection highlight */

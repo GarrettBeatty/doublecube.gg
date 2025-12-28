@@ -84,21 +84,6 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            // Reconnection logic: If no gameId specified, check for existing in-progress games
-            if (string.IsNullOrEmpty(gameId))
-            {
-                var existingGames = _sessionManager.GetPlayerGames(effectivePlayerId);
-                var activeGame = existingGames.FirstOrDefault(g => g.Engine.Winner == null);
-
-                if (activeGame != null)
-                {
-                    _logger.LogInformation(
-                        "Player {PlayerId} reconnecting to existing game {GameId}",
-                        effectivePlayerId, activeGame.Id);
-                    gameId = activeGame.Id;
-                }
-            }
-
             var session = _sessionManager.JoinOrCreate(effectivePlayerId, connectionId, gameId);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",

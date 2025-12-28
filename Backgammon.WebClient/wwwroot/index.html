@@ -6,36 +6,43 @@
     <title>Backgammon Online</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <!-- Landing Page -->
-    <div id="landingPage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary">
-        <div class="max-w-5xl mx-auto px-4 py-8">
-            <!-- Header -->
-            <header class="text-center text-white mb-12 relative">
-                <h1 class="text-5xl font-bold mb-2 drop-shadow-lg">Backgammon Online</h1>
-                <p class="text-xl opacity-90">Play the classic board game with friends online</p>
+    <!-- Shared Header (visible on all pages) -->
+    <header id="appHeader" class="bg-gradient-to-br from-primary to-secondary text-white px-6 py-4 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Left: Logo -->
+            <div class="flex items-center gap-4 cursor-pointer" onclick="showLandingPage()">
+                <h1 class="text-2xl font-bold">Backgammon Online</h1>
+            </div>
 
+            <!-- Right: Connection + Auth -->
+            <div class="flex items-center gap-4">
                 <!-- Connection Indicator -->
-                <div id="connectionIndicator" class="absolute top-0 right-0">
+                <div id="connectionIndicator">
                     <span class="loading loading-ring loading-sm text-error"></span>
                 </div>
 
-                <!-- Auth Area -->
-                <div class="absolute top-0 right-12 flex gap-2 items-center">
-                    <div id="authSection" class="flex gap-2">
-                        <button class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary" onclick="showLoginModal()">Login</button>
-                        <button class="btn btn-accent btn-sm" onclick="showRegisterModal()">Sign Up</button>
-                    </div>
-                    <div id="userSection" style="display: none;" class="flex items-center gap-2">
-                        <span id="usernameDisplay" class="font-semibold"></span>
-                        <button class="btn btn-ghost btn-sm text-white" onclick="showProfileModal()">Profile</button>
-                        <button class="btn btn-error btn-sm" onclick="logout()">Logout</button>
-                    </div>
+                <!-- Auth Section (unauthenticated) -->
+                <div id="authSection" class="flex gap-2">
+                    <button class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary" onclick="showLoginModal()">Login</button>
+                    <button class="btn btn-accent btn-sm" onclick="showRegisterModal()">Sign Up</button>
                 </div>
-            </header>
 
+                <!-- User Section (authenticated) -->
+                <div id="userSection" style="display: none;" class="flex items-center gap-2">
+                    <span id="usernameDisplay" class="font-semibold"></span>
+                    <button class="btn btn-ghost btn-sm text-white" onclick="showProfileModal()">Profile</button>
+                    <button class="btn btn-error btn-sm" onclick="logout()">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Landing Page -->
+    <div id="landingPage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary">
+        <div class="max-w-5xl mx-auto px-4 py-8">
             <!-- Main Content Card -->
             <div class="card bg-base-100 shadow-2xl">
                 <div class="card-body">
@@ -44,10 +51,6 @@
                         <button class="btn btn-primary btn-lg h-auto py-6 flex-col gap-2" onclick="createGame()">
                             <span class="text-3xl">+</span>
                             <span class="text-lg">Create New Game</span>
-                        </button>
-                        <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="quickMatch()">
-                            <span class="text-3xl">&#9733;</span>
-                            <span class="text-lg">Quick Match</span>
                         </button>
                     </div>
 
@@ -220,9 +223,9 @@
 
     <!-- SignalR JavaScript Client -->
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
-    <script src="auth.js"></script>
-    <script src="friends.js"></script>
-    <script src="board-svg.js"></script>
-    <script src="game.js"></script>
+    <script src="/auth.js"></script>
+    <script src="/friends.js"></script>
+    <script src="/board-svg.js"></script>
+    <script src="/game.js"></script>
 </body>
 </html>

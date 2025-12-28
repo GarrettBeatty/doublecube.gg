@@ -31,6 +31,18 @@ function setHomeUrl() {
     }
 }
 
+// ==== CONNECTION HELPERS ====
+async function waitForConnection(timeoutMs = 10000) {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+        if (connection && connection.state === 'Connected') {
+            return true;
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return false;
+}
+
 // ==== PLAYER ID MANAGEMENT ====
 function getOrCreatePlayerId() {
     let playerId = localStorage.getItem('backgammon_player_id');
@@ -58,9 +70,37 @@ window.addEventListener('load', async () => {
     // Check if URL contains a game ID
     const urlGameId = getGameIdFromUrl();
     if (urlGameId) {
-        // Wait for connection before joining
+        // Show game page immediately
+        showGamePage();
+
+        // Update placeholder with loading state
+        const boardPlaceholder = document.getElementById('boardPlaceholder');
+        if (boardPlaceholder) {
+            boardPlaceholder.innerHTML = '<div class="loading loading-spinner loading-lg text-primary"></div><p class="mt-4">Connecting to game...</p>';
+        }
+
+        // Connect to server
         await autoConnect();
-        await joinSpecificGame(urlGameId);
+
+        // Wait for connection to be ready
+        const isConnected = await waitForConnection();
+
+        if (isConnected) {
+            await joinSpecificGame(urlGameId);
+        } else {
+            // Connection failed - show error UI
+            if (boardPlaceholder) {
+                boardPlaceholder.innerHTML = `
+                    <div class="alert alert-error max-w-md">
+                        <span>Failed to connect to server</span>
+                    </div>
+                    <div class="flex gap-4 mt-4">
+                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                        <button class="btn btn-ghost" onclick="showLandingPage()">Back to Home</button>
+                    </div>
+                `;
+            }
+        }
     } else {
         showLandingPage();
         await autoConnect();
@@ -179,6 +219,7 @@ function setupEventHandlers() {
         currentGameId = gameId;
         localStorage.setItem('currentGameId', gameId);
         setGameUrl(gameId);
+        showGamePage(); // Show game page so player can see board while waiting
     });
 
     connection.on("OpponentJoined", (opponentId) => {
@@ -359,9 +400,25 @@ function getTimeAgo(date) {
 }
 
 async function joinSpecificGame(gameId) {
+    // Wait for connection if not ready yet
     if (!connection || connection.state !== 'Connected') {
-        alert('Not connected to server. Please wait...');
-        return;
+        log('Connection not ready, waiting...', 'warning');
+        const isReady = await waitForConnection(5000);
+        if (!isReady) {
+            const boardPlaceholder = document.getElementById('boardPlaceholder');
+            if (boardPlaceholder) {
+                boardPlaceholder.innerHTML = `
+                    <div class="alert alert-error max-w-md">
+                        <span>Not connected to server</span>
+                    </div>
+                    <div class="flex gap-4 mt-4">
+                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                        <button class="btn btn-ghost" onclick="showLandingPage()">Back to Home</button>
+                    </div>
+                `;
+            }
+            return;
+        }
     }
 
     try {
@@ -373,6 +430,18 @@ async function joinSpecificGame(gameId) {
         showGamePage();
     } catch (err) {
         log(`❌ Failed to join game: ${err}`, 'error');
+        const boardPlaceholder = document.getElementById('boardPlaceholder');
+        if (boardPlaceholder) {
+            boardPlaceholder.innerHTML = `
+                <div class="alert alert-error max-w-md">
+                    <span>Failed to join game: ${err.message || err}</span>
+                </div>
+                <div class="flex gap-4 mt-4">
+                    <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                    <button class="btn btn-ghost" onclick="showLandingPage()">Back to Home</button>
+                </div>
+            `;
+        }
     }
 }
 
@@ -391,23 +460,6 @@ async function createGame() {
         showGamePage();
     } catch (err) {
         log(`❌ Failed to create game: ${err}`, 'error');
-    }
-}
-
-async function quickMatch() {
-    if (!connection || connection.state !== 'Connected') {
-        alert('Not connected to server. Please wait...');
-        return;
-    }
-
-    try {
-        currentGameId = null;
-        localStorage.removeItem('currentGameId'); // Clear any old game
-        await connection.invoke("JoinGame", myPlayerId, null);
-        log('🎯 Finding match...', 'info');
-        showGamePage();
-    } catch (err) {
-        log(`❌ Failed to find match: ${err}`, 'error');
     }
 }
 
