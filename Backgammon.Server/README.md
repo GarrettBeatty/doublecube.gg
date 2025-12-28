@@ -1,4 +1,4 @@
-# Backgammon.Web - SignalR Game Server
+# Backgammon.Server - SignalR Game Server
 
 ASP.NET Core SignalR server for multiplayer Backgammon games. This is the **server-only** backend - use **Backgammon.WebClient** for the web UI.
 
@@ -14,7 +14,7 @@ ASP.NET Core SignalR server for multiplayer Backgammon games. This is the **serv
 ### Run the Server
 
 ```bash
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 ```
 

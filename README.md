@@ -35,7 +35,7 @@ Backgammon/
 │   └── Point.cs              # Point (triangle) on the board
 ├── Backgammon.Console/       # Console interface
 │   └── Program.cs            # Text-based game interface
-├── Backgammon.Web/           # SignalR multiplayer server
+├── Backgammon.Server/           # SignalR multiplayer server
 │   ├── Hubs/                 # SignalR hub for real-time game
 │   ├── Services/             # Game session management + MongoDB
 │   ├── Models/               # DTOs and game state
@@ -110,7 +110,7 @@ This script starts both the server and client automatically. Open `http://localh
 
 **Terminal 1 - Start SignalR Server:**
 ```bash
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 ```
 Server runs on `http://localhost:5000`
@@ -137,7 +137,7 @@ dotnet run
 cd Backgammon.AI
 dotnet run
 ```
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 # Server runs on http://localhost:5000
 
@@ -158,7 +158,7 @@ dotnet test --verbosity normal
 
 ## Multiplayer Support 🌐
 
-The `Backgammon.Web` project provides a **SignalR server** that enables real-time multiplayer gameplay from any client platform:
+The `Backgammon.Server` project provides a **SignalR server** that enables real-time multiplayer gameplay from any client platform:
 
 - ✅ **Web browsers** (JavaScript/TypeScript)
 - ✅ **Mobile apps** (iOS, Android via SignalR clients)
@@ -172,17 +172,17 @@ The `Backgammon.Web` project provides a **SignalR server** that enables real-tim
 - Supports multiple simultaneous games
 - Works with any SignalR-compatible client
 
-See [Backgammon.Web/README.md](Backgammon.Web/README.md) for full documentation, client examples, and API reference.
+See [Backgammon.Server/README.md](Backgammon.Server/README.md) for full documentation, client examples, and API reference.
 
 ### Quick Start - Multiplayer
 
 ```bash
 # Terminal 1: Start server
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 
 # Terminal 2: Test client
-cd Backgammon.Web/TestClient
+cd Backgammon.Server/TestClient
 dotnet run
 ```
 

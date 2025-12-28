@@ -1,6 +1,6 @@
-using Backgammon.Web.Models;
+using Backgammon.Server.Models;
 
-namespace Backgammon.Web.Services;
+namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Storage abstraction for completed backgammon games.

@@ -1,7 +1,7 @@
 using System.Linq;
-using Backgammon.Web.Models;
+using Backgammon.Server.Models;
 
-namespace Backgammon.Web.Services;
+namespace Backgammon.Server.Services;
 
 public interface IGameSessionManager
 {

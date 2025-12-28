@@ -1,6 +1,6 @@
 using Backgammon.Core;
 
-namespace Backgammon.Web.Models;
+namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Data transfer object representing the current state of a game.

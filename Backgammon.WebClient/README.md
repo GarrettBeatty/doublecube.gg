@@ -28,7 +28,7 @@ You can change this in the web UI by modifying the "Server URL" field.
 
 ## How to Play
 
-1. **Start the SignalR Server**: Make sure `Backgammon.Web` is running on port 5000
+1. **Start the SignalR Server**: Make sure `Backgammon.Server` is running on port 5000
 2. **Open the Web Client**: Navigate to `http://localhost:3000`
 3. **Connect**: Click "Connect" to establish connection with the server
 4. **Join a Game**: Click "Join/Create Game" to start or join a game

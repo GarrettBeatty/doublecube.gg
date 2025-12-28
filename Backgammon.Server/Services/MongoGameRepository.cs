@@ -1,9 +1,9 @@
 using MongoDB.Driver;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Backgammon.Web.Models;
+using Backgammon.Server.Models;
 
-namespace Backgammon.Web.Services;
+namespace Backgammon.Server.Services;
 
 /// <summary>
 /// MongoDB implementation of game storage.

@@ -36,7 +36,7 @@ echo ""
 
 # Start SignalR server in background
 echo "   📡 SignalR Server starting on http://localhost:5000"
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run --no-build --configuration Release > /dev/null 2>&1 &
 SERVER_PID=$!
 cd ..

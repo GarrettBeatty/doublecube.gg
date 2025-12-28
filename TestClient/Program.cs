@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.SignalR.Client;
 using Backgammon.Core;
 
-namespace Backgammon.Web.TestClient;
+namespace Backgammon.Server.TestClient;
 
 /// <summary>
 /// Simple console client to test the SignalR server.

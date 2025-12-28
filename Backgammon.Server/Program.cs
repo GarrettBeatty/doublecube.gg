@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Backgammon.Core;
-using Backgammon.Web.Hubs;
-using Backgammon.Web.Services;
+using Backgammon.Server.Hubs;
+using Backgammon.Server.Services;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -36,7 +36,7 @@ dotnet run
 
 This will:
 1. Start MongoDB in a Docker container
-2. Start the SignalR backend server (Backgammon.Web)
+2. Start the SignalR backend server (Backgammon.Server)
 3. Start the Blazor WebAssembly frontend (Backgammon.WebClient)
 4. Open the **Aspire Dashboard** in your browser
 
@@ -49,7 +49,7 @@ If you don't have Docker or prefer manual setup:
 brew services start mongodb-community
 
 # Terminal 2: Start backend
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 
 # Terminal 3: Start frontend
@@ -190,7 +190,7 @@ Backgammon/
 │   └── Backgammon.AppHost.csproj
 ├── Backgammon.ServiceDefaults/  # 📊 Shared Aspire config
 │   └── Extensions.cs            # Telemetry, health, resilience
-├── Backgammon.Web/              # 🌐 SignalR backend
+├── Backgammon.Server/              # 🌐 SignalR backend
 ├── Backgammon.WebClient/        # 💻 Blazor frontend
 └── Backgammon.Core/             # 🎲 Game engine
 ```
@@ -240,7 +240,7 @@ Then attach VS Code debugger to processes.
 Aspire automatically sets:
 
 ```bash
-# Backend (Backgammon.Web)
+# Backend (Backgammon.Server)
 ConnectionStrings__mongodb=mongodb://localhost:27017
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
 
@@ -304,7 +304,7 @@ dotnet restore
 For production, don't use AppHost. Instead:
 
 1. **MongoDB**: Use MongoDB Atlas or managed service
-2. **Backend**: Deploy `Backgammon.Web` to Azure App Service / AWS ECS
+2. **Backend**: Deploy `Backgammon.Server` to Azure App Service / AWS ECS
 3. **Frontend**: Deploy `Backgammon.WebClient` static files to CDN
 
 Update `appsettings.Production.json`:

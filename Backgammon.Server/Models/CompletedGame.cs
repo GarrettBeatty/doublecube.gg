@@ -1,7 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace Backgammon.Web.Models;
+namespace Backgammon.Server.Models;
 
 /// <summary>
 /// MongoDB document for storing completed backgammon games.

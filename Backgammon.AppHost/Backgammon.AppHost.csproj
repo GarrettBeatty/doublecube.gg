@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Backgammon.Web\Backgammon.Web.csproj" />
+    <ProjectReference Include="..\Backgammon.Server\Backgammon.Server.csproj" />
     <ProjectReference Include="..\Backgammon.WebClient\Backgammon.WebClient.csproj" />
     <ProjectReference Include="..\Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj" IsAspireProjectResource="false" />
   </ItemGroup>

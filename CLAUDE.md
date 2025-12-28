@@ -21,7 +21,7 @@ cd Backgammon.AppHost && dotnet run
 cd Backgammon.Console && dotnet run
 
 # Run web multiplayer (manual)
-cd Backgammon.Web && dotnet run      # Server on http://localhost:5000
+cd Backgammon.Server && dotnet run      # Server on http://localhost:5000
 cd Backgammon.WebClient && dotnet run # Client on http://localhost:3000
 
 # Quick start web (script)
@@ -37,7 +37,7 @@ cd Backgammon.AI && dotnet run
 
 - **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
-- **Backgammon.Web** - SignalR multiplayer server with MongoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
+- **Backgammon.Server** - SignalR multiplayer server with MongoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
 - **Backgammon.WebClient** - Static HTML/JS/CSS frontend with SignalR client
 - **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI` and `GreedyAI`.
 - **Backgammon.AppHost** - .NET Aspire orchestrator (manages MongoDB, services)

@@ -73,9 +73,9 @@ CREATE TABLE Moves (
 
 ### Install Packages
 ```bash
-dotnet add Backgammon.Web package Microsoft.EntityFrameworkCore
-dotnet add Backgammon.Web package Microsoft.EntityFrameworkCore.Sqlite
-dotnet add Backgammon.Web package Microsoft.EntityFrameworkCore.Design
+dotnet add Backgammon.Server package Microsoft.EntityFrameworkCore
+dotnet add Backgammon.Server package Microsoft.EntityFrameworkCore.Sqlite
+dotnet add Backgammon.Server package Microsoft.EntityFrameworkCore.Design
 ```
 
 ### DbContext
@@ -171,7 +171,7 @@ Backgammon.Data/
 └── Services/
     └── GamePersistenceService.cs
 
-Backgammon.Web/
+Backgammon.Server/
 └── Controllers/
     ├── GameController.cs  (REST API)
     └── AnalysisController.cs

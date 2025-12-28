@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Backgammon.Core;
-using Backgammon.Web.Services;
-using Backgammon.Web.Models;
+using Backgammon.Server.Services;
+using Backgammon.Server.Models;
 
-namespace Backgammon.Web.Hubs;
+namespace Backgammon.Server.Hubs;
 
 /// <summary>
 /// SignalR Hub for real-time Backgammon game communication.

@@ -9,7 +9,7 @@ var mongodb = builder.AddMongoDB("mongodb")
 var database = mongodb.AddDatabase("backgammon");
 
 // SignalR backend server - Aspire assigns port automatically
-var apiService = builder.AddProject<Projects.Backgammon_Web>("backgammon-api")
+var apiService = builder.AddProject<Projects.Backgammon_Server>("backgammon-api")
     .WithReference(database)
     .WaitFor(mongodb);
 

@@ -1,7 +1,7 @@
 using Backgammon.Core;
-using Backgammon.Web.Models;
+using Backgammon.Server.Models;
 
-namespace Backgammon.Web.Services;
+namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Represents an active game session between two players.

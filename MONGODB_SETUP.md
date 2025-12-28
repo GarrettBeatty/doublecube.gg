@@ -58,7 +58,7 @@ MongoDB connection settings are in `appsettings.json`:
 ### 3. Run the Server
 
 ```bash
-cd Backgammon.Web
+cd Backgammon.Server
 dotnet run
 ```
 
@@ -137,7 +137,7 @@ public class DynamoGameRepository : IGameRepository
 
 ### 2. Update DI registration
 
-In [Program.cs](Backgammon.Web/Program.cs):
+In [Program.cs](Backgammon.Server/Program.cs):
 
 ```csharp
 // Before:
