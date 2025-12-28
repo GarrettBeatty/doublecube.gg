@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.MongoDB.Driver" Version="13.1.0" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.5.2" />
   </ItemGroup>
 

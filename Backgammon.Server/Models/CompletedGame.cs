@@ -23,16 +23,40 @@ public class CompletedGame
     public string GameId { get; set; } = string.Empty;
     
     /// <summary>
-    /// Player ID for white (starting player)
+    /// Player ID for white (starting player) - anonymous ID or legacy
     /// </summary>
     [BsonElement("whitePlayerId")]
     public string WhitePlayerId { get; set; } = string.Empty;
-    
+
     /// <summary>
-    /// Player ID for red
+    /// Player ID for red - anonymous ID or legacy
     /// </summary>
     [BsonElement("redPlayerId")]
     public string RedPlayerId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Registered user ID for white player (null if anonymous)
+    /// </summary>
+    [BsonElement("whiteUserId")]
+    public string? WhiteUserId { get; set; }
+
+    /// <summary>
+    /// Registered user ID for red player (null if anonymous)
+    /// </summary>
+    [BsonElement("redUserId")]
+    public string? RedUserId { get; set; }
+
+    /// <summary>
+    /// Display name for white player at time of game
+    /// </summary>
+    [BsonElement("whiteDisplayName")]
+    public string? WhiteDisplayName { get; set; }
+
+    /// <summary>
+    /// Display name for red player at time of game
+    /// </summary>
+    [BsonElement("redDisplayName")]
+    public string? RedDisplayName { get; set; }
     
     /// <summary>
     /// Array of moves in notation "from/to" (e.g., ["24/20", "13/9", "bar/24"])

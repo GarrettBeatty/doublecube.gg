@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Backgammon.Core;
@@ -28,37 +29,80 @@ public class GameHub : Hub
 {
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
+    private readonly IUserRepository _userRepository;
     private readonly ILogger<GameHub> _logger;
 
-    public GameHub(IGameSessionManager sessionManager, IGameRepository gameRepository, ILogger<GameHub> logger)
+    public GameHub(
+        IGameSessionManager sessionManager,
+        IGameRepository gameRepository,
+        IUserRepository userRepository,
+        ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
+        _userRepository = userRepository;
         _logger = logger;
     }
 
     /// <summary>
-    /// Join an existing game by ID or create/join via matchmaking
+    /// Get authenticated user ID from JWT token if available
     /// </summary>
-    /// <param name="playerId">Persistent player ID</param>
+    private string? GetAuthenticatedUserId()
+    {
+        return Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    }
+
+    /// <summary>
+    /// Get display name from JWT token if authenticated
+    /// </summary>
+    private string? GetAuthenticatedDisplayName()
+    {
+        return Context.User?.FindFirst("displayName")?.Value;
+    }
+
+    /// <summary>
+    /// Get the effective player ID - authenticated user ID or anonymous ID
+    /// </summary>
+    private string GetEffectivePlayerId(string anonymousPlayerId)
+    {
+        return GetAuthenticatedUserId() ?? anonymousPlayerId;
+    }
+
+    /// <summary>
+    /// Join an existing game by ID or create/join via matchmaking.
+    /// Supports both authenticated users (via JWT) and anonymous players.
+    /// </summary>
+    /// <param name="playerId">Persistent player ID (anonymous ID if not authenticated)</param>
     /// <param name="gameId">Optional game ID. If null, uses matchmaking.</param>
     public async Task JoinGame(string playerId, string? gameId = null)
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var session = _sessionManager.JoinOrCreate(playerId, connectionId, gameId);
+
+            // Use authenticated user ID if available, otherwise use provided anonymous ID
+            var effectivePlayerId = GetEffectivePlayerId(playerId);
+            var displayName = GetAuthenticatedDisplayName();
+
+            var session = _sessionManager.JoinOrCreate(effectivePlayerId, connectionId, gameId);
             await Groups.AddToGroupAsync(connectionId, session.Id);
-            _logger.LogInformation("Player {ConnectionId} joined game {GameId}", connectionId, session.Id);
+            _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
+                effectivePlayerId, connectionId, session.Id);
 
             // Try to add as player; if full, add as spectator
-            if (!session.AddPlayer(playerId, connectionId))
+            if (!session.AddPlayer(effectivePlayerId, connectionId))
             {
                 session.AddSpectator(connectionId);
                 var spectatorState = session.GetState(null); // No color for spectators
                 await Clients.Caller.SendAsync("SpectatorJoined", spectatorState);
                 _logger.LogInformation("Spectator {ConnectionId} joined game {GameId}", connectionId, session.Id);
                 return;
+            }
+
+            // Set display name if authenticated
+            if (!string.IsNullOrEmpty(displayName))
+            {
+                session.SetPlayerName(effectivePlayerId, displayName);
             }
 
             if (session.IsFull)
@@ -82,7 +126,7 @@ public class GameHub : Hub
                 var state = session.GetState(connectionId);
                 await Clients.Caller.SendAsync("GameUpdate", state);
                 await Clients.Caller.SendAsync("WaitingForOpponent", session.Id);
-                _logger.LogInformation("Player {ConnectionId} waiting in game {GameId}", connectionId, session.Id);
+                _logger.LogInformation("Player {PlayerId} waiting in game {GameId}", effectivePlayerId, session.Id);
             }
         }
         catch (Exception ex)
@@ -275,14 +319,22 @@ public class GameHub : Hub
                 {
                     try
                     {
+                        // Determine if players are authenticated users
+                        var whiteUserId = IsRegisteredUserId(session.WhitePlayerId) ? session.WhitePlayerId : null;
+                        var redUserId = IsRegisteredUserId(session.RedPlayerId) ? session.RedPlayerId : null;
+
                         var completedGame = new CompletedGame
                         {
                             GameId = session.Id,
                             WhitePlayerId = session.WhitePlayerId ?? "unknown",
                             RedPlayerId = session.RedPlayerId ?? "unknown",
+                            WhiteUserId = whiteUserId,
+                            RedUserId = redUserId,
+                            WhiteDisplayName = session.WhitePlayerName,
+                            RedDisplayName = session.RedPlayerName,
                             Moves = session.Engine.MoveHistory
-                                .Select(m => m.IsBearOff ? $"{m.From}/off" : 
-                                             m.From == 0 ? $"bar/{m.To}" : 
+                                .Select(m => m.IsBearOff ? $"{m.From}/off" :
+                                             m.From == 0 ? $"bar/{m.To}" :
                                              $"{m.From}/{m.To}")
                                 .ToList(),
                             DiceRolls = new List<string>(), // TODO: Track dice rolls per turn
@@ -294,9 +346,12 @@ public class GameHub : Hub
                             CompletedAt = DateTime.UtcNow,
                             DurationSeconds = (int)(DateTime.UtcNow - session.CreatedAt).TotalSeconds
                         };
-                        
+
                         await _gameRepository.SaveCompletedGameAsync(completedGame);
                         _logger.LogInformation("Persisted game {GameId} to database", session.Id);
+
+                        // Update user stats if players are registered
+                        await UpdateUserStatsAfterGame(completedGame);
                     }
                     catch (Exception ex)
                     {
@@ -470,18 +525,102 @@ public class GameHub : Hub
             if (session != null)
             {
                 await Groups.RemoveFromGroupAsync(connectionId, session.Id);
-                
+
                 // Notify opponent
                 await Clients.Group(session.Id).SendAsync("OpponentLeft");
-                
+
                 _sessionManager.RemovePlayer(connectionId);
-                
+
                 _logger.LogInformation("Player {ConnectionId} left game {GameId}", connectionId, session.Id);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling disconnection");
+        }
+    }
+
+    /// <summary>
+    /// Check if a player ID looks like a registered user ID (GUID format)
+    /// Anonymous IDs have format "player_timestamp_random"
+    /// </summary>
+    private bool IsRegisteredUserId(string? playerId)
+    {
+        if (string.IsNullOrEmpty(playerId))
+            return false;
+
+        // Registered user IDs are GUIDs
+        return Guid.TryParse(playerId, out _);
+    }
+
+    /// <summary>
+    /// Update user statistics after a game is completed
+    /// </summary>
+    private async Task UpdateUserStatsAfterGame(CompletedGame game)
+    {
+        try
+        {
+            // Update white player stats if registered
+            if (!string.IsNullOrEmpty(game.WhiteUserId))
+            {
+                var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
+                if (user != null)
+                {
+                    var isWinner = game.Winner == "White";
+                    UpdateStats(user.Stats, isWinner, game.Stakes);
+                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                }
+            }
+
+            // Update red player stats if registered
+            if (!string.IsNullOrEmpty(game.RedUserId))
+            {
+                var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
+                if (user != null)
+                {
+                    var isWinner = game.Winner == "Red";
+                    UpdateStats(user.Stats, isWinner, game.Stakes);
+                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update user stats after game {GameId}", game.GameId);
+        }
+    }
+
+    private void UpdateStats(UserStats stats, bool isWinner, int stakes)
+    {
+        stats.TotalGames++;
+
+        if (isWinner)
+        {
+            stats.Wins++;
+            stats.TotalStakes += stakes;
+            stats.WinStreak++;
+
+            if (stats.WinStreak > stats.BestWinStreak)
+                stats.BestWinStreak = stats.WinStreak;
+
+            // Track win types
+            switch (stakes)
+            {
+                case 1:
+                    stats.NormalWins++;
+                    break;
+                case 2:
+                    stats.GammonWins++;
+                    break;
+                case 3:
+                    stats.BackgammonWins++;
+                    break;
+            }
+        }
+        else
+        {
+            stats.Losses++;
+            stats.WinStreak = 0; // Reset streak on loss
         }
     }
 }

@@ -125,6 +125,21 @@ public class GameSession
         }
         return playerId;
     }
+
+    /// <summary>
+    /// Set the display name for a player
+    /// </summary>
+    public void SetPlayerName(string playerId, string displayName)
+    {
+        if (WhitePlayerId == playerId)
+        {
+            WhitePlayerName = displayName;
+        }
+        else if (RedPlayerId == playerId)
+        {
+            RedPlayerName = displayName;
+        }
+    }
     
     /// <summary>
     /// Update player's connection ID (for reconnection scenarios)

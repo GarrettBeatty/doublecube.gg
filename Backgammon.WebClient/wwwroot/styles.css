@@ -780,7 +780,7 @@ body {
     .game-layout {
         grid-template-columns: 1fr;
     }
-    
+
     .chat-sidebar {
         position: fixed;
         right: 0;
@@ -791,8 +791,454 @@ body {
         transition: transform 0.3s;
         z-index: 1000;
     }
-    
+
     .chat-sidebar.open {
         transform: translateX(0);
+    }
+}
+
+/* ===== AUTH UI ===== */
+
+.auth-area {
+    position: absolute;
+    top: 20px;
+    right: 60px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.btn-auth {
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-auth:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.btn-register {
+    background: var(--success);
+}
+
+.btn-register:hover {
+    background: #38a169;
+}
+
+.btn-logout {
+    background: rgba(245, 101, 101, 0.8);
+}
+
+.btn-logout:hover {
+    background: var(--error);
+}
+
+.username-display {
+    color: white;
+    font-weight: 600;
+    padding: 0 10px;
+}
+
+/* ===== MODAL STYLES ===== */
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    min-width: 350px;
+    max-width: 450px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+    margin-bottom: 20px;
+    color: var(--text-dark);
+    text-align: center;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.modal-content input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-modal {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-modal.btn-primary {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-modal.btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.btn-modal.btn-secondary {
+    background: var(--text-light);
+    color: white;
+}
+
+.btn-modal.btn-secondary:hover {
+    background: var(--bg-dark);
+}
+
+.error-message {
+    color: var(--error);
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+    min-height: 20px;
+}
+
+.claim-info {
+    font-size: 12px;
+    color: var(--text-light);
+    text-align: center;
+    margin: 10px 0;
+    padding: 10px;
+    background: var(--bg-light);
+    border-radius: 6px;
+}
+
+.modal-footer {
+    font-size: 14px;
+    text-align: center;
+    margin-top: 15px;
+    color: var(--text-light);
+}
+
+.modal-footer a {
+    color: var(--primary);
+    text-decoration: none;
+}
+
+.modal-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Profile Modal */
+.modal-profile {
+    max-width: 500px;
+}
+
+.profile-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.profile-section:last-of-type {
+    border-bottom: none;
+}
+
+.profile-section h3 {
+    font-size: 1.1em;
+    margin-bottom: 15px;
+    color: var(--text-dark);
+}
+
+.profile-section label {
+    display: block;
+    margin-bottom: 10px;
+    color: var(--text-light);
+    font-size: 14px;
+}
+
+.profile-section label input {
+    margin-top: 5px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 15px;
+    background: var(--bg-light);
+    border-radius: 8px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.stat-label {
+    color: var(--text-light);
+    font-size: 0.9em;
+}
+
+/* ===== FRIENDS SECTION ===== */
+
+.friends-search {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.friends-search input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.friends-search input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.btn-search {
+    padding: 10px 20px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-search:hover {
+    background: var(--primary-dark);
+}
+
+.empty-friends {
+    color: var(--text-light);
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+.friend-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.friend-item:hover {
+    background: #e2e8f0;
+}
+
+.friend-item.online {
+    border-left: 3px solid var(--success);
+}
+
+.friend-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.online-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-light);
+}
+
+.online-indicator.online {
+    background: var(--success);
+}
+
+.friend-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.friend-username {
+    color: var(--text-light);
+    font-size: 0.9em;
+}
+
+.friend-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-invite {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-invite:hover {
+    background: var(--primary-dark);
+}
+
+.btn-remove {
+    background: var(--error);
+    color: white;
+    font-size: 14px;
+    padding: 4px 10px;
+}
+
+.btn-remove:hover {
+    background: #e53e3e;
+}
+
+/* Friend Requests */
+#friendRequests {
+    margin-bottom: 15px;
+}
+
+#friendRequests h4 {
+    font-size: 0.95em;
+    color: var(--text-dark);
+    margin-bottom: 10px;
+}
+
+.friend-request {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--primary);
+}
+
+.request-name {
+    font-weight: 600;
+}
+
+.request-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-accept {
+    background: var(--success);
+    color: white;
+}
+
+.btn-accept:hover {
+    background: #38a169;
+}
+
+.btn-decline {
+    background: var(--text-light);
+    color: white;
+}
+
+.btn-decline:hover {
+    background: var(--bg-dark);
+}
+
+/* Search Results */
+#userSearchResults {
+    margin-bottom: 15px;
+}
+
+.search-result {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.result-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.result-name {
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.result-username {
+    color: var(--text-light);
+    font-size: 0.9em;
+}
+
+.btn-add {
+    background: var(--success);
+    color: white;
+}
+
+.btn-add:hover {
+    background: #38a169;
+}
+
+.no-results {
+    color: var(--text-light);
+    text-align: center;
+    padding: 15px;
+    font-style: italic;
+}
+
+/* Responsive Auth */
+@media (max-width: 768px) {
+    .auth-area {
+        position: static;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .modal-content {
+        min-width: 90%;
+        max-width: 95%;
+        margin: 0 10px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .stat-value {
+        font-size: 1.5em;
     }
 }

@@ -44,6 +44,16 @@ public interface IGameSessionManager
     /// Clean up old/abandoned games
     /// </summary>
     void CleanupInactiveGames(TimeSpan maxInactivity);
+
+    /// <summary>
+    /// Check if a player is currently online (has an active connection)
+    /// </summary>
+    bool IsPlayerOnline(string playerId);
+
+    /// <summary>
+    /// Get a game session by ID (alias for GetGame for clarity)
+    /// </summary>
+    GameSession? GetSession(string gameId);
 }
 
 public class GameSessionManager : IGameSessionManager
@@ -214,19 +224,35 @@ public class GameSessionManager : IGameSessionManager
         {
             var cutoff = DateTime.UtcNow - maxInactivity;
             var inactiveGames = _games.Where(kvp => kvp.Value.LastActivityAt < cutoff).ToList();
-            
+
             foreach (var (gameId, game) in inactiveGames)
             {
                 _games.Remove(gameId);
-                
+
                 if (game.WhitePlayerId != null)
                     _playerToGame.Remove(game.WhitePlayerId);
                 if (game.RedPlayerId != null)
                     _playerToGame.Remove(game.RedPlayerId);
-                    
+
                 if (_waitingGame?.Id == gameId)
                     _waitingGame = null;
             }
         }
+    }
+
+    public bool IsPlayerOnline(string playerId)
+    {
+        lock (_lock)
+        {
+            // Check if player has an active game with a connection
+            return _games.Values.Any(g =>
+                (g.WhitePlayerId == playerId && g.WhiteConnectionId != null) ||
+                (g.RedPlayerId == playerId && g.RedConnectionId != null));
+        }
+    }
+
+    public GameSession? GetSession(string gameId)
+    {
+        return GetGame(gameId);
     }
 }

@@ -44,8 +44,17 @@ function getOrCreatePlayerId() {
 
 // ==== INITIALIZATION ====
 window.addEventListener('load', async () => {
-    myPlayerId = getOrCreatePlayerId();
-    
+    // Check authentication first (from auth.js)
+    if (typeof checkAuth === 'function') {
+        await checkAuth();
+        updateAuthUI();
+    }
+
+    // Use effective player ID (authenticated user or anonymous)
+    myPlayerId = typeof getEffectivePlayerId === 'function'
+        ? getEffectivePlayerId()
+        : getOrCreatePlayerId();
+
     // Check if URL contains a game ID
     const urlGameId = getGameIdFromUrl();
     if (urlGameId) {
@@ -57,6 +66,12 @@ window.addEventListener('load', async () => {
         await autoConnect();
     }
 
+    // Load friends if authenticated
+    if (typeof isAuthenticated === 'function' && isAuthenticated()) {
+        if (typeof loadFriends === 'function') loadFriends();
+        if (typeof loadFriendRequests === 'function') loadFriendRequests();
+    }
+
     // Add Roll Dice button handler
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
@@ -65,7 +80,7 @@ window.addEventListener('load', async () => {
             try {
                 await rollDice();
             } catch (err) {
-                log(`❌ Failed to roll dice: ${err}`, 'error');
+                log(`Failed to roll dice: ${err}`, 'error');
             }
         });
     }
@@ -77,7 +92,7 @@ window.addEventListener('load', async () => {
             try {
                 await endTurn();
             } catch (err) {
-                log(`❌ Failed to end turn: ${err}`, 'error');
+                log(`Failed to end turn: ${err}`, 'error');
             }
         });
     }
@@ -106,15 +121,21 @@ async function autoConnect() {
         const response = await fetch('/api/config');
         const config = await response.json();
         serverUrl = config.signalrUrl;
-        log(`📡 Using SignalR URL: ${serverUrl}`, 'info');
+        log(`Using SignalR URL: ${serverUrl}`, 'info');
     } catch (error) {
         // Fallback to hardcoded URL if config endpoint fails
         serverUrl = document.getElementById('serverUrl').value;
-        log(`⚠️ Using fallback URL: ${serverUrl}`, 'warning');
+        log(`Using fallback URL: ${serverUrl}`, 'warning');
     }
-    
+
+    // Build connection options - include auth token if authenticated
+    const connectionOptions = {};
+    if (typeof authToken !== 'undefined' && authToken) {
+        connectionOptions.accessTokenFactory = () => authToken;
+    }
+
     connection = new signalR.HubConnectionBuilder()
-        .withUrl(serverUrl)
+        .withUrl(serverUrl, connectionOptions)
         .withAutomaticReconnect()
         .configureLogging(signalR.LogLevel.Information)
         .build();
@@ -124,15 +145,15 @@ async function autoConnect() {
     try {
         await connection.start();
         updateConnectionStatus(true);
-        log('✅ Connected to server', 'success');
-        
+        log('Connected to server', 'success');
+
         // Always start on landing page and refresh games list
         // User can manually rejoin games from "My Games" section
         refreshGamesList();
         gameRefreshInterval = setInterval(refreshGamesList, 3000);
     } catch (err) {
         updateConnectionStatus(false);
-        log(`❌ Connection failed: ${err}`, 'error');
+        log(`Connection failed: ${err}`, 'error');
         setTimeout(autoConnect, 5000);
     }
 }
