@@ -58,3 +58,7 @@ artifacts/
 
 # macOS
 .DS_Store
+.azure
+
+# DynamoDB Local data
+dynamodb-data/

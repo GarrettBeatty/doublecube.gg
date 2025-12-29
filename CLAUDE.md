@@ -14,7 +14,7 @@ dotnet test
 # Run tests with detailed output
 dotnet test --verbosity normal
 
-# Run with Aspire (all-in-one: MongoDB + Backend + Frontend)
+# Run with Aspire (all-in-one: DynamoDB Local + Backend + Frontend)
 cd Backgammon.AppHost && dotnet run
 
 # Run console game
@@ -37,11 +37,39 @@ cd Backgammon.AI && dotnet run
 
 - **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
-- **Backgammon.Server** - SignalR multiplayer server with MongoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
+- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
 - **Backgammon.WebClient** - Static HTML/JS/CSS frontend with SignalR client
 - **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI` and `GreedyAI`.
-- **Backgammon.AppHost** - .NET Aspire orchestrator (manages MongoDB, services)
+- **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, services)
 - **Backgammon.Tests** / **Backgammon.IntegrationTests** - xUnit test projects
+
+## Database: DynamoDB
+
+The application uses **AWS DynamoDB** with a **single-table design** pattern for optimal performance and cost-efficiency.
+
+### Local Development
+- DynamoDB Local runs in a Docker container via Aspire
+- Table auto-created on startup by `DynamoDbInitializer`
+- Connection: http://localhost:8000
+- Table name: `backgammon-local`
+
+### Single-Table Design
+All entities (Users, Games, Friendships) stored in one table with composite PK/SK:
+- **Users**: `PK=USER#{userId}`, `SK=PROFILE`
+- **Games**: `PK=GAME#{gameId}`, `SK=METADATA`
+- **Player-Game Index**: `PK=USER#{playerId}`, `SK=GAME#{reversedTimestamp}#{gameId}`
+- **Friendships**: `PK=USER#{userId}`, `SK=FRIEND#{status}#{friendUserId}`
+
+### Global Secondary Indexes (GSIs)
+1. **GSI1**: Username lookups - `GSI1PK=USERNAME#{normalized}`, `GSI1SK=PROFILE`
+2. **GSI2**: Email lookups - `GSI2PK=EMAIL#{normalized}`, `GSI2SK=PROFILE`
+3. **GSI3**: Game status queries - `GSI3PK=GAME_STATUS#{status}`, `GSI3SK={timestamp}`
+
+### AWS Production Deployment
+- Infrastructure managed by AWS CDK (see `infra/cdk/`)
+- Deploy: `cd infra/cdk && cdk deploy`
+- On-demand billing (pay-per-request)
+- Point-in-time recovery enabled
 
 ## Core Domain Model
 

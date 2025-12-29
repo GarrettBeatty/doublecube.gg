@@ -1,8 +1,10 @@
+using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -10,7 +12,6 @@ using Backgammon.Core;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Services;
 using Backgammon.Server.Models;
-using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,15 +22,37 @@ builder.AddServiceDefaults();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 
-// MongoDB configuration with Aspire
-// When running via Aspire, connection string comes from service discovery
-// When running standalone, falls back to appsettings.json
-builder.AddMongoDBClient("backgammon");
-builder.Services.AddSingleton<IGameRepository, MongoGameRepository>();
+// ========== DYNAMODB CONFIGURATION ==========
+Console.WriteLine("=== DynamoDB Configuration ===");
+Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+
+var dynamoDbTableName = builder.Configuration["DynamoDb:TableName"];
+var awsEndpointUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL_DYNAMODB");
+var awsRegion = builder.Configuration["AWS:Region"] ?? Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1";
+
+Console.WriteLine($"DynamoDb:TableName = {dynamoDbTableName ?? "NULL"}");
+Console.WriteLine($"AWS_ENDPOINT_URL_DYNAMODB = {awsEndpointUrl ?? "NULL"}");
+Console.WriteLine($"AWS_REGION = {awsRegion}");
+Console.WriteLine("=====================================\n");
+// ========== END CONFIGURATION ==========
+
+// DynamoDB client configuration
+// AWS SDK automatically detects local endpoint via AWS_ENDPOINT_URL_DYNAMODB environment variable
+builder.Services.AddSingleton<Amazon.DynamoDBv2.IAmazonDynamoDB>(sp =>
+{
+    // No configuration needed - AWS SDK automatically picks up:
+    // - AWS_ENDPOINT_URL_DYNAMODB for local development (set by Aspire)
+    // - AWS credentials and region from environment/config
+    return new Amazon.DynamoDBv2.AmazonDynamoDBClient();
+});
+
+
+// Register DynamoDB services
+builder.Services.AddSingleton<IGameRepository, Backgammon.Server.Services.DynamoDb.DynamoDbGameRepository>();
+builder.Services.AddSingleton<IUserRepository, Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
 
 // User and authentication services
-builder.Services.AddSingleton<IUserRepository, MongoUserRepository>();
-builder.Services.AddSingleton<IFriendshipRepository, MongoFriendshipRepository>();
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IFriendService, FriendService>();
 
@@ -88,6 +111,15 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Initialize DynamoDB table if needed (local development only)
+if (!string.IsNullOrEmpty(awsEndpointUrl))
+{
+    Console.WriteLine("=== Initializing DynamoDB table ===");
+    var dynamoDb = app.Services.GetRequiredService<Amazon.DynamoDBv2.IAmazonDynamoDB>();
+    await EnsureTableExistsAsync(dynamoDb, dynamoDbTableName ?? "backgammon-local");
+    Console.WriteLine("=== DynamoDB initialization complete ===\n");
+}
 
 // Load active games from database on startup (restore from previous session)
 Console.WriteLine("=== Loading active games from database ===");
@@ -432,6 +464,93 @@ var cleanupTask = Task.Run(async () =>
 });
 
 app.Run();
+
+// Helper method to ensure DynamoDB table exists (local development only)
+static async Task EnsureTableExistsAsync(Amazon.DynamoDBv2.IAmazonDynamoDB dynamoDb, string tableName)
+{
+    try
+    {
+        // Check if table exists
+        await dynamoDb.DescribeTableAsync(tableName);
+        Console.WriteLine($"Table '{tableName}' already exists");
+        return;
+    }
+    catch (Amazon.DynamoDBv2.Model.ResourceNotFoundException)
+    {
+        Console.WriteLine($"Table '{tableName}' not found, creating...");
+    }
+
+    // Create table with single-table design
+    var request = new Amazon.DynamoDBv2.Model.CreateTableRequest
+    {
+        TableName = tableName,
+        KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
+        {
+            new() { AttributeName = "PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
+            new() { AttributeName = "SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
+        },
+        AttributeDefinitions = new List<Amazon.DynamoDBv2.Model.AttributeDefinition>
+        {
+            new() { AttributeName = "PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI1PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI1SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI2PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI2SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI3PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI3SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S }
+        },
+        BillingMode = Amazon.DynamoDBv2.BillingMode.PAY_PER_REQUEST,
+        GlobalSecondaryIndexes = new List<Amazon.DynamoDBv2.Model.GlobalSecondaryIndex>
+        {
+            new()
+            {
+                IndexName = "GSI1",
+                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
+                {
+                    new() { AttributeName = "GSI1PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
+                    new() { AttributeName = "GSI1SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
+                },
+                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
+            },
+            new()
+            {
+                IndexName = "GSI2",
+                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
+                {
+                    new() { AttributeName = "GSI2PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
+                    new() { AttributeName = "GSI2SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
+                },
+                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
+            },
+            new()
+            {
+                IndexName = "GSI3",
+                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
+                {
+                    new() { AttributeName = "GSI3PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
+                    new() { AttributeName = "GSI3SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
+                },
+                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
+            }
+        }
+    };
+
+    await dynamoDb.CreateTableAsync(request);
+    Console.WriteLine($"Table '{tableName}' created successfully");
+
+    // Wait for table to become active
+    for (int i = 0; i < 30; i++)
+    {
+        await Task.Delay(1000);
+        var response = await dynamoDb.DescribeTableAsync(tableName);
+        if (response.Table.TableStatus == Amazon.DynamoDBv2.TableStatus.ACTIVE)
+        {
+            Console.WriteLine($"Table '{tableName}' is now active");
+            return;
+        }
+    }
+}
 
 // Expose Program class for integration testing
 public partial class Program { }

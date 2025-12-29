@@ -7,6 +7,7 @@ let currentGameState = null;
 let selectedChecker = null; // { point: number, x: number, y: number }
 let validDestinations = [];
 let myPlayerId = null;  // Persistent player ID
+let apiBaseUrl = 'http://localhost:5000';  // Default fallback, will be overridden from /api/config
 
 // ==== URL ROUTING ====
 function getGameIdFromUrl() {
@@ -187,10 +188,16 @@ async function autoConnect() {
         const response = await fetch('/api/config');
         const config = await response.json();
         serverUrl = config.signalrUrl;
+
+        // Extract base API URL by removing /gamehub suffix
+        apiBaseUrl = serverUrl.replace('/gamehub', '');
+
         log(`Using SignalR URL: ${serverUrl}`, 'info');
+        log(`Using API Base URL: ${apiBaseUrl}`, 'info');
     } catch (error) {
         // Fallback to hardcoded URL if config endpoint fails
         serverUrl = document.getElementById('serverUrl').value;
+        apiBaseUrl = serverUrl.replace('/gamehub', '');
         log(`Using fallback URL: ${serverUrl}`, 'warning');
     }
 
@@ -336,7 +343,7 @@ async function refreshGamesList() {
 
     try {
         // Fetch all games list
-        const response = await fetch('http://localhost:5000/api/games');
+        const response = await fetch(`${apiBaseUrl}/api/games`);
         const data = await response.json();
 
         const gamesListEl = document.getElementById('gamesList');
@@ -397,7 +404,7 @@ async function refreshGamesList() {
 
 async function refreshMyGames() {
     try {
-        const response = await fetch(`http://localhost:5000/api/player/${myPlayerId}/active-games`);
+        const response = await fetch(`${apiBaseUrl}/api/player/${myPlayerId}/active-games`);
         const myGames = await response.json();
 
         const myGamesListEl = document.getElementById('myGamesList');
