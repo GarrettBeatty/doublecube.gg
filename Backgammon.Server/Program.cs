@@ -56,6 +56,9 @@ builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IFriendService, FriendService>();
 
+// AI opponent service
+builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
+
 // JWT Authentication configuration
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "BackgammonServer";

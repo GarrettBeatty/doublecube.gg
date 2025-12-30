@@ -30,17 +30,20 @@ public class GameHub : Hub
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IAiMoveService _aiMoveService;
     private readonly ILogger<GameHub> _logger;
 
     public GameHub(
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
         IUserRepository userRepository,
+        IAiMoveService aiMoveService,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _userRepository = userRepository;
+        _aiMoveService = aiMoveService;
         _logger = logger;
     }
 
@@ -136,6 +139,63 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error joining game");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Create a new game against an AI opponent.
+    /// The human player is always White (moves first).
+    /// </summary>
+    /// <param name="playerId">The human player's persistent ID</param>
+    public async Task CreateAiGame(string playerId)
+    {
+        try
+        {
+            var connectionId = Context.ConnectionId;
+
+            // Use authenticated user ID if available
+            var effectivePlayerId = GetEffectivePlayerId(playerId);
+            var displayName = GetAuthenticatedDisplayName();
+
+            // Create a new game session
+            var session = _sessionManager.CreateGame();
+            await Groups.AddToGroupAsync(connectionId, session.Id);
+
+            // Add human player as White
+            session.AddPlayer(effectivePlayerId, connectionId);
+            if (!string.IsNullOrEmpty(displayName))
+            {
+                session.SetPlayerName(effectivePlayerId, displayName);
+            }
+
+            // Add AI player as Red
+            var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
+            session.AddPlayer(aiPlayerId, ""); // Empty connection ID for AI
+            session.SetPlayerName(aiPlayerId, "Computer");
+
+            _logger.LogInformation("Created AI game {GameId}. Human: {PlayerId}, AI: {AiPlayerId}",
+                session.Id, effectivePlayerId, aiPlayerId);
+
+            // Game is now full - start immediately
+            var humanState = session.GetState(connectionId);
+            await Clients.Caller.SendAsync("GameStart", humanState);
+
+            // Save initial game state
+            await SaveGameStateAsync(session);
+
+            // If AI goes first (which would be unusual since White goes first, but handle it)
+            if (_aiMoveService.IsAiPlayer(GetCurrentPlayerId(session)))
+            {
+                // Trigger AI turn in background
+                _ = ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
+            }
+
+            _logger.LogInformation("AI game {GameId} started", session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating AI game");
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
     }
@@ -497,6 +557,15 @@ public class GameHub : Hub
 
             _logger.LogInformation("Turn ended in game {GameId}. Current player: {Player}",
                 session.Id, session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
+
+            // Check if next player is AI and trigger AI turn
+            var nextPlayerId = GetCurrentPlayerId(session);
+            if (_aiMoveService.IsAiPlayer(nextPlayerId))
+            {
+                _logger.LogInformation("Triggering AI turn for player {AiPlayerId} in game {GameId}",
+                    nextPlayerId, session.Id);
+                _ = ExecuteAiTurnWithBroadcastAsync(session, nextPlayerId!);
+            }
         }
         catch (Exception ex)
         {
@@ -907,6 +976,92 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Get the player ID of the current player in the session
+    /// </summary>
+    private string? GetCurrentPlayerId(GameSession session)
+    {
+        if (session.Engine.CurrentPlayer == null)
+            return null;
+
+        return session.Engine.CurrentPlayer.Color == CheckerColor.White
+            ? session.WhitePlayerId
+            : session.RedPlayerId;
+    }
+
+    /// <summary>
+    /// Get the AI player ID from the session (if any)
+    /// </summary>
+    private string? GetAiPlayerId(GameSession session)
+    {
+        if (_aiMoveService.IsAiPlayer(session.WhitePlayerId))
+            return session.WhitePlayerId;
+        if (_aiMoveService.IsAiPlayer(session.RedPlayerId))
+            return session.RedPlayerId;
+        return null;
+    }
+
+    /// <summary>
+    /// Execute AI turn and broadcast updates to clients.
+    /// Runs as a background task to avoid blocking the hub.
+    /// </summary>
+    private async Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId)
+    {
+        try
+        {
+            // Broadcast callback - sends state to human player
+            async Task BroadcastUpdate()
+            {
+                // Send personalized state to each connected player
+                if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+                {
+                    var whiteState = session.GetState(session.WhiteConnectionId);
+                    await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+                }
+                if (!string.IsNullOrEmpty(session.RedConnectionId))
+                {
+                    var redState = session.GetState(session.RedConnectionId);
+                    await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+                }
+            }
+
+            // Execute AI turn with delays and broadcasts
+            await _aiMoveService.ExecuteAiTurnAsync(session, aiPlayerId, BroadcastUpdate);
+
+            // Save game state after AI turn
+            await SaveGameStateAsync(session);
+
+            // Check if game is over
+            if (session.Engine.Winner != null)
+            {
+                var stakes = session.Engine.GetGameResult();
+                var finalState = session.GetState();
+                await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+                _logger.LogInformation("AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
+                    session.Id, session.Engine.Winner.Name, stakes);
+
+                // Update database status
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+                        var game = GameEngineMapper.ToGame(session);
+                        await UpdateUserStatsAfterGame(game);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to update completion status for AI game {GameId}", session.Id);
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error executing AI turn in game {GameId}", session.Id);
+        }
+    }
+
+    /// <summary>
     /// Update user statistics after a game is completed
     /// </summary>
     private async Task UpdateUserStatsAfterGame(Game game)
@@ -919,6 +1074,13 @@ public class GameHub : Hub
                 string.IsNullOrEmpty(game.WhitePlayerId))
             {
                 _logger.LogInformation("Skipping stats update for game {GameId} - no opponent joined", game.GameId);
+                return;
+            }
+
+            // Skip stats for AI games
+            if (game.IsAiOpponent)
+            {
+                _logger.LogInformation("Skipping stats update for game {GameId} - AI opponent", game.GameId);
                 return;
             }
 

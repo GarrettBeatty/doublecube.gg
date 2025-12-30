@@ -8,6 +8,7 @@ let selectedChecker = null; // { point: number, x: number, y: number }
 let validDestinations = [];
 let myPlayerId = null;  // Persistent player ID
 let apiBaseUrl = 'http://localhost:5000';  // Default fallback, will be overridden from /api/config
+let isAiGame = false;  // Track if playing against AI
 
 // ==== URL ROUTING ====
 function getGameIdFromUrl() {
@@ -416,7 +417,9 @@ async function refreshMyGames() {
 
         let html = '';
         myGames.forEach(game => {
+            const isAiOpponent = game.opponent === 'Computer';
             const opponentStatus = game.isFull ? escapeHtml(game.opponent) : 'Waiting for opponent';
+            const opponentIcon = isAiOpponent ? '🤖' : '';
             const timeAgo = getTimeAgo(new Date(game.lastActivity));
             const borderColor = game.isMyTurn ? 'border-success' : 'border-info';
             const bgColor = game.isMyTurn ? 'bg-success/10' : 'bg-base-200';
@@ -426,9 +429,10 @@ async function refreshMyGames() {
                     <div class="card-body p-4 flex-row justify-between items-center">
                         <div>
                             <p class="font-semibold">
-                                ${game.myColor === 'White' ? '⚪' : '🔴'} You vs ${opponentStatus}
+                                ${game.myColor === 'White' ? '⚪' : '🔴'} You vs ${opponentIcon} ${opponentStatus}
                             </p>
                             <div class="flex items-center gap-2 mt-1">
+                                ${isAiOpponent ? '<span class="badge badge-secondary badge-sm">AI</span>' : ''}
                                 <span class="badge ${game.isMyTurn ? 'badge-success' : 'badge-ghost'} badge-sm">${game.isMyTurn ? 'Your Turn' : 'Waiting'}</span>
                                 <span class="text-sm text-base-content/60">Active ${timeAgo}</span>
                             </div>
@@ -521,6 +525,23 @@ async function createGame() {
         showGamePage();
     } catch (err) {
         log(`❌ Failed to create game: ${err}`, 'error');
+    }
+}
+
+async function createAiGame() {
+    if (!connection || connection.state !== 'Connected') {
+        alert('Not connected to server. Please wait...');
+        return;
+    }
+
+    try {
+        currentGameId = null;
+        localStorage.removeItem('currentGameId'); // Clear any old game
+        await connection.invoke("CreateAiGame", myPlayerId);
+        log('🤖 Creating AI game...', 'info');
+        showGamePage();
+    } catch (err) {
+        log(`❌ Failed to create AI game: ${err}`, 'error');
     }
 }
 
@@ -796,6 +817,15 @@ function updateGameState(state, isSpectator = false) {
     console.log('Player Names - White:', state.whitePlayerName, 'Red:', state.redPlayerName);
 
     currentGameState = state; // Store for click handling
+
+    // Detect AI game (opponent named "Computer")
+    const whiteName = state.whitePlayerName || state.WhitePlayerName || '';
+    const redName = state.redPlayerName || state.RedPlayerName || '';
+    isAiGame = whiteName === 'Computer' || redName === 'Computer';
+
+    // Update AI game UI (hide chat and double button for AI games)
+    updateAiGameUI();
+
     // Spectator mode UI
     if (isSpectator || window.isSpectator) {
         document.body.classList.add('spectator-mode');
@@ -958,6 +988,31 @@ function resetGameUI() {
     if (rollBtn) rollBtn.disabled = true;
     if (undoBtn) undoBtn.disabled = true;
     if (endTurnBtn) endTurnBtn.disabled = true;
+}
+
+// ==== AI GAME UI ====
+function updateAiGameUI() {
+    const chatSidebar = document.getElementById('chatSidebar');
+    const doubleBtn = document.getElementById('doubleBtn');
+
+    if (isAiGame) {
+        // Hide chat sidebar for AI games
+        if (chatSidebar) {
+            chatSidebar.style.display = 'none';
+        }
+        // Hide double button for AI games (Phase 1 limitation)
+        if (doubleBtn) {
+            doubleBtn.style.display = 'none';
+        }
+    } else {
+        // Show chat and double button for human games
+        if (chatSidebar) {
+            chatSidebar.style.display = '';
+        }
+        if (doubleBtn) {
+            doubleBtn.style.display = '';
+        }
+    }
 }
 
 // ==== BOARD RENDERING ====

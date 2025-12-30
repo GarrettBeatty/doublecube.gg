@@ -74,6 +74,9 @@ public static class GameEngineMapper
             LastUpdatedAt = DateTime.UtcNow
         };
 
+        // Check if this is an AI game
+        game.IsAiOpponent = IsAiPlayer(session.WhitePlayerId) || IsAiPlayer(session.RedPlayerId);
+
         // If game is completed, add completion data
         if (engine.Winner != null)
         {
@@ -285,5 +288,13 @@ public static class GameEngineMapper
             return false;
 
         return Guid.TryParse(playerId, out _);
+    }
+
+    /// <summary>
+    /// Check if a player ID represents an AI opponent
+    /// </summary>
+    public static bool IsAiPlayer(string? playerId)
+    {
+        return playerId?.StartsWith("ai_") == true;
     }
 }
