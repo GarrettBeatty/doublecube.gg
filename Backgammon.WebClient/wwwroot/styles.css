@@ -476,7 +476,7 @@ body.spectator-mode .board-point {
     object-fit: contain; /* Maintain aspect ratio within container */
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-    cursor: pointer;
+    cursor: default; /* Changed from pointer - only draggable checkers get grab cursor */
     display: block;
     background: #4A3728;
 }
@@ -565,7 +565,7 @@ body.spectator-mode .board-point {
 /* Checker styling - flat modern design */
 .checker {
     transition: transform 0.15s ease, filter 0.15s ease;
-    cursor: pointer;
+    cursor: default; /* Changed from pointer - only draggable checkers get grab cursor */
 }
 
 .checker-white {
@@ -580,8 +580,8 @@ body.spectator-mode .board-point {
     stroke-width: 2;
 }
 
-/* Checker hover effect */
-.checker:hover {
+/* Checker hover effect - only for draggable checkers */
+.checker.draggable:hover {
     filter: brightness(1.15);
 }
 
