@@ -92,8 +92,8 @@ jobs:
           export AWS_REGION=us-east-1
           export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/dev/table-name --query Parameter.Value --output text)
           export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/dev/jwt-secret --with-decryption --query Parameter.Value --output text)
-          export DOMAIN=${DOMAIN:-localhost}
-          export TLS_EMAIL=${TLS_EMAIL:-admin@example.com}
+          export DOMAIN=$(aws ssm get-parameter --name /backgammon/dev/domain --query Parameter.Value --output text)
+          export TLS_EMAIL=$(aws ssm get-parameter --name /backgammon/dev/tls-email --query Parameter.Value --output text)
 
           # Pull new images
           docker-compose -f docker-compose.prod.yml pull

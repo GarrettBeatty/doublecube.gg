@@ -70,6 +70,8 @@ public class BackgammonStack : Stack
         // Grant SSM parameter read access
         ssmParams.JwtSecretParameter.GrantRead(ec2Role);
         ssmParams.TableNameParameter.GrantRead(ec2Role);
+        ssmParams.DomainParameter.GrantRead(ec2Role);
+        ssmParams.TlsEmailParameter.GrantRead(ec2Role);
 
         // EC2 User Data script - Install Docker and Docker Compose
         var userData = UserData.ForLinux();
