@@ -1,0 +1,67 @@
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+.vscode/
+
+# Rider
+.idea/
+*.sln.iml
+
+# Test results
+TestResults/
+**/*.trx
+**/*.coverage
+**/*.coveragexml
+
+# Node modules (if any)
+**/node_modules/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+**/.dockerignore
+**/docker-compose*.yml
+**/Dockerfile*
+.docker/
+
+# Documentation
+*.md
+docs/
+
+# CI/CD
+.github/
+azure-pipelines.yml
+
+# Misc
+LICENSE
+*.log
+.DS_Store
+Thumbs.db
+
+# CDK and infrastructure
+infra/
+cdk.out/
+
+# Local environment files
+.env
+.env.local
+*.local
+
+# Aspire
+**/.aspire/
+**/AppHost/

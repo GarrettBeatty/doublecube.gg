@@ -1,0 +1,114 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ENVIRONMENT: prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build and push Server image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Backgammon.Server/Dockerfile -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest
+        docker push $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG
+        docker push $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest
+
+    - name: Build and push WebClient image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -f Backgammon.WebClient/Dockerfile -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG .
+        docker tag $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest
+        docker push $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG
+        docker push $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest
+
+    - name: Deploy to EC2
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+      run: |
+        # Setup SSH
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+        chmod 600 ~/.ssh/deploy_key
+
+        # Add EC2 host to known_hosts
+        ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+
+        # Copy docker-compose and Caddyfile to EC2
+        scp -i ~/.ssh/deploy_key docker-compose.prod.yml ec2-user@$EC2_HOST:~/backgammon/
+        scp -i ~/.ssh/deploy_key Caddyfile ec2-user@$EC2_HOST:~/backgammon/
+
+        # Deploy on EC2
+        ssh -i ~/.ssh/deploy_key ec2-user@$EC2_HOST << 'ENDSSH'
+          set -e
+          cd ~/backgammon
+
+          # Login to ECR
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+
+          # Export environment variables
+          export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
+          export IMAGE_TAG=latest
+          export ENVIRONMENT=prod
+          export AWS_REGION=us-east-1
+          export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/prod/table-name --query Parameter.Value --output text)
+          export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/prod/jwt-secret --with-decryption --query Parameter.Value --output text)
+          export DOMAIN=${DOMAIN:-localhost}
+          export TLS_EMAIL=${TLS_EMAIL:-admin@example.com}
+
+          # Pull new images
+          docker-compose -f docker-compose.prod.yml pull
+
+          # Restart services with zero downtime
+          docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          # Wait for services to be healthy
+          sleep 10
+
+          # Cleanup old images
+          docker image prune -af --filter "until=24h"
+
+          echo "Deployment complete!"
+        ENDSSH
+
+    - name: Verify deployment
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
+        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+      run: |
+        # Check if services are running
+        ssh -i ~/.ssh/deploy_key ec2-user@$EC2_HOST << 'ENDSSH'
+          docker ps
+          echo "---"
+          echo "Service health:"
+          curl -f http://localhost:5000/alive || echo "Server health check failed"
+          echo "Server: OK"
+        ENDSSH

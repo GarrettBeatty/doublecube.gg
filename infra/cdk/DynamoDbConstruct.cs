@@ -6,24 +6,24 @@ namespace Backgammon.Infrastructure;
 
 public class DynamoDbConstruct : Construct
 {
-    public ITable Table { get; }
+    public ITable Table { get; private set; }
 
     public DynamoDbConstruct(Construct scope, string id, string environment) : base(scope, id)
     {
         var tableName = $"backgammon-{environment}";
 
         // Create the main table with single-table design
-        Table = new Table(this, "BackgammonTable", new TableProps
+        var table = new Table(this, "BackgammonTable", new TableProps
         {
             TableName = tableName,
 
             // Partition key and sort key
-            PartitionKey = new Attribute
+            PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "PK",
                 Type = AttributeType.STRING
             },
-            SortKey = new Attribute
+            SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "SK",
                 Type = AttributeType.STRING
@@ -48,16 +48,17 @@ public class DynamoDbConstruct : Construct
             RemovalPolicy = environment == "prod" ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY
         });
 
+        // Add Global Secondary Indexes
         // GSI1: Username Lookup Index
-        Table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName = "GSI1",
-            PartitionKey = new Attribute
+            PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI1PK",
                 Type = AttributeType.STRING
             },
-            SortKey = new Attribute
+            SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI1SK",
                 Type = AttributeType.STRING
@@ -66,15 +67,15 @@ public class DynamoDbConstruct : Construct
         });
 
         // GSI2: Email Lookup Index
-        Table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName = "GSI2",
-            PartitionKey = new Attribute
+            PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI2PK",
                 Type = AttributeType.STRING
             },
-            SortKey = new Attribute
+            SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI2SK",
                 Type = AttributeType.STRING
@@ -83,15 +84,15 @@ public class DynamoDbConstruct : Construct
         });
 
         // GSI3: Game Status Index
-        Table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
+        table.AddGlobalSecondaryIndex(new GlobalSecondaryIndexProps
         {
             IndexName = "GSI3",
-            PartitionKey = new Attribute
+            PartitionKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI3PK",
                 Type = AttributeType.STRING
             },
-            SortKey = new Attribute
+            SortKey = new Amazon.CDK.AWS.DynamoDB.Attribute
             {
                 Name = "GSI3SK",
                 Type = AttributeType.STRING
@@ -99,9 +100,12 @@ public class DynamoDbConstruct : Construct
             ProjectionType = ProjectionType.ALL
         });
 
+        // Assign to the ITable property
+        Table = table;
+
         // Tag the table
-        Tags.Of(Table).Add("Project", "Backgammon");
-        Tags.Of(Table).Add("Environment", environment);
-        Tags.Of(Table).Add("ManagedBy", "CDK");
+        Amazon.CDK.Tags.Of(Table).Add("Project", "Backgammon");
+        Amazon.CDK.Tags.Of(Table).Add("Environment", environment);
+        Amazon.CDK.Tags.Of(Table).Add("ManagedBy", "CDK");
     }
 }

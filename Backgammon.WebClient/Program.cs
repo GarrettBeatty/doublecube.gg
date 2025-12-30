@@ -13,19 +13,34 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // Expose API URL to browser via endpoint
-app.MapGet("/api/config", (IConfiguration config) =>
+app.MapGet("/api/config", (HttpContext context, IConfiguration config) =>
 {
-    // Try multiple configuration key formats for Aspire service discovery
-    var apiUrl = config["services:backgammon-api:http:0"]
-              ?? config["services:backgammon-api:https:0"]
-              ?? config["ConnectionStrings:backgammon-api"]
-              ?? "http://localhost:5000";
+    string apiUrl;
+
+    // In production (Docker Compose), use the public URL that the browser accessed
+    // In development (Aspire), use service discovery
+    var aspireApiUrl = config["services:backgammon-api:http:0"]
+                    ?? config["services:backgammon-api:https:0"]
+                    ?? config["ConnectionStrings:backgammon-api"];
+
+    if (!string.IsNullOrEmpty(aspireApiUrl))
+    {
+        // Aspire service discovery - use the discovered URL (development mode)
+        apiUrl = aspireApiUrl;
+        Console.WriteLine($"[WebClient] Using Aspire service discovery: {apiUrl}");
+    }
+    else
+    {
+        // Production mode - browser needs to connect via the same host it used to reach WebClient
+        // This works because Caddy reverse proxy routes all traffic through the same public domain
+        var publicUrl = $"{context.Request.Scheme}://{context.Request.Host}";
+        apiUrl = publicUrl;
+        Console.WriteLine($"[WebClient] Using public URL for production: {apiUrl}");
+    }
 
     // Debug logging
     Console.WriteLine($"[WebClient] /api/config called");
-    Console.WriteLine($"[WebClient] Resolved API URL: {apiUrl}");
-    Console.WriteLine($"[WebClient] services:backgammon-api:http:0 = {config["services:backgammon-api:http:0"]}");
-    Console.WriteLine($"[WebClient] services:backgammon-api:https:0 = {config["services:backgammon-api:https:0"]}");
+    Console.WriteLine($"[WebClient] Resolved SignalR URL: {apiUrl}/gamehub");
 
     return new { signalrUrl = $"{apiUrl}/gamehub" };
 });

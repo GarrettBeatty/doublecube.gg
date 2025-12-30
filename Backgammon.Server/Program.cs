@@ -99,6 +99,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // Add CORS for web clients (SignalR requires specific origins with credentials)
+var corsPolicy = "CorsPolicy";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -107,6 +108,27 @@ builder.Services.AddCors(options =>
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();  // Required for SignalR
+    });
+
+    options.AddPolicy("Production", policy =>
+    {
+        var domain = Environment.GetEnvironmentVariable("DOMAIN");
+        if (!string.IsNullOrEmpty(domain))
+        {
+            // Allow both HTTP and HTTPS for the configured domain
+            policy.WithOrigins($"http://{domain}", $"https://{domain}")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();  // Required for SignalR
+        }
+        else
+        {
+            // Fallback to localhost if DOMAIN not set
+            policy.WithOrigins("http://localhost:3000", "http://localhost")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
     });
 });
 
@@ -129,7 +151,9 @@ await sessionManager.LoadActiveGamesAsync(gameRepository);
 Console.WriteLine("=== Game loading complete ===\n");
 
 // MUST be first - CORS middleware needs to run before Aspire endpoints
-app.UseCors("AllowAll");
+// Use Production CORS policy in production environment, AllowAll otherwise
+var selectedCorsPolicy = app.Environment.IsProduction() ? "Production" : "AllowAll";
+app.UseCors(selectedCorsPolicy);
 
 // Authentication & Authorization middleware
 app.UseAuthentication();
@@ -139,11 +163,11 @@ app.UseAuthorization();
 app.MapDefaultEndpoints();
 
 // Map SignalR hub with CORS
-app.MapHub<GameHub>("/gamehub").RequireCors("AllowAll");
+app.MapHub<GameHub>("/gamehub").RequireCors(selectedCorsPolicy);
 
 // Health check endpoints
-app.MapGet("/", () => "Backgammon SignalR Server Running - Connect via /gamehub").RequireCors("AllowAll");
-app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow }).RequireCors("AllowAll");
+app.MapGet("/", () => "Backgammon SignalR Server Running - Connect via /gamehub").RequireCors(selectedCorsPolicy);
+app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow }).RequireCors(selectedCorsPolicy);
 
 // Game statistics endpoint
 app.MapGet("/stats", (IGameSessionManager sessionManager) =>
@@ -156,7 +180,7 @@ app.MapGet("/stats", (IGameSessionManager sessionManager) =>
         waitingGames = games.Count(g => !g.IsFull),
         completedGames = games.Count(g => g.Engine.Winner != null)
     };
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Game list endpoint - returns list of games available to join
 app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
@@ -187,7 +211,7 @@ app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
             })
             .ToList()
     };
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // My games endpoint - returns active games for a specific player
 app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSessionManager sessionManager) =>
@@ -206,7 +230,7 @@ app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSession
         createdAt = g.CreatedAt,
         lastActivity = g.LastActivityAt
     }).ToList();
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Database statistics endpoint
 app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
@@ -227,21 +251,21 @@ app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
             completedAt = g.CompletedAt
         })
     };
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Player game history endpoint
 app.MapGet("/api/player/{playerId}/games", async (string playerId, IGameRepository gameRepository, int limit = 20, int skip = 0) =>
 {
     var games = await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip);
     return games;
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Player statistics endpoint
 app.MapGet("/api/player/{playerId}/stats", async (string playerId, IGameRepository gameRepository) =>
 {
     var stats = await gameRepository.GetPlayerStatsAsync(playerId);
     return stats;
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Get specific game by ID
 app.MapGet("/api/game/{gameId}", async (string gameId, IGameRepository gameRepository) =>
@@ -251,7 +275,7 @@ app.MapGet("/api/game/{gameId}", async (string gameId, IGameRepository gameRepos
         return Results.NotFound(new { error = "Game not found" });
 
     return Results.Ok(game);
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // ==================== AUTH ENDPOINTS ====================
 
@@ -260,14 +284,14 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IAuthService a
 {
     var result = await authService.RegisterAsync(request);
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Login
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
 {
     var result = await authService.LoginAsync(request);
     return result.Success ? Results.Ok(result) : Results.Unauthorized();
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Get current user (requires auth)
 app.MapGet("/api/auth/me", async (HttpContext context, IAuthService authService) =>
@@ -278,7 +302,7 @@ app.MapGet("/api/auth/me", async (HttpContext context, IAuthService authService)
 
     var user = await authService.GetUserFromTokenAsync(token);
     return user != null ? Results.Ok(user) : Results.Unauthorized();
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // ==================== USER ENDPOINTS ====================
 
@@ -290,7 +314,7 @@ app.MapGet("/api/users/{userId}", async (string userId, IUserRepository userRepo
         return Results.NotFound(new { error = "User not found" });
 
     return Results.Ok(UserDto.FromUser(user));
-}).RequireCors("AllowAll");
+}).RequireCors(selectedCorsPolicy);
 
 // Update user profile (requires auth)
 app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContext context, IUserRepository userRepository) =>
@@ -322,7 +346,7 @@ app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContex
 
     await userRepository.UpdateUserAsync(user);
     return Results.Ok(UserDto.FromUser(user));
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Search users (requires auth)
 app.MapGet("/api/users/search", async (string q, IUserRepository userRepository) =>
@@ -337,7 +361,7 @@ app.MapGet("/api/users/search", async (string q, IUserRepository userRepository)
         username = u.Username,
         displayName = u.DisplayName
     }));
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // ==================== FRIEND ENDPOINTS ====================
 
@@ -350,7 +374,7 @@ app.MapGet("/api/friends", async (HttpContext context, IFriendService friendServ
 
     var friends = await friendService.GetFriendsAsync(userId);
     return Results.Ok(friends);
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Get pending friend requests (requires auth)
 app.MapGet("/api/friends/requests", async (HttpContext context, IFriendService friendService) =>
@@ -361,7 +385,7 @@ app.MapGet("/api/friends/requests", async (HttpContext context, IFriendService f
 
     var requests = await friendService.GetPendingRequestsAsync(userId);
     return Results.Ok(requests);
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Send friend request (requires auth)
 app.MapPost("/api/friends/request/{toUserId}", async (string toUserId, HttpContext context, IFriendService friendService) =>
@@ -372,7 +396,7 @@ app.MapPost("/api/friends/request/{toUserId}", async (string toUserId, HttpConte
 
     var (success, error) = await friendService.SendFriendRequestAsync(userId, toUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Accept friend request (requires auth)
 app.MapPost("/api/friends/accept/{friendUserId}", async (string friendUserId, HttpContext context, IFriendService friendService) =>
@@ -383,7 +407,7 @@ app.MapPost("/api/friends/accept/{friendUserId}", async (string friendUserId, Ht
 
     var (success, error) = await friendService.AcceptFriendRequestAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Decline friend request (requires auth)
 app.MapPost("/api/friends/decline/{friendUserId}", async (string friendUserId, HttpContext context, IFriendService friendService) =>
@@ -394,7 +418,7 @@ app.MapPost("/api/friends/decline/{friendUserId}", async (string friendUserId, H
 
     var (success, error) = await friendService.DeclineFriendRequestAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Remove friend (requires auth)
 app.MapDelete("/api/friends/{friendUserId}", async (string friendUserId, HttpContext context, IFriendService friendService) =>
@@ -405,7 +429,7 @@ app.MapDelete("/api/friends/{friendUserId}", async (string friendUserId, HttpCon
 
     var (success, error) = await friendService.RemoveFriendAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Block user (requires auth)
 app.MapPost("/api/friends/block/{blockedUserId}", async (string blockedUserId, HttpContext context, IFriendService friendService) =>
@@ -416,7 +440,7 @@ app.MapPost("/api/friends/block/{blockedUserId}", async (string blockedUserId, H
 
     var (success, error) = await friendService.BlockUserAsync(userId, blockedUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Invite friend to game (requires auth)
 app.MapPost("/api/friends/invite/{friendUserId}/game/{gameId}", async (string friendUserId, string gameId, HttpContext context, IFriendService friendService) =>
@@ -427,7 +451,7 @@ app.MapPost("/api/friends/invite/{friendUserId}/game/{gameId}", async (string fr
 
     var (success, error) = await friendService.InviteFriendToGameAsync(userId, friendUserId, gameId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
-}).RequireAuthorization().RequireCors("AllowAll");
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
 
 // Cleanup background service for inactive games
 var cleanupTask = Task.Run(async () =>

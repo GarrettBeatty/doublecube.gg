@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Backgammon.Server/Dockerfile
+    container_name: backgammon-server-local
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AWS_REGION=us-east-1
+      - DynamoDb__TableName=backgammon-local
+      - Jwt__Secret=local-test-secret-key-for-development-only-not-secure
+      - Jwt__Issuer=BackgammonServer
+      - Jwt__Audience=BackgammonClient
+      - Jwt__ExpirationDays=7
+      - DOMAIN=localhost
+      # For local testing without real DynamoDB, comment out the line below
+      - AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000
+    networks:
+      - backgammon-net
+    depends_on:
+      - dynamodb-local
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  webclient:
+    build:
+      context: .
+      dockerfile: Backgammon.WebClient/Dockerfile
+    container_name: backgammon-webclient-local
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Service discovery via Docker network
+      - services__backgammon-api__http__0=http://server:5000
+    networks:
+      - backgammon-net
+    depends_on:
+      - server
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: backgammon-caddy-local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=localhost
+      - TLS_EMAIL=admin@example.com
+    networks:
+      - backgammon-net
+    depends_on:
+      - server
+      - webclient
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # DynamoDB Local for testing
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: backgammon-dynamodb-local
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    networks:
+      - backgammon-net
+
+networks:
+  backgammon-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

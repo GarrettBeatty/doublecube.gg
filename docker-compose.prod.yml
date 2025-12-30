@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  server:
+    image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-prod}:${IMAGE_TAG:-latest}
+    container_name: backgammon-server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - DynamoDb__TableName=${DYNAMODB_TABLE_NAME:-backgammon-prod}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=BackgammonServer
+      - Jwt__Audience=BackgammonClient
+      - Jwt__ExpirationDays=7
+      - DOMAIN=${DOMAIN:-localhost}
+    networks:
+      - backgammon-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/alive"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  webclient:
+    image: ${ECR_REGISTRY}/backgammon-webclient-${ENVIRONMENT:-prod}:${IMAGE_TAG:-latest}
+    container_name: backgammon-webclient
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      # Service discovery via Docker network
+      - services__backgammon-api__http__0=http://server:5000
+    networks:
+      - backgammon-net
+    depends_on:
+      server:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: backgammon-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - TLS_EMAIL=${TLS_EMAIL:-admin@example.com}
+    networks:
+      - backgammon-net
+    depends_on:
+      - server
+      - webclient
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  backgammon-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

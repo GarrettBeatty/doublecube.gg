@@ -1,0 +1,43 @@
+{$DOMAIN:localhost} {
+    # Server API endpoints
+    handle /api/* {
+        reverse_proxy server:5000
+    }
+
+    # SignalR WebSocket endpoint
+    handle /gamehub {
+        reverse_proxy server:5000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Health check endpoints
+    handle /health {
+        reverse_proxy server:5000
+    }
+
+    handle /alive {
+        reverse_proxy server:5000
+    }
+
+    handle /stats {
+        reverse_proxy server:5000
+    }
+
+    # WebClient - Serve static content (catch-all, must be last)
+    handle /* {
+        reverse_proxy webclient:3000
+    }
+
+    # Enable automatic HTTPS
+    tls {$TLS_EMAIL:admin@example.com}
+
+    # Enable access logging
+    log {
+        output stdout
+        format console
+    }
+}
