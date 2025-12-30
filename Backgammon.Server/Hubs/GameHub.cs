@@ -31,6 +31,7 @@ public class GameHub : Hub
     private readonly IGameRepository _gameRepository;
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<GameHub> _logger;
 
     public GameHub(
@@ -38,12 +39,14 @@ public class GameHub : Hub
         IGameRepository gameRepository,
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
+        IHubContext<GameHub> hubContext,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -1003,24 +1006,26 @@ public class GameHub : Hub
     /// <summary>
     /// Execute AI turn and broadcast updates to clients.
     /// Runs as a background task to avoid blocking the hub.
+    /// Uses _hubContext instead of Clients because Hub instance may be disposed.
     /// </summary>
     private async Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId)
     {
         try
         {
             // Broadcast callback - sends state to human player
+            // Use _hubContext.Clients instead of this.Clients because Hub may be disposed
             async Task BroadcastUpdate()
             {
                 // Send personalized state to each connected player
                 if (!string.IsNullOrEmpty(session.WhiteConnectionId))
                 {
                     var whiteState = session.GetState(session.WhiteConnectionId);
-                    await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+                    await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
                 }
                 if (!string.IsNullOrEmpty(session.RedConnectionId))
                 {
                     var redState = session.GetState(session.RedConnectionId);
-                    await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+                    await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
                 }
             }
 
@@ -1035,7 +1040,7 @@ public class GameHub : Hub
             {
                 var stakes = session.Engine.GetGameResult();
                 var finalState = session.GetState();
-                await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+                await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
                 _logger.LogInformation("AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
                     session.Id, session.Engine.Winner.Name, stakes);
 
