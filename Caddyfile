@@ -1,4 +1,9 @@
 {$DOMAIN:localhost} {
+    # Client configuration endpoint (served by WebClient for service discovery)
+    handle /api/config {
+        reverse_proxy webclient:3000
+    }
+
     # Server API endpoints
     handle /api/* {
         reverse_proxy server:5000
