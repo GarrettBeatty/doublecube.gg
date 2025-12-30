@@ -30,25 +30,34 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Build and push Server image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -f Backgammon.Server/Dockerfile -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest
-        docker push $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG
-        docker push $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest
+        docker buildx build \
+          --platform linux/arm64 \
+          --push \
+          -f Backgammon.Server/Dockerfile \
+          -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG \
+          -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest \
+          .
 
     - name: Build and push WebClient image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         IMAGE_TAG: ${{ github.sha }}
       run: |
-        docker build -f Backgammon.WebClient/Dockerfile -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG .
-        docker tag $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest
-        docker push $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG
-        docker push $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest
+        docker buildx build \
+          --platform linux/arm64 \
+          --push \
+          -f Backgammon.WebClient/Dockerfile \
+          -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG \
+          -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest \
+          .
 
     - name: Deploy to EC2
       env:
