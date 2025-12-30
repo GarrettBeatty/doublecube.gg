@@ -351,10 +351,14 @@ public class GameHub : Hub
 
     private bool WillHit(GameEngine engine, Move move)
     {
+        // Bear-off moves (To = 0 or 25) cannot hit
+        if (move.IsBearOff)
+            return false;
+
         var targetPoint = engine.Board.GetPoint(move.To);
         if (targetPoint.Color == null || targetPoint.Count == 0)
             return false;
-            
+
         return targetPoint.Color != engine.CurrentPlayer?.Color && targetPoint.Count == 1;
     }
 
