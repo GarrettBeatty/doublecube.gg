@@ -197,10 +197,10 @@ public class SgfSerializerTests
         Assert.Equal(1, game.WhitePlayer.CheckersOnBar);
         Assert.Equal(CheckerColor.White, game.CurrentPlayer.Color);
 
-        // Check valid moves - White should be able to enter at points 3 or 4
+        // Check valid moves - White should be able to enter at points 22 (25-3) or 21 (25-4)
         var validMoves = game.GetValidMoves();
-        Assert.Contains(validMoves, m => m.From == 0 && m.To == 3);
-        Assert.Contains(validMoves, m => m.From == 0 && m.To == 4);
+        Assert.Contains(validMoves, m => m.From == 0 && m.To == 22);
+        Assert.Contains(validMoves, m => m.From == 0 && m.To == 21);
     }
 
     [Fact]
@@ -224,9 +224,9 @@ public class SgfSerializerTests
         Assert.Equal(1, game.RedPlayer.CheckersOnBar);
         Assert.Equal(CheckerColor.Red, game.CurrentPlayer.Color);
 
-        // Check valid moves - Red should be able to enter at points 22 (25-3) or 21 (25-4)
+        // Check valid moves - Red should be able to enter at points 3 or 4
         var validMoves = game.GetValidMoves();
-        Assert.Contains(validMoves, m => m.From == 0 && m.To == 22);
-        Assert.Contains(validMoves, m => m.From == 0 && m.To == 21);
+        Assert.Contains(validMoves, m => m.From == 0 && m.To == 3);
+        Assert.Contains(validMoves, m => m.From == 0 && m.To == 4);
     }
 }
