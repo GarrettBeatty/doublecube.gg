@@ -1,12 +1,25 @@
+using Microsoft.AspNetCore.HttpOverrides;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add service defaults for Aspire integration
 builder.AddServiceDefaults();
 
+// Configure forwarded headers for reverse proxy support
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 var app = builder.Build();
 
 // Map default health endpoints
 app.MapDefaultEndpoints();
+
+// Use forwarded headers from Caddy reverse proxy
+app.UseForwardedHeaders();
 
 // Serve static files (HTML, CSS, JS)
 app.UseDefaultFiles();

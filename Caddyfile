@@ -1,7 +1,12 @@
 {$DOMAIN:localhost} {
     # Client configuration endpoint (served by WebClient for service discovery)
     handle /api/config {
-        reverse_proxy webclient:3000
+        reverse_proxy webclient:3000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
 
     # Server API endpoints

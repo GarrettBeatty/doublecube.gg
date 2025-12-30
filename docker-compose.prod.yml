@@ -30,8 +30,6 @@ services:
       - "3000:3000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      # Service discovery via Docker network
-      - services__backgammon-api__http__0=http://server:5000
     networks:
       - backgammon-net
     depends_on:
