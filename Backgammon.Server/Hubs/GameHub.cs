@@ -141,6 +141,53 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Create an analysis/practice game where one player controls both sides
+    /// </summary>
+    public async Task CreateAnalysisGame()
+    {
+        try
+        {
+            var connectionId = Context.ConnectionId;
+            var userId = GetAuthenticatedUserId() ?? connectionId;
+
+            // Create new session
+            var session = _sessionManager.JoinOrCreate(userId, connectionId, null);
+            session.IsAnalysisMode = true;
+
+            // Directly set same player for both sides (bypassing AddPlayer logic)
+            // This is necessary because AddPlayer() won't add the same player twice
+            if (session.WhitePlayerId == null)
+            {
+                session.AddPlayer(userId, connectionId); // Adds as White
+            }
+
+            // Manually set Red player to same user (analysis mode special case)
+            session.SetRedPlayer(userId, connectionId);
+
+            // Start game immediately
+            if (!session.Engine.GameStarted)
+            {
+                session.Engine.StartNewGame();
+            }
+
+            await Groups.AddToGroupAsync(connectionId, session.Id);
+
+            var state = session.GetState(connectionId);
+            await Clients.Caller.SendAsync("GameStart", state);
+
+            // Save game state
+            await SaveGameStateAsync(session);
+
+            _logger.LogInformation("Analysis game {GameId} created by {UserId}", session.Id, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating analysis game");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Get list of points that have checkers that can be moved
     /// </summary>
     public async Task<List<int>> GetValidSources()
@@ -373,9 +420,16 @@ public class GameHub : Hub
                         // Update status explicitly to ensure CompletedAt timestamp is set
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                        // Update user statistics if players are registered
-                        var game = GameEngineMapper.ToGame(session);
-                        await UpdateUserStatsAfterGame(game);
+                        // Update user statistics if players are registered (skip for analysis games)
+                        if (!session.IsAnalysisMode)
+                        {
+                            var game = GameEngineMapper.ToGame(session);
+                            await UpdateUserStatsAfterGame(game);
+                        }
+                        else
+                        {
+                            _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+                        }
 
                         _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
                     }
@@ -652,8 +706,17 @@ public class GameHub : Hub
                 try
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-                    var game = GameEngineMapper.ToGame(session);
-                    await UpdateUserStatsAfterGame(game);
+
+                    // Skip stats update for analysis games
+                    if (!session.IsAnalysisMode)
+                    {
+                        var game = GameEngineMapper.ToGame(session);
+                        await UpdateUserStatsAfterGame(game);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+                    }
                     _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
                 }
                 catch (Exception ex)
@@ -750,8 +813,17 @@ public class GameHub : Hub
                 try
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
-                    var game = GameEngineMapper.ToGame(session);
-                    await UpdateUserStatsAfterGame(game);
+
+                    // Skip stats update for analysis games
+                    if (!session.IsAnalysisMode)
+                    {
+                        var game = GameEngineMapper.ToGame(session);
+                        await UpdateUserStatsAfterGame(game);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+                    }
                     _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
                 }
                 catch (Exception ex)
@@ -983,6 +1055,78 @@ public class GameHub : Hub
         {
             stats.Losses++;
             stats.WinStreak = 0; // Reset streak on loss
+        }
+    }
+
+    /// <summary>
+    /// Export the current game position in SGF format
+    /// </summary>
+    public async Task<string> ExportPosition()
+    {
+        var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+
+        if (session == null)
+        {
+            await Clients.Caller.SendAsync("Error", "You are not in a game");
+            return string.Empty;
+        }
+
+        try
+        {
+            return SgfSerializer.ExportPosition(session.Engine);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting position");
+            await Clients.Caller.SendAsync("Error", $"Failed to export position: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Import a position from SGF format
+    /// </summary>
+    public async Task ImportPosition(string sgf)
+    {
+        var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+
+        if (session == null)
+        {
+            await Clients.Caller.SendAsync("Error", "You are not in a game");
+            return;
+        }
+
+        // Allow import in analysis mode OR when same player controls both sides
+        if (!session.IsAnalysisMode &&
+            session.WhitePlayerId != null && session.RedPlayerId != null &&
+            session.WhitePlayerId != session.RedPlayerId)
+        {
+            await Clients.Caller.SendAsync("Error", "Cannot import positions in multiplayer games");
+            return;
+        }
+
+        try
+        {
+            SgfSerializer.ImportPosition(session.Engine, sgf);
+
+            // Send updated game state to all players
+            if (session.WhiteConnectionId != null)
+            {
+                var whiteState = session.GetState(session.WhiteConnectionId);
+                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+            }
+            if (session.RedConnectionId != null)
+            {
+                var redState = session.GetState(session.RedConnectionId);
+                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            }
+
+            _logger.LogInformation("Position imported successfully for game {GameId}", session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error importing position");
+            await Clients.Caller.SendAsync("Error", $"Failed to import position: {ex.Message}");
         }
     }
 }

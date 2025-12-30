@@ -765,11 +765,36 @@ const BoardSVG = (function() {
         if (!svgElement) return null;
 
         const rect = svgElement.getBoundingClientRect();
-        const scaleX = CONFIG.viewBox.width / rect.width;
-        const scaleY = CONFIG.viewBox.height / rect.height;
 
-        const x = (clientX - rect.left) * scaleX;
-        const y = (clientY - rect.top) * scaleY;
+        // Calculate the actual aspect ratio of the rendered SVG
+        const renderedAspect = rect.width / rect.height;
+        const viewBoxAspect = CONFIG.viewBox.width / CONFIG.viewBox.height;
+
+        // Adjust for non-uniform scaling due to CSS constraints
+        let effectiveWidth = rect.width;
+        let effectiveHeight = rect.height;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (renderedAspect > viewBoxAspect) {
+            // SVG is letterboxed (black bars on sides)
+            effectiveWidth = rect.height * viewBoxAspect;
+            offsetX = (rect.width - effectiveWidth) / 2;
+        } else if (renderedAspect < viewBoxAspect) {
+            // SVG is pillarboxed (black bars on top/bottom)
+            effectiveHeight = rect.width / viewBoxAspect;
+            offsetY = (rect.height - effectiveHeight) / 2;
+        }
+
+        const scaleX = CONFIG.viewBox.width / effectiveWidth;
+        const scaleY = CONFIG.viewBox.height / effectiveHeight;
+
+        const x = (clientX - rect.left - offsetX) * scaleX;
+        const y = (clientY - rect.top - offsetY) * scaleY;
+        console.log(`Click at client (${clientX}, ${clientY}), SVG coords (${x.toFixed(1)}, ${y.toFixed(1)})`);
+        console.log(`  rect: left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)}, width=${rect.width.toFixed(1)}, height=${rect.height.toFixed(1)}`);
+        console.log(`  effective: width=${effectiveWidth.toFixed(1)}, height=${effectiveHeight.toFixed(1)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
+        console.log(`  scale: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
 
         // Ignore clicks on sidebar
         if (x < CONFIG.sidebarWidth + 10) {
@@ -817,6 +842,7 @@ const BoardSVG = (function() {
                 result = 6 - pointIndex;   // Points 6-1
             }
         }
+        console.log(`  isTop=${isTop}, isLeftSide=${isLeftSide}, pointIndex=${pointIndex} → point ${result}`);
         return result;
     }
 

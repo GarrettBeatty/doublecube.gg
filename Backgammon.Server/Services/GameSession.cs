@@ -24,7 +24,8 @@ public class GameSession
     
     public bool IsFull => WhitePlayerId != null && RedPlayerId != null;
     public bool IsStarted => IsFull && Engine.GameStarted;
-    
+    public bool IsAnalysisMode { get; set; } = false;
+
     public GameSession(string id)
     {
         Id = id;
@@ -84,6 +85,20 @@ public class GameSession
         }
         
         return false; // Game is full
+    }
+
+    /// <summary>
+    /// Set the Red player directly (used for analysis mode)
+    /// </summary>
+    public void SetRedPlayer(string playerId, string connectionId)
+    {
+        RedPlayerId = playerId;
+        RedConnectionId = connectionId;
+        if (string.IsNullOrEmpty(RedPlayerName))
+        {
+            RedPlayerName = GenerateFriendlyName(playerId);
+        }
+        LastActivityAt = DateTime.UtcNow;
     }
 
     /// <summary>
@@ -193,6 +208,10 @@ public class GameSession
     /// </summary>
     public bool IsPlayerTurn(string connectionId)
     {
+        // In analysis mode, player controls both sides - always their turn
+        if (IsAnalysisMode)
+            return true;
+
         var playerColor = GetPlayerColor(connectionId);
         return playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value;
     }
@@ -218,7 +237,7 @@ public class GameSession
             RedPlayerName = RedPlayerName ?? RedPlayerId ?? "Waiting...",
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
             YourColor = playerColor,
-            IsYourTurn = playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value,
+            IsYourTurn = IsAnalysisMode ? true : (playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value),
             Dice = new[] { Engine.Dice.Die1, Engine.Dice.Die2 },
             RemainingMoves = Engine.RemainingMoves.ToArray(),
             MovesMadeThisTurn = Engine.MoveHistory.Count,
@@ -232,7 +251,8 @@ public class GameSession
             Status = IsFull ? (Engine.Winner != null ? GameStatus.Completed : GameStatus.InProgress) : GameStatus.WaitingForPlayer,
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
-            DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString()
+            DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
+            IsAnalysisMode = this.IsAnalysisMode
         };
         
         // Get valid moves for current player

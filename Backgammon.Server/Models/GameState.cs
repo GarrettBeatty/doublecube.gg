@@ -33,6 +33,7 @@ public class GameState
     public string? WinType { get; set; }
     public int DoublingCubeValue { get; set; }
     public string? DoublingCubeOwner { get; set; }
+    public bool IsAnalysisMode { get; set; }
 }
 
 /// <summary>

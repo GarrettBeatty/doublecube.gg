@@ -524,6 +524,26 @@ async function createGame() {
     }
 }
 
+/**
+ * Create an analysis/practice game (solo mode)
+ */
+async function createAnalysisGame() {
+    if (!connection || connection.state !== 'Connected') {
+        alert('Not connected to server. Please wait...');
+        return;
+    }
+
+    try {
+        currentGameId = null;
+        localStorage.removeItem('currentGameId');
+        await connection.invoke("CreateAnalysisGame");
+        log('📊 Creating analysis game...', 'info');
+        showGamePage();
+    } catch (err) {
+        log(`❌ Failed to create analysis game: ${err}`, 'error');
+    }
+}
+
 async function joinGameById(gameId) {
     if (!connection || connection.state !== 'Connected') {
         alert('Not connected to server. Please wait...');
@@ -802,6 +822,12 @@ function updateGameState(state, isSpectator = false) {
         // Optionally disable move controls here
     } else {
         document.body.classList.remove('spectator-mode');
+    }
+
+    // Show analysis mode indicator if applicable
+    const analysisBadge = document.getElementById('analysisBadge');
+    if (analysisBadge) {
+        analysisBadge.style.display = state.isAnalysisMode ? '' : 'none';
     }
 
     // Update current game ID (no need to display it, it's in the URL)
@@ -1143,7 +1169,13 @@ async function selectChecker(point) {
 
         // Special case: check bar
         if (point === 0) {
-            const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+            // In analysis mode, check which side has checkers on bar for current player
+            let onBar;
+            if (currentGameState.isAnalysisMode) {
+                onBar = currentGameState.currentPlayer === 0 ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+            } else {
+                onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
+            }
             console.log('Bar selection - checkers on bar:', onBar);
             if (onBar === 0) {
                 console.log('No checkers on bar - cannot select');
@@ -1152,7 +1184,7 @@ async function selectChecker(point) {
                 renderBoard(currentGameState);
                 return;
             }
-        } else if (!pointData || pointData.color !== myColorValue || pointData.count === 0) {
+        } else if (!pointData || pointData.count === 0 || (!currentGameState.isAnalysisMode && pointData.color !== myColorValue)) {
             console.log('Point not selectable - wrong color or empty');
             selectedChecker = null;
             validDestinations = [];
@@ -1245,6 +1277,95 @@ function getPointAtPosition(x, y, canvasWidth, canvasHeight) {
             return 6 - (posIndex - 6); // Points 6-1
         }
     }
-    
+
     return null;
+}
+
+// ============================================================================
+// Position Import/Export Functions (SGF Format)
+// ============================================================================
+
+/**
+ * Export the current position to SGF format
+ */
+async function exportPosition() {
+    if (!connection) {
+        log('Not connected to server', 'error');
+        return;
+    }
+
+    try {
+        const sgf = await connection.invoke("ExportPosition");
+        if (sgf) {
+            // Show modal with exported position
+            document.getElementById('positionText').value = sgf;
+            document.getElementById('positionModalTitle').textContent = 'Export Position (SGF Format)';
+            document.getElementById('copyPositionBtn').style.display = '';
+            document.getElementById('importPositionBtn').style.display = 'none';
+            document.getElementById('positionModal').showModal();
+            log('Position exported successfully', 'success');
+        }
+    } catch (error) {
+        log(`Failed to export position: ${error}`, 'error');
+    }
+}
+
+/**
+ * Show the import modal
+ */
+function showImportModal() {
+    document.getElementById('positionText').value = '';
+    document.getElementById('positionModalTitle').textContent = 'Import Position (SGF Format)';
+    document.getElementById('copyPositionBtn').style.display = 'none';
+    document.getElementById('importPositionBtn').style.display = '';
+    document.getElementById('positionModal').showModal();
+}
+
+/**
+ * Copy the exported position to clipboard
+ */
+async function copyPosition() {
+    const text = document.getElementById('positionText').value;
+    if (!text) {
+        log('No position to copy', 'error');
+        return;
+    }
+
+    try {
+        await navigator.clipboard.writeText(text);
+        log('Position copied to clipboard!', 'success');
+    } catch (error) {
+        log('Failed to copy to clipboard', 'error');
+    }
+}
+
+/**
+ * Import a position from SGF format
+ */
+async function applyPosition() {
+    const sgf = document.getElementById('positionText').value.trim();
+    if (!sgf) {
+        log('Please enter an SGF position string', 'error');
+        return;
+    }
+
+    if (!connection) {
+        log('Not connected to server', 'error');
+        return;
+    }
+
+    try {
+        await connection.invoke("ImportPosition", sgf);
+        document.getElementById('positionModal').close();
+        log('Position imported successfully', 'success');
+    } catch (error) {
+        log(`Failed to import position: ${error}`, 'error');
+    }
+}
+
+/**
+ * Close the position modal
+ */
+function closePositionModal() {
+    document.getElementById('positionModal').close();
 }

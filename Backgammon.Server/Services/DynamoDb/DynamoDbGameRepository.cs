@@ -43,6 +43,7 @@ public class DynamoDbGameRepository : IGameRepository
             };
 
             // Add player-game index items if players are assigned
+            // In analysis mode, both players have the same ID, so only create one index item
             if (!string.IsNullOrEmpty(game.WhitePlayerId))
             {
                 var whitePlayerGame = DynamoDbHelpers.CreatePlayerGameIndexItem(
@@ -64,7 +65,8 @@ public class DynamoDbGameRepository : IGameRepository
                 });
             }
 
-            if (!string.IsNullOrEmpty(game.RedPlayerId))
+            // Only add Red player index if it's a different player (not analysis mode)
+            if (!string.IsNullOrEmpty(game.RedPlayerId) && game.RedPlayerId != game.WhitePlayerId)
             {
                 var redPlayerGame = DynamoDbHelpers.CreatePlayerGameIndexItem(
                     game.RedPlayerId,

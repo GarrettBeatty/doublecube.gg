@@ -442,7 +442,8 @@ body.spectator-mode .btn-roll {
     width: 100%;
     height: auto;
     max-width: min(80vw, 1200px);
-    max-height: min(calc(80vw * 0.5), calc(100vh - 350px)); /* Leave room for header, player names, controls */
+    aspect-ratio: 1100 / 500; /* Match viewBox aspect ratio to prevent distortion */
+    object-fit: contain; /* Maintain aspect ratio within container */
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
     cursor: pointer;

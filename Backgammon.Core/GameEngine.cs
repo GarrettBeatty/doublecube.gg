@@ -457,4 +457,20 @@ public class GameEngine
         // Normal win (1x)
         return DoublingCube.Value;
     }
+
+    /// <summary>
+    /// Set the current player (for position import/testing)
+    /// </summary>
+    public void SetCurrentPlayer(CheckerColor color)
+    {
+        CurrentPlayer = color == CheckerColor.White ? WhitePlayer : RedPlayer;
+    }
+
+    /// <summary>
+    /// Set game started flag (for position import/testing)
+    /// </summary>
+    public void SetGameStarted(bool started)
+    {
+        GameStarted = started;
+    }
 }

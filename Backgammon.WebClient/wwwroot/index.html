@@ -6,7 +6,7 @@
     <title>Backgammon Online</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/styles.css">
+    <link rel="stylesheet" href="/styles.css?v=2">
 </head>
 <body>
     <!-- Shared Header (visible on all pages) -->
@@ -52,6 +52,11 @@
                             <span class="text-3xl">+</span>
                             <span class="text-lg">Create New Game</span>
                         </button>
+                        <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="createAnalysisGame()">
+                            <span class="text-3xl">📊</span>
+                            <span class="text-lg">Analysis Mode</span>
+                            <span class="text-xs opacity-70">Practice & test positions</span>
+                        </button>
                     </div>
 
                     <!-- My Games Section -->
@@ -96,6 +101,11 @@
                 <div class="game-container" style="min-height: calc(100vh - 72px); justify-content:center;align-items:center;">
                     <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
                         <div class="board-wrapper-game" style="gap:8px;">
+                            <!-- Analysis Mode Badge -->
+                            <div id="analysisBadge" style="display: none; text-align: center; margin-bottom: 8px;">
+                                <span class="badge badge-info badge-lg">📊 Analysis Mode</span>
+                            </div>
+
                             <!-- Red Player (Top) -->
                             <div class="player-name-top">
                                 <div class="player-name-label" id="redPlayerBadge">
@@ -143,6 +153,12 @@
                                 </button>
                                 <button id="abandonBtn" class="btn btn-error btn-lg gap-2" onclick="showAbandonConfirm()">
                                     ⚠️ Abandon Game
+                                </button>
+                                <button id="exportBtn" class="btn btn-ghost btn-sm gap-2" onclick="exportPosition()">
+                                    📋 Export
+                                </button>
+                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" onclick="showImportModal()">
+                                    📥 Import
                                 </button>
                                 <button class="btn btn-ghost btn-sm gap-2" onclick="leaveGameAndReturn()">
                                     ← Leave
@@ -344,6 +360,50 @@
             <div class="modal-action gap-2">
                 <button onclick="confirmOfferDouble()" class="btn btn-success">Confirm Double</button>
                 <button onclick="cancelOfferDouble()" class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Position Import/Export Modal -->
+    <dialog id="positionModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box max-w-4xl">
+            <h3 class="font-bold text-lg mb-4" id="positionModalTitle">Position Import/Export (SGF Format)</h3>
+            <div class="alert alert-info mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>SGF (Smart Game Format) is the standard format used by GNU Backgammon and other tools.</span>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">SGF Position String</span>
+                </label>
+                <textarea
+                    id="positionText"
+                    class="textarea textarea-bordered w-full font-mono text-sm"
+                    rows="12"
+                    placeholder="(;GM[6]
+  AW[f[6]h[3]m[5]y[1]]  ; White checkers
+  AB[a[2]l[5]q[3]s[5]]  ; Red checkers
+  PL[W]                  ; White to move
+  DI[34]                 ; Dice: 3, 4
+  CO[c]                  ; Cube centered
+  CV[1]                  ; Cube value: 1
+)"></textarea>
+            </div>
+            <div class="modal-action gap-2 flex-wrap">
+                <button id="copyPositionBtn" onclick="copyPosition()" class="btn btn-primary">
+                    📋 Copy to Clipboard
+                </button>
+                <button id="importPositionBtn" onclick="applyPosition()" class="btn btn-success">
+                    📥 Import Position
+                </button>
+                <button onclick="closePositionModal()" class="btn btn-ghost">Close</button>
+            </div>
+            <div class="alert alert-warning mt-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>Import is only allowed in solo practice games, not multiplayer.</span>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
