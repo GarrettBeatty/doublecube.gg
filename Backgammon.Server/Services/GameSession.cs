@@ -263,17 +263,15 @@ public class GameSession
         };
         
         // Get valid moves for current player
-        if (Engine.RemainingMoves.Count > 0)
+        // Always populate ValidMoves to ensure client has complete state
+        var validMoves = Engine.GetValidMoves();
+        state.ValidMoves = validMoves.Select(m => new MoveDto
         {
-            var validMoves = Engine.GetValidMoves();
-            state.ValidMoves = validMoves.Select(m => new MoveDto
-            {
-                From = m.From,
-                To = m.To,
-                DieValue = Math.Abs(m.To - m.From),
-                IsHit = WillHit(m)
-            }).ToList();
-        }
+            From = m.From,
+            To = m.To,
+            DieValue = Math.Abs(m.To - m.From),
+            IsHit = WillHit(m)
+        }).ToList();
         
         if (Engine.Winner != null)
         {

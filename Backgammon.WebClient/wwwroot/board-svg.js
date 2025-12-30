@@ -517,13 +517,20 @@ const BoardSVG = (function() {
         if (!originalDice || originalDice.length === 0) return [];
         if (!remainingMoves) remainingMoves = [];
 
-        // Create a copy of remaining moves to track
-        const remaining = [...remainingMoves];
+        // Detect doubles: originalDice is [5,5] but for doubles we need to treat it as [5,5,5,5]
+        const isDoubles = originalDice.length === 2 && originalDice[0] === originalDice[1];
 
-        return originalDice.map(value => {
+        // For doubles, expand [5,5] to [5,5,5,5] for rendering 4 dice
+        const diceToRender = isDoubles
+            ? [originalDice[0], originalDice[0], originalDice[0], originalDice[0]]
+            : originalDice;
+
+        // Simple binary logic: sequentially mark dice as used based on remaining moves
+        const remaining = [...remainingMoves];
+        return diceToRender.map(value => {
             const idx = remaining.indexOf(value);
             if (idx !== -1) {
-                remaining.splice(idx, 1); // Remove from tracking
+                remaining.splice(idx, 1);
                 return { value, used: false };
             }
             return { value, used: true };
@@ -577,10 +584,12 @@ const BoardSVG = (function() {
             if (index >= positions.length) return;
 
             const pos = positions[index];
-            const usedClass = die.used ? 'used' : '';
+
+            // Determine CSS class based on usage state
+            const usageClass = die.used ? 'used' : '';
 
             const group = createSVGElement('g', {
-                'class': `board-die ${usedClass}`.trim(),
+                'class': `board-die ${usageClass}`.trim(),
                 'transform': `translate(${pos.x}, ${pos.y})`
             });
 
