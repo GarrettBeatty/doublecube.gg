@@ -150,9 +150,107 @@ public class GameEngineTests
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
         
         // Act
-        var move = new Move(0, 2, 2);
+        var move = new Move(0, 23, 2);
         var isValid = game.IsValidMove(move);
         
+        // Assert
+        Assert.True(isValid);
+    }
+
+    [Fact]
+    public void EnterFromBar_WhiteWithDie1_ShouldEnterAtPoint24()
+    {
+        // Arrange
+        var game = new GameEngine();
+        game.StartNewGame();
+
+        while (game.CurrentPlayer.Color != CheckerColor.White)
+            game.EndTurn();
+
+        game.WhitePlayer.CheckersOnBar = 1;
+        game.Dice.SetDice(1, 3);
+        game.RemainingMoves.Clear();
+        game.RemainingMoves.AddRange(game.Dice.GetMoves());
+
+        // Act - White with die=1 should enter at point 24 (25-1)
+        var move = new Move(0, 24, 1);
+        var isValid = game.IsValidMove(move);
+
+        // Assert
+        Assert.True(isValid);
+    }
+
+    [Fact]
+    public void EnterFromBar_WhiteWithDie6_ShouldEnterAtPoint19()
+    {
+        // Arrange
+        var game = new GameEngine();
+        game.StartNewGame();
+
+        while (game.CurrentPlayer.Color != CheckerColor.White)
+            game.EndTurn();
+
+        // Clear point 19 so White can enter (initially has 5 Red checkers)
+        game.Board.GetPoint(19).Checkers.Clear();
+
+        game.WhitePlayer.CheckersOnBar = 1;
+        game.Dice.SetDice(6, 3);
+        game.RemainingMoves.Clear();
+        game.RemainingMoves.AddRange(game.Dice.GetMoves());
+
+        // Act - White with die=6 should enter at point 19 (25-6)
+        var move = new Move(0, 19, 6);
+        var isValid = game.IsValidMove(move);
+
+        // Assert
+        Assert.True(isValid);
+    }
+
+    [Fact]
+    public void EnterFromBar_RedWithDie1_ShouldEnterAtPoint1()
+    {
+        // Arrange
+        var game = new GameEngine();
+        game.StartNewGame();
+
+        while (game.CurrentPlayer.Color != CheckerColor.Red)
+            game.EndTurn();
+
+        game.RedPlayer.CheckersOnBar = 1;
+        game.Dice.SetDice(1, 3);
+        game.RemainingMoves.Clear();
+        game.RemainingMoves.AddRange(game.Dice.GetMoves());
+
+        // Act - Red with die=1 should enter at point 1
+        var move = new Move(0, 1, 1);
+        var isValid = game.IsValidMove(move);
+
+        // Assert
+        Assert.True(isValid);
+    }
+
+    [Fact]
+    public void EnterFromBar_RedWithDie6_ShouldEnterAtPoint6()
+    {
+        // Arrange
+        var game = new GameEngine();
+        game.StartNewGame();
+
+        while (game.CurrentPlayer.Color != CheckerColor.Red)
+            game.EndTurn();
+
+        // Clear point 6 so Red can enter (initially has 5 White checkers)
+        game.Board.GetPoint(6).Checkers.Clear();
+
+        game.RedPlayer.CheckersOnBar = 1;
+        game.Dice.SetDice(6, 3);
+        game.RemainingMoves.Clear();
+        game.RemainingMoves.AddRange(game.Dice.GetMoves());
+
+        // Act - Red with die=6 should enter at point 6
+        var move = new Move(0, 6, 6);
+        var isValid = game.IsValidMove(move);
+
         // Assert
         Assert.True(isValid);
     }
