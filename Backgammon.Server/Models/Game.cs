@@ -194,6 +194,12 @@ public class Game
     /// </summary>
     [JsonPropertyName("durationSeconds")]
     public int DurationSeconds { get; set; }
+
+    /// <summary>
+    /// Whether this game is against an AI opponent
+    /// </summary>
+    [JsonPropertyName("isAiOpponent")]
+    public bool IsAiOpponent { get; set; }
 }
 
 /// <summary>

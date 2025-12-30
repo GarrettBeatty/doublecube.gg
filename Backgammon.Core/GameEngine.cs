@@ -254,7 +254,7 @@ public class GameEngine
         {
             foreach (var die in RemainingMoves.Distinct())
             {
-                int entryPoint = CurrentPlayer.Color == CheckerColor.White ? die : 25 - die;
+                int entryPoint = CurrentPlayer.Color == CheckerColor.White ? 25 - die : die;
                 var move = new Move(0, entryPoint, die);
                 if (IsValidMove(move))
                     validMoves.Add(move);

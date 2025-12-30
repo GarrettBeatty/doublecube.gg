@@ -301,6 +301,9 @@ public static class DynamoDbHelpers
             item["durationSeconds"] = new AttributeValue { N = game.DurationSeconds.ToString() };
         }
 
+        // AI opponent flag
+        item["isAiOpponent"] = new AttributeValue { BOOL = game.IsAiOpponent };
+
         return item;
     }
 
@@ -334,7 +337,8 @@ public static class DynamoDbHelpers
             DoublingCubeOwner = GetStringOrNull(item, "doublingCubeOwner"),
             Winner = GetStringOrNull(item, "winner"),
             CompletedAt = GetNullableDateTime(item, "completedAt"),
-            DurationSeconds = GetInt(item, "durationSeconds")
+            DurationSeconds = GetInt(item, "durationSeconds"),
+            IsAiOpponent = GetBool(item, "isAiOpponent", false)
         };
 
         // Board state
