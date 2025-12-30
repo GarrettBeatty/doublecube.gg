@@ -101,7 +101,7 @@ jobs:
           # Restart services with zero downtime
           docker-compose -f docker-compose.prod.yml up -d --remove-orphans
 
-          # Wait for services to be healthy
+          # Wait for services to start
           sleep 10
 
           # Cleanup old images
@@ -120,6 +120,6 @@ jobs:
           docker ps
           echo "---"
           echo "Service health:"
-          curl -f http://localhost:5000/alive || echo "Server health check failed"
+          curl -f http://localhost:5000/health || echo "Server health check failed"
           echo "Server: OK"
         ENDSSH

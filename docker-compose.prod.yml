@@ -21,12 +21,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/alive"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   webclient:
     image: ${ECR_REGISTRY}/backgammon-webclient-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
@@ -41,8 +35,7 @@ services:
     networks:
       - backgammon-net
     depends_on:
-      server:
-        condition: service_healthy
+      - server
     logging:
       driver: "json-file"
       options:
