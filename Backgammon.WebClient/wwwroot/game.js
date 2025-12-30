@@ -81,6 +81,12 @@ let apiBaseUrl = 'http://localhost:5000';  // Default fallback, will be overridd
 let isAiGame = false;  // Track if playing against AI
 let isBoardFlipped = false;  // Track board flip state
 
+// History navigation state
+let gameHistory = null;  // Full turn history from server
+let historyViewIndex = -1;  // -1 = live mode, 0+ = viewing history at that turn index
+let initialBoardState = null;  // Snapshot of starting position for replay
+let reconstructedGameState = null;  // Board state at historyViewIndex
+
 // ==== URL ROUTING ====
 function getGameIdFromUrl() {
     const pathParts = window.location.pathname.split('/');
@@ -255,6 +261,25 @@ window.addEventListener('load', async () => {
             }
         });
     }
+
+    // Add keyboard event listeners for history navigation
+    document.addEventListener('keydown', (event) => {
+        // Ignore if typing in input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            navigateHistoryBackward();
+        } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            navigateHistoryForward();
+        } else if (event.key === 'Escape' && historyViewIndex !== -1) {
+            event.preventDefault();
+            exitHistoryMode();
+        }
+    });
 
     const volumeSlider = document.getElementById('volumeSlider');
     if (volumeSlider) {
@@ -791,6 +816,214 @@ async function endTurn() {
     }
 }
 
+// ==== HISTORY NAVIGATION ====
+
+/**
+ * Reconstruct board state at a specific turn index by replaying moves from start
+ * @param {number} turnIndex - Turn to reconstruct (-1 = current live state)
+ * @returns {Object|null} - Reconstructed game state or null for live mode
+ */
+function reconstructBoardAtTurn(turnIndex) {
+    if (turnIndex === -1 || !gameHistory || !initialBoardState) {
+        return null; // Use live state
+    }
+
+    // Start with a deep copy of initial board state
+    let reconstructed = JSON.parse(JSON.stringify(initialBoardState));
+
+    // Replay moves up to and including the specified turn
+    for (let i = 0; i <= turnIndex && i < gameHistory.length; i++) {
+        const turn = gameHistory[i];
+        // Apply each move in this turn
+        turn.moves.forEach(move => {
+            applyMoveToState(reconstructed, move, turn.player);
+        });
+    }
+
+    return reconstructed;
+}
+
+/**
+ * Apply a single move to a board state (pure function for client-side simulation)
+ * @param {Object} state - Game state object to modify
+ * @param {Object} move - Move to apply {from, to, dieValue, isHit}
+ * @param {string} player - "White" or "Red"
+ */
+function applyMoveToState(state, move, player) {
+    const { from, to, isHit } = move;
+
+    // Handle entering from bar (from === 0)
+    if (from === 0) {
+        // Remove from bar
+        if (player === "White") {
+            state.whiteCheckersOnBar--;
+        } else {
+            state.redCheckersOnBar--;
+        }
+
+        // Add to destination point
+        const destPoint = state.board.find(p => p.position === to);
+        if (destPoint) {
+            if (isHit && destPoint.color && destPoint.color !== player) {
+                // Hit opponent - move their checker to bar
+                destPoint.count = 0;
+                destPoint.color = null;
+                if (player === "White") {
+                    state.redCheckersOnBar++;
+                } else {
+                    state.whiteCheckersOnBar++;
+                }
+            }
+            destPoint.color = player;
+            destPoint.count = (destPoint.count || 0) + 1;
+        }
+    }
+    // Handle bearing off (to === 0 or to === 25)
+    else if (to === 0 || to === 25) {
+        // Remove from source point
+        const fromPoint = state.board.find(p => p.position === from);
+        if (fromPoint && fromPoint.count > 0) {
+            fromPoint.count--;
+            if (fromPoint.count === 0) {
+                fromPoint.color = null;
+            }
+        }
+
+        // Add to borne off count
+        if (player === "White") {
+            state.whiteBornOff = (state.whiteBornOff || 0) + 1;
+        } else {
+            state.redBornOff = (state.redBornOff || 0) + 1;
+        }
+    }
+    // Handle normal move
+    else {
+        // Remove from source point
+        const fromPoint = state.board.find(p => p.position === from);
+        if (fromPoint && fromPoint.count > 0) {
+            fromPoint.count--;
+            if (fromPoint.count === 0) {
+                fromPoint.color = null;
+            }
+        }
+
+        // Add to destination point
+        const toPoint = state.board.find(p => p.position === to);
+        if (toPoint) {
+            if (isHit && toPoint.color && toPoint.color !== player) {
+                // Hit opponent - move their checker to bar
+                toPoint.count = 0;
+                toPoint.color = null;
+                if (player === "White") {
+                    state.redCheckersOnBar++;
+                } else {
+                    state.whiteCheckersOnBar++;
+                }
+            }
+            toPoint.color = player;
+            toPoint.count = (toPoint.count || 0) + 1;
+        }
+    }
+}
+
+/**
+ * Navigate backward in history (Left arrow key)
+ */
+function navigateHistoryBackward() {
+    if (!gameHistory || gameHistory.length === 0) {
+        log('No history available to navigate', 'info');
+        return;
+    }
+
+    if (historyViewIndex === -1) {
+        // First press - go to latest completed turn
+        historyViewIndex = gameHistory.length - 1;
+    } else if (historyViewIndex > 0) {
+        historyViewIndex--;
+    } else {
+        log('Already at first turn', 'info');
+        return;
+    }
+
+    renderHistoryView();
+}
+
+/**
+ * Navigate forward in history (Right arrow key)
+ */
+function navigateHistoryForward() {
+    if (!gameHistory || historyViewIndex === -1) {
+        return;
+    }
+
+    if (historyViewIndex < gameHistory.length - 1) {
+        historyViewIndex++;
+        renderHistoryView();
+    } else {
+        // Reached end - return to live mode
+        exitHistoryMode();
+    }
+}
+
+/**
+ * Exit history review mode and return to live game
+ */
+function exitHistoryMode() {
+    historyViewIndex = -1;
+    reconstructedGameState = null;
+
+    // Re-render the live game state
+    if (currentGameState) {
+        renderBoard(currentGameState);
+        updateHistoryUI(false);
+    }
+
+    log('↩ Returned to live game', 'info');
+}
+
+/**
+ * Render board at current history position
+ */
+function renderHistoryView() {
+    reconstructedGameState = reconstructBoardAtTurn(historyViewIndex);
+
+    if (reconstructedGameState && gameHistory[historyViewIndex]) {
+        // Render the historical state
+        renderBoard(reconstructedGameState);
+        updateHistoryUI(true);
+
+        const turn = gameHistory[historyViewIndex];
+        log(`📖 Viewing Turn ${turn.turnNumber}: ${turn.player} rolled [${turn.diceRolled.join(', ')}]`, 'info');
+    }
+}
+
+/**
+ * Update UI to show history mode status
+ * @param {boolean} inHistoryMode - Whether currently in history review mode
+ */
+function updateHistoryUI(inHistoryMode) {
+    const indicator = document.getElementById('historyIndicator');
+
+    if (inHistoryMode && indicator && gameHistory) {
+        const currentTurn = historyViewIndex + 1;
+        const totalTurns = gameHistory.length;
+        const turn = gameHistory[historyViewIndex];
+
+        indicator.style.display = 'flex';
+        indicator.innerHTML = `
+            <div class="flex-1">
+                <div class="font-semibold">📖 Reviewing History</div>
+                <div class="text-sm">Turn ${currentTurn} of ${totalTurns}: ${turn.player} rolled [${turn.diceRolled.join(', ')}]</div>
+            </div>
+            <div class="text-sm text-gray-400">
+                ← → to navigate • ESC to return
+            </div>
+        `;
+    } else if (indicator) {
+        indicator.style.display = 'none';
+    }
+}
+
 // ==== ABANDON GAME ====
 function showAbandonConfirm() {
     const isWaitingForPlayer = currentGameState && currentGameState.status === 0; // GameStatus.WaitingForPlayer = 0
@@ -1039,6 +1272,30 @@ function updateGameState(state, isSpectator = false) {
 
     currentGameState = state; // Store for click handling
 
+    // Store game history if provided
+    if (state.turnHistory && state.turnHistory.length > 0) {
+        gameHistory = state.turnHistory;
+    }
+
+    // Capture initial board state on first game update
+    if (!initialBoardState && state.board && state.board.length > 0) {
+        initialBoardState = JSON.parse(JSON.stringify(state));
+    }
+
+    // If in history review mode, don't update the view (stay on historical position)
+    if (historyViewIndex !== -1) {
+        // Disable all action buttons in history mode
+        const rollBtn = document.getElementById('rollBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const endTurnBtn = document.getElementById('endTurnBtn');
+        const doubleBtn = document.getElementById('doubleBtn');
+        if (rollBtn) rollBtn.disabled = true;
+        if (undoBtn) undoBtn.disabled = true;
+        if (endTurnBtn) endTurnBtn.disabled = true;
+        if (doubleBtn) doubleBtn.disabled = true;
+        return;
+    }
+
     // Detect AI game (opponent named "Computer")
     const whiteName = state.whitePlayerName || state.WhitePlayerName || '';
     const redName = state.redPlayerName || state.RedPlayerName || '';
@@ -1177,7 +1434,7 @@ function updateGameState(state, isSpectator = false) {
     // Render board
     if (state.board) {
         renderBoard(state);
-        setupBoardClickHandler(); // Enable click interactions
+        // setupBoardClickHandler(); // Disabled - using drag-and-drop only
     }
 
     // Update controls
@@ -1428,15 +1685,71 @@ function renderBoard(state) {
 
     // Initialize SVG board if not already done
     if (!BoardSVG.isInitialized()) {
+        console.log('[game.js] Initializing BoardSVG');
         BoardSVG.init('boardSvg');
+
+        // Register drag and drop handlers
+        console.log('[game.js] Registering drag and drop handlers');
+        BoardSVG.setMoveHandlers({
+            onSelectChecker: async (point) => {
+                console.log(`[game.js] onSelectChecker called for point ${point}`);
+                await selectChecker(point);
+            },
+            onExecuteMove: async (from, to) => {
+                console.log(`[game.js] onExecuteMove called: ${from} -> ${to}`);
+                await executeMove(from, to);
+            },
+            getRenderCallback: () => {
+                console.log('[game.js] getRenderCallback called');
+                return () => {
+                    console.log('[game.js] Render callback executing');
+                    selectedChecker = null;
+                    validDestinations = [];
+                    if (currentGameState) {
+                        renderBoard(currentGameState);
+                    }
+                };
+            },
+            getValidDestinations: (fromPoint) => {
+                console.log(`[game.js] getValidDestinations called for point ${fromPoint}`);
+                if (!currentGameState || !currentGameState.validMoves) {
+                    console.log('[game.js] No validMoves in currentGameState');
+                    return [];
+                }
+                // Filter validMoves to get only moves from this point
+                const destinations = currentGameState.validMoves
+                    .filter(m => m.from === fromPoint)
+                    .map(m => ({ to: m.to, isHit: m.isHit }));
+                console.log(`[game.js] Found ${destinations.length} valid destinations:`, destinations);
+                return destinations;
+            }
+        });
+        console.log('[game.js] Handlers registered');
     }
 
     // Get valid source points for highlighting
     let validSources = [];
+    console.log('[game.js] Calculating validSources:');
+    console.log('  - state.isYourTurn:', state.isYourTurn);
+    console.log('  - state.remainingMoves:', state.remainingMoves);
+    console.log('  - remainingMoves.length:', state.remainingMoves?.length);
+    console.log('  - selectedChecker:', selectedChecker);
+    console.log('  - state.validMoves:', state.validMoves);
+
     if (state.isYourTurn && state.remainingMoves && state.remainingMoves.length > 0 && !selectedChecker) {
+        console.log('[game.js] Conditions met for calculating validSources');
         if (state.validMoves && state.validMoves.length > 0) {
             validSources = [...new Set(state.validMoves.map(m => m.from))];
+            console.log('[game.js] validSources calculated:', validSources);
+        } else {
+            console.log('[game.js] No validMoves in state');
         }
+    } else {
+        console.log('[game.js] Conditions NOT met:', {
+            isYourTurn: state.isYourTurn,
+            hasRemainingMoves: state.remainingMoves?.length > 0,
+            noSelection: !selectedChecker
+        });
     }
 
     // Build dice state for rendering on board
@@ -1537,7 +1850,23 @@ function setupBoardClickHandler() {
 }
 
 async function handleBoardClick(event) {
+    // DISABLED: Click-to-move functionality removed in favor of drag-and-drop only
+    console.log('=== BOARD CLICK (DISABLED) ===');
+    return;
+
+    /* OLD CLICK-TO-MOVE CODE - KEEPING FOR REFERENCE
     console.log('=== BOARD CLICK START ===');
+    console.log('  - event.target:', event.target);
+    console.log('  - event.target.tagName:', event.target?.tagName);
+    console.log('  - event.target.classList:', event.target?.classList);
+    console.log('  - has draggable class?:', event.target?.classList?.contains('draggable'));
+
+    // Check if we clicked on a draggable checker - if so, let drag handler take over
+    if (event.target && event.target.classList && event.target.classList.contains('draggable')) {
+        console.log('Clicked on draggable checker, skipping click handler');
+        return;
+    }
+
     if (!currentGameState || !currentGameState.isYourTurn) {
         console.log('Not your turn or no game state');
         return;
@@ -1545,7 +1874,7 @@ async function handleBoardClick(event) {
     if (currentGameState.remainingMoves.length === 0) {
         console.log('No remaining moves');
         return;
-    }
+    }*/
 
     // Get clicked point from SVG coordinates
     const clickedPoint = BoardSVG.getPointAtPosition(event.clientX, event.clientY);

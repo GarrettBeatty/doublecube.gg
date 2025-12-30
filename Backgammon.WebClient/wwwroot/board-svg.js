@@ -113,6 +113,24 @@ const BoardSVG = (function() {
     let initialized = false;
     let clickHandler = null;
 
+    // Drag and drop state
+    let dragState = {
+        isDragging: false,
+        draggedChecker: null,
+        draggedCheckerOriginalPos: null,
+        sourcePoint: null,
+        ghostChecker: null,
+        offset: { x: 0, y: 0 }
+    };
+
+    // Callback handlers for drag and drop
+    let moveHandlers = {
+        onSelectChecker: null,
+        onExecuteMove: null,
+        getRenderCallback: null,
+        getValidDestinations: null
+    };
+
     // Create SVG element helper
     function createSVGElement(tag, attributes = {}) {
         const el = document.createElementNS(SVG_NS, tag);
@@ -208,13 +226,16 @@ const BoardSVG = (function() {
     }
 
     // Create checker circle
-    function createChecker(pointNum, stackIndex, color, isSelected = false) {
+    function createChecker(pointNum, stackIndex, color, isSelected = false, isDraggable = false) {
         const pos = getCheckerPosition(pointNum, stackIndex);
         const colorClass = color === 0 ? 'checker-white' : 'checker-red';
         const selectedClass = isSelected ? 'selected' : '';
+        const draggableClass = isDraggable ? 'draggable' : '';
+
+        console.log(`[BoardSVG] Creating checker at point ${pointNum}, index ${stackIndex}, isDraggable: ${isDraggable}`);
 
         const circle = createSVGElement('circle', {
-            'class': `checker ${colorClass} ${selectedClass}`.trim(),
+            'class': `checker ${colorClass} ${selectedClass} ${draggableClass}`.trim(),
             'cx': pos.x,
             'cy': pos.y,
             'r': CONFIG.checkerRadius,
@@ -222,6 +243,23 @@ const BoardSVG = (function() {
             'data-index': stackIndex,
             'data-color': color
         });
+
+        // Make draggable checkers interactive
+        if (isDraggable) {
+            console.log(`[BoardSVG] Making checker at point ${pointNum} draggable, adding listeners to:`, circle);
+            circle.style.cursor = 'grab';
+
+            // Add a simple click test
+            circle.addEventListener('click', (e) => {
+                console.log(`[BoardSVG] CLICK EVENT on checker at point ${pointNum}!`);
+            });
+
+            circle.addEventListener('mousedown', handleCheckerMouseDown, true); // Use capture phase
+            circle.addEventListener('touchstart', handleCheckerTouchStart, { passive: false, capture: true });
+
+            // Verify listener was added
+            console.log(`[BoardSVG] Event listeners added to checker at point ${pointNum}`);
+        }
 
         return circle;
     }
@@ -365,8 +403,191 @@ const BoardSVG = (function() {
         return true;
     }
 
+    // ===== DRAG AND DROP HANDLERS =====
+
+    function handleCheckerMouseDown(event) {
+        console.log('[BoardSVG] Mouse down on checker', event.currentTarget);
+        event.preventDefault();
+        event.stopPropagation();
+        startDrag(event, event.currentTarget, event.clientX, event.clientY);
+    }
+
+    function handleCheckerTouchStart(event) {
+        console.log('[BoardSVG] Touch start on checker', event.currentTarget);
+        event.preventDefault();
+        event.stopPropagation();
+        const touch = event.touches[0];
+        startDrag(event, event.currentTarget, touch.clientX, touch.clientY);
+    }
+
+    function startDrag(event, checkerElement, clientX, clientY) {
+        const pointNum = parseInt(checkerElement.getAttribute('data-point'));
+        const color = parseInt(checkerElement.getAttribute('data-color'));
+
+        console.log(`[BoardSVG] Starting drag from point ${pointNum}, color ${color}`);
+        console.log('[BoardSVG] Move handlers:', moveHandlers);
+
+        // Get SVG coordinates
+        const svgPoint = svgElement.createSVGPoint();
+        svgPoint.x = clientX;
+        svgPoint.y = clientY;
+        const ctm = svgElement.getScreenCTM();
+        const svgCoords = svgPoint.matrixTransform(ctm.inverse());
+
+        console.log(`[BoardSVG] Client coords: (${clientX}, ${clientY}), SVG coords: (${svgCoords.x}, ${svgCoords.y})`);
+
+        // Store drag state
+        dragState.isDragging = true;
+        dragState.sourcePoint = pointNum;
+        dragState.draggedChecker = checkerElement;
+        dragState.draggedCheckerOriginalPos = {
+            cx: parseFloat(checkerElement.getAttribute('cx')),
+            cy: parseFloat(checkerElement.getAttribute('cy'))
+        };
+        dragState.offset = {
+            x: svgCoords.x - dragState.draggedCheckerOriginalPos.cx,
+            y: svgCoords.y - dragState.draggedCheckerOriginalPos.cy
+        };
+
+        console.log('[BoardSVG] Drag state set:', dragState);
+
+        // Create ghost checker for drag visual
+        dragState.ghostChecker = createSVGElement('circle', {
+            'class': `checker ${color === 0 ? 'checker-white' : 'checker-red'} dragging`,
+            'cx': svgCoords.x - dragState.offset.x,
+            'cy': svgCoords.y - dragState.offset.y,
+            'r': CONFIG.checkerRadius,
+            'opacity': '0.7',
+            'pointer-events': 'none'
+        });
+        checkersGroup.appendChild(dragState.ghostChecker);
+        console.log('[BoardSVG] Ghost checker created and appended');
+
+        // Hide original checker
+        checkerElement.style.opacity = '0.3';
+        checkerElement.style.cursor = 'grabbing';
+
+        // Add global mouse/touch move and up listeners
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+        document.addEventListener('touchmove', handleDragMove, { passive: false });
+        document.addEventListener('touchend', handleDragEnd);
+        console.log('[BoardSVG] Global drag listeners added');
+
+        // Get valid destinations for this point and show highlights without re-rendering
+        console.log(`[BoardSVG] Drag started, manually highlighting valid destinations`);
+
+        // Get valid destinations from the callback
+        if (moveHandlers.getValidDestinations) {
+            const validDests = moveHandlers.getValidDestinations(pointNum);
+            console.log(`[BoardSVG] Valid destinations for point ${pointNum}:`, validDests);
+
+            // Highlight valid destinations without re-rendering
+            updateHighlights([pointNum], pointNum, validDests);
+        } else {
+            console.warn('[BoardSVG] No getValidDestinations handler registered!');
+        }
+    }
+
+    function handleDragMove(event) {
+        if (!dragState.isDragging || !dragState.ghostChecker) return;
+
+        event.preventDefault();
+
+        let clientX, clientY;
+        if (event.type === 'touchmove') {
+            const touch = event.touches[0];
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        // Convert to SVG coordinates
+        const svgPoint = svgElement.createSVGPoint();
+        svgPoint.x = clientX;
+        svgPoint.y = clientY;
+        const ctm = svgElement.getScreenCTM();
+        const svgCoords = svgPoint.matrixTransform(ctm.inverse());
+
+        // Update ghost checker position
+        dragState.ghostChecker.setAttribute('cx', svgCoords.x - dragState.offset.x);
+        dragState.ghostChecker.setAttribute('cy', svgCoords.y - dragState.offset.y);
+    }
+
+    function handleDragEnd(event) {
+        if (!dragState.isDragging) {
+            console.log('[BoardSVG] Drag end called but not dragging');
+            return;
+        }
+
+        console.log('[BoardSVG] Drag end');
+        event.preventDefault();
+
+        let clientX, clientY;
+        if (event.type === 'touchend') {
+            const touch = event.changedTouches[0];
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+
+        console.log(`[BoardSVG] Drop at client coords: (${clientX}, ${clientY})`);
+
+        // Determine drop target
+        const targetPoint = getPointAtPosition(clientX, clientY);
+        console.log(`[BoardSVG] Drop target point: ${targetPoint}, source point: ${dragState.sourcePoint}`);
+
+        // Clean up drag state
+        if (dragState.ghostChecker) {
+            dragState.ghostChecker.remove();
+        }
+        if (dragState.draggedChecker) {
+            dragState.draggedChecker.style.opacity = '1';
+            dragState.draggedChecker.style.cursor = 'grab';
+        }
+
+        // Remove global listeners
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        document.removeEventListener('touchmove', handleDragMove);
+        document.removeEventListener('touchend', handleDragEnd);
+
+        const sourcePoint = dragState.sourcePoint;
+
+        // Reset drag state
+        dragState.isDragging = false;
+        dragState.draggedChecker = null;
+        dragState.ghostChecker = null;
+        dragState.sourcePoint = null;
+
+        // Clear highlights
+        updateHighlights([], null, []);
+
+        // Execute move if valid target
+        if (targetPoint !== null && targetPoint !== sourcePoint) {
+            console.log(`[BoardSVG] Executing move from ${sourcePoint} to ${targetPoint}`);
+            if (moveHandlers.onExecuteMove) {
+                moveHandlers.onExecuteMove(sourcePoint, targetPoint);
+            } else {
+                console.warn('[BoardSVG] No onExecuteMove handler registered!');
+            }
+        } else {
+            console.log('[BoardSVG] Invalid drop, cancelling');
+            // Invalid drop - just deselect and re-render
+            if (moveHandlers.getRenderCallback) {
+                const renderFn = moveHandlers.getRenderCallback();
+                if (renderFn) renderFn();
+            }
+        }
+    }
+
     // Render checkers based on game state
-    function renderCheckers(gameState, selectedChecker) {
+    function renderCheckers(gameState, selectedChecker, validSources = []) {
+        console.log(`[BoardSVG] renderCheckers called, validSources:`, validSources);
         if (!checkersGroup) return;
 
         // Clear existing checkers
@@ -383,7 +604,11 @@ const BoardSVG = (function() {
                     const isSelected = selectedChecker &&
                         selectedChecker.point === pointNum &&
                         i === maxVisible - 1;
-                    const checker = createChecker(pointNum, i, point.color, isSelected);
+                    // Top checker (last in stack) should be draggable if it's a valid source
+                    const isTopChecker = i === maxVisible - 1;
+                    const isDraggable = isTopChecker && validSources.includes(pointNum);
+                    console.log(`[BoardSVG] Point ${pointNum}, index ${i}, isTopChecker: ${isTopChecker}, validSources includes ${pointNum}: ${validSources.includes(pointNum)}, isDraggable: ${isDraggable}`);
+                    const checker = createChecker(pointNum, i, point.color, isSelected, isDraggable);
                     checkersGroup.appendChild(checker);
                 }
 
@@ -398,20 +623,39 @@ const BoardSVG = (function() {
         // Render bar checkers
         if (gameState.whiteCheckersOnBar > 0) {
             const maxVisible = Math.min(gameState.whiteCheckersOnBar, 2);
+            const isBarDraggable = validSources.includes(0);
+            console.log(`[BoardSVG] Rendering ${gameState.whiteCheckersOnBar} white bar checkers, isBarDraggable: ${isBarDraggable}`);
             for (let i = 0; i < maxVisible; i++) {
                 const isSelected = selectedChecker && selectedChecker.point === 0;
+                const isTopBarChecker = i === maxVisible - 1;
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
                     y: CONFIG.viewBox.height / 2 + 100 + (i * 50) // Moved further down to avoid dice
                 };
                 const checker = createSVGElement('circle', {
-                    'class': `checker checker-white ${isSelected ? 'selected' : ''}`,
+                    'class': `checker checker-white ${isSelected ? 'selected' : ''} ${isTopBarChecker && isBarDraggable ? 'draggable' : ''}`.trim(),
                     'cx': pos.x,
                     'cy': pos.y,
                     'r': CONFIG.checkerRadius,
                     'data-point': 0,
                     'data-color': 0
                 });
+
+                // Make draggable if it's the top bar checker and bar is valid source
+                if (isTopBarChecker && isBarDraggable) {
+                    console.log(`[BoardSVG] Making white bar checker draggable (index ${i})`);
+                    checker.style.cursor = 'grab';
+
+                    // Add a simple click test
+                    checker.addEventListener('click', (e) => {
+                        console.log(`[BoardSVG] CLICK EVENT on white bar checker!`);
+                    });
+
+                    checker.addEventListener('mousedown', handleCheckerMouseDown, true); // Use capture phase
+                    checker.addEventListener('touchstart', handleCheckerTouchStart, { passive: false, capture: true });
+                    console.log(`[BoardSVG] Event listeners added to white bar checker`);
+                }
+
                 checkersGroup.appendChild(checker);
             }
             if (gameState.whiteCheckersOnBar > 2) {
@@ -433,20 +677,39 @@ const BoardSVG = (function() {
 
         if (gameState.redCheckersOnBar > 0) {
             const maxVisible = Math.min(gameState.redCheckersOnBar, 2);
+            const isBarDraggable = validSources.includes(0);
+            console.log(`[BoardSVG] Rendering ${gameState.redCheckersOnBar} red bar checkers, isBarDraggable: ${isBarDraggable}`);
             for (let i = 0; i < maxVisible; i++) {
                 const isSelected = selectedChecker && selectedChecker.point === 0;
+                const isTopBarChecker = i === maxVisible - 1;
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
                     y: CONFIG.viewBox.height / 2 - 100 - (i * 50) // Moved further up to avoid dice
                 };
                 const checker = createSVGElement('circle', {
-                    'class': `checker checker-red ${isSelected ? 'selected' : ''}`,
+                    'class': `checker checker-red ${isSelected ? 'selected' : ''} ${isTopBarChecker && isBarDraggable ? 'draggable' : ''}`.trim(),
                     'cx': pos.x,
                     'cy': pos.y,
                     'r': CONFIG.checkerRadius,
                     'data-point': 0,
                     'data-color': 1
                 });
+
+                // Make draggable if it's the top bar checker and bar is valid source
+                if (isTopBarChecker && isBarDraggable) {
+                    console.log(`[BoardSVG] Making red bar checker draggable (index ${i})`);
+                    checker.style.cursor = 'grab';
+
+                    // Add a simple click test
+                    checker.addEventListener('click', (e) => {
+                        console.log(`[BoardSVG] CLICK EVENT on red bar checker!`);
+                    });
+
+                    checker.addEventListener('mousedown', handleCheckerMouseDown, true); // Use capture phase
+                    checker.addEventListener('touchstart', handleCheckerTouchStart, { passive: false, capture: true });
+                    console.log(`[BoardSVG] Event listeners added to red bar checker`);
+                }
+
                 checkersGroup.appendChild(checker);
             }
             if (gameState.redCheckersOnBar > 2) {
@@ -759,7 +1022,8 @@ const BoardSVG = (function() {
             return;
         }
 
-        renderCheckers(gameState, selectedChecker);
+        console.log('[BoardSVG] render() called with validSources:', validSources);
+        renderCheckers(gameState, selectedChecker, validSources); // Pass validSources!
         renderCube(gameState);
         renderDice(diceState);
         updateHighlights(
@@ -887,12 +1151,23 @@ const BoardSVG = (function() {
         };
     }
 
+    // Set handlers for drag and drop callbacks
+    function setMoveHandlers(handlers) {
+        console.log('[BoardSVG] setMoveHandlers called with:', handlers);
+        if (handlers.onSelectChecker) moveHandlers.onSelectChecker = handlers.onSelectChecker;
+        if (handlers.onExecuteMove) moveHandlers.onExecuteMove = handlers.onExecuteMove;
+        if (handlers.getRenderCallback) moveHandlers.getRenderCallback = handlers.getRenderCallback;
+        if (handlers.getValidDestinations) moveHandlers.getValidDestinations = handlers.getValidDestinations;
+        console.log('[BoardSVG] Move handlers now:', moveHandlers);
+    }
+
     // Public API
     return {
         init,
         render,
         getPointAtPosition,
         animateMove,
+        setMoveHandlers,
         isInitialized: () => initialized,
         getConfig: () => ({ ...CONFIG }),
         getColors: () => ({ ...COLORS })

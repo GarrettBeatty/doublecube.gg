@@ -622,6 +622,22 @@ body.spectator-mode .board-point {
     z-index: 100;
 }
 
+/* Drag and drop styles */
+.checker.draggable {
+    cursor: grab !important;
+}
+
+.checker.draggable:hover {
+    filter: brightness(1.25);
+    stroke-width: 3;
+}
+
+.checker.dragging {
+    cursor: grabbing !important;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5));
+    z-index: 1000;
+}
+
 /* Point number labels (optional, for debugging) */
 .point-label {
     font-family: system-ui, -apple-system, sans-serif;

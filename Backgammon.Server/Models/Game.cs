@@ -150,6 +150,13 @@ public class Game
     [JsonPropertyName("moves")]
     public List<string> Moves { get; set; } = new();
 
+    /// <summary>
+    /// Complete turn-by-turn history with dice rolls and moves
+    /// Used for game replay and history navigation
+    /// </summary>
+    [JsonPropertyName("turnHistory")]
+    public List<TurnRecordDto> TurnHistory { get; set; } = new();
+
     // Completion data
     /// <summary>
     /// Winning player color: "White" or "Red" (null if game not complete)

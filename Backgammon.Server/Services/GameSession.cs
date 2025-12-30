@@ -259,9 +259,23 @@ public class GameSession
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
-            IsAnalysisMode = this.IsAnalysisMode
+            IsAnalysisMode = this.IsAnalysisMode,
+            TurnHistory = Engine.TurnHistory.Select(turn => new TurnRecordDto
+            {
+                TurnNumber = turn.TurnNumber,
+                Player = turn.Player.ToString(),
+                DiceRolled = turn.DiceRolled,
+                Moves = turn.Moves.Select(m => new MoveDto
+                {
+                    From = m.From,
+                    To = m.To,
+                    DieValue = m.DieValue,
+                    IsHit = m.IsHit
+                }).ToList(),
+                Timestamp = turn.Timestamp
+            }).ToList()
         };
-        
+
         // Get valid moves for current player
         // Always populate ValidMoves to ensure client has complete state
         var validMoves = Engine.GetValidMoves();

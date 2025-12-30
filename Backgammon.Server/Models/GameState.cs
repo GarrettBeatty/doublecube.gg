@@ -34,6 +34,7 @@ public class GameState
     public int DoublingCubeValue { get; set; }
     public string? DoublingCubeOwner { get; set; }
     public bool IsAnalysisMode { get; set; }
+    public List<TurnRecordDto> TurnHistory { get; set; } = new();
 }
 
 /// <summary>
@@ -55,6 +56,18 @@ public class MoveDto
     public int To { get; set; }
     public int DieValue { get; set; }
     public bool IsHit { get; set; }
+}
+
+/// <summary>
+/// Data transfer object for a complete turn with dice rolled and moves made
+/// </summary>
+public class TurnRecordDto
+{
+    public int TurnNumber { get; set; }
+    public string Player { get; set; } = string.Empty; // "White" or "Red"
+    public int[] DiceRolled { get; set; } = Array.Empty<int>();
+    public List<MoveDto> Moves { get; set; } = new();
+    public DateTime Timestamp { get; set; }
 }
 
 public enum GameStatus

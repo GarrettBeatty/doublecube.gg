@@ -13,6 +13,8 @@ public class GameEngine
     public DoublingCube DoublingCube { get; }
     public List<int> RemainingMoves { get; private set; }
     public List<Move> MoveHistory { get; private set; }
+    public List<TurnRecord> TurnHistory { get; private set; }
+    private TurnRecord? _currentTurn = null;
     public bool GameStarted { get; private set; }
     public bool GameOver { get; private set; }
     public Player? Winner { get; private set; }
@@ -27,6 +29,7 @@ public class GameEngine
         DoublingCube = new DoublingCube();
         RemainingMoves = new List<int>();
         MoveHistory = new List<Move>();
+        TurnHistory = new List<TurnRecord>();
         GameStarted = false;
         GameOver = false;
     }
@@ -80,6 +83,15 @@ public class GameEngine
         Dice.Roll();
         RemainingMoves = new List<int>(Dice.GetMoves());
         MoveHistory.Clear(); // Clear history for new turn
+
+        // Create new turn record for history tracking
+        _currentTurn = new TurnRecord
+        {
+            TurnNumber = TurnHistory.Count + 1,
+            Player = CurrentPlayer.Color,
+            DiceRolled = Dice.GetMoves().ToArray(),
+            Timestamp = DateTime.UtcNow
+        };
     }
 
     /// <summary>
@@ -139,6 +151,12 @@ public class GameEngine
 
         // Track move in history
         MoveHistory.Add(move);
+
+        // Add move to current turn record
+        if (_currentTurn != null)
+        {
+            _currentTurn.Moves.Add(move);
+        }
 
         // Check for win condition
         if (CurrentPlayer.CheckersBornOff == 15)
@@ -314,6 +332,12 @@ public class GameEngine
         var lastMove = MoveHistory[MoveHistory.Count - 1];
         MoveHistory.RemoveAt(MoveHistory.Count - 1);
 
+        // Also remove from current turn record
+        if (_currentTurn != null && _currentTurn.Moves.Count > 0)
+        {
+            _currentTurn.Moves.RemoveAt(_currentTurn.Moves.Count - 1);
+        }
+
         // Determine the die value used
         int dieValue = Math.Abs(lastMove.To - lastMove.From);
         
@@ -384,6 +408,13 @@ public class GameEngine
     /// </summary>
     public void EndTurn()
     {
+        // Finalize current turn and add to history
+        if (_currentTurn != null)
+        {
+            TurnHistory.Add(_currentTurn);
+            _currentTurn = null;
+        }
+
         RemainingMoves.Clear();
         MoveHistory.Clear();
         Dice.SetDice(0, 0); // Clear dice for next player
