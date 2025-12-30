@@ -708,3 +708,39 @@ body.spectator-mode .board-point {
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
     pointer-events: none;
 }
+
+/* ===== BOARD FLIP FEATURE ===== */
+
+/* Flip the entire board 180 degrees */
+.board-svg.flipped {
+    transform: rotate(180deg);
+    transition: transform 0.6s ease-in-out;
+}
+
+/* Counter-rotate all visual elements to keep them upright */
+.board-svg.flipped .checker,
+.board-svg.flipped .checker-count,
+.board-svg.flipped .bearoff-count {
+    transform: rotate(-180deg);
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+/* Counter-rotate dice and cube groups (not individual elements) */
+.board-svg.flipped #dice,
+.board-svg.flipped #cube {
+    transform: rotate(-180deg);
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+/* Smooth transition for flip animation */
+.board-svg {
+    transition: transform 0.6s ease-in-out;
+}
+
+/* Flip button active state */
+#flipBoardBtn.active {
+    background-color: rgba(76, 175, 80, 0.3);
+    border-color: rgba(76, 175, 80, 0.8);
+}

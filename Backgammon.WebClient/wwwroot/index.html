@@ -173,6 +173,9 @@
                                 <button id="endTurnBtn" class="btn btn-success btn-lg gap-2" disabled>
                                     ✓ End Turn
                                 </button>
+                                <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" onclick="toggleBoardFlip()" title="Flip board orientation">
+                                    🔄 Flip Board
+                                </button>
                                 <button id="abandonBtn" class="btn btn-error btn-lg gap-2" onclick="showAbandonConfirm()">
                                     ⚠️ Abandon Game
                                 </button>
@@ -294,6 +297,34 @@
                     <input type="text" id="profileDisplayName" class="input input-bordered w-full">
                 </div>
                 <button onclick="updateProfile()" class="btn btn-primary btn-sm mt-3">Update</button>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Audio Settings -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Audio Settings</h4>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Enable Sound Effects</span>
+                        <input type="checkbox" id="audioEnabled" class="toggle toggle-primary" checked>
+                    </label>
+                </div>
+
+                <div class="form-control w-full mt-3">
+                    <label class="label">
+                        <span class="label-text">Volume</span>
+                        <span class="label-text-alt" id="volumeDisplay">70%</span>
+                    </label>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="70"
+                           class="range range-primary range-sm" step="10">
+                    <div class="w-full flex justify-between text-xs px-2 mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
             </div>
 
             <div class="divider"></div>
@@ -461,6 +492,7 @@
     <script src="/auth.js"></script>
     <script src="/friends.js"></script>
     <script src="/board-svg.js"></script>
+    <script src="/audio.js"></script>
     <script src="/game.js"></script>
 </body>
 </html>

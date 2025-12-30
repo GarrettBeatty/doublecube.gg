@@ -79,6 +79,7 @@ let validDestinations = [];
 let myPlayerId = null;  // Persistent player ID
 let apiBaseUrl = 'http://localhost:5000';  // Default fallback, will be overridden from /api/config
 let isAiGame = false;  // Track if playing against AI
+let isBoardFlipped = false;  // Track board flip state
 
 // ==== URL ROUTING ====
 function getGameIdFromUrl() {
@@ -184,6 +185,11 @@ window.addEventListener('load', async () => {
         if (typeof loadFriendRequests === 'function') loadFriendRequests();
     }
 
+    // Initialize audio system
+    if (typeof AudioManager !== 'undefined') {
+        AudioManager.init();
+    }
+
     // Add Roll Dice button handler
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
@@ -192,6 +198,9 @@ window.addEventListener('load', async () => {
             rollBtn.disabled = true;
             try {
                 await rollDice();
+                if (typeof AudioManager !== 'undefined') {
+                    AudioManager.playSound('dice-roll');
+                }
             } catch (err) {
                 debug('Roll dice failed', err, 'error');
                 log(`Failed to roll dice: ${err}`, 'error');
@@ -236,6 +245,33 @@ window.addEventListener('load', async () => {
             document.getElementById('doubleConfirmModal').showModal();
         });
     }
+
+    // Add audio settings event handlers
+    const audioEnabledToggle = document.getElementById('audioEnabled');
+    if (audioEnabledToggle) {
+        audioEnabledToggle.addEventListener('change', (e) => {
+            if (typeof AudioManager !== 'undefined') {
+                AudioManager.setEnabled(e.target.checked);
+            }
+        });
+    }
+
+    const volumeSlider = document.getElementById('volumeSlider');
+    if (volumeSlider) {
+        volumeSlider.addEventListener('input', (e) => {
+            if (typeof AudioManager !== 'undefined') {
+                const volume = parseInt(e.target.value) / 100;
+                AudioManager.setVolume(volume);
+                const volumeDisplay = document.getElementById('volumeDisplay');
+                if (volumeDisplay) {
+                    volumeDisplay.textContent = `${e.target.value}%`;
+                }
+            }
+        });
+    }
+
+    // Load board flip preference from session
+    loadBoardFlipPreference();
 });
 
 // Handle browser back/forward buttons
@@ -319,6 +355,25 @@ function setupEventHandlers() {
             isYourTurn: gameState.isYourTurn,
             dice: gameState.dice
         }, 'info');
+
+        // Detect and play sounds BEFORE updating state
+        if (typeof AudioManager !== 'undefined' && currentGameState) {
+            // Turn change detection
+            if (currentGameState.currentPlayer !== gameState.currentPlayer) {
+                AudioManager.playSound('turn-change');
+            }
+
+            // Move detection
+            const moveType = detectMoveType(currentGameState, gameState);
+            if (moveType === 'hit') {
+                AudioManager.playSound('checker-hit');
+            } else if (moveType === 'bearoff') {
+                AudioManager.playSound('bear-off');
+            } else if (moveType === 'move') {
+                AudioManager.playSound('checker-move');
+            }
+        }
+
         updateGameState(gameState);
         // Update URL to reflect current game
         if (gameState.gameId) {
@@ -354,6 +409,9 @@ function setupEventHandlers() {
 
     connection.on("DoubleOffered", (currentStakes, newStakes) => {
         log(`🎲 Opponent offers to double! Stakes would be ${newStakes}x`, 'warning');
+        if (typeof AudioManager !== 'undefined') {
+            AudioManager.playSound('double-offer');
+        }
         document.getElementById('doubleCurrentStakes').textContent = `${currentStakes}x`;
         document.getElementById('doubleNewStakes').textContent = `${newStakes}x`;
         document.getElementById('doubleOfferModal').showModal();
@@ -373,6 +431,10 @@ function setupEventHandlers() {
         // Determine if this message is from us
         const isOwn = senderConnectionId === connection.connectionId;
         const displayName = isOwn ? 'You' : senderName;
+        // Play sound for incoming messages (not our own)
+        if (!isOwn && typeof AudioManager !== 'undefined') {
+            AudioManager.playSound('chat-message');
+        }
         addChatMessage(displayName, message, isOwn);
     });
 
@@ -678,6 +740,7 @@ async function leaveGameAndReturn() {
         myColor = null;
         localStorage.removeItem('currentGameId'); // Clear saved game
         resetGameUI();
+        resetBoardFlipPreference();
         showLandingPage();
     } catch (err) {
         log(`❌ Error leaving game: ${err}`, 'error');
@@ -879,6 +942,35 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/**
+ * Detect type of move by comparing board states
+ * @param {Object} prevState - Previous game state
+ * @param {Object} newState - New game state
+ * @returns {string|null} 'hit' | 'bearoff' | 'move' | null
+ */
+function detectMoveType(prevState, newState) {
+    if (!prevState || !newState) return null;
+
+    // Check for bear-off (bornOff count increased)
+    if (newState.whiteBornOff > prevState.whiteBornOff ||
+        newState.redBornOff > prevState.redBornOff) {
+        return 'bearoff';
+    }
+
+    // Check for hit (bar count increased)
+    if (newState.whiteCheckersOnBar > prevState.whiteCheckersOnBar ||
+        newState.redCheckersOnBar > prevState.redCheckersOnBar) {
+        return 'hit';
+    }
+
+    // Regular move (board changed)
+    if (JSON.stringify(prevState.board) !== JSON.stringify(newState.board)) {
+        return 'move';
+    }
+
+    return null;
+}
+
 // ==== LOGGING ====
 function log(message, type = 'info') {
     const logEl = document.getElementById('log');
@@ -1027,6 +1119,9 @@ function updateGameState(state, isSpectator = false) {
     if (state.yourColor !== null && state.yourColor !== undefined) {
         myColor = state.yourColor === 0 ? 'White' : 'Red';
         console.log('My color:', myColor);
+
+        // Auto-flip board when player color is assigned
+        autoFlipForColor();
     }
 
     // Update player badges
@@ -1163,6 +1258,12 @@ function updateGameState(state, isSpectator = false) {
     // Check for winner
     const winner = state.winner ?? state.Winner;
     if (winner) {
+        // Play win/loss sound
+        if (typeof AudioManager !== 'undefined') {
+            const didWeWin = (myColor === 'White' && winner === 'White') ||
+                             (myColor === 'Red' && winner === 'Red');
+            AudioManager.playSound(didWeWin ? 'game-won' : 'game-lost');
+        }
         log(`🏆 Game Over! ${winner} wins!`, 'success');
         localStorage.removeItem('currentGameId'); // Clear completed game
         setTimeout(() => {
@@ -1190,6 +1291,10 @@ function resetGameUI() {
     if (rollBtn) rollBtn.disabled = true;
     if (undoBtn) undoBtn.disabled = true;
     if (endTurnBtn) endTurnBtn.disabled = true;
+
+    // Reset board flip when resetting UI
+    isBoardFlipped = false;
+    applyBoardFlip();
 }
 
 // ==== AI GAME UI ====
@@ -1215,6 +1320,91 @@ function updateAiGameUI() {
             doubleBtn.style.display = '';
         }
     }
+}
+
+// ==== BOARD FLIP FEATURE ====
+
+/**
+ * Toggle board flip manually
+ */
+function toggleBoardFlip() {
+    isBoardFlipped = !isBoardFlipped;
+    applyBoardFlip();
+    saveBoardFlipPreference();
+
+    const flipBtn = document.getElementById('flipBoardBtn');
+    if (flipBtn) {
+        flipBtn.classList.toggle('active', isBoardFlipped);
+    }
+
+    log(`Board ${isBoardFlipped ? 'flipped' : 'unflipped'}`, 'info');
+}
+
+/**
+ * Apply the flip transformation to the board
+ */
+function applyBoardFlip() {
+    const boardSvg = document.getElementById('boardSvg');
+    if (boardSvg) {
+        if (isBoardFlipped) {
+            boardSvg.classList.add('flipped');
+        } else {
+            boardSvg.classList.remove('flipped');
+        }
+    }
+}
+
+/**
+ * Auto-flip board when player is Red (called when color is assigned)
+ */
+function autoFlipForColor() {
+    // Only auto-flip if user hasn't manually toggled
+    const manualOverride = sessionStorage.getItem('backgammon_flip_manual_override');
+
+    if (!manualOverride && myColor === 'Red') {
+        isBoardFlipped = true;
+        applyBoardFlip();
+
+        const flipBtn = document.getElementById('flipBoardBtn');
+        if (flipBtn) {
+            flipBtn.classList.toggle('active', true);
+        }
+    }
+}
+
+/**
+ * Save flip preference to session storage
+ */
+function saveBoardFlipPreference() {
+    // Mark that user has manually toggled (prevents auto-flip from overriding)
+    sessionStorage.setItem('backgammon_flip_manual_override', 'true');
+    sessionStorage.setItem('backgammon_board_flipped', isBoardFlipped ? '1' : '0');
+}
+
+/**
+ * Load flip preference from session storage
+ */
+function loadBoardFlipPreference() {
+    const saved = sessionStorage.getItem('backgammon_board_flipped');
+    if (saved !== null) {
+        isBoardFlipped = saved === '1';
+        applyBoardFlip();
+
+        const flipBtn = document.getElementById('flipBoardBtn');
+        if (flipBtn) {
+            flipBtn.classList.toggle('active', isBoardFlipped);
+        }
+    }
+}
+
+/**
+ * Reset flip preference (call when leaving game)
+ */
+function resetBoardFlipPreference() {
+    sessionStorage.removeItem('backgammon_flip_manual_override');
+    sessionStorage.removeItem('backgammon_board_flipped');
+    isBoardFlipped = false;
+    applyBoardFlip();
 }
 
 // ==== BOARD RENDERING ====
