@@ -958,9 +958,56 @@ function updateGameState(state, isSpectator = false) {
     // Spectator mode UI
     if (isSpectator || window.isSpectator) {
         document.body.classList.add('spectator-mode');
-        // Optionally disable move controls here
+
+        // Add spectator badge if not present
+        if (!document.getElementById('spectatorBadge')) {
+            const badge = document.createElement('div');
+            badge.id = 'spectatorBadge';
+            badge.className = 'alert alert-info py-2 mb-4';
+            badge.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                    <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                </svg>
+                <span>You are spectating this game</span>
+            `;
+            // Insert badge at top of game board area
+            const gameBoard = document.querySelector('.game-board-section');
+            if (gameBoard) {
+                gameBoard.insertBefore(badge, gameBoard.firstChild);
+            }
+        }
+
+        // Disable all control buttons except Leave (spectators should be able to leave)
+        const controlButtons = [
+            'rollBtn', 'doubleBtn', 'undoBtn', 'endTurnBtn',
+            'abandonBtn', 'exportBtn', 'importBtn'
+        ];
+        controlButtons.forEach(btnId => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.disabled = true;
+                btn.style.pointerEvents = 'none';
+            }
+        });
     } else {
         document.body.classList.remove('spectator-mode');
+        // Remove spectator badge if present
+        const badge = document.getElementById('spectatorBadge');
+        if (badge) badge.remove();
+
+        // Re-enable control buttons (they'll be managed by normal game logic)
+        const controlButtons = [
+            'rollBtn', 'doubleBtn', 'undoBtn', 'endTurnBtn',
+            'abandonBtn', 'exportBtn', 'importBtn'
+        ];
+        controlButtons.forEach(btnId => {
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                btn.style.pointerEvents = '';
+                // Don't set disabled=false here, let normal game logic handle it
+            }
+        });
     }
 
     // Show analysis mode indicator if applicable
@@ -1552,4 +1599,88 @@ async function applyPosition() {
  */
 function closePositionModal() {
     document.getElementById('positionModal').close();
+}
+
+// ==================== BOT GAMES & SPECTATOR MODE ====================
+
+/**
+ * Load and display active bot games
+ */
+async function loadBotGames() {
+    try {
+        const response = await fetch(`${apiBaseUrl}/api/bot-games`);
+        const botGames = await response.json();
+
+        const botGamesList = document.getElementById('botGamesList');
+        if (!botGamesList) return;
+
+        if (botGames.length === 0) {
+            botGamesList.innerHTML = '<p class="text-base-content/60 text-center py-4 italic">No bot games running</p>';
+            return;
+        }
+
+        botGamesList.innerHTML = botGames.map(game => `
+            <div class="card bg-base-200 shadow-sm hover:shadow-md transition-shadow">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1">
+                            <div class="font-semibold text-base mb-1">
+                                ${game.whitePlayer} vs ${game.redPlayer}
+                            </div>
+                            <div class="text-sm text-base-content/60">
+                                ${game.currentPlayer} to move • Pips: ${game.whitePipCount} - ${game.redPipCount}
+                                ${game.spectatorCount > 0 ? ` • 👁 ${game.spectatorCount} watching` : ''}
+                            </div>
+                        </div>
+                        <button onclick="spectateGame('${game.gameId}')"
+                                class="btn btn-primary btn-sm gap-1">
+                            👀 Watch
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+        debug('Loaded bot games', { count: botGames.length }, 'info');
+    } catch (err) {
+        debug('Failed to load bot games', err, 'error');
+        // Hide section on error
+        const section = document.getElementById('botGamesSection');
+        if (section) section.style.display = 'none';
+    }
+}
+
+/**
+ * Spectate a game by ID
+ */
+async function spectateGame(gameId) {
+    debug('Spectating game', { gameId }, 'info');
+
+    // Navigate to game URL
+    setGameUrl(gameId);
+    showGamePage();
+
+    // Wait for connection
+    const isConnected = await waitForConnection();
+    if (!isConnected) {
+        log('Failed to connect to server', 'error');
+        showLandingPage();
+        return;
+    }
+
+    // Join game (will be added as spectator if full)
+    try {
+        await joinSpecificGame(gameId);
+    } catch (err) {
+        log('Failed to join game as spectator', 'error');
+        showLandingPage();
+    }
+}
+
+// Load bot games on page load and refresh every 5 seconds
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', () => {
+        loadBotGames();
+        setInterval(loadBotGames, 5000);
+    });
 }

@@ -59,6 +59,12 @@ builder.Services.AddSingleton<IFriendService, FriendService>();
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
+// Feature flags configuration
+builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
+
+// Bot game background service
+builder.Services.AddHostedService<BotGameService>();
+
 // JWT Authentication configuration
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "BackgammonServer";
@@ -233,6 +239,31 @@ app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSession
         createdAt = g.CreatedAt,
         lastActivity = g.LastActivityAt
     }).ToList();
+}).RequireCors(selectedCorsPolicy);
+
+// Bot games endpoint - returns active bot games for spectating
+app.MapGet("/api/bot-games", (IGameSessionManager sessionManager) =>
+{
+    var botGames = sessionManager.GetAllGames()
+        .Where(g => g.IsBotGame && !g.Engine.GameOver)
+        .Select(g =>
+        {
+            var state = g.GetState(null);  // null = spectator view
+            return new
+            {
+                gameId = g.Id,
+                whitePlayer = g.WhitePlayerName,
+                redPlayer = g.RedPlayerName,
+                currentPlayer = g.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown",
+                whitePipCount = state.WhitePipCount,
+                redPipCount = state.RedPipCount,
+                status = state.Status.ToString(),
+                spectatorCount = g.SpectatorConnections.Count
+            };
+        })
+        .ToList();
+
+    return botGames;
 }).RequireCors(selectedCorsPolicy);
 
 // Database statistics endpoint

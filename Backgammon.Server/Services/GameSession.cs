@@ -11,6 +11,12 @@ public class GameSession
 {
     // Track spectator connections
     private readonly HashSet<string> _spectatorConnections = new();
+
+    /// <summary>
+    /// Read-only access to spectator connection IDs for broadcasting updates.
+    /// </summary>
+    public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
+
     public string Id { get; }
     public GameEngine Engine { get; }
     public string? WhitePlayerId { get; private set; }  // Persistent player ID
@@ -25,6 +31,7 @@ public class GameSession
     public bool IsFull => WhitePlayerId != null && RedPlayerId != null;
     public bool IsStarted => IsFull && Engine.GameStarted;
     public bool IsAnalysisMode { get; set; } = false;
+    public bool IsBotGame { get; set; } = false;
 
     public GameSession(string id)
     {
@@ -304,6 +311,10 @@ public class GameSession
     
     private bool WillHit(Move move)
     {
+        // Bear-off moves (To = 0 or 25) cannot hit
+        if (move.IsBearOff)
+            return false;
+
         var targetPoint = Engine.Board.GetPoint(move.To);
         if (targetPoint.Color == null || targetPoint.Count == 0)
             return false;

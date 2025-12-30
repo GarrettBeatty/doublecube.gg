@@ -425,6 +425,13 @@ public class GameHub : Hub
                 _logger.LogDebug("Red player has no connection ID (AI player) in game {GameId}", session.Id);
             }
 
+            // Send updates to all spectators
+            var spectatorState = session.GetState(null); // null = spectator view
+            foreach (var spectatorId in session.SpectatorConnections)
+            {
+                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
+            }
+
             // Save game state after dice roll (progressive save)
             await SaveGameStateAsync(session);
         }
@@ -498,6 +505,13 @@ public class GameHub : Hub
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            }
+
+            // Send updates to all spectators
+            var spectatorState = session.GetState(null); // null = spectator view
+            foreach (var spectatorId in session.SpectatorConnections)
+            {
+                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
             }
 
             // Save game state after move (progressive save)
@@ -635,7 +649,7 @@ public class GameHub : Hub
 
             session.Engine.EndTurn();
             session.UpdateActivity();
-            
+
             // Send personalized state to each player
             if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
@@ -646,6 +660,13 @@ public class GameHub : Hub
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            }
+
+            // Send updates to all spectators
+            var spectatorStateEndTurn = session.GetState(null); // null = spectator view
+            foreach (var spectatorId in session.SpectatorConnections)
+            {
+                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorStateEndTurn);
             }
 
             // Save game state after turn end (progressive save)
@@ -798,6 +819,21 @@ public class GameHub : Hub
                 ? session.Engine.RedPlayer
                 : session.Engine.WhitePlayer;
 
+            // Check if game is already over or hasn't started
+            if (session.Engine.GameOver)
+            {
+                _logger.LogWarning("Game {GameId} is already over, cannot decline double", session.Id);
+                await Clients.Caller.SendAsync("Error", "Game is already finished");
+                return;
+            }
+
+            if (!session.Engine.GameStarted)
+            {
+                _logger.LogWarning("Game {GameId} hasn't started yet, cannot decline double", session.Id);
+                await Clients.Caller.SendAsync("Error", "Game hasn't started yet");
+                return;
+            }
+
             // Forfeit game - opponent wins at current stakes
             session.Engine.ForfeitGame(opponentPlayer);
 
@@ -904,6 +940,21 @@ public class GameHub : Hub
             var opponentPlayer = abandoningColor == CheckerColor.White
                 ? session.Engine.RedPlayer
                 : session.Engine.WhitePlayer;
+
+            // Check if game is already over or hasn't started
+            if (session.Engine.GameOver)
+            {
+                _logger.LogWarning("Game {GameId} is already over, cannot abandon", session.Id);
+                await Clients.Caller.SendAsync("Error", "Game is already finished");
+                return;
+            }
+
+            if (!session.Engine.GameStarted)
+            {
+                _logger.LogWarning("Game {GameId} hasn't started yet, cannot forfeit", session.Id);
+                await Clients.Caller.SendAsync("Error", "Game hasn't started yet");
+                return;
+            }
 
             // Forfeit game - set opponent as winner
             session.Engine.ForfeitGame(opponentPlayer);
@@ -1042,12 +1093,22 @@ public class GameHub : Hub
             {
                 await Groups.RemoveFromGroupAsync(connectionId, session.Id);
 
-                // Notify opponent
-                await Clients.Group(session.Id).SendAsync("OpponentLeft");
+                // Check if this is a spectator
+                if (session.IsSpectator(connectionId))
+                {
+                    session.RemoveSpectator(connectionId);
+                    _sessionManager.RemovePlayer(connectionId); // Clean up mapping
+                    _logger.LogInformation("Spectator {ConnectionId} left game {GameId}", connectionId, session.Id);
+                }
+                else
+                {
+                    // Notify opponent
+                    await Clients.Group(session.Id).SendAsync("OpponentLeft");
 
-                _sessionManager.RemovePlayer(connectionId);
+                    _sessionManager.RemovePlayer(connectionId);
 
-                _logger.LogInformation("Player {ConnectionId} left game {GameId}", connectionId, session.Id);
+                    _logger.LogInformation("Player {ConnectionId} left game {GameId}", connectionId, session.Id);
+                }
             }
         }
         catch (Exception ex)
@@ -1123,7 +1184,7 @@ public class GameHub : Hub
     {
         try
         {
-            // Broadcast callback - sends state to human player
+            // Broadcast callback - sends state to players and spectators
             // Use _hubContext.Clients instead of this.Clients because Hub may be disposed
             async Task BroadcastUpdate()
             {
@@ -1137,6 +1198,13 @@ public class GameHub : Hub
                 {
                     var redState = session.GetState(session.RedConnectionId);
                     await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+                }
+
+                // Send updates to all spectators
+                var spectatorState = session.GetState(null); // null = spectator view
+                foreach (var spectatorId in session.SpectatorConnections)
+                {
+                    await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
                 }
             }
 

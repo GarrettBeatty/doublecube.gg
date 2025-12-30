@@ -25,6 +25,7 @@ public interface IAiMoveService
     /// <summary>
     /// Generates a new AI player ID.
     /// </summary>
+    /// <param name="aiType">The type of AI: "greedy" or "random" (default: "greedy")</param>
     /// <returns>A unique AI player ID</returns>
-    string GenerateAiPlayerId();
+    string GenerateAiPlayerId(string aiType = "greedy");
 }

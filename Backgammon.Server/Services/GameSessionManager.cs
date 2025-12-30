@@ -146,12 +146,17 @@ public class GameSessionManager : IGameSessionManager
                 if (_games.TryGetValue(gameId, out var existingGame))
                 {
                     // Try to join/reconnect to existing game
+                    // If game is full, return it anyway - GameHub will add as spectator
                     if (existingGame.AddPlayer(playerId, connectionId))
                     {
                         _playerToGame[connectionId] = gameId;
-                        return existingGame;
                     }
-                    throw new InvalidOperationException("Game is full");
+                    else
+                    {
+                        // Game is full, but register connection for spectator tracking
+                        _playerToGame[connectionId] = gameId;
+                    }
+                    return existingGame;
                 }
                 
                 // Create the game with the specified ID

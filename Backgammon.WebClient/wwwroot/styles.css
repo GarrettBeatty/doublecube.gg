@@ -205,6 +205,36 @@ body.spectator-mode .btn-roll {
     filter: grayscale(0.5);
 }
 
+/* Disable most controls in spectator mode (but allow Leave button) */
+body.spectator-mode .game-controls button,
+body.spectator-mode #abandonBtn,
+body.spectator-mode #exportBtn,
+body.spectator-mode #importBtn {
+    pointer-events: none !important;
+    opacity: 0.4 !important;
+    cursor: not-allowed !important;
+    filter: grayscale(0.7) !important;
+}
+
+body.spectator-mode .board-point {
+    cursor: default !important;
+}
+
+#spectatorBadge {
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 /* Page structure */
 .page {
     min-height: 100vh;

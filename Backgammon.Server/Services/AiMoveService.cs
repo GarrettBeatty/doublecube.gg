@@ -6,37 +6,51 @@ namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Service for handling AI opponent moves in backgammon games.
-/// Uses GreedyAI for move selection with realistic delays between actions.
+/// Supports both GreedyAI and RandomAI with realistic delays between actions.
 /// </summary>
 public class AiMoveService : IAiMoveService
 {
-    private const string AiPlayerIdPrefix = "ai_greedy_";
+    private const string GreedyAiPrefix = "ai_greedy_";
+    private const string RandomAiPrefix = "ai_random_";
     private const int DelayBeforeRoll = 500;      // ms before rolling dice
     private const int DelayAfterRoll = 800;       // ms after rolling to show dice
     private const int DelayPerMove = 600;         // ms per move executed
 
     private readonly ILogger<AiMoveService> _logger;
-    private readonly GreedyAI _ai;
 
     public AiMoveService(ILogger<AiMoveService> logger)
     {
         _logger = logger;
-        _ai = new GreedyAI("Computer");
     }
 
     public bool IsAiPlayer(string? playerId)
     {
-        return playerId?.StartsWith(AiPlayerIdPrefix) == true;
+        if (playerId == null) return false;
+        return playerId.StartsWith(GreedyAiPrefix) || playerId.StartsWith(RandomAiPrefix);
     }
 
-    public string GenerateAiPlayerId()
+    public string GenerateAiPlayerId(string aiType = "greedy")
     {
-        return $"{AiPlayerIdPrefix}{Guid.NewGuid()}";
+        var prefix = aiType.ToLowerInvariant() == "random" ? RandomAiPrefix : GreedyAiPrefix;
+        return $"{prefix}{Guid.NewGuid()}";
+    }
+
+    /// <summary>
+    /// Creates an AI instance based on the player ID prefix.
+    /// </summary>
+    private IBackgammonAI CreateAI(string playerId)
+    {
+        if (playerId.StartsWith(RandomAiPrefix))
+        {
+            return new RandomAI("RandomBot");
+        }
+        return new GreedyAI("GreedyBot");
     }
 
     public async Task ExecuteAiTurnAsync(GameSession session, string aiPlayerId, Func<Task> broadcastUpdate)
     {
         var engine = session.Engine;
+        var ai = CreateAI(aiPlayerId);
 
         _logger.LogInformation("AI {AiPlayerId} starting turn in game {GameId}", aiPlayerId, session.Id);
 
@@ -61,7 +75,7 @@ public class AiMoveService : IAiMoveService
 
             while (engine.RemainingMoves.Count > 0 && validMoves.Count > 0)
             {
-                var move = SelectBestMove(validMoves, engine);
+                var move = SelectBestMove(validMoves, engine, ai);
 
                 if (engine.ExecuteMove(move))
                 {
@@ -99,11 +113,20 @@ public class AiMoveService : IAiMoveService
     }
 
     /// <summary>
-    /// Selects the best move using GreedyAI's strategy.
-    /// Extracted from GreedyAI to allow per-move broadcasting.
+    /// Selects the best move using the AI's strategy.
+    /// For RandomAI: selects randomly.
+    /// For GreedyAI: uses priority-based strategy (bear off > hit > advance).
     /// </summary>
-    private Move SelectBestMove(List<Move> validMoves, GameEngine engine)
+    private Move SelectBestMove(List<Move> validMoves, GameEngine engine, IBackgammonAI ai)
     {
+        // For RandomAI, select randomly
+        if (ai is RandomAI)
+        {
+            var random = new Random();
+            return validMoves[random.Next(validMoves.Count)];
+        }
+
+        // For GreedyAI (or any other AI), use greedy strategy
         // Priority 1: Bear off if possible
         var bearOffMoves = validMoves.Where(m => m.IsBearOff).ToList();
         if (bearOffMoves.Any())
