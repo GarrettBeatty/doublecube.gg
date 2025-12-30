@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   server:
-    image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-prod}:${IMAGE_TAG:-latest}
+    image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
     container_name: backgammon-server
     restart: unless-stopped
     ports:
@@ -10,7 +10,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - AWS_REGION=${AWS_REGION:-us-east-1}
-      - DynamoDb__TableName=${DYNAMODB_TABLE_NAME:-backgammon-prod}
+      - DynamoDb__TableName=${DYNAMODB_TABLE_NAME:-backgammon-dev}
       - Jwt__Secret=${JWT_SECRET}
       - Jwt__Issuer=BackgammonServer
       - Jwt__Audience=BackgammonClient
@@ -31,7 +31,7 @@ services:
       start_period: 40s
 
   webclient:
-    image: ${ECR_REGISTRY}/backgammon-webclient-${ENVIRONMENT:-prod}:${IMAGE_TAG:-latest}
+    image: ${ECR_REGISTRY}/backgammon-webclient-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
     container_name: backgammon-webclient
     restart: unless-stopped
     ports:

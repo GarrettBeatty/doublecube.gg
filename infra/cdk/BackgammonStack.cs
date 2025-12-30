@@ -22,6 +22,13 @@ public class BackgammonStack : Stack
         // Create SSM parameters for secrets and config
         var ssmParams = new SsmParameterConstruct(this, "SsmParameters", environment, dynamoDbTable.Table.TableName);
 
+        // Create GitHub OIDC provider and IAM role for GitHub Actions
+        var githubOidc = new GitHubOidcConstruct(this, "GitHubOidc", "GarrettBeatty", "Backgammon");
+
+        // Grant GitHub Actions role access to ECR repositories
+        ecr.ServerRepository.GrantPullPush(githubOidc.DeployRole);
+        ecr.WebClientRepository.GrantPullPush(githubOidc.DeployRole);
+
         // Import default VPC (free, no cost)
         var vpc = Vpc.FromLookup(this, "DefaultVpc", new VpcLookupOptions { IsDefault = true });
 

@@ -7,11 +7,14 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ENVIRONMENT: prod
+  ENVIRONMENT: dev
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Required for OIDC
+      contents: read
 
     steps:
     - name: Checkout code
@@ -20,8 +23,7 @@ jobs:
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        role-to-assume: arn:aws:iam::902820134073:role/GitHubActionsDeployRole
         aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to Amazon ECR
@@ -79,8 +81,8 @@ jobs:
           export IMAGE_TAG=latest
           export ENVIRONMENT=prod
           export AWS_REGION=us-east-1
-          export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/prod/table-name --query Parameter.Value --output text)
-          export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/prod/jwt-secret --with-decryption --query Parameter.Value --output text)
+          export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/dev/table-name --query Parameter.Value --output text)
+          export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/dev/jwt-secret --with-decryption --query Parameter.Value --output text)
           export DOMAIN=${DOMAIN:-localhost}
           export TLS_EMAIL=${TLS_EMAIL:-admin@example.com}
 
