@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   server:
     image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}

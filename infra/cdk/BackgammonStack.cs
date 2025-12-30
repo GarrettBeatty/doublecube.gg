@@ -60,9 +60,12 @@ public class BackgammonStack : Stack
         // Grant DynamoDB read/write access
         dynamoDbTable.Table.GrantReadWriteData(ec2Role);
 
-        // Grant ECR pull access
+        // Grant ECR pull access to EC2 instance
         ecr.ServerRepository.GrantPull(ec2Role);
         ecr.WebClientRepository.GrantPull(ec2Role);
+
+        // Grant ECR login permission (needed for docker login)
+        ec2Role.AddManagedPolicy(ManagedPolicy.FromAwsManagedPolicyName("AmazonEC2ContainerRegistryReadOnly"));
 
         // Grant SSM parameter read access
         ssmParams.JwtSecretParameter.GrantRead(ec2Role);

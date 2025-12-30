@@ -13,8 +13,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.AI", "Backgammon
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Server", "Backgammon.Server\Backgammon.Server.csproj", "{E132FD8F-1867-42EC-99AA-AEC5A0053C8A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestClient", "TestClient\TestClient.csproj", "{D57F4727-67B6-4842-B285-A65834BC5880}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.WebClient", "Backgammon.WebClient\Backgammon.WebClient.csproj", "{7A3F18D3-EB12-46F5-821C-404EB7EE7372}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.AppHost", "Backgammon.AppHost\Backgammon.AppHost.csproj", "{6B5DE56F-FB84-4D1C-8694-EFC991E8A4C9}"

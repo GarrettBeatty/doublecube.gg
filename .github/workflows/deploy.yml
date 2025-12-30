@@ -79,7 +79,7 @@ jobs:
           # Export environment variables
           export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
           export IMAGE_TAG=latest
-          export ENVIRONMENT=prod
+          export ENVIRONMENT=dev
           export AWS_REGION=us-east-1
           export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/dev/table-name --query Parameter.Value --output text)
           export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/dev/jwt-secret --with-decryption --query Parameter.Value --output text)
