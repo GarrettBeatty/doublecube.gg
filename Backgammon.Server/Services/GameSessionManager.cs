@@ -9,7 +9,12 @@ public interface IGameSessionManager
     /// Create a new game session with a specific ID
     /// </summary>
     GameSession CreateGame(string? gameId = null);
-    
+
+    /// <summary>
+    /// Register a player's connection to a game session (for manual game creation)
+    /// </summary>
+    void RegisterPlayerConnection(string connectionId, string gameId);
+
     /// <summary>
     /// Get a game session by ID
     /// </summary>
@@ -77,13 +82,27 @@ public class GameSessionManager : IGameSessionManager
         lock (_lock)
         {
             gameId ??= Guid.NewGuid().ToString();
-            
+
             if (_games.ContainsKey(gameId))
                 throw new InvalidOperationException($"Game {gameId} already exists");
-            
+
             var session = new GameSession(gameId);
             _games[gameId] = session;
             return session;
+        }
+    }
+
+    /// <summary>
+    /// Register a player's connection to a game session (for manual game creation)
+    /// </summary>
+    public void RegisterPlayerConnection(string connectionId, string gameId)
+    {
+        lock (_lock)
+        {
+            if (!string.IsNullOrEmpty(connectionId))
+            {
+                _playerToGame[connectionId] = gameId;
+            }
         }
     }
     

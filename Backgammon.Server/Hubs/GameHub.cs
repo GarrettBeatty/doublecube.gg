@@ -114,12 +114,12 @@ public class GameHub : Hub
             if (session.IsFull)
             {
                 // Game is ready to start - send personalized state to each player
-                if (session.WhiteConnectionId != null)
+                if (!string.IsNullOrEmpty(session.WhiteConnectionId))
                 {
                     var whiteState = session.GetState(session.WhiteConnectionId);
                     await Clients.Client(session.WhiteConnectionId).SendAsync("GameStart", whiteState);
                 }
-                if (session.RedConnectionId != null)
+                if (!string.IsNullOrEmpty(session.RedConnectionId))
                 {
                     var redState = session.GetState(session.RedConnectionId);
                     await Clients.Client(session.RedConnectionId).SendAsync("GameStart", redState);
@@ -203,40 +203,56 @@ public class GameHub : Hub
         try
         {
             var connectionId = Context.ConnectionId;
+            _logger.LogDebug("CreateAiGame called by connection {ConnectionId}, playerId={PlayerId}",
+                connectionId, playerId);
 
             // Use authenticated user ID if available
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
+            _logger.LogDebug("Effective player ID: {EffectivePlayerId}, Display name: {DisplayName}",
+                effectivePlayerId, displayName);
 
             // Create a new game session
             var session = _sessionManager.CreateGame();
             await Groups.AddToGroupAsync(connectionId, session.Id);
+            _logger.LogDebug("Created game session {GameId}", session.Id);
 
             // Add human player as White
             session.AddPlayer(effectivePlayerId, connectionId);
+            _sessionManager.RegisterPlayerConnection(connectionId, session.Id); // Register connection for lookup
             if (!string.IsNullOrEmpty(displayName))
             {
                 session.SetPlayerName(effectivePlayerId, displayName);
             }
+            _logger.LogDebug("Added human player as White: {PlayerId}, registered connection {ConnectionId}",
+                effectivePlayerId, connectionId);
 
             // Add AI player as Red
             var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
             session.AddPlayer(aiPlayerId, ""); // Empty connection ID for AI
             session.SetPlayerName(aiPlayerId, "Computer");
+            _logger.LogDebug("Added AI player as Red: {AiPlayerId}", aiPlayerId);
 
             _logger.LogInformation("Created AI game {GameId}. Human: {PlayerId}, AI: {AiPlayerId}",
                 session.Id, effectivePlayerId, aiPlayerId);
 
             // Game is now full - start immediately
             var humanState = session.GetState(connectionId);
+            _logger.LogDebug("Sending GameStart to human player. IsYourTurn={IsYourTurn}, CurrentPlayer={CurrentPlayer}, YourColor={YourColor}",
+                humanState.IsYourTurn, humanState.CurrentPlayer, humanState.YourColor);
             await Clients.Caller.SendAsync("GameStart", humanState);
 
             // Save initial game state
             await SaveGameStateAsync(session);
 
             // If AI goes first (which would be unusual since White goes first, but handle it)
-            if (_aiMoveService.IsAiPlayer(GetCurrentPlayerId(session)))
+            var currentPlayerId = GetCurrentPlayerId(session);
+            _logger.LogDebug("Current player ID: {CurrentPlayerId}, Is AI: {IsAi}",
+                currentPlayerId, _aiMoveService.IsAiPlayer(currentPlayerId));
+
+            if (_aiMoveService.IsAiPlayer(currentPlayerId))
             {
+                _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
                 // Trigger AI turn in background
                 _ = ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
             }
@@ -349,45 +365,68 @@ public class GameHub : Hub
     {
         try
         {
+            _logger.LogDebug("RollDice called by connection {ConnectionId}", Context.ConnectionId);
+
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
+                _logger.LogWarning("RollDice failed: No session found for connection {ConnectionId}", Context.ConnectionId);
                 await Clients.Caller.SendAsync("Error", "Not in a game");
                 return;
             }
 
+            _logger.LogDebug("RollDice: Found session {GameId}, CurrentPlayer={CurrentPlayer}, WhiteConn={WhiteConn}, RedConn={RedConn}",
+                session.Id, session.Engine.CurrentPlayer?.Color, session.WhiteConnectionId, session.RedConnectionId);
+
             if (!session.IsPlayerTurn(Context.ConnectionId))
             {
+                _logger.LogWarning("RollDice failed: Not player's turn. Connection={ConnectionId}, Game={GameId}",
+                    Context.ConnectionId, session.Id);
                 await Clients.Caller.SendAsync("Error", "Not your turn");
                 return;
             }
 
             if (session.Engine.RemainingMoves.Count > 0)
             {
+                _logger.LogWarning("RollDice failed: Remaining moves exist. Count={Count}, Connection={ConnectionId}",
+                    session.Engine.RemainingMoves.Count, Context.ConnectionId);
                 await Clients.Caller.SendAsync("Error", "Must complete current moves first");
                 return;
             }
 
             session.Engine.RollDice();
             session.UpdateActivity();
-            
+
+            _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}: [{Die1}, {Die2}]",
+                Context.ConnectionId, session.Id, session.Engine.Dice.Die1, session.Engine.Dice.Die2);
+
             // Send personalized state to each player
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
+                _logger.LogDebug("Sending GameUpdate to White player (conn={Conn}). IsYourTurn={IsYourTurn}, Dice=[{Die1},{Die2}]",
+                    session.WhiteConnectionId, whiteState.IsYourTurn, whiteState.Dice?.FirstOrDefault(), whiteState.Dice?.Skip(1).FirstOrDefault());
                 await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
             }
-            if (session.RedConnectionId != null)
+            else
+            {
+                _logger.LogWarning("White player has no connection ID in game {GameId}", session.Id);
+            }
+
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
+                _logger.LogDebug("Sending GameUpdate to Red player (conn={Conn}). IsYourTurn={IsYourTurn}, Dice=[{Die1},{Die2}]",
+                    session.RedConnectionId, redState.IsYourTurn, redState.Dice?.FirstOrDefault(), redState.Dice?.Skip(1).FirstOrDefault());
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            }
+            else
+            {
+                _logger.LogDebug("Red player has no connection ID (AI player) in game {GameId}", session.Id);
             }
 
             // Save game state after dice roll (progressive save)
             await SaveGameStateAsync(session);
-
-            _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}",
-                Context.ConnectionId, session.Id);
         }
         catch (Exception ex)
         {
@@ -450,12 +489,12 @@ public class GameHub : Hub
             session.UpdateActivity();
             
             // Send personalized state to each player
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
                 await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
             }
-            if (session.RedConnectionId != null)
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
@@ -539,12 +578,12 @@ public class GameHub : Hub
             session.UpdateActivity();
             
             // Send personalized state to each player
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
                 await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
             }
-            if (session.RedConnectionId != null)
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
@@ -598,12 +637,12 @@ public class GameHub : Hub
             session.UpdateActivity();
             
             // Send personalized state to each player
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
                 await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
             }
-            if (session.RedConnectionId != null)
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
@@ -706,12 +745,12 @@ public class GameHub : Hub
             session.UpdateActivity();
 
             // Send updated state to both players
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
                 await Clients.Client(session.WhiteConnectionId).SendAsync("DoubleAccepted", whiteState);
             }
-            if (session.RedConnectionId != null)
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("DoubleAccepted", redState);
@@ -1277,12 +1316,12 @@ public class GameHub : Hub
             SgfSerializer.ImportPosition(session.Engine, sgf);
 
             // Send updated game state to all players
-            if (session.WhiteConnectionId != null)
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
             {
                 var whiteState = session.GetState(session.WhiteConnectionId);
                 await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
             }
-            if (session.RedConnectionId != null)
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
             {
                 var redState = session.GetState(session.RedConnectionId);
                 await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);

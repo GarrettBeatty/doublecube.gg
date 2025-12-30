@@ -1,3 +1,73 @@
+// ==== DEBUG LOGGING ====
+let debugEnabled = false;
+
+function debug(message, data = null, level = 'info') {
+    const timestamp = new Date().toISOString().split('T')[1].substring(0, 12);
+    const colors = {
+        info: '#3b82f6',
+        success: '#22c55e',
+        warning: '#f59e0b',
+        error: '#ef4444',
+        trace: '#94a3b8'
+    };
+
+    const color = colors[level] || colors.info;
+    const icon = {
+        info: 'ℹ️',
+        success: '✅',
+        warning: '⚠️',
+        error: '❌',
+        trace: '🔍'
+    }[level] || 'ℹ️';
+
+    // Always log to console
+    if (data !== null) {
+        console.log(`[${timestamp}] ${icon} ${message}`, data);
+    } else {
+        console.log(`[${timestamp}] ${icon} ${message}`);
+    }
+
+    // Log to debug panel if enabled
+    if (debugEnabled) {
+        const debugLog = document.getElementById('debugLog');
+        if (debugLog) {
+            const entry = document.createElement('div');
+            entry.style.cssText = `margin: 2px 0; padding: 4px; border-left: 3px solid ${color}; background: rgba(255,255,255,0.03);`;
+
+            let html = `<span style="color: #64748b;">[${timestamp}]</span> ${icon} <span style="color: ${color};">${message}</span>`;
+            if (data !== null) {
+                const dataStr = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+                html += `<pre style="margin: 4px 0 0 20px; padding: 4px; background: rgba(0,0,0,0.3); border-radius: 3px; font-size: 10px; overflow-x: auto;">${dataStr}</pre>`;
+            }
+            entry.innerHTML = html;
+            debugLog.appendChild(entry);
+
+            // Auto-scroll if enabled
+            const autoScroll = document.getElementById('debugAutoScroll');
+            if (autoScroll && autoScroll.checked) {
+                debugLog.scrollTop = debugLog.scrollHeight;
+            }
+        }
+    }
+}
+
+function toggleDebugPanel() {
+    const panel = document.getElementById('debugPanel');
+    if (panel) {
+        debugEnabled = panel.style.display === 'none';
+        panel.style.display = debugEnabled ? 'block' : 'none';
+        debug(`Debug panel ${debugEnabled ? 'enabled' : 'disabled'}`, null, 'info');
+    }
+}
+
+function clearDebugLog() {
+    const debugLog = document.getElementById('debugLog');
+    if (debugLog) {
+        debugLog.innerHTML = '<div style="color: #94a3b8; font-size: 10px; padding: 5px; text-align: center;">Debug log cleared.</div>';
+        debug('Debug log cleared', null, 'info');
+    }
+}
+
 // ==== STATE ====
 let connection = null;
 let myColor = null;
@@ -118,10 +188,12 @@ window.addEventListener('load', async () => {
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
         rollBtn.addEventListener('click', async () => {
+            debug('Roll Dice button clicked', { disabled: rollBtn.disabled, currentGameId }, 'trace');
             rollBtn.disabled = true;
             try {
                 await rollDice();
             } catch (err) {
+                debug('Roll dice failed', err, 'error');
                 log(`Failed to roll dice: ${err}`, 'error');
             }
         });
@@ -234,12 +306,19 @@ async function autoConnect() {
 
 function setupEventHandlers() {
         connection.on("SpectatorJoined", (gameState) => {
+            debug('SignalR: SpectatorJoined received', { gameId: gameState.gameId }, 'info');
             log('👀 You are spectating this game.', 'info');
             updateGameState(gameState, true); // pass spectator flag
             showGamePage();
             window.isSpectator = true;
         });
     connection.on("GameUpdate", (gameState) => {
+        debug('SignalR: GameUpdate received', {
+            gameId: gameState.gameId,
+            currentPlayer: gameState.currentPlayer,
+            isYourTurn: gameState.isYourTurn,
+            dice: gameState.dice
+        }, 'info');
         updateGameState(gameState);
         // Update URL to reflect current game
         if (gameState.gameId) {
@@ -248,6 +327,7 @@ function setupEventHandlers() {
     });
 
     connection.on("GameStart", (gameState) => {
+        debug('SignalR: GameStart received', { gameId: gameState.gameId }, 'success');
         log('🎮 Game started! Both players connected.', 'success');
         updateGameState(gameState);
         // Update URL to reflect current game
@@ -285,6 +365,7 @@ function setupEventHandlers() {
     });
 
     connection.on("Error", (errorMessage) => {
+        debug('SignalR: Error received', { errorMessage }, 'error');
         log(`❌ Error: ${errorMessage}`, 'error');
     });
 
@@ -549,7 +630,10 @@ async function createAnalysisGame() {
 }
 
 async function createAiGame() {
+    debug('createAiGame called', { connectionState: connection?.state, myPlayerId }, 'trace');
+
     if (!connection || connection.state !== 'Connected') {
+        debug('Cannot create AI game - not connected', null, 'warning');
         alert('Not connected to server. Please wait...');
         return;
     }
@@ -557,10 +641,13 @@ async function createAiGame() {
     try {
         currentGameId = null;
         localStorage.removeItem('currentGameId'); // Clear any old game
+        debug('Invoking CreateAiGame on server', { myPlayerId }, 'info');
         await connection.invoke("CreateAiGame", myPlayerId);
         log('🤖 Creating AI game...', 'info');
+        debug('AI game created, showing game page', null, 'success');
         showGamePage();
     } catch (err) {
+        debug('Failed to create AI game', err, 'error');
         log(`❌ Failed to create AI game: ${err}`, 'error');
     }
 }
@@ -599,10 +686,20 @@ async function leaveGameAndReturn() {
 
 // ==== GAME CONTROLS ====
 async function rollDice() {
+    debug('rollDice called', {
+        connectionState: connection?.state,
+        currentGameId,
+        myColor,
+        hasCurrentGameState: !!currentGameState
+    }, 'trace');
+
     try {
+        debug('Invoking RollDice on server', null, 'info');
         await connection.invoke("RollDice");
         log('🎲 Rolling dice...', 'info');
+        debug('RollDice invoked successfully', null, 'success');
     } catch (err) {
+        debug('RollDice invoke failed', err, 'error');
         log(`❌ Failed to roll dice: ${err}`, 'error');
     }
 }
@@ -833,6 +930,18 @@ function calculatePipCount(state, color) {
 
 // ==== GAME STATE ====
 function updateGameState(state, isSpectator = false) {
+    debug('updateGameState called', {
+        gameId: state.gameId,
+        currentPlayer: state.currentPlayer,
+        isYourTurn: state.isYourTurn,
+        IsYourTurn: state.IsYourTurn,
+        yourColor: state.yourColor,
+        YourColor: state.YourColor,
+        hasDice: state.dice,
+        remainingMoves: state.remainingMoves?.length,
+        status: state.status
+    }, 'trace');
+
     console.log('Game State:', state);
     console.log('Player Names - White:', state.whitePlayerName, 'Red:', state.redPlayerName);
 
@@ -930,30 +1039,47 @@ function updateGameState(state, isSpectator = false) {
     }
 
     // Update controls
-    const isMyTurn = state.isYourTurn;
-    const hasRemainingMoves = state.remainingMoves && state.remainingMoves.length > 0;
-    const hasDice = state.dice && state.dice.length > 0 && (state.dice[0] > 0 || state.dice[1] > 0);
-    const movesMade = state.movesMadeThisTurn || 0;
-    const isWaitingForPlayer = state.status === 0; // GameStatus.WaitingForPlayer = 0
-    
+    // Handle both PascalCase and camelCase (SignalR may use either)
+    const isMyTurn = state.isYourTurn ?? state.IsYourTurn ?? false;
+    const hasRemainingMoves = (state.remainingMoves ?? state.RemainingMoves ?? []).length > 0;
+    const dice = state.dice ?? state.Dice ?? [];
+    const hasDice = dice.length > 0 && (dice[0] > 0 || dice[1] > 0);
+    const movesMade = state.movesMadeThisTurn ?? state.MovesMadeThisTurn ?? 0;
+    const isWaitingForPlayer = (state.status ?? state.Status ?? 1) === 0; // GameStatus.WaitingForPlayer = 0
+
+    debug('Button state calculation', {
+        isMyTurn,
+        hasRemainingMoves,
+        hasDice,
+        movesMade,
+        isWaitingForPlayer,
+        dice
+    }, 'trace');
+
     const rollBtn = document.getElementById('rollBtn');
     if (rollBtn) {
         // Can only roll at the START of your turn (no dice rolled yet)
         // Once you roll, you must end turn before rolling again
         // Also disable if waiting for another player to join
-        rollBtn.disabled = isWaitingForPlayer || !isMyTurn || hasDice;
+        const shouldDisable = isWaitingForPlayer || !isMyTurn || hasDice;
+        debug('Roll button state update', {
+            wasDisabled: rollBtn.disabled,
+            willBeDisabled: shouldDisable,
+            reason: shouldDisable ? (isWaitingForPlayer ? 'waiting for player' : (!isMyTurn ? 'not your turn' : 'has dice')) : 'enabled'
+        }, 'trace');
+        rollBtn.disabled = shouldDisable;
     }
     
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
         // Can undo only if you've made at least one move this turn
         // Check movesMadeThisTurn or fallback to comparing dice vs remaining
-        const movesMadeFromState = state.movesMadeThisTurn || 0;
-        const totalDice = state.dice && state.dice[0] === state.dice[1] ? 4 : 2;
-        const remainingCount = state.remainingMoves ? state.remainingMoves.length : 0;
+        const movesMadeFromState = movesMade;
+        const totalDice = dice.length >= 2 && dice[0] === dice[1] ? 4 : 2;
+        const remainingCount = (state.remainingMoves ?? state.RemainingMoves ?? []).length;
         const movesMadeFromDice = hasDice ? (totalDice - remainingCount) : 0;
         const actualMovesMade = Math.max(movesMadeFromState, movesMadeFromDice);
-        
+
         const canUndo = isMyTurn && (actualMovesMade > 0);
         undoBtn.disabled = !canUndo;
     }
@@ -964,7 +1090,8 @@ function updateGameState(state, isSpectator = false) {
         // 1. You've rolled dice (hasDice is true), AND
         // 2. All moves are made (no remaining moves), OR no valid moves are possible
         const allMovesMade = !hasRemainingMoves;
-        const noValidMoves = !state.validMoves || state.validMoves.length === 0;
+        const validMoves = state.validMoves ?? state.ValidMoves ?? [];
+        const noValidMoves = validMoves.length === 0;
         const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
         endTurnBtn.disabled = !canEndTurn;
     }
@@ -977,20 +1104,22 @@ function updateGameState(state, isSpectator = false) {
         // 3. Game is in progress (not waiting for player)
         // 4. You own the cube OR it's centered (null)
         const myColorString = myColor === 0 ? "White" : "Red";
+        const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
         const canDouble = isMyTurn &&
                           !hasDice &&
                           !isWaitingForPlayer &&
-                          (state.doublingCubeOwner === null ||
-                           state.doublingCubeOwner === myColorString);
+                          (doublingCubeOwner === null ||
+                           doublingCubeOwner === myColorString);
         doubleBtn.disabled = !canDouble;
     }
 
     // Check for winner
-    if (state.winner) {
-        log(`🏆 Game Over! ${state.winner} wins!`, 'success');
+    const winner = state.winner ?? state.Winner;
+    if (winner) {
+        log(`🏆 Game Over! ${winner} wins!`, 'success');
         localStorage.removeItem('currentGameId'); // Clear completed game
         setTimeout(() => {
-            if (confirm(`Game Over! ${state.winner} wins! Return to lobby?`)) {
+            if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
                 leaveGameAndReturn();
             }
         }, 2000);

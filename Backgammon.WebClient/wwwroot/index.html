@@ -19,6 +19,11 @@
 
             <!-- Right: Connection + Auth -->
             <div class="flex items-center gap-4">
+                <!-- Debug Toggle Button -->
+                <button id="debugToggleBtn" class="btn btn-ghost btn-sm text-white" onclick="toggleDebugPanel()" title="Toggle Debug Panel">
+                    🐛
+                </button>
+
                 <!-- Connection Indicator -->
                 <div id="connectionIndicator">
                     <span class="loading loading-ring loading-sm text-error"></span>
@@ -419,6 +424,26 @@
 
     <!-- Quick Join Modal (hidden) -->
     <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
+
+    <!-- Debug Panel (floating) -->
+    <div id="debugPanel" style="display: none; position: fixed; bottom: 20px; right: 20px; width: 500px; max-height: 600px; background: rgba(0, 0, 0, 0.95); border: 2px solid #4ade80; border-radius: 8px; z-index: 9999; font-family: monospace; font-size: 11px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #1a1a1a; border-bottom: 1px solid #4ade80; border-radius: 6px 6px 0 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: #4ade80; font-weight: bold;">🐛 DEBUG PANEL</span>
+                <label style="display: flex; align-items: center; gap: 4px; color: #94a3b8; font-size: 10px;">
+                    <input type="checkbox" id="debugAutoScroll" checked style="width: 14px; height: 14px;">
+                    Auto-scroll
+                </label>
+            </div>
+            <div style="display: flex; gap: 4px;">
+                <button onclick="clearDebugLog()" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Clear</button>
+                <button onclick="toggleDebugPanel()" style="background: #6366f1; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Close</button>
+            </div>
+        </div>
+        <div id="debugLog" style="padding: 10px; overflow-y: auto; max-height: 550px; color: #e2e8f0;">
+            <div style="color: #94a3b8; font-size: 10px; padding: 5px; text-align: center;">Debug logging enabled. Events will appear here...</div>
+        </div>
+    </div>
 
     <!-- SignalR JavaScript Client -->
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
