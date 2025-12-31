@@ -1204,26 +1204,26 @@ const BoardSVG = (function() {
         const cubeValue = gameState.doublingCubeValue || 1;
         const cubeOwner = gameState.doublingCubeOwner; // null, "White", or "Red"
 
-        // Position cube in bar center based on owner
+        // Position cube on right side margin based on owner
         let cubeX, cubeY;
-        const barCenterX = CONFIG.barX + CONFIG.barWidth / 2; // Center of bar
         const boardCenterY = CONFIG.viewBox.height / 2;
+        const cubeSize = 40;
 
-        cubeX = barCenterX; // Always centered horizontally in bar
+        // Position horizontally centered in the bear-off area
+        cubeX = CONFIG.viewBox.width - CONFIG.bearoffWidth / 2 - 5;
 
         if (cubeOwner === null) {
-            // Above center when neutral
-            cubeY = boardCenterY - 100;
+            // Center position when neutral
+            cubeY = boardCenterY;
         } else if (cubeOwner === "White") {
-            // Lower position (White's side)
-            cubeY = boardCenterY + 120;
+            // Lower position (White's side) - centered in bottom half
+            cubeY = boardCenterY + (boardCenterY / 2);
         } else if (cubeOwner === "Red") {
-            // Upper position (Red's side)
-            cubeY = boardCenterY - 140;
+            // Upper position (Red's side) - centered in top half
+            cubeY = boardCenterY - (boardCenterY / 2);
         }
 
-        const cubeSize = 60;
-        const cubeRadius = 8;
+        const cubeRadius = 6;
 
         // Create cube (rounded square)
         const cubeRect = createSVGElement('rect', {
