@@ -24,9 +24,11 @@ backgammon.beatty.codes, doublecube.gg {
             header_up Connection {>Connection}
             header_up Upgrade {>Upgrade}
 
-            # Force HTTP/1.1 for WebSocket support
+            # Force HTTP/1.1 for WebSocket support with long timeouts for game sessions
             transport http {
                 versions 1.1
+                read_timeout 2h
+                write_timeout 2h
             }
         }
     }

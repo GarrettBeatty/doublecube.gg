@@ -2006,8 +2006,9 @@ async function spectateGame(gameId) {
 
 // Load bot games on page load and refresh every 5 seconds
 if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', () => {
-        loadBotGames();
+    window.addEventListener('DOMContentLoaded', async () => {
+        await autoConnect();  // Wait for config to load first
+        loadBotGames();       // Now apiBaseUrl is set correctly
         setInterval(loadBotGames, 5000);
     });
 }

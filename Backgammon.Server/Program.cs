@@ -19,7 +19,14 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add services to the container
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    // Production-friendly timeout settings for long-lived WebSocket connections
+    options.ClientTimeoutInterval = TimeSpan.FromMinutes(2);  // Default: 30s
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);      // Default: 15s
+    options.KeepAliveInterval = TimeSpan.FromSeconds(30);     // Default: 15s
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+});
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 
 // ========== DYNAMODB CONFIGURATION ==========
