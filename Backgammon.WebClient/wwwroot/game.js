@@ -1129,13 +1129,13 @@ function updateGameState(state, isSpectator = false) {
         autoFlipForColor();
     }
 
-    // Update player badges
-    const whiteBadge = document.getElementById('whitePlayerBadge');
-    const redBadge = document.getElementById('redPlayerBadge');
-    if (whiteBadge && redBadge) {
+    // Update player cards (active state)
+    const whiteCard = document.getElementById('whitePlayerCard');
+    const redCard = document.getElementById('redPlayerCard');
+    if (whiteCard && redCard) {
         // currentPlayer is 0 for White, 1 for Red
-        whiteBadge.classList.toggle('active', state.currentPlayer === 0);
-        redBadge.classList.toggle('active', state.currentPlayer === 1);
+        whiteCard.classList.toggle('active', state.currentPlayer === 0);
+        redCard.classList.toggle('active', state.currentPlayer === 1);
     }
 
     // Update player names and IDs next to board

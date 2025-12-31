@@ -6,8 +6,8 @@ const BoardSVG = (function() {
 
     // Configuration constants
     const CONFIG = {
-        viewBox: { width: 1100, height: 500 }, // Extended width for sidebar
-        sidebarWidth: 80, // Left sidebar for doubling cube
+        viewBox: { width: 1020, height: 500 }, // Reduced width (removed sidebar)
+        sidebarWidth: 0, // No sidebar (cube moved to center)
         margin: 30,
         barWidth: 70,
         pointWidth: 72,
@@ -321,29 +321,6 @@ const BoardSVG = (function() {
             'stroke-width': 3
         });
         svgElement.appendChild(border);
-
-        // Left sidebar for doubling cube
-        const sidebar = createSVGElement('rect', {
-            'class': 'cube-sidebar',
-            'x': 5,
-            'y': 5,
-            'width': CONFIG.sidebarWidth,
-            'height': CONFIG.viewBox.height - 10,
-            'rx': 4
-        });
-        svgElement.appendChild(sidebar);
-
-        // Sidebar divider line (right edge of sidebar)
-        const sidebarDivider = createSVGElement('line', {
-            'class': 'sidebar-divider',
-            'x1': CONFIG.sidebarWidth + 5,
-            'y1': 5,
-            'x2': CONFIG.sidebarWidth + 5,
-            'y2': CONFIG.viewBox.height - 5,
-            'stroke': COLORS.boardBorder,
-            'stroke-width': 2
-        });
-        svgElement.appendChild(sidebarDivider);
 
         // Bar
         barGroup = createSVGElement('g', { 'id': 'bar' });
@@ -893,22 +870,22 @@ const BoardSVG = (function() {
         const cubeValue = gameState.doublingCubeValue || 1;
         const cubeOwner = gameState.doublingCubeOwner; // null, "White", or "Red"
 
-        // Position cube in left sidebar based on owner
+        // Position cube in bar center based on owner
         let cubeX, cubeY;
-        const sidebarCenterX = 5 + CONFIG.sidebarWidth / 2; // Center of sidebar
+        const barCenterX = CONFIG.barX + CONFIG.barWidth / 2; // Center of bar
         const boardCenterY = CONFIG.viewBox.height / 2;
 
-        cubeX = sidebarCenterX; // Always centered in sidebar
+        cubeX = barCenterX; // Always centered horizontally in bar
 
         if (cubeOwner === null) {
-            // Centered vertically when neutral
-            cubeY = boardCenterY;
+            // Above center when neutral
+            cubeY = boardCenterY - 100;
         } else if (cubeOwner === "White") {
-            // Bottom third (White's side)
-            cubeY = CONFIG.viewBox.height * 0.75;
+            // Lower position (White's side)
+            cubeY = boardCenterY + 120;
         } else if (cubeOwner === "Red") {
-            // Top third (Red's side)
-            cubeY = CONFIG.viewBox.height * 0.25;
+            // Upper position (Red's side)
+            cubeY = boardCenterY - 140;
         }
 
         const cubeSize = 60;
@@ -1015,6 +992,93 @@ const BoardSVG = (function() {
         }
     }
 
+    // Render point numbers at top and bottom of board
+    function renderPointNumbers() {
+        if (!svgElement) return;
+
+        // Remove existing point numbers if any
+        const existing = svgElement.querySelectorAll('.point-number');
+        existing.forEach(el => el.remove());
+
+        const fontSize = 12;
+        const fillColor = 'rgba(255, 255, 255, 0.4)';
+
+        // Bottom numbers: 12, 11, 10, 9, 8, 7 | BAR | 6, 5, 4, 3, 2, 1
+        // Left side (12-7)
+        for (let i = 0; i < 6; i++) {
+            const pointNum = 12 - i;
+            const x = CONFIG.boardStartX + (i * CONFIG.pointWidth) + CONFIG.pointWidth / 2;
+            const y = CONFIG.viewBox.height - 8;
+
+            const text = createSVGElement('text', {
+                'class': 'point-number',
+                'x': x,
+                'y': y,
+                'text-anchor': 'middle',
+                'font-size': fontSize,
+                'fill': fillColor
+            });
+            text.textContent = pointNum;
+            svgElement.appendChild(text);
+        }
+
+        // Right side (6-1)
+        const rightStart = CONFIG.barX + CONFIG.barWidth;
+        for (let i = 0; i < 6; i++) {
+            const pointNum = 6 - i;
+            const x = rightStart + (i * CONFIG.pointWidth) + CONFIG.pointWidth / 2;
+            const y = CONFIG.viewBox.height - 8;
+
+            const text = createSVGElement('text', {
+                'class': 'point-number',
+                'x': x,
+                'y': y,
+                'text-anchor': 'middle',
+                'font-size': fontSize,
+                'fill': fillColor
+            });
+            text.textContent = pointNum;
+            svgElement.appendChild(text);
+        }
+
+        // Top numbers: 13, 14, 15, 16, 17, 18 | BAR | 19, 20, 21, 22, 23, 24
+        // Left side (13-18)
+        for (let i = 0; i < 6; i++) {
+            const pointNum = 13 + i;
+            const x = CONFIG.boardStartX + (i * CONFIG.pointWidth) + CONFIG.pointWidth / 2;
+            const y = 18;
+
+            const text = createSVGElement('text', {
+                'class': 'point-number',
+                'x': x,
+                'y': y,
+                'text-anchor': 'middle',
+                'font-size': fontSize,
+                'fill': fillColor
+            });
+            text.textContent = pointNum;
+            svgElement.appendChild(text);
+        }
+
+        // Right side (19-24)
+        for (let i = 0; i < 6; i++) {
+            const pointNum = 19 + i;
+            const x = rightStart + (i * CONFIG.pointWidth) + CONFIG.pointWidth / 2;
+            const y = 18;
+
+            const text = createSVGElement('text', {
+                'class': 'point-number',
+                'x': x,
+                'y': y,
+                'text-anchor': 'middle',
+                'font-size': fontSize,
+                'fill': fillColor
+            });
+            text.textContent = pointNum;
+            svgElement.appendChild(text);
+        }
+    }
+
     // Main render function
     function render(gameState, selectedChecker, validDestinations, validSources, diceState) {
         if (!initialized) {
@@ -1026,6 +1090,7 @@ const BoardSVG = (function() {
         renderCheckers(gameState, selectedChecker, validSources); // Pass validSources!
         renderCube(gameState);
         renderDice(diceState);
+        renderPointNumbers(); // Add point numbers
         updateHighlights(
             validSources,
             selectedChecker?.point,
@@ -1068,11 +1133,6 @@ const BoardSVG = (function() {
         console.log(`  rect: left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)}, width=${rect.width.toFixed(1)}, height=${rect.height.toFixed(1)}`);
         console.log(`  effective: width=${effectiveWidth.toFixed(1)}, height=${effectiveHeight.toFixed(1)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
         console.log(`  scale: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
-
-        // Ignore clicks on sidebar
-        if (x < CONFIG.sidebarWidth + 10) {
-            return null;
-        }
 
         // Check bar
         if (x >= CONFIG.barX && x <= CONFIG.barX + CONFIG.barWidth) {

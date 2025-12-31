@@ -118,7 +118,40 @@
     <!-- Game Page -->
     <div id="gamePage" class="page" style="display: none;">
         <div class="game-layout-with-chat">
-            <!-- Left: Board Area -->
+            <!-- Left: Player Sidebar -->
+            <div class="player-sidebar">
+                <!-- Red Player Card (Top) -->
+                <div class="player-card" id="redPlayerCard">
+                    <div class="player-avatar red">
+                        <span class="player-color-indicator">🔴</span>
+                    </div>
+                    <div class="player-info">
+                        <span id="redPlayerName" class="player-name">Red Player</span>
+                        <span id="redPlayerId" class="player-id">-</span>
+                        <span id="redPipCount" class="pip-count">Pips: -</span>
+                    </div>
+                </div>
+
+                <!-- Match Score -->
+                <div class="match-score">
+                    <div class="score-label">Match Length: <span id="matchLength">1</span></div>
+                    <div class="score-label">Stake: <span id="matchStake">0</span></div>
+                </div>
+
+                <!-- White Player Card (Bottom) -->
+                <div class="player-card" id="whitePlayerCard">
+                    <div class="player-avatar white">
+                        <span class="player-color-indicator">⚪</span>
+                    </div>
+                    <div class="player-info">
+                        <span id="whitePlayerName" class="player-name">White Player</span>
+                        <span id="whitePlayerId" class="player-id">-</span>
+                        <span id="whitePipCount" class="pip-count">Pips: -</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Board Area -->
             <div class="board-section">
                 <div class="game-container" style="min-height: calc(100vh - 72px); justify-content:center;align-items:center;">
                     <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
@@ -128,18 +161,6 @@
                                 <span class="badge badge-info badge-lg">📊 Analysis Mode</span>
                             </div>
 
-                            <!-- Red Player (Top) -->
-                            <div class="player-name-top">
-                                <div class="player-name-label" id="redPlayerBadge">
-                                    <span class="player-color-indicator red">🔴</span>
-                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-                                        <span id="redPlayerName">Red Player</span>
-                                        <span id="redPlayerId" style="font-size: 0.75em; opacity: 0.7; font-family: monospace;">-</span>
-                                        <span id="redPipCount" style="font-size: 0.75em; opacity: 0.8;">Pips: -</span>
-                                    </div>
-                                </div>
-                            </div>
-
                             <!-- Board -->
                             <svg id="boardSvg" class="board-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
                             <div id="boardPlaceholder" class="board-placeholder">
@@ -147,34 +168,13 @@
                                 <p class="mt-4">Waiting for game to start...</p>
                             </div>
 
-                            <!-- White Player (Bottom) -->
-                            <div class="player-name-bottom">
-                                <div class="player-name-label" id="whitePlayerBadge">
-                                    <span class="player-color-indicator white">⚪</span>
-                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-                                        <span id="whitePlayerName">White Player</span>
-                                        <span id="whitePlayerId" style="font-size: 0.75em; opacity: 0.7; font-family: monospace;">-</span>
-                                        <span id="whitePipCount" style="font-size: 0.75em; opacity: 0.8;">Pips: -</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Modern Game Controls -->
-                            <div class="game-controls-modern">
-                                <button id="rollBtn" class="btn btn-primary btn-lg gap-2" disabled>
-                                    🎲 Roll Dice
-                                </button>
-                                <button id="doubleBtn" class="btn btn-warning btn-lg gap-2" disabled>
-                                    2x Double
-                                </button>
-                                <button id="endTurnBtn" class="btn btn-success btn-lg gap-2" disabled>
-                                    ✓ End Turn
-                                </button>
+                            <!-- Secondary Game Controls -->
+                            <div class="game-controls-secondary" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
                                 <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" onclick="toggleBoardFlip()" title="Flip board orientation">
                                     🔄 Flip Board
                                 </button>
-                                <button id="abandonBtn" class="btn btn-error btn-lg gap-2" onclick="showAbandonConfirm()">
-                                    ⚠️ Abandon Game
+                                <button id="abandonBtn" class="btn btn-error btn-sm gap-2" onclick="showAbandonConfirm()">
+                                    ⚠️ Abandon
                                 </button>
                                 <button id="exportBtn" class="btn btn-ghost btn-sm gap-2" onclick="exportPosition()">
                                     📋 Export
@@ -190,29 +190,6 @@
                     </main>
                 </div>
             </div>
-
-            <!-- Right: Chat Sidebar -->
-            <aside class="chat-sidebar" id="chatSidebar">
-                <div class="chat-sidebar-header" onclick="toggleChatSidebar()">
-                    <h3 class="font-bold text-white">💬 Chat</h3>
-                    <span id="chatToggle" class="text-sm cursor-pointer">◀</span>
-                </div>
-                <div id="chatMessages" class="chat-messages">
-                    <div class="chat-welcome text-center text-sm opacity-70 py-4">
-                        Send a message to your opponent...
-                    </div>
-                </div>
-                <div class="chat-input-area">
-                    <input type="text"
-                           id="chatInput"
-                           placeholder="Type a message..."
-                           class="input input-bordered input-sm w-full"
-                           onkeypress="handleChatKeyPress(event)">
-                    <button onclick="sendChat()" class="btn btn-primary btn-sm">
-                        Send
-                    </button>
-                </div>
-            </aside>
         </div>
     </div>
 

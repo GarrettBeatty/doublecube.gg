@@ -58,10 +58,10 @@
     animation: subtle-pulse 2s infinite;
 }
 
-/* ===== GAME LAYOUT WITH CHAT ===== */
+/* ===== GAME LAYOUT WITH PLAYER SIDEBAR ===== */
 .game-layout-with-chat {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 280px 1fr;
     gap: 1rem;
     height: calc(100vh - 72px);
     padding: 1rem;
@@ -71,122 +71,115 @@
     display: flex;
     flex-direction: column;
     min-width: 0; /* Prevent grid blowout */
-}
-
-/* ===== CHAT SIDEBAR ===== */
-.chat-sidebar {
-    display: flex;
-    flex-direction: column;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 12px;
-    overflow: hidden;
+    width: 100%;
     height: 100%;
 }
 
-.chat-sidebar-header {
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+/* ===== PLAYER SIDEBAR ===== */
+.player-sidebar {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-    user-select: none;
-}
-
-.chat-sidebar-header:hover {
+    flex-direction: column;
+    gap: 1rem;
     background: rgba(0, 0, 0, 0.3);
-}
-
-.chat-sidebar.collapsed {
-    width: 48px;
-    min-width: 48px;
-    flex-shrink: 0;
-}
-
-.chat-sidebar.collapsed .chat-sidebar-header h3 {
-    display: none;
-}
-
-.chat-sidebar.collapsed .chat-messages,
-.chat-sidebar.collapsed .chat-input-area {
-    display: none;
-}
-
-/* Expand board when chat is collapsed */
-.game-layout-with-chat:has(.chat-sidebar.collapsed) {
-    grid-template-columns: 1fr 48px;
-}
-
-.chat-messages {
-    flex: 1;
-    overflow-y: auto;
+    border-radius: 12px;
     padding: 1rem;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.player-card {
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 12px;
+    padding: 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.player-card.active {
+    border-color: rgba(76, 175, 80, 0.8);
+    background: rgba(76, 175, 80, 0.2);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+    animation: subtle-pulse 2s infinite;
+}
+
+.player-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3em;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.player-avatar.red {
+    border-color: rgba(239, 68, 68, 0.5);
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.player-avatar.white {
+    border-color: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.player-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    width: 100%;
+}
+
+.player-name {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.1em;
+    text-align: center;
+    word-wrap: break-word;
+}
+
+.player-id {
+    font-size: 0.75em;
+    opacity: 0.6;
+    font-family: monospace;
+    color: #ffffff;
+}
+
+.pip-count {
+    font-size: 0.85em;
+    opacity: 0.8;
+    color: #ffffff;
+    margin-top: 0.25rem;
+}
+
+.match-score {
+    text-align: center;
+    padding: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    margin: auto 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
 }
 
-.chat-input-area {
-    display: flex;
-    gap: 0.5rem;
-    padding: 1rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+.score-label {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9em;
 }
 
-/* Chat messages */
-.chat-message {
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-    max-width: 80%;
-    word-wrap: break-word;
+.score-label span {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 1.1em;
 }
 
-.chat-message.own {
-    background: rgba(102, 126, 234, 0.3);
-    align-self: flex-end;
-    border: 1px solid rgba(102, 126, 234, 0.5);
-}
-
-.chat-message.opponent {
-    background: rgba(255, 255, 255, 0.1);
-    align-self: flex-start;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.chat-message-sender {
-    font-size: 0.75rem;
-    font-weight: 600;
-    opacity: 0.8;
-    margin-bottom: 0.25rem;
-    color: white;
-}
-
-.chat-message-text {
-    font-size: 0.875rem;
-    line-height: 1.4;
-    color: white;
-}
-
-/* Scrollbar styling for chat */
-.chat-messages::-webkit-scrollbar {
-    width: 6px;
-}
-
-.chat-messages::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 3px;
-}
-
-.chat-messages::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-}
-
-.chat-messages::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
-}
 
 /* Spectator mode */
 body.spectator-mode #turnIndicator::after {
@@ -252,27 +245,24 @@ body.spectator-mode .board-point {
 .board-area {
     display: flex;
     flex-direction: column;
-    background: #2d5016;
-    padding: 0;
-    min-width: 0;
-    min-height: 0;
+    background: #1a1f2e;
+    padding: 1rem;
+    width: 100%;
+    height: 100%;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - 72px); /* Account for header height */
 }
 
 .board-wrapper-game {
-    flex: 0 0 auto;
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     position: relative;
-    min-height: 0;
+    width: 100%;
+    height: 100%;
     gap: 8px;
-    width: min(80vw, 100%);
-    max-width: 80vw;
-    max-height: calc(100vh - 72px - 20px); /* Fit within viewport minus header and padding */
 }
 
 .board-canvas {
@@ -351,56 +341,11 @@ body.spectator-mode .board-point {
     gap: 20px;
 }
 
-/* Player name labels on board */
-.player-name-top,
-.player-name-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-}
-
-.player-name-label {
-    background: rgba(0, 0, 0, 0.5);
-    padding: 10px 24px;
-    border-radius: 8px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 12px;
-    min-width: 150px;
-    justify-content: center;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-}
-
-/* Highlight active player's turn */
-.player-name-label.active {
-    background: rgba(76, 175, 80, 0.3);
-    border: 2px solid rgba(76, 175, 80, 0.8);
-    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
-    animation: subtle-pulse 2s infinite;
-}
-
-.player-name-label span {
-    color: #ffffff;
-    font-weight: 600;
-    font-size: 1em;
-    text-align: center;
-    white-space: nowrap;
-}
-
+/* Player color indicator */
 .player-color-indicator {
-    font-size: 1.3em;
+    font-size: 1em;
     line-height: 1;
-}
-
-.player-color-indicator.white {
-    filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.5));
-}
-
-.player-color-indicator.red {
-    filter: drop-shadow(0 0 3px rgba(255, 0, 0, 0.5));
+    filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
 }
 
 /* Animations */
@@ -420,16 +365,36 @@ body.spectator-mode .board-point {
 }
 
 /* Responsive */
-/* Chat sidebar stacks below board on tablets/mobile */
+/* Player sidebar stacks on top on tablets/mobile */
 @media (max-width: 1024px) {
     .game-layout-with-chat {
         grid-template-columns: 1fr;
-        grid-template-rows: 1fr auto;
+        grid-template-rows: auto 1fr;
         gap: 0.5rem;
     }
 
-    .chat-sidebar {
-        max-height: 300px;
+    .player-sidebar {
+        flex-direction: row;
+        height: auto;
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .player-card {
+        flex: 1;
+        padding: 0.75rem;
+    }
+
+    .player-avatar {
+        width: 50px;
+        height: 50px;
+        font-size: 2em;
+    }
+
+    .match-score {
+        flex: 0 1 auto;
+        padding: 0.75rem;
+        margin: 0;
     }
 }
 
@@ -471,14 +436,15 @@ body.spectator-mode .board-point {
 .board-svg {
     width: 100%;
     height: auto;
-    max-width: min(80vw, 1200px);
-    aspect-ratio: 1100 / 500; /* Match viewBox aspect ratio to prevent distortion */
+    max-width: 100%;
+    max-height: calc(100vh - 72px - 4rem);
+    aspect-ratio: 1020 / 500; /* Match viewBox aspect ratio to prevent distortion */
     object-fit: contain; /* Maintain aspect ratio within container */
-    border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     cursor: default; /* Changed from pointer - only draggable checkers get grab cursor */
     display: block;
-    background: #4A3728;
+    background: #5d4e37;
 }
 
 /* Board background */
