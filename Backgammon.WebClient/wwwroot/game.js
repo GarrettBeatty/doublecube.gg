@@ -663,9 +663,13 @@ async function createGame() {
     }
 
     try {
+        // Leave any existing game first (important for spectated games)
+        if (currentGameId && connection.state === 'Connected') {
+            await connection.invoke("LeaveGame");
+        }
+
         currentGameId = null;
         localStorage.removeItem('currentGameId'); // Clear any old game
-        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         await connection.invoke("JoinGame", myPlayerId, null);
         log('🎮 Creating new game...', 'info');
         showGamePage();
@@ -684,9 +688,13 @@ async function createAnalysisGame() {
     }
 
     try {
+        // Leave any existing game first (important for spectated games)
+        if (currentGameId && connection.state === 'Connected') {
+            await connection.invoke("LeaveGame");
+        }
+
         currentGameId = null;
         localStorage.removeItem('currentGameId');
-        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         await connection.invoke("CreateAnalysisGame");
         log('📊 Creating analysis game...', 'info');
         showGamePage();
@@ -705,9 +713,13 @@ async function createAiGame() {
     }
 
     try {
+        // Leave any existing game first (important for spectated games)
+        if (currentGameId && connection.state === 'Connected') {
+            await connection.invoke("LeaveGame");
+        }
+
         currentGameId = null;
         localStorage.removeItem('currentGameId'); // Clear any old game
-        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         debug('Invoking CreateAiGame on server', { myPlayerId }, 'info');
         await connection.invoke("CreateAiGame", myPlayerId);
         log('🤖 Creating AI game...', 'info');
