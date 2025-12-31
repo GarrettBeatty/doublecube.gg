@@ -23,7 +23,7 @@ public class BackgammonStack : Stack
         var ssmParams = new SsmParameterConstruct(this, "SsmParameters", environment, dynamoDbTable.Table.TableName);
 
         // Create GitHub OIDC provider and IAM role for GitHub Actions
-        var githubOidc = new GitHubOidcConstruct(this, "GitHubOidc", "GarrettBeatty", "Backgammon");
+        var githubOidc = new GitHubOidcConstruct(this, "GitHubOidc", "GarrettBeatty", "doublecube.gg");
 
         // Grant GitHub Actions role access to ECR repositories
         ecr.ServerRepository.GrantPullPush(githubOidc.DeployRole);
