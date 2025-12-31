@@ -439,6 +439,40 @@ function setupEventHandlers() {
         addChatMessage(displayName, message, isOwn);
     });
 
+    connection.on("GameOver", (gameState) => {
+        debug('SignalR: GameOver received', {
+            gameId: gameState.gameId,
+            winner: gameState.winner
+        }, 'success');
+
+        // Determine winner and show appropriate message
+        const winner = gameState.winner ?? gameState.Winner;
+        if (winner) {
+            // Play win/loss sound
+            if (typeof AudioManager !== 'undefined') {
+                const didWeWin = (myColor === 'White' && winner === 'White') ||
+                                 (myColor === 'Red' && winner === 'Red');
+                AudioManager.playSound(didWeWin ? 'game-won' : 'game-lost');
+            }
+            log(`🏆 Game Over! ${winner} wins!`, 'success');
+        } else {
+            log('Game Over!', 'info');
+        }
+
+        // Clear saved game ID
+        localStorage.removeItem('currentGameId');
+
+        // Show confirm dialog and navigate if user agrees
+        setTimeout(() => {
+            if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
+                // Clear game state
+                currentGameId = null;
+                myColor = null;
+                leaveGameAndReturn();
+            }
+        }, 1500);
+    });
+
     connection.onreconnecting(() => {
         updateConnectionStatus(false);
     });
@@ -1302,23 +1336,8 @@ function updateGameState(state, isSpectator = false) {
         doubleBtn.disabled = !canDouble;
     }
 
-    // Check for winner
-    const winner = state.winner ?? state.Winner;
-    if (winner) {
-        // Play win/loss sound
-        if (typeof AudioManager !== 'undefined') {
-            const didWeWin = (myColor === 'White' && winner === 'White') ||
-                             (myColor === 'Red' && winner === 'Red');
-            AudioManager.playSound(didWeWin ? 'game-won' : 'game-lost');
-        }
-        log(`🏆 Game Over! ${winner} wins!`, 'success');
-        localStorage.removeItem('currentGameId'); // Clear completed game
-        setTimeout(() => {
-            if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
-                leaveGameAndReturn();
-            }
-        }, 2000);
-    }
+    // Note: Winner detection and game-over handling is done by the GameOver event handler
+    // (see setupEventHandlers), not here. updateGameState() only updates UI with current state.
 }
 
 function resetGameUI() {
