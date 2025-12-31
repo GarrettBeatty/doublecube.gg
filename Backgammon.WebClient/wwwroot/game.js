@@ -1119,6 +1119,12 @@ function updateGameState(state, isSpectator = false) {
         importBtn.style.display = state.isAnalysisMode ? '' : 'none';
     }
 
+    // Show export button only in analysis mode
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.style.display = state.isAnalysisMode ? '' : 'none';
+    }
+
     // Update Abandon button text to Forfeit if game has started
     const abandonBtn = document.getElementById('abandonBtn');
     if (abandonBtn) {

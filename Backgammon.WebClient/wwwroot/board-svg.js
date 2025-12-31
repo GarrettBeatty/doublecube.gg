@@ -794,10 +794,12 @@ const BoardSVG = (function() {
             return;
         }
 
-        console.log('[BoardSVG] Rendering Roll button at right side of board');
+        console.log('[BoardSVG] Rendering Roll button centered in right half of board');
 
-        // Position on right side of board
-        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 100;
+        // Calculate center of right half of board (between bar and bear-off area)
+        const rightHalfStart = CONFIG.barX + CONFIG.barWidth;
+        const rightHalfEnd = CONFIG.viewBox.width - CONFIG.margin - CONFIG.bearoffWidth;
+        const rightHalfCenterX = (rightHalfStart + rightHalfEnd) / 2;
         const centerY = CONFIG.viewBox.height / 2;
 
         // Create button group
@@ -806,12 +808,15 @@ const BoardSVG = (function() {
             'style': 'cursor: pointer;'
         });
 
-        // Button background
+        const buttonWidth = 100;
+        const buttonHeight = 60;
+
+        // Button background - centered at rightHalfCenterX
         const buttonBg = createSVGElement('rect', {
-            'x': rightSideX,
-            'y': centerY - 30,
-            'width': 100,
-            'height': 60,
+            'x': rightHalfCenterX - buttonWidth / 2,
+            'y': centerY - buttonHeight / 2,
+            'width': buttonWidth,
+            'height': buttonHeight,
             'rx': 8,
             'ry': 8,
             'fill': 'rgba(76, 175, 80, 0.9)',
@@ -820,9 +825,9 @@ const BoardSVG = (function() {
         });
         buttonGroup.appendChild(buttonBg);
 
-        // Button text
+        // Button text - centered
         const buttonText = createSVGElement('text', {
-            'x': rightSideX + 50,
+            'x': rightHalfCenterX,
             'y': centerY,
             'text-anchor': 'middle',
             'dominant-baseline': 'central',
@@ -863,8 +868,10 @@ const BoardSVG = (function() {
 
         if (!gameState) return;
 
-        // Position on right side of board (same as Roll button)
-        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 100;
+        // Calculate center of right half of board (between bar and bear-off area)
+        const rightHalfStart = CONFIG.barX + CONFIG.barWidth;
+        const rightHalfEnd = CONFIG.viewBox.width - CONFIG.margin - CONFIG.bearoffWidth;
+        const rightHalfCenterX = (rightHalfStart + rightHalfEnd) / 2;
         const centerY = CONFIG.viewBox.height / 2;
 
         // Create button group
@@ -873,12 +880,15 @@ const BoardSVG = (function() {
             'style': 'cursor: pointer;'
         });
 
-        // Button background (blue/green color)
+        const buttonWidth = 100;
+        const buttonHeight = 60;
+
+        // Button background (blue color) - centered at rightHalfCenterX
         const buttonBg = createSVGElement('rect', {
-            'x': rightSideX,
-            'y': centerY - 30,
-            'width': 100,
-            'height': 60,
+            'x': rightHalfCenterX - buttonWidth / 2,
+            'y': centerY - buttonHeight / 2,
+            'width': buttonWidth,
+            'height': buttonHeight,
             'rx': 8,
             'ry': 8,
             'fill': 'rgba(33, 150, 243, 0.9)',
@@ -887,9 +897,9 @@ const BoardSVG = (function() {
         });
         buttonGroup.appendChild(buttonBg);
 
-        // Button text
+        // Button text - centered
         const buttonText = createSVGElement('text', {
-            'x': rightSideX + 50,
+            'x': rightHalfCenterX,
             'y': centerY,
             'text-anchor': 'middle',
             'dominant-baseline': 'central',
@@ -941,27 +951,29 @@ const BoardSVG = (function() {
         const dieSize = 44;
         const dieRadius = 6;
 
-        // Position on right side of board (same location as Roll button)
-        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 50;
+        // Calculate center of right half of board (between bar and bear-off area)
+        const rightHalfStart = CONFIG.barX + CONFIG.barWidth;
+        const rightHalfEnd = CONFIG.viewBox.width - CONFIG.margin - CONFIG.bearoffWidth;
+        const rightHalfCenterX = (rightHalfStart + rightHalfEnd) / 2;
         const boardCenterY = CONFIG.viewBox.height / 2;
 
-        // Calculate positions based on number of dice
+        // Calculate positions based on number of dice - centered at rightHalfCenterX
         let positions = [];
         if (numDice === 2) {
-            // Stack vertically on right side
+            // Stack vertically, centered horizontally
             positions = [
-                { x: rightSideX - dieSize / 2, y: boardCenterY - dieSize - 8 },
-                { x: rightSideX - dieSize / 2, y: boardCenterY + 8 }
+                { x: rightHalfCenterX - dieSize / 2, y: boardCenterY - dieSize - 8 },
+                { x: rightHalfCenterX - dieSize / 2, y: boardCenterY + 8 }
             ];
         } else if (numDice === 4) {
-            // 2x2 grid for doubles on right side
+            // 2x2 grid for doubles, centered at rightHalfCenterX
             const offsetX = 24;
             const offsetY = 26;
             positions = [
-                { x: rightSideX - offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
-                { x: rightSideX + offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
-                { x: rightSideX - offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 },
-                { x: rightSideX + offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 }
+                { x: rightHalfCenterX - offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
+                { x: rightHalfCenterX + offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
+                { x: rightHalfCenterX - offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 },
+                { x: rightHalfCenterX + offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 }
             ];
         }
 
