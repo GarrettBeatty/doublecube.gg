@@ -140,43 +140,64 @@ window.addEventListener('load', async () => {
         ? getEffectivePlayerId()
         : getOrCreatePlayerId();
 
-    // Check if URL contains a game ID
-    const urlGameId = getGameIdFromUrl();
-    if (urlGameId) {
-        // Show game page immediately
-        showGamePage();
-
-        // Update placeholder with loading state
-        const boardPlaceholder = document.getElementById('boardPlaceholder');
-        if (boardPlaceholder) {
-            boardPlaceholder.innerHTML = '<div class="loading loading-spinner loading-lg text-primary"></div><p class="mt-4">Connecting to game...</p>';
-        }
-
-        // Connect to server
+    // Check if URL contains a profile username
+    const profileUsername = getProfileUsernameFromUrl();
+    if (profileUsername) {
+        // Show profile page immediately
+        showProfilePage();
+        
+        // Connect to server first
         await autoConnect();
-
+        
         // Wait for connection to be ready
         const isConnected = await waitForConnection();
-
+        
         if (isConnected) {
-            await joinSpecificGame(urlGameId);
+            await loadProfile(profileUsername);
         } else {
             // Connection failed - show error UI
-            if (boardPlaceholder) {
-                boardPlaceholder.innerHTML = `
-                    <div class="alert alert-error max-w-md">
-                        <span>Failed to connect to server</span>
-                    </div>
-                    <div class="flex gap-4 mt-4">
-                        <button class="btn btn-primary" onclick="location.reload()">Retry</button>
-                        <button class="btn btn-ghost" onclick="showLandingPage()">Back to Home</button>
-                    </div>
-                `;
-            }
+            showLandingPage();
+            log('Failed to connect to server', 'error');
         }
     } else {
-        showLandingPage();
-        await autoConnect();
+        // Check if URL contains a game ID
+        const urlGameId = getGameIdFromUrl();
+        if (urlGameId) {
+            // Show game page immediately
+            showGamePage();
+
+            // Update placeholder with loading state
+            const boardPlaceholder = document.getElementById('boardPlaceholder');
+            if (boardPlaceholder) {
+                boardPlaceholder.innerHTML = '<div class="loading loading-spinner loading-lg text-primary"></div><p class="mt-4">Connecting to game...</p>';
+            }
+
+            // Connect to server
+            await autoConnect();
+
+            // Wait for connection to be ready
+            const isConnected = await waitForConnection();
+
+            if (isConnected) {
+                await joinSpecificGame(urlGameId);
+            } else {
+                // Connection failed - show error UI
+                if (boardPlaceholder) {
+                    boardPlaceholder.innerHTML = `
+                        <div class="alert alert-error max-w-md">
+                            <span>Failed to connect to server</span>
+                        </div>
+                        <div class="flex gap-4 mt-4">
+                            <button class="btn btn-primary" onclick="location.reload()">Retry</button>
+                            <button class="btn btn-ghost" onclick="showLandingPage()">Back to Home</button>
+                        </div>
+                    `;
+                }
+            }
+        } else {
+            showLandingPage();
+            await autoConnect();
+        }
     }
 
     // Load friends if authenticated
@@ -288,6 +309,16 @@ window.addEventListener('load', async () => {
 
 // Handle browser back/forward buttons
 window.addEventListener('popstate', (event) => {
+    // Check for profile URL first
+    const profileUsername = getProfileUsernameFromUrl();
+    if (profileUsername) {
+        // User navigated to a profile URL
+        showProfilePage();
+        loadProfile(profileUsername);
+        return;
+    }
+    
+    // Check for game URL
     const gameId = getGameIdFromUrl();
     if (gameId) {
         // User navigated to a game URL
@@ -507,6 +538,7 @@ function setupEventHandlers() {
 function showLandingPage() {
     document.getElementById('landingPage').style.display = 'block';
     document.getElementById('gamePage').style.display = 'none';
+    document.getElementById('profilePage').style.display = 'none';
     setHomeUrl();
     if (gameRefreshInterval) {
         clearInterval(gameRefreshInterval);
@@ -517,6 +549,7 @@ function showLandingPage() {
 function showGamePage() {
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('gamePage').style.display = 'block';
+    document.getElementById('profilePage').style.display = 'none';
 
     if (gameRefreshInterval) {
         clearInterval(gameRefreshInterval);
@@ -571,11 +604,16 @@ async function refreshGamesList() {
                     const waitTime = game.minutesWaiting < 1 ? 'just now' :
                                     game.minutesWaiting === 1 ? '1 min ago' :
                                     `${game.minutesWaiting} mins ago`;
+                    // Make username clickable if we have one
+                    const playerLink = game.playerUsername && game.playerUsername !== 'Computer' 
+                        ? `<a href="/profile/${encodeURIComponent(game.playerUsername)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${game.playerUsername}')">${escapeHtml(game.playerName)}</a>`
+                        : escapeHtml(game.playerName);
+                    
                     html += `
                         <div class="card bg-base-200 shadow-sm hover:shadow-md transition-all border-l-4 border-warning">
                             <div class="card-body p-4 flex-row justify-between items-center">
                                 <div>
-                                    <p class="font-semibold">👤 ${escapeHtml(game.playerName)}</p>
+                                    <p class="font-semibold">👤 ${playerLink}</p>
                                     <p class="text-sm text-base-content/60">Created ${waitTime}</p>
                                 </div>
                                 <button class="btn btn-primary btn-sm" onclick="joinSpecificGame('${game.gameId}')">Join Game</button>
@@ -590,10 +628,19 @@ async function refreshGamesList() {
             if (data.activeGames.length > 0) {
                 html += '<div><h3 class="font-semibold mb-3 text-base-content/80">Games in Progress</h3><div class="space-y-2">';
                 data.activeGames.forEach(game => {
+                    // Make usernames clickable if we have them
+                    const whiteLink = game.whiteUsername && game.whiteUsername !== 'Computer'
+                        ? `<a href="/profile/${encodeURIComponent(game.whiteUsername)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${game.whiteUsername}')">${escapeHtml(game.whitePlayer)}</a>`
+                        : escapeHtml(game.whitePlayer);
+                    
+                    const redLink = game.redUsername && game.redUsername !== 'Computer'
+                        ? `<a href="/profile/${encodeURIComponent(game.redUsername)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${game.redUsername}')">${escapeHtml(game.redPlayer)}</a>`
+                        : escapeHtml(game.redPlayer);
+                    
                     html += `
                         <div class="card bg-base-200 shadow-sm border-l-4 border-success">
                             <div class="card-body p-4">
-                                <p class="font-semibold">⚪ ${escapeHtml(game.whitePlayer)} vs 🔴 ${escapeHtml(game.redPlayer)}</p>
+                                <p class="font-semibold">⚪ ${whiteLink} vs 🔴 ${redLink}</p>
                             </div>
                         </div>
                     `;
@@ -626,11 +673,20 @@ async function refreshMyGames() {
         let html = '';
         myGames.forEach(game => {
             const isAiOpponent = game.opponent === 'Computer';
-            const opponentStatus = game.isFull ? escapeHtml(game.opponent) : 'Waiting for opponent';
             const opponentIcon = isAiOpponent ? '🤖' : '';
             const timeAgo = getTimeAgo(new Date(game.lastActivity));
             const borderColor = game.isMyTurn ? 'border-success' : 'border-info';
             const bgColor = game.isMyTurn ? 'bg-success/10' : 'bg-base-200';
+            
+            // Make opponent name clickable if we have username and it's not AI
+            let opponentStatus;
+            if (!game.isFull) {
+                opponentStatus = 'Waiting for opponent';
+            } else if (game.opponentUsername && !isAiOpponent) {
+                opponentStatus = `<a href="/profile/${encodeURIComponent(game.opponentUsername)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${game.opponentUsername}')">${escapeHtml(game.opponent)}</a>`;
+            } else {
+                opponentStatus = escapeHtml(game.opponent);
+            }
 
             html += `
                 <div class="card ${bgColor} shadow-sm hover:shadow-md transition-all border-l-4 ${borderColor} ${game.isMyTurn ? 'animate-pulse' : ''}">
@@ -1070,6 +1126,16 @@ function clearLog() {
     if (logEl) logEl.innerHTML = '';
 }
 
+// ==== HELPER FUNCTIONS ====
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // ==== PIP COUNT CALCULATION ====
 function calculatePipCount(state, color) {
     if (!state || !state.board) return 0;
@@ -1248,7 +1314,14 @@ function updateGameState(state, isSpectator = false) {
     if (whiteNameEl) {
         const isYou = state.yourColor === 0; // White = 0
         const name = state.whitePlayerName || state.WhitePlayerName || 'White Player';
-        whiteNameEl.textContent = name + (isYou ? ' (You)' : '');
+        const username = state.whiteUsername || state.WhiteUsername || '';
+        
+        // Make username clickable if it's not "Computer" and we have a username
+        if (username && username !== 'Computer') {
+            whiteNameEl.innerHTML = `<a href="/profile/${encodeURIComponent(username)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${username}')">${escapeHtml(name)}</a>${isYou ? ' (You)' : ''}`;
+        } else {
+            whiteNameEl.textContent = name + (isYou ? ' (You)' : '');
+        }
     }
     if (whiteIdEl) {
         const whiteId = state.whitePlayerId || state.WhitePlayerId || '-';
@@ -1258,7 +1331,14 @@ function updateGameState(state, isSpectator = false) {
     if (redNameEl) {
         const isYou = state.yourColor === 1; // Red = 1
         const name = state.redPlayerName || state.RedPlayerName || 'Red Player';
-        redNameEl.textContent = name + (isYou ? ' (You)' : '');
+        const username = state.redUsername || state.RedUsername || '';
+        
+        // Make username clickable if it's not "Computer" and we have a username
+        if (username && username !== 'Computer') {
+            redNameEl.innerHTML = `<a href="/profile/${encodeURIComponent(username)}" class="link link-hover" onclick="event.preventDefault(); navigateToProfile('${username}')">${escapeHtml(name)}</a>${isYou ? ' (You)' : ''}`;
+        } else {
+            redNameEl.textContent = name + (isYou ? ' (You)' : '');
+        }
     }
     if (redIdEl) {
         const redId = state.redPlayerId || state.RedPlayerId || '-';

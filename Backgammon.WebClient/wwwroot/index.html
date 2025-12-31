@@ -196,6 +196,156 @@
         </div>
     </div>
 
+    <!-- Profile Page -->
+    <div id="profilePage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body">
+                    <!-- Profile Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-4">
+                            <div class="avatar placeholder">
+                                <div class="bg-neutral text-neutral-content rounded-full w-24">
+                                    <span class="text-3xl" id="profileAvatar">?</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold" id="profileDisplayName">Loading...</h1>
+                                <p class="text-base-content/60">@<span id="profileUsername">...</span></p>
+                                <p class="text-sm text-base-content/50">Member since <span id="profileJoinDate">...</span></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2" id="profileActions">
+                            <!-- Actions will be added dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Privacy Notice -->
+                    <div id="profilePrivacyNotice" class="alert alert-warning mb-6" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <span>This profile is private. Only limited information is visible.</span>
+                    </div>
+
+                    <!-- Stats Section -->
+                    <div id="profileStats" class="stats shadow mb-6">
+                        <div class="stat">
+                            <div class="stat-figure text-primary">
+                                🎮
+                            </div>
+                            <div class="stat-title">Total Games</div>
+                            <div class="stat-value" id="statTotalGames">-</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-success">
+                                🏆
+                            </div>
+                            <div class="stat-title">Wins</div>
+                            <div class="stat-value text-success" id="statWins">-</div>
+                            <div class="stat-desc">Win rate: <span id="statWinRate">-</span>%</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-error">
+                                ❌
+                            </div>
+                            <div class="stat-title">Losses</div>
+                            <div class="stat-value text-error" id="statLosses">-</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-warning">
+                                🔥
+                            </div>
+                            <div class="stat-title">Best Streak</div>
+                            <div class="stat-value" id="statBestStreak">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs tabs-boxed mb-6">
+                        <a class="tab tab-active" onclick="showProfileTab('games')" id="tabGames">Recent Games</a>
+                        <a class="tab" onclick="showProfileTab('friends')" id="tabFriends">Friends</a>
+                        <a class="tab" onclick="showProfileTab('stats')" id="tabStats">Detailed Stats</a>
+                        <a class="tab" onclick="showProfileTab('settings')" id="tabSettings" style="display: none;">Settings</a>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div id="profileTabContent">
+                        <!-- Recent Games Tab -->
+                        <div id="tabContentGames" class="space-y-2">
+                            <div class="text-center py-8">
+                                <span class="loading loading-spinner loading-lg"></span>
+                            </div>
+                        </div>
+
+                        <!-- Friends Tab -->
+                        <div id="tabContentFriends" class="space-y-2" style="display: none;">
+                            <div class="text-center py-8">
+                                <span class="loading loading-spinner loading-lg"></span>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Stats Tab -->
+                        <div id="tabContentStats" class="space-y-4" style="display: none;">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Normal Wins</div>
+                                    <div class="stat-value text-lg" id="statNormalWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Gammons</div>
+                                    <div class="stat-value text-lg" id="statGammonWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Backgammons</div>
+                                    <div class="stat-value text-lg" id="statBackgammonWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Total Stakes Won</div>
+                                    <div class="stat-value text-lg" id="statTotalStakes">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Settings Tab (only for own profile) -->
+                        <div id="tabContentSettings" class="space-y-4" style="display: none;">
+                            <h3 class="text-lg font-bold">Privacy Settings</h3>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Profile Visibility</span>
+                                </label>
+                                <select id="settingProfilePrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public - Anyone can view</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private - Hidden from everyone</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Game History Visibility</span>
+                                </label>
+                                <select id="settingGameHistoryPrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Friends List Visibility</span>
+                                </label>
+                                <select id="settingFriendsListPrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary mt-4" onclick="saveProfileSettings()">Save Privacy Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Login Modal -->
     <dialog id="loginModal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box">
@@ -471,5 +621,6 @@
     <script src="/board-svg.js"></script>
     <script src="/audio.js"></script>
     <script src="/game.js"></script>
+    <script src="/profile.js"></script>
 </body>
 </html>

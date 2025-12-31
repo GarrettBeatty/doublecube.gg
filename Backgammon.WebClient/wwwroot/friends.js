@@ -205,8 +205,8 @@ function renderFriendsList() {
                     </div>
                 </div>
                 <div>
-                    <p class="font-semibold text-sm">${escapeHtml(friend.displayName)}</p>
-                    <p class="text-xs text-base-content/60">@${escapeHtml(friend.username)}</p>
+                    <p class="font-semibold text-sm" style="cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" onclick="navigateToProfile('${escapeHtml(friend.username)}')">${escapeHtml(friend.displayName)}</p>
+                    <p class="text-xs text-base-content/60" style="cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" onclick="navigateToProfile('${escapeHtml(friend.username)}')">@${escapeHtml(friend.username)}</p>
                 </div>
             </div>
             <div class="flex gap-2">
@@ -244,7 +244,7 @@ function renderFriendRequests() {
             <div class="space-y-2">
                 ${pendingRequests.map(req => `
                     <div class="flex items-center justify-between p-3 bg-primary/10 rounded-lg border-l-4 border-primary">
-                        <span class="font-semibold">${escapeHtml(req.displayName)}</span>
+                        <span class="font-semibold" style="cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" onclick="navigateToProfile('${escapeHtml(req.username)}')">${escapeHtml(req.displayName)}</span>
                         <div class="flex gap-2">
                             <button onclick="acceptFriendRequest('${req.userId}')" class="btn btn-success btn-xs">Accept</button>
                             <button onclick="declineFriendRequest('${req.userId}')" class="btn btn-ghost btn-xs">Decline</button>
@@ -284,8 +284,8 @@ function renderSearchResults() {
     container.innerHTML = '<div class="space-y-2 mb-4">' + filteredResults.map(user => `
         <div class="flex items-center justify-between p-3 bg-base-200 rounded-lg">
             <div>
-                <p class="font-semibold text-sm">${escapeHtml(user.displayName)}</p>
-                <p class="text-xs text-base-content/60">@${escapeHtml(user.username)}</p>
+                <p class="font-semibold text-sm" style="cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" onclick="navigateToProfile('${escapeHtml(user.username)}')">${escapeHtml(user.displayName)}</p>
+                <p class="text-xs text-base-content/60" style="cursor: pointer;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'" onclick="navigateToProfile('${escapeHtml(user.username)}')">@${escapeHtml(user.username)}</p>
             </div>
             <button onclick="sendFriendRequest('${user.userId}')" class="btn btn-success btn-xs">
                 Add Friend
