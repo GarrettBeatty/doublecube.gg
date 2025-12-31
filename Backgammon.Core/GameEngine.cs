@@ -90,6 +90,10 @@ public class GameEngine
         if (!IsValidMove(move))
             return false;
 
+        // Capture state BEFORE executing (for undo)
+        move.OpponentCheckersOnBarBefore = GetOpponent().CheckersOnBar;
+        move.CurrentPlayerBornOffBefore = CurrentPlayer.CheckersBornOff;
+
         // Handle entering from bar
         if (move.From == 0)
         {
@@ -312,6 +316,67 @@ public class GameEngine
         MoveHistory.Clear();
         Dice.SetDice(0, 0); // Clear dice for next player
         CurrentPlayer = GetOpponent();
+    }
+
+    /// <summary>
+    /// Undo the last move made during the current turn.
+    /// Returns true if undo succeeded, false if no moves to undo.
+    /// </summary>
+    public bool UndoLastMove()
+    {
+        if (MoveHistory.Count == 0)
+            return false;
+
+        var move = MoveHistory[^1]; // Get last move
+        MoveHistory.RemoveAt(MoveHistory.Count - 1);
+
+        // Reverse the move based on type
+        if (move.From == 0)
+        {
+            // Was entering from bar - reverse it
+            var destPoint = Board.GetPoint(move.To);
+            destPoint.RemoveChecker();
+            CurrentPlayer.CheckersOnBar++;
+
+            // If we hit opponent, restore their checker
+            if (move.IsHit)
+            {
+                var opponent = GetOpponent();
+                destPoint.AddChecker(opponent.Color);
+                opponent.CheckersOnBar = move.OpponentCheckersOnBarBefore;
+            }
+        }
+        else if (move.IsBearOff)
+        {
+            // Was bearing off - reverse it
+            var fromPoint = Board.GetPoint(move.From);
+            fromPoint.AddChecker(CurrentPlayer.Color);
+            CurrentPlayer.CheckersBornOff = move.CurrentPlayerBornOffBefore;
+        }
+        else
+        {
+            // Normal move - reverse it
+            var fromPoint = Board.GetPoint(move.From);
+            var toPoint = Board.GetPoint(move.To);
+
+            toPoint.RemoveChecker();
+            fromPoint.AddChecker(CurrentPlayer.Color);
+
+            // If we hit opponent, restore their checker
+            if (move.IsHit)
+            {
+                var opponent = GetOpponent();
+                toPoint.AddChecker(opponent.Color);
+                opponent.CheckersOnBar = move.OpponentCheckersOnBarBefore;
+            }
+        }
+
+        // Restore die value to remaining moves
+        RemainingMoves.Add(move.DieValue);
+        RemainingMoves.Sort();
+        RemainingMoves.Reverse(); // Keep largest first
+
+        return true;
     }
 
     /// <summary>

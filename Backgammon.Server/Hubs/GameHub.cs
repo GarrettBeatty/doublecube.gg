@@ -646,6 +646,73 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Undo the last move made during the current turn
+    /// </summary>
+    public async Task UndoLastMove()
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            if (!session.IsPlayerTurn(Context.ConnectionId))
+            {
+                await Clients.Caller.SendAsync("Error", "Not your turn");
+                return;
+            }
+
+            if (session.Engine.MoveHistory.Count == 0)
+            {
+                await Clients.Caller.SendAsync("Error", "No moves to undo");
+                return;
+            }
+
+            // Perform undo
+            if (!session.Engine.UndoLastMove())
+            {
+                await Clients.Caller.SendAsync("Error", "Failed to undo move");
+                return;
+            }
+
+            session.UpdateActivity();
+
+            // Send updated state to both players
+            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+            {
+                var whiteState = session.GetState(session.WhiteConnectionId);
+                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+            }
+            if (!string.IsNullOrEmpty(session.RedConnectionId))
+            {
+                var redState = session.GetState(session.RedConnectionId);
+                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            }
+
+            // Send updates to spectators
+            var spectatorState = session.GetState(null);
+            foreach (var spectatorId in session.SpectatorConnections)
+            {
+                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
+            }
+
+            // Save updated game state
+            await SaveGameStateAsync(session);
+
+            _logger.LogInformation("Player {ConnectionId} undid last move in game {GameId}",
+                Context.ConnectionId, session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error undoing move");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Offer to double the stakes to the opponent
     /// </summary>
     public async Task OfferDouble()

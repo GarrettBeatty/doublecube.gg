@@ -5,9 +5,6 @@ namespace Backgammon.ConsoleApp;
 
 class Program
 {
-    // Track moves made during current turn for undo functionality
-    private static Stack<MoveRecord> _moveHistory = new Stack<MoveRecord>();
-    
     static void Main(string[] args)
     {
         AnsiConsole.Clear();
@@ -42,9 +39,6 @@ class Program
             
             if (game.RemainingMoves.Count == 0)
             {
-                // Clear move history at start of new turn
-                _moveHistory.Clear();
-                
                 AnsiConsole.MarkupLine("[grey]Press Enter to roll dice...[/]");
                 Console.ReadLine();
                 game.RollDice();
@@ -72,14 +66,14 @@ class Program
             }
             
             int menuOffset = validMoves.Count + 1;
-            
+
             // Add undo option if there are moves to undo
-            if (_moveHistory.Count > 0)
+            if (game.MoveHistory.Count > 0)
             {
                 AnsiConsole.MarkupLine($"[yellow]{menuOffset}. Undo last move[/]");
                 menuOffset++;
             }
-            
+
             AnsiConsole.MarkupLine($"[grey]{menuOffset}. End turn[/]");
 
             // Get player choice
@@ -96,30 +90,20 @@ class Program
             if (choice2 == menuOffset)
             {
                 game.EndTurn();
-                _moveHistory.Clear();
             }
             // Check if user chose to undo
-            else if (_moveHistory.Count > 0 && choice2 == validMoves.Count + 1)
+            else if (game.MoveHistory.Count > 0 && choice2 == validMoves.Count + 1)
             {
-                UndoLastMove(game);
-                AnsiConsole.MarkupLine("[yellow]⬅️  Move undone[/]");
+                if (game.UndoLastMove())
+                {
+                    AnsiConsole.MarkupLine("[yellow]⬅️  Move undone[/]");
+                }
             }
             // Execute the selected move
             else
             {
                 var move = validMoves[choice2 - 1];
-                
-                // Save board state before executing move
-                var moveRecord = new MoveRecord
-                {
-                    Move = move,
-                    OpponentCheckersOnBar = game.GetOpponent().CheckersOnBar,
-                    CurrentPlayerBornOff = game.CurrentPlayer.CheckersBornOff
-                };
-                
                 game.ExecuteMove(move);
-                _moveHistory.Push(moveRecord);
-                
                 AnsiConsole.MarkupLine($"[green]✓ Executed: {move.ToString().EscapeMarkup()}[/]");
                 
                 if (move.IsHit)
@@ -261,65 +245,4 @@ class Program
         
         return "   ";
     }
-    
-    static void UndoLastMove(GameEngine game)
-    {
-        if (_moveHistory.Count == 0)
-            return;
-            
-        var record = _moveHistory.Pop();
-        var move = record.Move;
-        
-        // Reverse the move based on type
-        if (move.From == 0)
-        {
-            // Was entering from bar - reverse it
-            var destPoint = game.Board.GetPoint(move.To);
-            destPoint.RemoveChecker();
-            game.CurrentPlayer.CheckersOnBar++;
-            
-            // If we hit an opponent, restore their checker
-            if (move.IsHit)
-            {
-                destPoint.AddChecker(game.GetOpponent().Color);
-                game.GetOpponent().CheckersOnBar--;
-            }
-        }
-        else if (move.IsBearOff)
-        {
-            // Was bearing off - reverse it
-            var fromPoint = game.Board.GetPoint(move.From);
-            fromPoint.AddChecker(game.CurrentPlayer.Color);
-            game.CurrentPlayer.CheckersBornOff--;
-        }
-        else
-        {
-            // Normal move - reverse it
-            var fromPoint = game.Board.GetPoint(move.From);
-            var toPoint = game.Board.GetPoint(move.To);
-            
-            toPoint.RemoveChecker();
-            fromPoint.AddChecker(game.CurrentPlayer.Color);
-            
-            // If we hit an opponent, restore their checker
-            if (move.IsHit)
-            {
-                toPoint.AddChecker(game.GetOpponent().Color);
-                game.GetOpponent().CheckersOnBar--;
-            }
-        }
-        
-        // Restore the die value to remaining moves
-        game.RemainingMoves.Add(move.DieValue);
-        game.RemainingMoves.Sort();
-        game.RemainingMoves.Reverse();
-    }
-}
-
-// Helper class to track move state for undo
-class MoveRecord
-{
-    public Move Move { get; set; } = null!;
-    public int OpponentCheckersOnBar { get; set; }
-    public int CurrentPlayerBornOff { get; set; }
 }

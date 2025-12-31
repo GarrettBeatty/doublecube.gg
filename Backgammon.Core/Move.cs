@@ -26,6 +26,16 @@ public class Move
     public bool IsHit { get; set; }
 
     /// <summary>
+    /// Opponent's checkers on bar before this move (for undo)
+    /// </summary>
+    public int OpponentCheckersOnBarBefore { get; set; }
+
+    /// <summary>
+    /// Current player's checkers born off before this move (for undo)
+    /// </summary>
+    public int CurrentPlayerBornOffBefore { get; set; }
+
+    /// <summary>
     /// Whether this is a bear-off move
     /// </summary>
     public bool IsBearOff => To == 0 || To == 25;

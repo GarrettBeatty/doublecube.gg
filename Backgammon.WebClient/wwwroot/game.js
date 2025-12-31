@@ -219,6 +219,19 @@ window.addEventListener('load', async () => {
             }
         });
     }
+    // Add Undo button handler
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', async () => {
+            debug('Undo button clicked', { disabled: undoBtn.disabled }, 'trace');
+            undoBtn.disabled = true;
+            try {
+                await undoLastMove();
+            } finally {
+                setTimeout(() => updateControls(currentGameState), 100);
+            }
+        });
+    }
     // Add Double button handler
     const doubleBtn = document.getElementById('doubleBtn');
     if (doubleBtn) {
@@ -796,6 +809,16 @@ async function endTurn() {
     }
 }
 
+async function undoLastMove() {
+    try {
+        await connection.invoke("UndoLastMove");
+        debug('Undo move invoked successfully', null, 'success');
+    } catch (err) {
+        debug('Failed to undo move', err, 'error');
+        showError(err.toString());
+    }
+}
+
 // ==== ABANDON GAME ====
 function showAbandonConfirm() {
     const isWaitingForPlayer = currentGameState && currentGameState.status === 0; // GameStatus.WaitingForPlayer = 0
@@ -1252,6 +1275,14 @@ function updateGameState(state, isSpectator = false) {
         const noValidMoves = validMoves.length === 0;
         const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
         endTurnBtn.disabled = !canEndTurn;
+    }
+
+    // Update Undo button
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        const hasMoves = movesMade > 0;
+        const canUndo = isMyTurn && hasMoves;
+        undoBtn.disabled = !canUndo;
     }
 
     const doubleBtn = document.getElementById('doubleBtn');

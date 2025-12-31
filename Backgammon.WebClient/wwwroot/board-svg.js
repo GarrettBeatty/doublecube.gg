@@ -661,7 +661,7 @@ const BoardSVG = (function() {
                 const isTopBarChecker = i === maxVisible - 1;
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 - 100 - (i * 50) // Moved further up to avoid dice
+                    y: CONFIG.viewBox.height / 2 - 200 - (i * 50) // Moved further up to avoid doubling cube
                 };
                 const checker = createSVGElement('circle', {
                     'class': `checker checker-red ${isSelected ? 'selected' : ''} ${isTopBarChecker && isBarDraggable ? 'draggable' : ''}`.trim(),
@@ -692,7 +692,7 @@ const BoardSVG = (function() {
             if (gameState.redCheckersOnBar > 2) {
                 const pos = {
                     x: CONFIG.barX + CONFIG.barWidth / 2,
-                    y: CONFIG.viewBox.height / 2 - 100
+                    y: CONFIG.viewBox.height / 2 - 200
                 };
                 const text = createSVGElement('text', {
                     'class': 'checker-count count-light',
@@ -859,20 +859,13 @@ const BoardSVG = (function() {
         diceGroup.appendChild(buttonGroup);
     }
 
-    // Render End Turn (Confirm) button on right side of board
-    function renderEndTurnButton(gameState) {
-        if (!diceGroup) return;
-
-        // Clear existing content
-        diceGroup.innerHTML = '';
-
-        if (!gameState) return;
-
+    // Helper function to create End Turn button group (without clearing diceGroup)
+    function createEndTurnButtonGroup(yOffset = 0) {
         // Calculate center of right half of board (between bar and bear-off area)
         const rightHalfStart = CONFIG.barX + CONFIG.barWidth;
         const rightHalfEnd = CONFIG.viewBox.width - CONFIG.margin - CONFIG.bearoffWidth;
         const rightHalfCenterX = (rightHalfStart + rightHalfEnd) / 2;
-        const centerY = CONFIG.viewBox.height / 2;
+        const centerY = CONFIG.viewBox.height / 2 + yOffset;
 
         // Create button group
         const buttonGroup = createSVGElement('g', {
@@ -926,6 +919,87 @@ const BoardSVG = (function() {
         });
         buttonGroup.addEventListener('mouseleave', () => {
             buttonBg.setAttribute('fill', 'rgba(33, 150, 243, 0.9)');
+        });
+
+        return buttonGroup;
+    }
+
+    // Render End Turn (Confirm) button on right side of board
+    function renderEndTurnButton(gameState) {
+        if (!diceGroup) return;
+
+        // Clear existing content
+        diceGroup.innerHTML = '';
+
+        if (!gameState) return;
+
+        const buttonGroup = createEndTurnButtonGroup();
+        diceGroup.appendChild(buttonGroup);
+    }
+
+    // Render Undo button on left side of board in the center
+    function renderUndoButton(gameState) {
+        if (!diceGroup) return;
+
+        // Only show if moves have been made this turn
+        if (!gameState || gameState.movesMadeThisTurn === 0) return;
+
+        // Calculate center of left half of board (between bear-off area and bar)
+        const leftHalfStart = CONFIG.margin + CONFIG.bearoffWidth;
+        const leftHalfEnd = CONFIG.barX;
+        const leftHalfCenterX = (leftHalfStart + leftHalfEnd) / 2;
+        const centerY = CONFIG.viewBox.height / 2;
+
+        const buttonGroup = createSVGElement('g', {
+            'class': 'undo-button',
+            'style': 'cursor: pointer;'
+        });
+
+        const buttonWidth = 100;
+        const buttonHeight = 50;
+
+        // Button background (yellow/warning color)
+        const buttonBg = createSVGElement('rect', {
+            'x': leftHalfCenterX - buttonWidth / 2,
+            'y': centerY - buttonHeight / 2,
+            'width': buttonWidth,
+            'height': buttonHeight,
+            'rx': 8,
+            'ry': 8,
+            'fill': 'rgba(245, 158, 11, 0.9)', // Yellow
+            'stroke': 'rgba(255, 255, 255, 0.3)',
+            'stroke-width': 2
+        });
+        buttonGroup.appendChild(buttonBg);
+
+        // Button text
+        const buttonText = createSVGElement('text', {
+            'x': leftHalfCenterX,
+            'y': centerY,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'central',
+            'fill': '#ffffff',
+            'font-size': '16',
+            'font-weight': 'bold',
+            'pointer-events': 'none'
+        });
+        buttonText.textContent = '↶ Undo';
+        buttonGroup.appendChild(buttonText);
+
+        // Click handler
+        buttonGroup.addEventListener('click', () => {
+            const undoBtn = document.getElementById('undoBtn');
+            if (undoBtn && !undoBtn.disabled) {
+                undoBtn.click();
+            }
+        });
+
+        // Hover effect
+        buttonGroup.addEventListener('mouseenter', () => {
+            buttonBg.setAttribute('fill', 'rgba(245, 158, 11, 1)');
+        });
+        buttonGroup.addEventListener('mouseleave', () => {
+            buttonBg.setAttribute('fill', 'rgba(245, 158, 11, 0.9)');
         });
 
         diceGroup.appendChild(buttonGroup);
@@ -1277,18 +1351,43 @@ const BoardSVG = (function() {
         // Only show controls on player's turn
         if (isPlayerTurn && !isWaitingForPlayer) {
             console.log('[BoardSVG] Player turn and game started');
+
+            // Check if there are valid moves available
+            const validMoves = gameState.validMoves || [];
+            const noValidMoves = validMoves.length === 0;
+
             if (!hasRolledDice) {
                 // Show Roll button when dice haven't been rolled yet
                 console.log('[BoardSVG] Should show Roll button');
                 renderRollButton(gameState);
+            } else if (hasRolledDice && hasRemainingMoves && noValidMoves) {
+                // Show greyed-out dice and End Turn button when no valid moves exist
+                console.log('[BoardSVG] Should show greyed Dice and End Turn button (no valid moves)');
+                console.log('[BoardSVG] diceState:', diceState);
+                console.log('[BoardSVG] validMoves:', validMoves);
+                // Show dice greyed out by passing empty remaining moves
+                const greyedDiceState = {
+                    dice: diceState.dice,
+                    remainingMoves: [] // Empty to grey out all dice
+                };
+                renderDice(greyedDiceState);
+                // Add End Turn button below the dice
+                const buttonGroup = createEndTurnButtonGroup(80); // Offset down by 80px
+                diceGroup.appendChild(buttonGroup);
+                // Add undo button if moves have been made
+                renderUndoButton(gameState);
             } else if (hasRolledDice && hasRemainingMoves) {
                 // Show Dice when rolled and still have moves to make
                 console.log('[BoardSVG] Should show Dice (with remaining moves)');
                 renderDice(diceState);
+                // Add undo button if moves have been made
+                renderUndoButton(gameState);
             } else if (hasRolledDice && !hasRemainingMoves) {
                 // Show End Turn button when all moves are used
                 console.log('[BoardSVG] Should show End Turn button');
                 renderEndTurnButton(gameState);
+                // Add undo button if moves have been made
+                renderUndoButton(gameState);
             }
         } else if (hasRolledDice) {
             // Show opponent's dice (but no button controls)
@@ -1296,6 +1395,10 @@ const BoardSVG = (function() {
             renderDice(diceState);
         } else {
             console.log('[BoardSVG] No controls shown - waiting or not player turn');
+            // Clear any lingering buttons (e.g., confirm button from previous turn)
+            if (diceGroup) {
+                diceGroup.innerHTML = '';
+            }
         }
 
         renderPointNumbers(); // Add point numbers
@@ -1335,8 +1438,15 @@ const BoardSVG = (function() {
         const scaleX = CONFIG.viewBox.width / effectiveWidth;
         const scaleY = CONFIG.viewBox.height / effectiveHeight;
 
-        const x = (clientX - rect.left - offsetX) * scaleX;
-        const y = (clientY - rect.top - offsetY) * scaleY;
+        let x = (clientX - rect.left - offsetX) * scaleX;
+        let y = (clientY - rect.top - offsetY) * scaleY;
+
+        // Account for board flip - invert coordinates if flipped
+        if (svgElement.classList.contains('flipped')) {
+            x = CONFIG.viewBox.width - x;
+            y = CONFIG.viewBox.height - y;
+        }
+
         console.log(`Click at client (${clientX}, ${clientY}), SVG coords (${x.toFixed(1)}, ${y.toFixed(1)})`);
         console.log(`  rect: left=${rect.left.toFixed(1)}, top=${rect.top.toFixed(1)}, width=${rect.width.toFixed(1)}, height=${rect.height.toFixed(1)}`);
         console.log(`  effective: width=${effectiveWidth.toFixed(1)}, height=${effectiveHeight.toFixed(1)}, offset=(${offsetX.toFixed(1)}, ${offsetY.toFixed(1)})`);
