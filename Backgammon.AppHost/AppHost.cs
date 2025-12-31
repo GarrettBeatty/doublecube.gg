@@ -12,7 +12,7 @@ var apiService = builder.AddProject<Projects.Backgammon_Server>("backgammon-api"
 
 // Blazor WebAssembly frontend - gets API URL via service discovery
 builder.AddProject<Projects.Backgammon_WebClient>("backgammon-webclient")
-    .WithExternalHttpEndpoints()  // Make it accessible from browser
+    .WithExternalHttpEndpoints() // Make it accessible from browser
     .WithReference(apiService)
     .WaitFor(apiService);
 
