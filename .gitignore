@@ -62,3 +62,31 @@ artifacts/
 
 # DynamoDB Local data
 dynamodb-data/
+
+# Secrets and sensitive files
+*.env
+*.env.local
+*.env.production
+*.env.development
+.env.*
+secrets.json
+appsettings.Secrets.json
+*.secrets.json
+*.key
+*.pem
+*.pfx
+*.p12
+*.cer
+*.crt
+*_rsa
+*_dsa
+*_ecdsa
+*_ed25519
+
+# AWS credentials
+.aws/
+aws-credentials.json
+
+# Local configuration overrides
+appsettings.Local.json
+local-config.json
