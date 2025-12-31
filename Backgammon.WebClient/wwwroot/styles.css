@@ -444,11 +444,11 @@ body.spectator-mode .board-point {
 
 /* Board background */
 .board-background {
-    fill: #5d4e37;
+    fill: var(--theme-board-background, #5d4e37);
 }
 
 .board-border {
-    stroke: #4a7c4e;
+    stroke: var(--theme-board-border, #4a7c4e);
     stroke-width: 8;
 }
 
@@ -458,11 +458,11 @@ body.spectator-mode .board-point {
 }
 
 .point-triangle.point-light {
-    fill: #D4C4B0;
+    fill: var(--theme-point-light, #D4C4B0);
 }
 
 .point-triangle.point-dark {
-    fill: #8B7355;
+    fill: var(--theme-point-dark, #8B7355);
 }
 
 .point:hover .point-triangle {
@@ -478,41 +478,41 @@ body.spectator-mode .board-point {
 }
 
 .point.valid-source .point-highlight {
-    fill: rgba(255, 213, 79, 0.5);
+    fill: var(--theme-highlight-source, rgba(255, 213, 79, 0.5));
     opacity: 1;
 }
 
 .point.selected .point-highlight {
-    fill: rgba(76, 175, 80, 0.6);
+    fill: var(--theme-highlight-selected, rgba(76, 175, 80, 0.6));
     opacity: 1;
 }
 
 .point.valid-destination .point-highlight {
-    fill: rgba(33, 150, 243, 0.5);
+    fill: var(--theme-highlight-dest, rgba(33, 150, 243, 0.5));
     opacity: 1;
 }
 
 .point.valid-destination.capture .point-highlight {
-    fill: rgba(244, 67, 54, 0.5);
+    fill: var(--theme-highlight-capture, rgba(244, 67, 54, 0.5));
     opacity: 1;
 }
 
 /* Bar styling */
 .bar-background {
-    fill: #3D2E22;
+    fill: var(--theme-bar, #3D2E22);
 }
 
 #bar.valid-source .bar-background {
-    fill: rgba(255, 213, 79, 0.4);
+    fill: var(--theme-highlight-source, rgba(255, 213, 79, 0.4));
 }
 
 #bar.selected .bar-background {
-    fill: rgba(76, 175, 80, 0.5);
+    fill: var(--theme-highlight-selected, rgba(76, 175, 80, 0.5));
 }
 
 /* Bear-off styling */
 .bearoff-background {
-    fill: #3D2E22;
+    fill: var(--theme-bearoff, #3D2E22);
 }
 
 .bearoff-divider {
@@ -521,7 +521,7 @@ body.spectator-mode .board-point {
 }
 
 #bearoff.valid-destination .bearoff-background {
-    fill: rgba(33, 150, 243, 0.4);
+    fill: var(--theme-highlight-dest, rgba(33, 150, 243, 0.4));
 }
 
 /* Checker styling - flat modern design */
@@ -531,14 +531,14 @@ body.spectator-mode .board-point {
 }
 
 .checker-white {
-    fill: #F5F5F5;
-    stroke: #BDBDBD;
+    fill: var(--theme-checker-white, #F5F5F5);
+    stroke: var(--theme-checker-white-stroke, #BDBDBD);
     stroke-width: 2;
 }
 
 .checker-red {
-    fill: #D32F2F;
-    stroke: #B71C1C;
+    fill: var(--theme-checker-red, #D32F2F);
+    stroke: var(--theme-checker-red-stroke, #B71C1C);
     stroke-width: 2;
 }
 
@@ -621,8 +621,8 @@ body.spectator-mode .board-point {
 }
 
 .die-face {
-    fill: #FFFFFF;
-    stroke: #5C6BC0;
+    fill: var(--theme-dice-background, #FFFFFF);
+    stroke: var(--theme-dice-border, #5C6BC0);
     stroke-width: 3;
     filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
     transition: fill 0.3s ease, stroke 0.3s ease, opacity 0.3s ease;
@@ -632,7 +632,7 @@ body.spectator-mode .board-point {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 24px;
     font-weight: 700;
-    fill: #5C6BC0;
+    fill: var(--theme-dice-text, #5C6BC0);
     transition: fill 0.3s ease;
 }
 
@@ -642,12 +642,12 @@ body.spectator-mode .board-point {
 }
 
 .board-die.used .die-face {
-    fill: #E0E0E0;
-    stroke: #9E9E9E;
+    fill: var(--theme-dice-used-background, #E0E0E0);
+    stroke: var(--theme-dice-used-border, #9E9E9E);
 }
 
 .board-die.used .die-value {
-    fill: #757575;
+    fill: var(--theme-dice-used-text, #757575);
 }
 
 /* ===== CUBE SIDEBAR ===== */
@@ -659,8 +659,8 @@ body.spectator-mode .board-point {
 
 /* ===== DOUBLING CUBE ===== */
 .doubling-cube {
-    fill: #3D3D3D;
-    stroke: #FFD700;
+    fill: var(--theme-cube-background, #3D3D3D);
+    stroke: var(--theme-cube-border, #FFD700);
     stroke-width: 3;
     transition: all 0.3s ease;
     filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
@@ -674,14 +674,14 @@ body.spectator-mode .board-point {
 .cube-value {
     font-size: 36px;
     font-weight: bold;
-    fill: #FFD700;
+    fill: var(--theme-cube-text, #FFD700);
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     pointer-events: none;
 }
 
 .cube-owner {
     font-size: 11px;
-    fill: #FFD700;
+    fill: var(--theme-cube-text, #FFD700);
     opacity: 0.8;
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
     pointer-events: none;

@@ -24,27 +24,44 @@ const BoardSVG = (function() {
     // Calculate bar X position (after sidebar + 6 points + margin)
     CONFIG.barX = CONFIG.boardStartX + (6 * CONFIG.pointWidth);
 
-    // Color palette - Match Backgammon Galaxy style
+    // Color palette - Uses CSS variables from theme system
     const COLORS = {
-        boardBackground: '#5d4e37',
-        boardBorder: '#4a7c4e',
-        pointLight: '#d4b896',
-        pointDark: '#6b5a47',
-        bar: '#3d3024',
-        bearoff: '#3d3024',
+        get boardBackground() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-board-background') || '#5d4e37'; },
+        get boardBorder() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-board-border') || '#4a7c4e'; },
+        get pointLight() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-point-light') || '#d4b896'; },
+        get pointDark() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-point-dark') || '#6b5a47'; },
+        get bar() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-bar') || '#3d3024'; },
+        get bearoff() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-bearoff') || '#3d3024'; },
 
-        checkerWhite: '#F5F5F5',
-        checkerWhiteStroke: '#BDBDBD',
-        checkerRed: '#D32F2F',
-        checkerRedStroke: '#B71C1C',
+        get checkerWhite() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-checker-white') || '#F5F5F5'; },
+        get checkerWhiteStroke() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-checker-white-stroke') || '#BDBDBD'; },
+        get checkerRed() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-checker-red') || '#D32F2F'; },
+        get checkerRedStroke() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-checker-red-stroke') || '#B71C1C'; },
 
-        highlightSource: 'rgba(255, 213, 79, 0.6)',
-        highlightSelected: 'rgba(76, 175, 80, 0.7)',
-        highlightDest: 'rgba(33, 150, 243, 0.6)',
-        highlightCapture: 'rgba(244, 67, 54, 0.6)',
+        get highlightSource() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-highlight-source') || 'rgba(255, 213, 79, 0.6)'; },
+        get highlightSelected() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-highlight-selected') || 'rgba(76, 175, 80, 0.7)'; },
+        get highlightDest() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-highlight-dest') || 'rgba(33, 150, 243, 0.6)'; },
+        get highlightCapture() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-highlight-capture') || 'rgba(244, 67, 54, 0.6)'; },
 
-        textLight: 'rgba(255, 255, 255, 0.5)',
-        textDark: 'rgba(0, 0, 0, 0.7)'
+        get textLight() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-text-light') || 'rgba(255, 255, 255, 0.5)'; },
+        get textDark() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-text-dark') || 'rgba(0, 0, 0, 0.7)'; },
+        
+        // Additional theme colors for dice and buttons
+        get diceBackground() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-background') || '#FFFFFF'; },
+        get diceBorder() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-border') || '#5C6BC0'; },
+        get diceText() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-text') || '#5C6BC0'; },
+        get diceUsedBackground() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-used-background') || '#E0E0E0'; },
+        get diceUsedBorder() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-used-border') || '#9E9E9E'; },
+        get diceUsedText() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-dice-used-text') || '#757575'; },
+        
+        get cubeBackground() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-cube-background') || '#3D3D3D'; },
+        get cubeBorder() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-cube-border') || '#FFD700'; },
+        get cubeText() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-cube-text') || '#FFD700'; },
+        
+        get buttonRollBg() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-button-roll-bg') || 'rgba(76, 175, 80, 0.9)'; },
+        get buttonConfirmBg() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-button-confirm-bg') || 'rgba(33, 150, 243, 0.9)'; },
+        get buttonUndoBg() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-button-undo-bg') || 'rgba(245, 158, 11, 0.9)'; },
+        get buttonDoubleBg() { return getComputedStyle(document.documentElement).getPropertyValue('--theme-button-double-bg') || 'rgba(59, 130, 246, 0.9)'; }
     };
 
     // Pre-calculate point coordinates
@@ -819,7 +836,7 @@ const BoardSVG = (function() {
             'height': buttonHeight,
             'rx': 8,
             'ry': 8,
-            'fill': 'rgba(76, 175, 80, 0.9)',
+            'fill': COLORS.buttonRollBg,
             'stroke': 'rgba(255, 255, 255, 0.3)',
             'stroke-width': 2
         });
@@ -850,10 +867,10 @@ const BoardSVG = (function() {
 
         // Add hover effect
         buttonGroup.addEventListener('mouseenter', () => {
-            buttonBg.setAttribute('fill', 'rgba(76, 175, 80, 1)');
+            buttonBg.setAttribute('fill', COLORS.buttonRollBg.replace('0.9', '1'));
         });
         buttonGroup.addEventListener('mouseleave', () => {
-            buttonBg.setAttribute('fill', 'rgba(76, 175, 80, 0.9)');
+            buttonBg.setAttribute('fill', COLORS.buttonRollBg);
         });
 
         diceGroup.appendChild(buttonGroup);
@@ -884,7 +901,7 @@ const BoardSVG = (function() {
             'height': buttonHeight,
             'rx': 8,
             'ry': 8,
-            'fill': 'rgba(33, 150, 243, 0.9)',
+            'fill': COLORS.buttonConfirmBg,
             'stroke': 'rgba(255, 255, 255, 0.3)',
             'stroke-width': 2
         });
@@ -915,10 +932,10 @@ const BoardSVG = (function() {
 
         // Add hover effect
         buttonGroup.addEventListener('mouseenter', () => {
-            buttonBg.setAttribute('fill', 'rgba(33, 150, 243, 1)');
+            buttonBg.setAttribute('fill', COLORS.buttonConfirmBg.replace('0.9', '1'));
         });
         buttonGroup.addEventListener('mouseleave', () => {
-            buttonBg.setAttribute('fill', 'rgba(33, 150, 243, 0.9)');
+            buttonBg.setAttribute('fill', COLORS.buttonConfirmBg);
         });
 
         return buttonGroup;
@@ -966,7 +983,7 @@ const BoardSVG = (function() {
             'height': buttonHeight,
             'rx': 8,
             'ry': 8,
-            'fill': 'rgba(245, 158, 11, 0.9)', // Yellow
+            'fill': COLORS.buttonUndoBg,
             'stroke': 'rgba(255, 255, 255, 0.3)',
             'stroke-width': 2
         });
@@ -996,10 +1013,10 @@ const BoardSVG = (function() {
 
         // Hover effect
         buttonGroup.addEventListener('mouseenter', () => {
-            buttonBg.setAttribute('fill', 'rgba(245, 158, 11, 1)');
+            buttonBg.setAttribute('fill', COLORS.buttonUndoBg.replace('0.9', '1'));
         });
         buttonGroup.addEventListener('mouseleave', () => {
-            buttonBg.setAttribute('fill', 'rgba(245, 158, 11, 0.9)');
+            buttonBg.setAttribute('fill', COLORS.buttonUndoBg);
         });
 
         diceGroup.appendChild(buttonGroup);
@@ -1060,7 +1077,7 @@ const BoardSVG = (function() {
             'height': buttonHeight,
             'rx': 8,
             'ry': 8,
-            'fill': 'rgba(59, 130, 246, 0.9)', // Blue
+            'fill': COLORS.buttonDoubleBg,
             'stroke': 'rgba(255, 255, 255, 0.3)',
             'stroke-width': 2
         });
@@ -1098,10 +1115,10 @@ const BoardSVG = (function() {
 
         // Hover effect
         buttonGroup.addEventListener('mouseenter', () => {
-            buttonBg.setAttribute('fill', 'rgba(59, 130, 246, 1)');
+            buttonBg.setAttribute('fill', COLORS.buttonDoubleBg.replace('0.9', '1'));
         });
         buttonGroup.addEventListener('mouseleave', () => {
-            buttonBg.setAttribute('fill', 'rgba(59, 130, 246, 0.9)');
+            buttonBg.setAttribute('fill', COLORS.buttonDoubleBg);
         });
 
         diceGroup.appendChild(buttonGroup);
@@ -1643,6 +1660,16 @@ const BoardSVG = (function() {
         console.log('[BoardSVG] Move handlers now:', moveHandlers);
     }
 
+    // Apply theme changes (force re-render with current game state)
+    function applyTheme(theme) {
+        if (!initialized) return;
+        
+        // Force a re-render with the current state
+        // The COLORS object already uses getters so colors will update automatically
+        const event = new Event('themeApplied');
+        window.dispatchEvent(event);
+    }
+
     // Public API
     return {
         init,
@@ -1650,6 +1677,7 @@ const BoardSVG = (function() {
         getPointAtPosition,
         animateMove,
         setMoveHandlers,
+        applyTheme,
         isInitialized: () => initialized,
         getConfig: () => ({ ...CONFIG }),
         getColors: () => ({ ...COLORS })
