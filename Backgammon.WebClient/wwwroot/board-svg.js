@@ -24,14 +24,14 @@ const BoardSVG = (function() {
     // Calculate bar X position (after sidebar + 6 points + margin)
     CONFIG.barX = CONFIG.boardStartX + (6 * CONFIG.pointWidth);
 
-    // Color palette - Flat Modern Design
+    // Color palette - Match Backgammon Galaxy style
     const COLORS = {
-        boardBackground: '#4A3728',
-        boardBorder: '#2D1F15',
-        pointLight: '#D4C4B0',
-        pointDark: '#8B7355',
-        bar: '#3D2E22',
-        bearoff: '#3D2E22',
+        boardBackground: '#5d4e37',
+        boardBorder: '#4a7c4e',
+        pointLight: '#d4b896',
+        pointDark: '#6b5a47',
+        bar: '#3d3024',
+        bearoff: '#3d3024',
 
         checkerWhite: '#F5F5F5',
         checkerWhiteStroke: '#BDBDBD',
@@ -777,7 +777,151 @@ const BoardSVG = (function() {
         });
     }
 
-    // Render dice in the center bar
+    // Render Roll button on right side of board
+    function renderRollButton(gameState) {
+        console.log('[BoardSVG] renderRollButton called', { gameState, hasDiceGroup: !!diceGroup });
+
+        if (!diceGroup) {
+            console.warn('[BoardSVG] No diceGroup - cannot render Roll button');
+            return;
+        }
+
+        // Clear existing content
+        diceGroup.innerHTML = '';
+
+        if (!gameState) {
+            console.warn('[BoardSVG] No gameState - cannot render Roll button');
+            return;
+        }
+
+        console.log('[BoardSVG] Rendering Roll button at right side of board');
+
+        // Position on right side of board
+        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 100;
+        const centerY = CONFIG.viewBox.height / 2;
+
+        // Create button group
+        const buttonGroup = createSVGElement('g', {
+            'class': 'roll-button',
+            'style': 'cursor: pointer;'
+        });
+
+        // Button background
+        const buttonBg = createSVGElement('rect', {
+            'x': rightSideX,
+            'y': centerY - 30,
+            'width': 100,
+            'height': 60,
+            'rx': 8,
+            'ry': 8,
+            'fill': 'rgba(76, 175, 80, 0.9)',
+            'stroke': 'rgba(255, 255, 255, 0.3)',
+            'stroke-width': 2
+        });
+        buttonGroup.appendChild(buttonBg);
+
+        // Button text
+        const buttonText = createSVGElement('text', {
+            'x': rightSideX + 50,
+            'y': centerY,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'central',
+            'fill': '#ffffff',
+            'font-size': '18',
+            'font-weight': 'bold',
+            'pointer-events': 'none'
+        });
+        buttonText.textContent = '🎲 Roll';
+        buttonGroup.appendChild(buttonText);
+
+        // Add click handler
+        buttonGroup.addEventListener('click', () => {
+            // Trigger the roll button click in the game
+            const rollBtn = document.getElementById('rollBtn');
+            if (rollBtn && !rollBtn.disabled) {
+                rollBtn.click();
+            }
+        });
+
+        // Add hover effect
+        buttonGroup.addEventListener('mouseenter', () => {
+            buttonBg.setAttribute('fill', 'rgba(76, 175, 80, 1)');
+        });
+        buttonGroup.addEventListener('mouseleave', () => {
+            buttonBg.setAttribute('fill', 'rgba(76, 175, 80, 0.9)');
+        });
+
+        diceGroup.appendChild(buttonGroup);
+    }
+
+    // Render End Turn (Confirm) button on right side of board
+    function renderEndTurnButton(gameState) {
+        if (!diceGroup) return;
+
+        // Clear existing content
+        diceGroup.innerHTML = '';
+
+        if (!gameState) return;
+
+        // Position on right side of board (same as Roll button)
+        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 100;
+        const centerY = CONFIG.viewBox.height / 2;
+
+        // Create button group
+        const buttonGroup = createSVGElement('g', {
+            'class': 'end-turn-button',
+            'style': 'cursor: pointer;'
+        });
+
+        // Button background (blue/green color)
+        const buttonBg = createSVGElement('rect', {
+            'x': rightSideX,
+            'y': centerY - 30,
+            'width': 100,
+            'height': 60,
+            'rx': 8,
+            'ry': 8,
+            'fill': 'rgba(33, 150, 243, 0.9)',
+            'stroke': 'rgba(255, 255, 255, 0.3)',
+            'stroke-width': 2
+        });
+        buttonGroup.appendChild(buttonBg);
+
+        // Button text
+        const buttonText = createSVGElement('text', {
+            'x': rightSideX + 50,
+            'y': centerY,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'central',
+            'fill': '#ffffff',
+            'font-size': '16',
+            'font-weight': 'bold',
+            'pointer-events': 'none'
+        });
+        buttonText.textContent = '✓ Confirm';
+        buttonGroup.appendChild(buttonText);
+
+        // Add click handler
+        buttonGroup.addEventListener('click', () => {
+            // Trigger the end turn button click in the game
+            const endTurnBtn = document.getElementById('endTurnBtn');
+            if (endTurnBtn && !endTurnBtn.disabled) {
+                endTurnBtn.click();
+            }
+        });
+
+        // Add hover effect
+        buttonGroup.addEventListener('mouseenter', () => {
+            buttonBg.setAttribute('fill', 'rgba(33, 150, 243, 1)');
+        });
+        buttonGroup.addEventListener('mouseleave', () => {
+            buttonBg.setAttribute('fill', 'rgba(33, 150, 243, 0.9)');
+        });
+
+        diceGroup.appendChild(buttonGroup);
+    }
+
+    // Render dice on right side of board
     function renderDice(diceState) {
         if (!diceGroup) return;
 
@@ -796,26 +940,28 @@ const BoardSVG = (function() {
         // Dice dimensions
         const dieSize = 44;
         const dieRadius = 6;
-        const barCenterX = CONFIG.barX + CONFIG.barWidth / 2;
+
+        // Position on right side of board (same location as Roll button)
+        const rightSideX = CONFIG.viewBox.width - CONFIG.margin - 50;
         const boardCenterY = CONFIG.viewBox.height / 2;
 
         // Calculate positions based on number of dice
         let positions = [];
         if (numDice === 2) {
-            // Stack vertically in center
+            // Stack vertically on right side
             positions = [
-                { x: barCenterX - dieSize / 2, y: boardCenterY - dieSize - 8 },
-                { x: barCenterX - dieSize / 2, y: boardCenterY + 8 }
+                { x: rightSideX - dieSize / 2, y: boardCenterY - dieSize - 8 },
+                { x: rightSideX - dieSize / 2, y: boardCenterY + 8 }
             ];
         } else if (numDice === 4) {
-            // 2x2 grid for doubles
+            // 2x2 grid for doubles on right side
             const offsetX = 24;
             const offsetY = 26;
             positions = [
-                { x: barCenterX - offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
-                { x: barCenterX + offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
-                { x: barCenterX - offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 },
-                { x: barCenterX + offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 }
+                { x: rightSideX - offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
+                { x: rightSideX + offsetX - dieSize / 2, y: boardCenterY - offsetY - dieSize / 2 },
+                { x: rightSideX - offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 },
+                { x: rightSideX + offsetX - dieSize / 2, y: boardCenterY + offsetY - dieSize / 2 }
             ];
         }
 
@@ -1086,10 +1232,60 @@ const BoardSVG = (function() {
             return;
         }
 
-        console.log('[BoardSVG] render() called with validSources:', validSources);
         renderCheckers(gameState, selectedChecker, validSources); // Pass validSources!
         renderCube(gameState);
-        renderDice(diceState);
+
+        // Determine what to show on right side: Roll button, Dice, or End Turn button
+        const hasRolledDice = diceState && diceState.dice && diceState.dice.some(d => d > 0);
+        const hasRemainingMoves = diceState && diceState.remainingMoves && diceState.remainingMoves.length > 0;
+
+        // Check if it's the player's turn (not opponent's turn)
+        const isPlayerTurn = gameState && gameState.yourColor !== undefined &&
+                             gameState.currentPlayer === gameState.yourColor;
+
+        // Check if game is waiting for player (Status: 0 = WaitingForPlayer)
+        const isWaitingForPlayer = gameState && gameState.status === 0;
+
+        console.log('[BoardSVG] Button decision logic:', {
+            gameState: gameState ? {
+                yourColor: gameState.yourColor,
+                currentPlayer: gameState.currentPlayer,
+                status: gameState.status
+            } : null,
+            diceState: diceState ? {
+                dice: diceState.dice,
+                remainingMoves: diceState.remainingMoves
+            } : null,
+            hasRolledDice,
+            hasRemainingMoves,
+            isPlayerTurn,
+            isWaitingForPlayer
+        });
+
+        // Only show controls on player's turn
+        if (isPlayerTurn && !isWaitingForPlayer) {
+            console.log('[BoardSVG] Player turn and game started');
+            if (!hasRolledDice) {
+                // Show Roll button when dice haven't been rolled yet
+                console.log('[BoardSVG] Should show Roll button');
+                renderRollButton(gameState);
+            } else if (hasRolledDice && hasRemainingMoves) {
+                // Show Dice when rolled and still have moves to make
+                console.log('[BoardSVG] Should show Dice (with remaining moves)');
+                renderDice(diceState);
+            } else if (hasRolledDice && !hasRemainingMoves) {
+                // Show End Turn button when all moves are used
+                console.log('[BoardSVG] Should show End Turn button');
+                renderEndTurnButton(gameState);
+            }
+        } else if (hasRolledDice) {
+            // Show opponent's dice (but no button controls)
+            console.log('[BoardSVG] Opponent turn - showing dice only');
+            renderDice(diceState);
+        } else {
+            console.log('[BoardSVG] No controls shown - waiting or not player turn');
+        }
+
         renderPointNumbers(); // Add point numbers
         updateHighlights(
             validSources,

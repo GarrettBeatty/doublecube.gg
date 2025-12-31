@@ -238,7 +238,8 @@ body.spectator-mode .board-point {
 .game-container {
     display: flex;
     flex-direction: column;
-    min-height: calc(100vh - 72px); /* Account for header height */
+    width: 100%;
+    height: 100%;
 }
 
 /* Board area */
@@ -265,29 +266,23 @@ body.spectator-mode .board-point {
     gap: 8px;
 }
 
-.board-canvas {
-    width: 100%;
-    height: calc(80vw * 0.566);
-    max-width: 80vw;
-    max-height: 80vh;
-    border-radius: 1.2vw;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    cursor: pointer;
-    transition: filter 0.2s;
-    background: #2d5016;
-    display: block;
-}
-
-.board-canvas:hover {
-    filter: brightness(1.05);
-}
-
 .board-placeholder {
     position: absolute;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 1.5em;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 1.2em;
     text-align: center;
     pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Secondary game controls */
+.game-controls-secondary {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0.5rem;
+    border-radius: 8px;
 }
 
 /* Dice section */
@@ -449,11 +444,12 @@ body.spectator-mode .board-point {
 
 /* Board background */
 .board-background {
-    fill: #4A3728;
+    fill: #5d4e37;
 }
 
 .board-border {
-    stroke: #2D1F15;
+    stroke: #4a7c4e;
+    stroke-width: 8;
 }
 
 /* Point triangles - flat design */

@@ -1113,6 +1113,25 @@ function updateGameState(state, isSpectator = false) {
         analysisBadge.style.display = state.isAnalysisMode ? '' : 'none';
     }
 
+    // Show import button only in analysis mode
+    const importBtn = document.getElementById('importBtn');
+    if (importBtn) {
+        importBtn.style.display = state.isAnalysisMode ? '' : 'none';
+    }
+
+    // Update Abandon button text to Forfeit if game has started
+    const abandonBtn = document.getElementById('abandonBtn');
+    if (abandonBtn) {
+        // Game has started if both players have made at least one move
+        // Status: 0 = WaitingForPlayer, 1 = InProgress, 2 = Completed
+        const gameHasStarted = state.status !== 0 && state.status !== undefined;
+        if (gameHasStarted) {
+            abandonBtn.innerHTML = '⚠️ Forfeit';
+        } else {
+            abandonBtn.innerHTML = '⚠️ Abandon';
+        }
+    }
+
     // Update current game ID (no need to display it, it's in the URL)
     currentGameId = state.gameId;
     // Save to localStorage for reconnection

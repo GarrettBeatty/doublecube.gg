@@ -168,6 +168,12 @@
                                 <p class="mt-4">Waiting for game to start...</p>
                             </div>
 
+                            <!-- Hidden buttons (triggered by SVG controls) -->
+                            <button id="rollBtn" style="display: none;" disabled></button>
+                            <button id="doubleBtn" style="display: none;" disabled></button>
+                            <button id="undoBtn" style="display: none;" disabled></button>
+                            <button id="endTurnBtn" style="display: none;" disabled></button>
+
                             <!-- Secondary Game Controls -->
                             <div class="game-controls-secondary" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
                                 <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" onclick="toggleBoardFlip()" title="Flip board orientation">
@@ -179,11 +185,8 @@
                                 <button id="exportBtn" class="btn btn-ghost btn-sm gap-2" onclick="exportPosition()">
                                     📋 Export
                                 </button>
-                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" onclick="showImportModal()">
+                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" onclick="showImportModal()" style="display: none;">
                                     📥 Import
-                                </button>
-                                <button class="btn btn-ghost btn-sm gap-2" onclick="leaveGameAndReturn()">
-                                    ← Leave
                                 </button>
                             </div>
                         </div>
