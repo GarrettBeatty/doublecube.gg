@@ -1,4 +1,4 @@
-{$DOMAIN:localhost} {
+backgammon.beatty.codes, doublecube.gg {
     # Client configuration endpoint (served by WebClient for service discovery)
     handle /api/config {
         reverse_proxy webclient:3000 {

@@ -124,8 +124,13 @@ builder.Services.AddCors(options =>
         var domain = Environment.GetEnvironmentVariable("DOMAIN");
         if (!string.IsNullOrEmpty(domain))
         {
-            // Allow both HTTP and HTTPS for the configured domain
-            policy.WithOrigins($"http://{domain}", $"https://{domain}")
+            // Parse comma-separated domains and allow both HTTP and HTTPS for each
+            var domains = domain.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                .Select(d => d.Trim())
+                                .SelectMany(d => new[] { $"http://{d}", $"https://{d}" })
+                                .ToArray();
+
+            policy.WithOrigins(domains)
                   .AllowAnyMethod()
                   .AllowAnyHeader()
                   .AllowCredentials();  // Required for SignalR
