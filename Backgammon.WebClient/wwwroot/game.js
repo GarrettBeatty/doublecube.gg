@@ -81,12 +81,6 @@ let apiBaseUrl = 'http://localhost:5000';  // Default fallback, will be overridd
 let isAiGame = false;  // Track if playing against AI
 let isBoardFlipped = false;  // Track board flip state
 
-// History navigation state
-let gameHistory = null;  // Full turn history from server
-let historyViewIndex = -1;  // -1 = live mode, 0+ = viewing history at that turn index
-let initialBoardState = null;  // Snapshot of starting position for replay
-let reconstructedGameState = null;  // Board state at historyViewIndex
-
 // ==== URL ROUTING ====
 function getGameIdFromUrl() {
     const pathParts = window.location.pathname.split('/');
@@ -213,18 +207,6 @@ window.addEventListener('load', async () => {
             }
         });
     }
-    // Add Undo button handler
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) {
-        undoBtn.addEventListener('click', async () => {
-            undoBtn.disabled = true;
-            try {
-                await undoMove();
-            } catch (err) {
-                log(`Failed to undo move: ${err}`, 'error');
-            }
-        });
-    }
     // Add End Turn button handler
     const endTurnBtn = document.getElementById('endTurnBtn');
     if (endTurnBtn) {
@@ -261,25 +243,6 @@ window.addEventListener('load', async () => {
             }
         });
     }
-
-    // Add keyboard event listeners for history navigation
-    document.addEventListener('keydown', (event) => {
-        // Ignore if typing in input field
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-            return;
-        }
-
-        if (event.key === 'ArrowLeft') {
-            event.preventDefault();
-            navigateHistoryBackward();
-        } else if (event.key === 'ArrowRight') {
-            event.preventDefault();
-            navigateHistoryForward();
-        } else if (event.key === 'Escape' && historyViewIndex !== -1) {
-            event.preventDefault();
-            exitHistoryMode();
-        }
-    });
 
     const volumeSlider = document.getElementById('volumeSlider');
     if (volumeSlider) {
@@ -400,8 +363,8 @@ function setupEventHandlers() {
         }
 
         updateGameState(gameState);
-        // Update URL to reflect current game
-        if (gameState.gameId) {
+        // Update URL to reflect current game (only if we're on the game page)
+        if (gameState.gameId && document.getElementById('gamePage').style.display !== 'none') {
             setGameUrl(gameState.gameId);
         }
     });
@@ -410,8 +373,8 @@ function setupEventHandlers() {
         debug('SignalR: GameStart received', { gameId: gameState.gameId }, 'success');
         log('🎮 Game started! Both players connected.', 'success');
         updateGameState(gameState);
-        // Update URL to reflect current game
-        if (gameState.gameId) {
+        // Update URL to reflect current game (only if we're on the game page)
+        if (gameState.gameId && document.getElementById('gamePage').style.display !== 'none') {
             setGameUrl(gameState.gameId);
         }
     });
@@ -494,6 +457,20 @@ function showGamePage() {
 
     if (gameRefreshInterval) {
         clearInterval(gameRefreshInterval);
+    }
+}
+
+/**
+ * Navigate to home - properly leaves game if currently in one
+ */
+async function goHome() {
+    const isOnGamePage = document.getElementById('gamePage').style.display !== 'none';
+    if (isOnGamePage && currentGameId) {
+        // In a game - leave it first
+        await leaveGameAndReturn();
+    } else {
+        // Already on landing page or not in a game - just show landing page
+        showLandingPage();
     }
 }
 
@@ -688,6 +665,7 @@ async function createGame() {
     try {
         currentGameId = null;
         localStorage.removeItem('currentGameId'); // Clear any old game
+        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         await connection.invoke("JoinGame", myPlayerId, null);
         log('🎮 Creating new game...', 'info');
         showGamePage();
@@ -708,6 +686,7 @@ async function createAnalysisGame() {
     try {
         currentGameId = null;
         localStorage.removeItem('currentGameId');
+        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         await connection.invoke("CreateAnalysisGame");
         log('📊 Creating analysis game...', 'info');
         showGamePage();
@@ -728,6 +707,7 @@ async function createAiGame() {
     try {
         currentGameId = null;
         localStorage.removeItem('currentGameId'); // Clear any old game
+        setHomeUrl(); // Clear URL to prevent auto-joining old spectated game
         debug('Invoking CreateAiGame on server', { myPlayerId }, 'info');
         await connection.invoke("CreateAiGame", myPlayerId);
         log('🤖 Creating AI game...', 'info');
@@ -792,18 +772,6 @@ async function rollDice() {
     }
 }
 
-async function undoMove() {
-    try {
-        await connection.invoke("UndoMove");
-        log('↶ Undoing last move...', 'info');
-        // Clear selection state
-        selectedChecker = null;
-        validDestinations = [];
-    } catch (err) {
-        log(`❌ Failed to undo: ${err}`, 'error');
-    }
-}
-
 async function endTurn() {
     try {
         await connection.invoke("EndTurn");
@@ -813,214 +781,6 @@ async function endTurn() {
         validDestinations = [];
     } catch (err) {
         log(`❌ Failed to end turn: ${err}`, 'error');
-    }
-}
-
-// ==== HISTORY NAVIGATION ====
-
-/**
- * Reconstruct board state at a specific turn index by replaying moves from start
- * @param {number} turnIndex - Turn to reconstruct (-1 = current live state)
- * @returns {Object|null} - Reconstructed game state or null for live mode
- */
-function reconstructBoardAtTurn(turnIndex) {
-    if (turnIndex === -1 || !gameHistory || !initialBoardState) {
-        return null; // Use live state
-    }
-
-    // Start with a deep copy of initial board state
-    let reconstructed = JSON.parse(JSON.stringify(initialBoardState));
-
-    // Replay moves up to and including the specified turn
-    for (let i = 0; i <= turnIndex && i < gameHistory.length; i++) {
-        const turn = gameHistory[i];
-        // Apply each move in this turn
-        turn.moves.forEach(move => {
-            applyMoveToState(reconstructed, move, turn.player);
-        });
-    }
-
-    return reconstructed;
-}
-
-/**
- * Apply a single move to a board state (pure function for client-side simulation)
- * @param {Object} state - Game state object to modify
- * @param {Object} move - Move to apply {from, to, dieValue, isHit}
- * @param {string} player - "White" or "Red"
- */
-function applyMoveToState(state, move, player) {
-    const { from, to, isHit } = move;
-
-    // Handle entering from bar (from === 0)
-    if (from === 0) {
-        // Remove from bar
-        if (player === "White") {
-            state.whiteCheckersOnBar--;
-        } else {
-            state.redCheckersOnBar--;
-        }
-
-        // Add to destination point
-        const destPoint = state.board.find(p => p.position === to);
-        if (destPoint) {
-            if (isHit && destPoint.color && destPoint.color !== player) {
-                // Hit opponent - move their checker to bar
-                destPoint.count = 0;
-                destPoint.color = null;
-                if (player === "White") {
-                    state.redCheckersOnBar++;
-                } else {
-                    state.whiteCheckersOnBar++;
-                }
-            }
-            destPoint.color = player;
-            destPoint.count = (destPoint.count || 0) + 1;
-        }
-    }
-    // Handle bearing off (to === 0 or to === 25)
-    else if (to === 0 || to === 25) {
-        // Remove from source point
-        const fromPoint = state.board.find(p => p.position === from);
-        if (fromPoint && fromPoint.count > 0) {
-            fromPoint.count--;
-            if (fromPoint.count === 0) {
-                fromPoint.color = null;
-            }
-        }
-
-        // Add to borne off count
-        if (player === "White") {
-            state.whiteBornOff = (state.whiteBornOff || 0) + 1;
-        } else {
-            state.redBornOff = (state.redBornOff || 0) + 1;
-        }
-    }
-    // Handle normal move
-    else {
-        // Remove from source point
-        const fromPoint = state.board.find(p => p.position === from);
-        if (fromPoint && fromPoint.count > 0) {
-            fromPoint.count--;
-            if (fromPoint.count === 0) {
-                fromPoint.color = null;
-            }
-        }
-
-        // Add to destination point
-        const toPoint = state.board.find(p => p.position === to);
-        if (toPoint) {
-            if (isHit && toPoint.color && toPoint.color !== player) {
-                // Hit opponent - move their checker to bar
-                toPoint.count = 0;
-                toPoint.color = null;
-                if (player === "White") {
-                    state.redCheckersOnBar++;
-                } else {
-                    state.whiteCheckersOnBar++;
-                }
-            }
-            toPoint.color = player;
-            toPoint.count = (toPoint.count || 0) + 1;
-        }
-    }
-}
-
-/**
- * Navigate backward in history (Left arrow key)
- */
-function navigateHistoryBackward() {
-    if (!gameHistory || gameHistory.length === 0) {
-        log('No history available to navigate', 'info');
-        return;
-    }
-
-    if (historyViewIndex === -1) {
-        // First press - go to latest completed turn
-        historyViewIndex = gameHistory.length - 1;
-    } else if (historyViewIndex > 0) {
-        historyViewIndex--;
-    } else {
-        log('Already at first turn', 'info');
-        return;
-    }
-
-    renderHistoryView();
-}
-
-/**
- * Navigate forward in history (Right arrow key)
- */
-function navigateHistoryForward() {
-    if (!gameHistory || historyViewIndex === -1) {
-        return;
-    }
-
-    if (historyViewIndex < gameHistory.length - 1) {
-        historyViewIndex++;
-        renderHistoryView();
-    } else {
-        // Reached end - return to live mode
-        exitHistoryMode();
-    }
-}
-
-/**
- * Exit history review mode and return to live game
- */
-function exitHistoryMode() {
-    historyViewIndex = -1;
-    reconstructedGameState = null;
-
-    // Re-render the live game state
-    if (currentGameState) {
-        renderBoard(currentGameState);
-        updateHistoryUI(false);
-    }
-
-    log('↩ Returned to live game', 'info');
-}
-
-/**
- * Render board at current history position
- */
-function renderHistoryView() {
-    reconstructedGameState = reconstructBoardAtTurn(historyViewIndex);
-
-    if (reconstructedGameState && gameHistory[historyViewIndex]) {
-        // Render the historical state
-        renderBoard(reconstructedGameState);
-        updateHistoryUI(true);
-
-        const turn = gameHistory[historyViewIndex];
-        log(`📖 Viewing Turn ${turn.turnNumber}: ${turn.player} rolled [${turn.diceRolled.join(', ')}]`, 'info');
-    }
-}
-
-/**
- * Update UI to show history mode status
- * @param {boolean} inHistoryMode - Whether currently in history review mode
- */
-function updateHistoryUI(inHistoryMode) {
-    const indicator = document.getElementById('historyIndicator');
-
-    if (inHistoryMode && indicator && gameHistory) {
-        const currentTurn = historyViewIndex + 1;
-        const totalTurns = gameHistory.length;
-        const turn = gameHistory[historyViewIndex];
-
-        indicator.style.display = 'flex';
-        indicator.innerHTML = `
-            <div class="flex-1">
-                <div class="font-semibold">📖 Reviewing History</div>
-                <div class="text-sm">Turn ${currentTurn} of ${totalTurns}: ${turn.player} rolled [${turn.diceRolled.join(', ')}]</div>
-            </div>
-            <div class="text-sm text-gray-400">
-                ← → to navigate • ESC to return
-            </div>
-        `;
-    } else if (indicator) {
-        indicator.style.display = 'none';
     }
 }
 
@@ -1272,30 +1032,6 @@ function updateGameState(state, isSpectator = false) {
 
     currentGameState = state; // Store for click handling
 
-    // Store game history if provided
-    if (state.turnHistory && state.turnHistory.length > 0) {
-        gameHistory = state.turnHistory;
-    }
-
-    // Capture initial board state on first game update
-    if (!initialBoardState && state.board && state.board.length > 0) {
-        initialBoardState = JSON.parse(JSON.stringify(state));
-    }
-
-    // If in history review mode, don't update the view (stay on historical position)
-    if (historyViewIndex !== -1) {
-        // Disable all action buttons in history mode
-        const rollBtn = document.getElementById('rollBtn');
-        const undoBtn = document.getElementById('undoBtn');
-        const endTurnBtn = document.getElementById('endTurnBtn');
-        const doubleBtn = document.getElementById('doubleBtn');
-        if (rollBtn) rollBtn.disabled = true;
-        if (undoBtn) undoBtn.disabled = true;
-        if (endTurnBtn) endTurnBtn.disabled = true;
-        if (doubleBtn) doubleBtn.disabled = true;
-        return;
-    }
-
     // Detect AI game (opponent named "Computer")
     const whiteName = state.whitePlayerName || state.WhitePlayerName || '';
     const redName = state.redPlayerName || state.RedPlayerName || '';
@@ -1329,7 +1065,7 @@ function updateGameState(state, isSpectator = false) {
 
         // Disable all control buttons except Leave (spectators should be able to leave)
         const controlButtons = [
-            'rollBtn', 'doubleBtn', 'undoBtn', 'endTurnBtn',
+            'rollBtn', 'doubleBtn', 'endTurnBtn',
             'abandonBtn', 'exportBtn', 'importBtn'
         ];
         controlButtons.forEach(btnId => {
@@ -1347,7 +1083,7 @@ function updateGameState(state, isSpectator = false) {
 
         // Re-enable control buttons (they'll be managed by normal game logic)
         const controlButtons = [
-            'rollBtn', 'doubleBtn', 'undoBtn', 'endTurnBtn',
+            'rollBtn', 'doubleBtn', 'endTurnBtn',
             'abandonBtn', 'exportBtn', 'importBtn'
         ];
         controlButtons.forEach(btnId => {
@@ -1468,21 +1204,7 @@ function updateGameState(state, isSpectator = false) {
         }, 'trace');
         rollBtn.disabled = shouldDisable;
     }
-    
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) {
-        // Can undo only if you've made at least one move this turn
-        // Check movesMadeThisTurn or fallback to comparing dice vs remaining
-        const movesMadeFromState = movesMade;
-        const totalDice = dice.length >= 2 && dice[0] === dice[1] ? 4 : 2;
-        const remainingCount = (state.remainingMoves ?? state.RemainingMoves ?? []).length;
-        const movesMadeFromDice = hasDice ? (totalDice - remainingCount) : 0;
-        const actualMovesMade = Math.max(movesMadeFromState, movesMadeFromDice);
 
-        const canUndo = isMyTurn && (actualMovesMade > 0);
-        undoBtn.disabled = !canUndo;
-    }
-    
     const endTurnBtn = document.getElementById('endTurnBtn');
     if (endTurnBtn) {
         // Can end turn only if:
@@ -1542,11 +1264,9 @@ function resetGameUI() {
     }
 
     const rollBtn = document.getElementById('rollBtn');
-    const undoBtn = document.getElementById('undoBtn');
     const endTurnBtn = document.getElementById('endTurnBtn');
 
     if (rollBtn) rollBtn.disabled = true;
-    if (undoBtn) undoBtn.disabled = true;
     if (endTurnBtn) endTurnBtn.disabled = true;
 
     // Reset board flip when resetting UI
@@ -1712,6 +1432,7 @@ function renderBoard(state) {
             },
             getValidDestinations: (fromPoint) => {
                 console.log(`[game.js] getValidDestinations called for point ${fromPoint}`);
+
                 if (!currentGameState || !currentGameState.validMoves) {
                     console.log('[game.js] No validMoves in currentGameState');
                     return [];

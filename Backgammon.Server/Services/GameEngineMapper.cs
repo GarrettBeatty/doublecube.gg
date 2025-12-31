@@ -66,22 +66,6 @@ public static class GameEngineMapper
                              $"{m.From}/{m.To}")
                 .ToList(),
 
-            // Turn history (complete game history with dice and moves)
-            TurnHistory = engine.TurnHistory.Select(turn => new TurnRecordDto
-            {
-                TurnNumber = turn.TurnNumber,
-                Player = turn.Player.ToString(),
-                DiceRolled = turn.DiceRolled,
-                Moves = turn.Moves.Select(m => new MoveDto
-                {
-                    From = m.From,
-                    To = m.To,
-                    DieValue = m.DieValue,
-                    IsHit = m.IsHit
-                }).ToList(),
-                Timestamp = turn.Timestamp
-            }).ToList(),
-
             // Move count
             MoveCount = engine.MoveHistory.Count,
 
@@ -149,32 +133,6 @@ public static class GameEngineMapper
         engine.Dice.SetDice(game.Die1, game.Die2);
         engine.RemainingMoves.Clear();
         engine.RemainingMoves.AddRange(game.RemainingMoves);
-
-        // Restore turn history
-        if (game.TurnHistory != null && game.TurnHistory.Count > 0)
-        {
-            var restoredHistory = game.TurnHistory.Select(turnDto => new TurnRecord
-            {
-                TurnNumber = turnDto.TurnNumber,
-                Player = Enum.Parse<CheckerColor>(turnDto.Player),
-                DiceRolled = turnDto.DiceRolled,
-                Moves = turnDto.Moves.Select(moveDto => new Move(
-                    moveDto.From,
-                    moveDto.To,
-                    moveDto.DieValue,
-                    moveDto.IsHit
-                )).ToList(),
-                Timestamp = turnDto.Timestamp
-            }).ToList();
-
-            // Set TurnHistory using reflection (has private setter)
-            var turnHistoryField = engine.GetType()
-                .GetField("<TurnHistory>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
-            if (turnHistoryField != null)
-            {
-                turnHistoryField.SetValue(engine, restoredHistory);
-            }
-        }
 
         // Restore doubling cube
         if (game.DoublingCubeValue > 1)

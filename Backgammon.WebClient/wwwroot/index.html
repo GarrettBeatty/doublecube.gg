@@ -13,7 +13,7 @@
     <header id="appHeader" class="bg-gradient-to-br from-primary to-secondary text-white px-6 py-4 sticky top-0 z-50 shadow-lg">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <!-- Left: Logo -->
-            <div class="flex items-center gap-4 cursor-pointer" onclick="showLandingPage()">
+            <div class="flex items-center gap-4 cursor-pointer" onclick="goHome()">
                 <h1 class="text-2xl font-bold">Backgammon Online</h1>
             </div>
 
@@ -159,11 +159,6 @@
                                 </div>
                             </div>
 
-                            <!-- History Navigation Indicator -->
-                            <div id="historyIndicator" class="alert alert-info py-2 px-4 mb-4 gap-3" style="display: none;">
-                                <!-- Content will be dynamically updated by updateHistoryUI() -->
-                            </div>
-
                             <!-- Modern Game Controls -->
                             <div class="game-controls-modern">
                                 <button id="rollBtn" class="btn btn-primary btn-lg gap-2" disabled>
@@ -171,9 +166,6 @@
                                 </button>
                                 <button id="doubleBtn" class="btn btn-warning btn-lg gap-2" disabled>
                                     2x Double
-                                </button>
-                                <button id="undoBtn" class="btn btn-warning btn-lg gap-2" disabled>
-                                    ↩️ Undo
                                 </button>
                                 <button id="endTurnBtn" class="btn btn-success btn-lg gap-2" disabled>
                                     ✓ End Turn
