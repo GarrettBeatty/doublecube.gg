@@ -1,12 +1,14 @@
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# Build stage (Alpine-based for smaller image size)
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
 # Copy csproj files and restore dependencies (layer caching optimization)
 COPY ["Backgammon.Server/Backgammon.Server.csproj", "Backgammon.Server/"]
 COPY ["Backgammon.Core/Backgammon.Core.csproj", "Backgammon.Core/"]
 COPY ["Backgammon.ServiceDefaults/Backgammon.ServiceDefaults.csproj", "Backgammon.ServiceDefaults/"]
-RUN dotnet restore "Backgammon.Server/Backgammon.Server.csproj"
+# Use BuildKit cache mount to cache NuGet packages across builds
+RUN --mount=type=cache,id=nuget-server,target=/root/.nuget/packages \
+    dotnet restore "Backgammon.Server/Backgammon.Server.csproj"
 
 # Copy source code and build
 COPY . .
@@ -17,8 +19,8 @@ RUN dotnet build "Backgammon.Server.csproj" -c Release -o /app/build
 FROM build AS publish
 RUN dotnet publish "Backgammon.Server.csproj" -c Release -o /app/publish --no-restore
 
-# Runtime stage (minimal chiseled image for production)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+# Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
@@ -27,6 +29,9 @@ EXPOSE 5000
 
 # Set ASP.NET Core to listen on port 5000
 ENV ASPNETCORE_URLS=http://+:5000
+
+# Use invariant globalization (recommended for APIs, saves ~30 MB)
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 
 # Run the application
 ENTRYPOINT ["dotnet", "Backgammon.Server.dll"]
