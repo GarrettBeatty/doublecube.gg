@@ -1,15 +1,17 @@
-# Backgammon .NET
+# DoubleCube.gg
 
-[![Tests](https://github.com/garrett/Backgammon/actions/workflows/test.yml/badge.svg)](https://github.com/garrett/Backgammon/actions/workflows/test.yml)
+[![Tests](https://github.com/garrett/doublecube.gg/actions/workflows/test.yml/badge.svg)](https://github.com/garrett/doublecube.gg/actions/workflows/test.yml)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com/)
 [![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)](https://learn.microsoft.com/en-us/dotnet/csharp/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
-A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **multiplayer via SignalR** with **MongoDB persistence**.
+🎲 **[Play online at doublecube.gg](https://doublecube.gg)** 🎲
+
+A complete implementation of the classic Backgammon board game in .NET, with support for console play, AI simulation, and **online multiplayer via SignalR** with **DynamoDB persistence**.
 
 ## Quick Start with .NET Aspire 🚀
 
-Run the entire stack (MongoDB + Backend + Frontend) with one command:
+Run the entire stack (DynamoDB Local + Backend + Frontend) with one command:
 
 ```bash
 cd Backgammon.AppHost
@@ -37,7 +39,7 @@ Backgammon/
 │   └── Program.cs            # Text-based game interface
 ├── Backgammon.Server/           # SignalR multiplayer server
 │   ├── Hubs/                 # SignalR hub for real-time game
-│   ├── Services/             # Game session management + MongoDB
+│   ├── Services/             # Game session management + DynamoDB
 │   ├── Models/               # DTOs and game state
 │   └── Program.cs            # Web server startup
 ├── Backgammon.WebClient/     # Web UI client (frontend)
@@ -302,7 +304,7 @@ Potential additions to the project:
 
 ## License
 
-This is a demonstration project for learning purposes.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details.
 
 ## Backgammon Rules Reference
 
@@ -315,4 +317,4 @@ The implementation follows standard backgammon rules. For detailed rules, see:
 
 ---
 
-**Enjoy playing Backgammon!** 🎲
+**Enjoy playing at [doublecube.gg](https://doublecube.gg)!** 🎲
