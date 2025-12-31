@@ -439,6 +439,11 @@ function setupEventHandlers() {
         log(`❌ Error: ${errorMessage}`, 'error');
     });
 
+    connection.on("Info", (infoMessage) => {
+        debug('SignalR: Info received', { infoMessage }, 'info');
+        log(`ℹ️ ${infoMessage}`, 'info');
+    });
+
     connection.on("ReceiveChatMessage", (senderName, message, senderConnectionId) => {
         // Determine if this message is from us
         const isOwn = senderConnectionId === connection.connectionId;
@@ -924,10 +929,13 @@ function cancelOfferDouble() {
 
 async function offerDouble() {
     try {
+        debug('offerDouble called', { isAiGame, currentGameId }, 'info');
         await connection.invoke("OfferDouble");
         log('Double offered to opponent...', 'info');
+        debug('OfferDouble invoked successfully', null, 'success');
         document.getElementById('doubleConfirmModal').close();
     } catch (err) {
+        debug('OfferDouble failed', err, 'error');
         log(`Failed to offer double: ${err}`, 'error');
         document.getElementById('doubleConfirmModal').close();
     }
@@ -1386,24 +1394,16 @@ function resetGameUI() {
 // ==== AI GAME UI ====
 function updateAiGameUI() {
     const chatSidebar = document.getElementById('chatSidebar');
-    const doubleBtn = document.getElementById('doubleBtn');
 
     if (isAiGame) {
         // Hide chat sidebar for AI games
         if (chatSidebar) {
             chatSidebar.style.display = 'none';
         }
-        // Hide double button for AI games (Phase 1 limitation)
-        if (doubleBtn) {
-            doubleBtn.style.display = 'none';
-        }
     } else {
-        // Show chat and double button for human games
+        // Show chat for human games
         if (chatSidebar) {
             chatSidebar.style.display = '';
-        }
-        if (doubleBtn) {
-            doubleBtn.style.display = '';
         }
     }
 }

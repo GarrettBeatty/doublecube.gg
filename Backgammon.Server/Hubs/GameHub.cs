@@ -754,7 +754,10 @@ public class GameHub : Hub
                 ? session.RedConnectionId
                 : session.WhiteConnectionId;
 
-            if (opponentConnectionId != null)
+            _logger.LogInformation("OfferDouble: opponentConnectionId={OpponentConnectionId}, WhiteConn={WhiteConn}, RedConn={RedConn}",
+                opponentConnectionId ?? "null", session.WhiteConnectionId ?? "null", session.RedConnectionId ?? "null");
+
+            if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
             {
                 await Clients.Client(opponentConnectionId).SendAsync("DoubleOffered", currentValue, newValue);
                 _logger.LogInformation("Player {ConnectionId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
@@ -766,6 +769,9 @@ public class GameHub : Hub
                 var opponentPlayerId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
                     ? session.RedPlayerId
                     : session.WhitePlayerId;
+
+                _logger.LogInformation("OfferDouble: Checking AI opponent. OpponentPlayerId={OpponentPlayerId}, IsAiPlayer={IsAi}",
+                    opponentPlayerId ?? "null", opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId));
 
                 if (opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId))
                 {
@@ -785,14 +791,18 @@ public class GameHub : Hub
                         session.Engine.AcceptDouble();
                         session.UpdateActivity();
 
-                        // Send updated state to the human player
+                        // Send updated state to the human player (use DoubleAccepted for consistency)
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var state = session.GetState(Context.ConnectionId);
-                            await Clients.Caller.SendAsync("GameUpdate", state);
+                            await Clients.Caller.SendAsync("DoubleAccepted", state);
                         }
 
-                        await Clients.Caller.SendAsync("Info", "Computer accepted the double!");
+                        // Save game state
+                        await SaveGameStateAsync(session);
+
+                        _logger.LogInformation("AI accepted double in game {GameId}. New stakes: {Stakes}x",
+                            session.Id, session.Engine.DoublingCube.Value);
                     }
                     else
                     {
