@@ -760,6 +760,93 @@ public class GameHub : Hub
                 _logger.LogInformation("Player {ConnectionId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
                     Context.ConnectionId, session.Id, currentValue, newValue);
             }
+            else
+            {
+                // Opponent might be an AI (empty connection ID)
+                var opponentPlayerId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
+                    ? session.RedPlayerId
+                    : session.WhitePlayerId;
+
+                if (opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId))
+                {
+                    _logger.LogInformation("AI opponent {AiPlayerId} evaluating double offer in game {GameId}. Stakes: {Current}x → {New}x",
+                        opponentPlayerId, session.Id, currentValue, newValue);
+
+                    // AI decision logic: Accept if new value <= 4, otherwise decline
+                    // This is a simple conservative strategy
+                    bool aiAccepts = newValue <= 4;
+
+                    // Small delay to make it feel more natural
+                    await Task.Delay(1000);
+
+                    if (aiAccepts)
+                    {
+                        _logger.LogInformation("AI {AiPlayerId} accepted the double", opponentPlayerId);
+                        session.Engine.AcceptDouble();
+                        session.UpdateActivity();
+
+                        // Send updated state to the human player
+                        if (!string.IsNullOrEmpty(Context.ConnectionId))
+                        {
+                            var state = session.GetState(Context.ConnectionId);
+                            await Clients.Caller.SendAsync("GameUpdate", state);
+                        }
+
+                        await Clients.Caller.SendAsync("Info", "Computer accepted the double!");
+                    }
+                    else
+                    {
+                        _logger.LogInformation("AI {AiPlayerId} declined the double", opponentPlayerId);
+
+                        // Determine human player (opponent of AI)
+                        var humanColor = session.GetPlayerColor(Context.ConnectionId);
+                        var humanPlayer = humanColor == CheckerColor.White
+                            ? session.Engine.WhitePlayer
+                            : session.Engine.RedPlayer;
+
+                        // AI declines - human wins at current stakes
+                        session.Engine.ForfeitGame(humanPlayer);
+                        var stakes = session.Engine.GetGameResult();
+
+                        _logger.LogInformation("Game {GameId} ended. AI declined double. Winner: {Winner} (Stakes: {Stakes})",
+                            session.Id, humanPlayer.Name, stakes);
+
+                        // Send game over event to human player
+                        if (!string.IsNullOrEmpty(Context.ConnectionId))
+                        {
+                            var finalState = session.GetState(Context.ConnectionId);
+                            await Clients.Caller.SendAsync("GameOver", finalState);
+                        }
+
+                        await Clients.Caller.SendAsync("Info", "Computer declined the double. You win!");
+
+                        // Update database and stats (async)
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+
+                                // Skip stats update for analysis games
+                                if (!session.IsAnalysisMode)
+                                {
+                                    var game = GameEngineMapper.ToGame(session);
+                                    await UpdateUserStatsAfterGame(game);
+                                }
+
+                                _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
+                            }
+                        });
+
+                        // Clean up game session
+                        _sessionManager.RemoveGame(session.Id);
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {

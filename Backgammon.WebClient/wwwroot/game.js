@@ -236,6 +236,8 @@ window.addEventListener('load', async () => {
     const doubleBtn = document.getElementById('doubleBtn');
     if (doubleBtn) {
         doubleBtn.addEventListener('click', () => {
+            debug('Double button clicked', { disabled: doubleBtn.disabled, currentGameState: !!currentGameState }, 'trace');
+
             // Show confirmation modal
             if (currentGameState) {
                 const currentStakes = currentGameState.doublingCubeValue || 1;
@@ -243,8 +245,17 @@ window.addEventListener('load', async () => {
                 document.getElementById('doubleConfirmCurrentStakes').textContent = `${currentStakes}x`;
                 document.getElementById('doubleConfirmNewStakes').textContent = `${newStakes}x`;
             }
-            document.getElementById('doubleConfirmModal').showModal();
+
+            const modal = document.getElementById('doubleConfirmModal');
+            debug('Opening double confirm modal', { modalExists: !!modal }, 'trace');
+            if (modal) {
+                modal.showModal();
+            } else {
+                console.error('doubleConfirmModal not found in DOM');
+            }
         });
+    } else {
+        console.error('doubleBtn not found in DOM during setup');
     }
 
     // Add audio settings event handlers
@@ -1326,13 +1337,24 @@ function updateGameState(state, isSpectator = false) {
         // 2. You haven't rolled dice yet (before rolling)
         // 3. Game is in progress (not waiting for player)
         // 4. You own the cube OR it's centered (null)
-        const myColorString = myColor === 0 ? "White" : "Red";
+        const myColorString = myColor; // myColor is already "White" or "Red" string
         const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
         const canDouble = isMyTurn &&
                           !hasDice &&
                           !isWaitingForPlayer &&
-                          (doublingCubeOwner === null ||
+                          (doublingCubeOwner == null ||  // null or undefined
                            doublingCubeOwner === myColorString);
+
+        debug('Double button state update', {
+            isMyTurn,
+            hasDice,
+            isWaitingForPlayer,
+            doublingCubeOwner,
+            myColorString,
+            canDouble,
+            willDisable: !canDouble
+        }, 'trace');
+
         doubleBtn.disabled = !canDouble;
     }
 

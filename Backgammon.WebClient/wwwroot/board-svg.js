@@ -1005,6 +1005,108 @@ const BoardSVG = (function() {
         diceGroup.appendChild(buttonGroup);
     }
 
+    // Render Double button on left side of board (same position as Undo)
+    function renderDoubleButton(gameState) {
+        console.log('[BoardSVG] renderDoubleButton called', {
+            hasDiceGroup: !!diceGroup,
+            hasGameState: !!gameState,
+            yourColor: gameState?.yourColor,
+            doublingCubeOwner: gameState?.doublingCubeOwner
+        });
+
+        if (!diceGroup) return;
+        if (!gameState || gameState.yourColor === undefined) {
+            console.log('[BoardSVG] Not rendering double button - no game state or yourColor');
+            return;
+        }
+
+        // Check cube ownership - only show button if cube is centered OR you own it
+        const myColorString = gameState.yourColor === 0 ? "White" : "Red";
+        const doublingCubeOwner = gameState.doublingCubeOwner;
+        const canOfferDouble = doublingCubeOwner == null || doublingCubeOwner === myColorString;
+
+        console.log('[BoardSVG] Double button ownership check:', {
+            myColorString,
+            doublingCubeOwner,
+            canOfferDouble
+        });
+
+        if (!canOfferDouble) {
+            console.log('[BoardSVG] Not rendering double button - opponent owns cube');
+            return;
+        }
+
+        console.log('[BoardSVG] Rendering double button');
+
+        // Calculate center of left half of board (between bear-off area and bar)
+        const leftHalfStart = CONFIG.margin + CONFIG.bearoffWidth;
+        const leftHalfEnd = CONFIG.barX;
+        const leftHalfCenterX = (leftHalfStart + leftHalfEnd) / 2;
+        const centerY = CONFIG.viewBox.height / 2;
+
+        const buttonGroup = createSVGElement('g', {
+            'class': 'double-button',
+            'style': 'cursor: pointer;'
+        });
+
+        const buttonWidth = 100;
+        const buttonHeight = 50;
+
+        // Button background (blue/strategic color)
+        const buttonBg = createSVGElement('rect', {
+            'x': leftHalfCenterX - buttonWidth / 2,
+            'y': centerY - buttonHeight / 2,
+            'width': buttonWidth,
+            'height': buttonHeight,
+            'rx': 8,
+            'ry': 8,
+            'fill': 'rgba(59, 130, 246, 0.9)', // Blue
+            'stroke': 'rgba(255, 255, 255, 0.3)',
+            'stroke-width': 2
+        });
+        buttonGroup.appendChild(buttonBg);
+
+        // Button text
+        const buttonText = createSVGElement('text', {
+            'x': leftHalfCenterX,
+            'y': centerY,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'central',
+            'fill': '#ffffff',
+            'font-size': '16',
+            'font-weight': 'bold',
+            'pointer-events': 'none'
+        });
+        buttonText.textContent = 'Double';
+        buttonGroup.appendChild(buttonText);
+
+        // Click handler
+        buttonGroup.addEventListener('click', () => {
+            console.log('[BoardSVG] Double button SVG clicked');
+            const doubleBtn = document.getElementById('doubleBtn');
+            console.log('[BoardSVG] Hidden double button state:', {
+                exists: !!doubleBtn,
+                disabled: doubleBtn?.disabled
+            });
+            if (doubleBtn && !doubleBtn.disabled) {
+                console.log('[BoardSVG] Triggering hidden button click');
+                doubleBtn.click();
+            } else {
+                console.warn('[BoardSVG] Double button not clicked - button missing or disabled');
+            }
+        });
+
+        // Hover effect
+        buttonGroup.addEventListener('mouseenter', () => {
+            buttonBg.setAttribute('fill', 'rgba(59, 130, 246, 1)');
+        });
+        buttonGroup.addEventListener('mouseleave', () => {
+            buttonBg.setAttribute('fill', 'rgba(59, 130, 246, 0.9)');
+        });
+
+        diceGroup.appendChild(buttonGroup);
+    }
+
     // Render dice on right side of board
     function renderDice(diceState) {
         if (!diceGroup) return;
@@ -1360,6 +1462,8 @@ const BoardSVG = (function() {
                 // Show Roll button when dice haven't been rolled yet
                 console.log('[BoardSVG] Should show Roll button');
                 renderRollButton(gameState);
+                // Show Double button if player can double
+                renderDoubleButton(gameState);
             } else if (hasRolledDice && hasRemainingMoves && noValidMoves) {
                 // Show greyed-out dice and End Turn button when no valid moves exist
                 console.log('[BoardSVG] Should show greyed Dice and End Turn button (no valid moves)');
