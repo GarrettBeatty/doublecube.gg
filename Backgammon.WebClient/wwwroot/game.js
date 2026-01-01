@@ -1483,91 +1483,67 @@ function updateGameState(state, isSpectator = false) {
         // setupBoardClickHandler(); // Disabled - using drag-and-drop only
     }
 
-    // Update controls
-    // Handle both PascalCase and camelCase (SignalR may use either)
-    const isMyTurn = state.isYourTurn ?? state.IsYourTurn ?? false;
-    const hasRemainingMoves = (state.remainingMoves ?? state.RemainingMoves ?? []).length > 0;
-    const dice = state.dice ?? state.Dice ?? [];
-    const hasDice = dice.length > 0 && (dice[0] > 0 || dice[1] > 0);
-    const movesMade = state.movesMadeThisTurn ?? state.MovesMadeThisTurn ?? 0;
-    const isWaitingForPlayer = (state.status ?? state.Status ?? 1) === 0; // GameStatus.WaitingForPlayer = 0
-
-    debug('Button state calculation', {
-        isMyTurn,
-        hasRemainingMoves,
-        hasDice,
-        movesMade,
-        isWaitingForPlayer,
-        dice
-    }, 'trace');
-
-    const rollBtn = document.getElementById('rollBtn');
-    if (rollBtn) {
-        // Can only roll at the START of your turn (no dice rolled yet)
-        // Once you roll, you must end turn before rolling again
-        // Also disable if waiting for another player to join
-        const shouldDisable = isWaitingForPlayer || !isMyTurn || hasDice;
-        debug('Roll button state update', {
-            wasDisabled: rollBtn.disabled,
-            willBeDisabled: shouldDisable,
-            reason: shouldDisable ? (isWaitingForPlayer ? 'waiting for player' : (!isMyTurn ? 'not your turn' : 'has dice')) : 'enabled'
-        }, 'trace');
-        rollBtn.disabled = shouldDisable;
-    }
-
-    const endTurnBtn = document.getElementById('endTurnBtn');
-    if (endTurnBtn) {
-        // Can end turn only if:
-        // 1. You've rolled dice (hasDice is true), AND
-        // 2. All moves are made (no remaining moves), OR no valid moves are possible
-        const allMovesMade = !hasRemainingMoves;
-        const validMoves = state.validMoves ?? state.ValidMoves ?? [];
-        const noValidMoves = validMoves.length === 0;
-        const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
-        endTurnBtn.disabled = !canEndTurn;
-    }
-
-    // Update Undo button
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) {
-        const hasMoves = movesMade > 0;
-        const canUndo = isMyTurn && hasMoves;
-        undoBtn.disabled = !canUndo;
-    }
-
-    const doubleBtn = document.getElementById('doubleBtn');
-    if (doubleBtn) {
-        // Can offer double only if:
-        // 1. It's your turn
-        // 2. You haven't rolled dice yet (before rolling)
-        // 3. Game is in progress (not waiting for player)
-        // 4. You own the cube OR it's centered (null)
-        const myColorString = myColor; // myColor is already "White" or "Red" string
-        const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
-        const canDouble = isMyTurn &&
-                          !hasDice &&
-                          !isWaitingForPlayer &&
-                          (doublingCubeOwner == null ||  // null or undefined
-                           doublingCubeOwner === myColorString);
-
-        debug('Double button state update', {
-            isMyTurn,
-            hasDice,
-            isWaitingForPlayer,
-            doublingCubeOwner,
-            myColorString,
-            canDouble,
-            willDisable: !canDouble
-        }, 'trace');
-
-        doubleBtn.disabled = !canDouble;
-    }
+    // Update controls - centralized button state management
+    updateAllButtonStates(state);
 
     // Update match-related UI if this is a match game
     updateMatchUI();
 
     // Note: Winner detection and game-over handling is done by the GameOver event handler
     // (see setupEventHandlers), not here. updateGameState() only updates UI with current state.
+}
+
+/**
+ * Centralized button state management - ensures all buttons
+ * are in sync with current game state after every update
+ */
+function updateAllButtonStates(state) {
+    if (!state) return;
+
+    const isMyTurn = state.isYourTurn ?? state.IsYourTurn ?? false;
+    const hasRemainingMoves = (state.remainingMoves ?? state.RemainingMoves ?? []).length > 0;
+    const dice = state.dice ?? state.Dice ?? [];
+    const hasDice = dice.length > 0 && (dice[0] > 0 || dice[1] > 0);
+    const movesMade = state.movesMadeThisTurn ?? state.MovesMadeThisTurn ?? 0;
+    const isWaitingForPlayer = (state.status ?? state.Status ?? 1) === 0;
+    const validMoves = state.validMoves ?? state.ValidMoves ?? [];
+
+    // Roll button: can only roll at start of turn (no dice yet)
+    const rollBtn = document.getElementById('rollBtn');
+    if (rollBtn) {
+        rollBtn.disabled = isWaitingForPlayer || !isMyTurn || hasDice;
+    }
+
+    // End Turn button: can end if dice rolled AND (no moves left OR no valid moves)
+    const endTurnBtn = document.getElementById('endTurnBtn');
+    if (endTurnBtn) {
+        const allMovesMade = !hasRemainingMoves;
+        const noValidMoves = validMoves.length === 0;
+        const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
+
+        debug('End Turn button state', {
+            isMyTurn, hasDice, hasRemainingMoves,
+            validMovesCount: validMoves.length,
+            allMovesMade, noValidMoves, canEndTurn
+        }, 'trace');
+
+        endTurnBtn.disabled = !canEndTurn;
+    }
+
+    // Undo button: can undo if moves made this turn
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.disabled = !(isMyTurn && movesMade > 0);
+    }
+
+    // Double button: can double before rolling, if you own cube or it's centered
+    const doubleBtn = document.getElementById('doubleBtn');
+    if (doubleBtn) {
+        const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
+        const canDouble = isMyTurn && !hasDice && !isWaitingForPlayer &&
+                         (doublingCubeOwner == null || doublingCubeOwner === myColor);
+        doubleBtn.disabled = !canDouble;
+    }
 }
 
 function updateMatchUI() {

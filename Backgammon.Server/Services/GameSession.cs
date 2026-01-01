@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Server.Models;
+using Backgammon.Server.Services.GameModes;
 using ServerGameStatus = Backgammon.Server.Models.GameStatus;
 
 namespace Backgammon.Server.Services;
@@ -31,7 +32,8 @@ public class GameSession
     
     public bool IsFull => WhitePlayerId != null && RedPlayerId != null;
     public bool IsStarted => IsFull && Engine.GameStarted;
-    public bool IsAnalysisMode { get; set; } = false;
+    public IGameMode GameMode { get; private set; }
+    public bool IsAnalysisMode => GameMode is AnalysisMode;  // Helper property for backwards compatibility
     public bool IsBotGame { get; set; } = false;
     
     // Match-related properties
@@ -46,6 +48,7 @@ public class GameSession
         Engine.Board.SetupInitialPosition();
         CreatedAt = DateTime.UtcNow;
         LastActivityAt = DateTime.UtcNow;
+        GameMode = new MultiplayerMode();  // Default to multiplayer mode
     }
     
     /// <summary>
@@ -110,6 +113,15 @@ public class GameSession
         {
             RedPlayerName = GenerateFriendlyName(playerId);
         }
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Enable analysis mode for this game session
+    /// </summary>
+    public void EnableAnalysisMode(string playerId)
+    {
+        GameMode = new AnalysisMode(playerId);
         LastActivityAt = DateTime.UtcNow;
     }
 
@@ -220,12 +232,7 @@ public class GameSession
     /// </summary>
     public bool IsPlayerTurn(string connectionId)
     {
-        // In analysis mode, player controls both sides - always their turn
-        if (IsAnalysisMode)
-            return true;
-
-        var playerColor = GetPlayerColor(connectionId);
-        return playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value;
+        return GameMode.IsPlayerTurn(connectionId, this);
     }
     
     /// <summary>
@@ -240,6 +247,8 @@ public class GameSession
             playerColor = GetPlayerColor(forConnectionId);
         }
         
+        var features = GameMode.GetFeatures();
+
         var state = new GameState
         {
             GameId = Id,
@@ -249,7 +258,7 @@ public class GameSession
             RedPlayerName = RedPlayerName ?? RedPlayerId ?? "Waiting...",
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
             YourColor = playerColor,
-            IsYourTurn = IsAnalysisMode ? true : (playerColor.HasValue && Engine.CurrentPlayer?.Color == playerColor.Value),
+            IsYourTurn = forConnectionId != null && GameMode.IsPlayerTurn(forConnectionId, this),
             Dice = new[] { Engine.Dice.Die1, Engine.Dice.Die2 },
             RemainingMoves = Engine.RemainingMoves.ToArray(),
             MovesMadeThisTurn = Engine.MoveHistory.Count,
@@ -264,7 +273,7 @@ public class GameSession
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
-            IsAnalysisMode = this.IsAnalysisMode
+            IsAnalysisMode = features.ShowAnalysisBadge
         };
 
         // Get valid moves for current player

@@ -184,7 +184,6 @@ public class GameHub : Hub
 
             // Create new session
             var session = await _sessionManager.JoinOrCreateAsync(userId, connectionId, null);
-            session.IsAnalysisMode = true;
 
             // Directly set same player for both sides (bypassing AddPlayer logic)
             // This is necessary because AddPlayer() won't add the same player twice
@@ -195,6 +194,9 @@ public class GameHub : Hub
 
             // Manually set Red player to same user (analysis mode special case)
             session.SetRedPlayer(userId, connectionId);
+
+            // Enable analysis mode
+            session.EnableAnalysisMode(userId);
 
             // Start game immediately
             if (!session.Engine.GameStarted)
@@ -570,14 +572,14 @@ public class GameHub : Hub
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
                         // Update user statistics if players are registered (skip for analysis games)
-                        if (!session.IsAnalysisMode)
+                        if (session.GameMode.ShouldTrackStats)
                         {
                             var game = GameEngineMapper.ToGame(session);
                             await UpdateUserStatsAfterGame(game);
                         }
                         else
                         {
-                            _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+                            _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
                         }
 
                         _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
@@ -866,8 +868,8 @@ public class GameHub : Hub
                             {
                                 await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                                // Skip stats update for analysis games
-                                if (!session.IsAnalysisMode)
+                                // Skip stats update for non-competitive games
+                                if (session.GameMode.ShouldTrackStats)
                                 {
                                     var game = GameEngineMapper.ToGame(session);
                                     await UpdateUserStatsAfterGame(game);
@@ -1001,15 +1003,15 @@ public class GameHub : Hub
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                    // Skip stats update for analysis games
-                    if (!session.IsAnalysisMode)
+                    // Skip stats update for non-competitive games
+                    if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
                         await UpdateUserStatsAfterGame(game);
                     }
                     else
                     {
-                        _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+                        _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
                     }
                     _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
                 }
@@ -1123,8 +1125,8 @@ public class GameHub : Hub
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
-                    // Skip stats update for analysis games
-                    if (!session.IsAnalysisMode)
+                    // Skip stats update for non-competitive games
+                    if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
                         await UpdateUserStatsAfterGame(game);
@@ -1528,12 +1530,11 @@ public class GameHub : Hub
             return;
         }
 
-        // Allow import in analysis mode OR when same player controls both sides
-        if (!session.IsAnalysisMode &&
-            session.WhitePlayerId != null && session.RedPlayerId != null &&
-            session.WhitePlayerId != session.RedPlayerId)
+        // Check if import is allowed in this game mode
+        var features = session.GameMode.GetFeatures();
+        if (!features.AllowImportExport)
         {
-            await Clients.Caller.SendAsync("Error", "Cannot import positions in multiplayer games");
+            await Clients.Caller.SendAsync("Error", "Cannot import positions in this game mode");
             return;
         }
 
