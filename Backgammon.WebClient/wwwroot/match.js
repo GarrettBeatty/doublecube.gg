@@ -118,8 +118,9 @@ function initializeMatchEvents() {
             });
             window.matchController.navigateToGame(data.matchId, data.gameId);
             // Join the game directly without page reload
-            if (typeof joinGame === 'function') {
-                joinGame(data.gameId);
+            if (typeof showGamePage === 'function' && typeof joinSpecificGame === 'function') {
+                showGamePage();
+                joinSpecificGame(data.gameId);
             }
         }
     });
