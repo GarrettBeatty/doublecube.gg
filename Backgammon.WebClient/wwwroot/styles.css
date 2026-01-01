@@ -88,7 +88,7 @@
 }
 
 .player-card {
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--theme-player-card-background);
     border-radius: 12px;
     padding: 1.5rem 1rem;
     display: flex;
@@ -100,8 +100,8 @@
 }
 
 .player-card.active {
-    border-color: rgba(76, 175, 80, 0.8);
-    background: rgba(76, 175, 80, 0.2);
+    border-color: var(--theme-player-card-active-border);
+    background: var(--theme-player-card-active);
     box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
     animation: subtle-pulse 2s infinite;
 }
@@ -233,6 +233,51 @@ body.spectator-mode .board-point {
     min-height: 100vh;
 }
 
+/* ===== THEME CSS VARIABLES ===== */
+:root {
+    /* Board colors */
+    --theme-board-background: #5d4e37;
+    --theme-board-border: #4a7c4e;
+    --theme-point-light: #D4C4B0;
+    --theme-point-dark: #8B7355;
+    --theme-bar: #3D2E22;
+    --theme-bearoff: #3D2E22;
+    
+    /* Checker colors */
+    --theme-checker-white: #F5F5F5;
+    --theme-checker-white-stroke: #BDBDBD;
+    --theme-checker-red: #D32F2F;
+    --theme-checker-red-stroke: #B71C1C;
+    
+    /* Highlight colors */
+    --theme-highlight-source: rgba(255, 213, 79, 0.5);
+    --theme-highlight-selected: rgba(76, 175, 80, 0.6);
+    --theme-highlight-dest: rgba(33, 150, 243, 0.5);
+    --theme-highlight-capture: rgba(244, 67, 54, 0.5);
+    
+    /* Text colors */
+    --theme-text-light: #FFFFFF;
+    --theme-text-dark: #37474F;
+    
+    /* Dice colors */
+    --theme-dice-background: #FFFFFF;
+    --theme-dice-border: #5C6BC0;
+    --theme-dice-value: #5C6BC0;
+    --theme-dice-used-background: #E0E0E0;
+    --theme-dice-used-border: #9E9E9E;
+    --theme-dice-used-value: #757575;
+    
+    /* Doubling cube colors */
+    --theme-cube-background: #3D3D3D;
+    --theme-cube-border: #FFD700;
+    --theme-cube-text: #FFD700;
+    
+    /* UI colors */
+    --theme-player-card-background: rgba(0, 0, 0, 0.4);
+    --theme-player-card-active: rgba(76, 175, 80, 0.2);
+    --theme-player-card-active-border: rgba(76, 175, 80, 0.8);
+}
+
 /* ===== GAME PAGE ===== */
 
 .game-container {
@@ -311,15 +356,15 @@ body.spectator-mode .board-point {
     min-height: 48px;
     max-width: 96px;
     max-height: 96px;
-    background: white;
-    border: 0.4vw solid #667eea;
+    background: var(--theme-dice-background);
+    border: 0.4vw solid var(--theme-dice-border);
     border-radius: 1vw;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 2.5vw;
     font-weight: bold;
-    color: #667eea;
+    color: var(--theme-dice-value);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
 }
 
@@ -439,16 +484,16 @@ body.spectator-mode .board-point {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     cursor: default; /* Changed from pointer - only draggable checkers get grab cursor */
     display: block;
-    background: #5d4e37;
+    background: var(--theme-board-background);
 }
 
 /* Board background */
 .board-background {
-    fill: #5d4e37;
+    fill: var(--theme-board-background);
 }
 
 .board-border {
-    stroke: #4a7c4e;
+    stroke: var(--theme-board-border);
     stroke-width: 8;
 }
 
@@ -458,11 +503,11 @@ body.spectator-mode .board-point {
 }
 
 .point-triangle.point-light {
-    fill: #D4C4B0;
+    fill: var(--theme-point-light);
 }
 
 .point-triangle.point-dark {
-    fill: #8B7355;
+    fill: var(--theme-point-dark);
 }
 
 .point:hover .point-triangle {
@@ -478,41 +523,41 @@ body.spectator-mode .board-point {
 }
 
 .point.valid-source .point-highlight {
-    fill: rgba(255, 213, 79, 0.5);
+    fill: var(--theme-highlight-source);
     opacity: 1;
 }
 
 .point.selected .point-highlight {
-    fill: rgba(76, 175, 80, 0.6);
+    fill: var(--theme-highlight-selected);
     opacity: 1;
 }
 
 .point.valid-destination .point-highlight {
-    fill: rgba(33, 150, 243, 0.5);
+    fill: var(--theme-highlight-dest);
     opacity: 1;
 }
 
 .point.valid-destination.capture .point-highlight {
-    fill: rgba(244, 67, 54, 0.5);
+    fill: var(--theme-highlight-capture);
     opacity: 1;
 }
 
 /* Bar styling */
 .bar-background {
-    fill: #3D2E22;
+    fill: var(--theme-bar);
 }
 
 #bar.valid-source .bar-background {
-    fill: rgba(255, 213, 79, 0.4);
+    fill: var(--theme-highlight-source);
 }
 
 #bar.selected .bar-background {
-    fill: rgba(76, 175, 80, 0.5);
+    fill: var(--theme-highlight-selected);
 }
 
 /* Bear-off styling */
 .bearoff-background {
-    fill: #3D2E22;
+    fill: var(--theme-bearoff);
 }
 
 .bearoff-divider {
@@ -521,7 +566,7 @@ body.spectator-mode .board-point {
 }
 
 #bearoff.valid-destination .bearoff-background {
-    fill: rgba(33, 150, 243, 0.4);
+    fill: var(--theme-highlight-dest);
 }
 
 /* Checker styling - flat modern design */
@@ -531,14 +576,14 @@ body.spectator-mode .board-point {
 }
 
 .checker-white {
-    fill: #F5F5F5;
-    stroke: #BDBDBD;
+    fill: var(--theme-checker-white);
+    stroke: var(--theme-checker-white-stroke);
     stroke-width: 2;
 }
 
 .checker-red {
-    fill: #D32F2F;
-    stroke: #B71C1C;
+    fill: var(--theme-checker-red);
+    stroke: var(--theme-checker-red-stroke);
     stroke-width: 2;
 }
 
@@ -563,11 +608,11 @@ body.spectator-mode .board-point {
 }
 
 .checker-count.count-dark {
-    fill: #37474F;
+    fill: var(--theme-text-dark);
 }
 
 .checker-count.count-light {
-    fill: #FFFFFF;
+    fill: var(--theme-text-light);
 }
 
 /* Bear-off count */
@@ -575,7 +620,7 @@ body.spectator-mode .board-point {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-weight: 700;
     font-size: 24px;
-    fill: #FFFFFF;
+    fill: var(--theme-text-light);
 }
 
 /* Animation for moving pieces */
@@ -621,8 +666,8 @@ body.spectator-mode .board-point {
 }
 
 .die-face {
-    fill: #FFFFFF;
-    stroke: #5C6BC0;
+    fill: var(--theme-dice-background);
+    stroke: var(--theme-dice-border);
     stroke-width: 3;
     filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.3));
     transition: fill 0.3s ease, stroke 0.3s ease, opacity 0.3s ease;
@@ -632,7 +677,7 @@ body.spectator-mode .board-point {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-size: 24px;
     font-weight: 700;
-    fill: #5C6BC0;
+    fill: var(--theme-dice-value);
     transition: fill 0.3s ease;
 }
 
@@ -642,12 +687,12 @@ body.spectator-mode .board-point {
 }
 
 .board-die.used .die-face {
-    fill: #E0E0E0;
-    stroke: #9E9E9E;
+    fill: var(--theme-dice-used-background);
+    stroke: var(--theme-dice-used-border);
 }
 
 .board-die.used .die-value {
-    fill: #757575;
+    fill: var(--theme-dice-used-value);
 }
 
 /* ===== CUBE SIDEBAR ===== */
@@ -659,8 +704,8 @@ body.spectator-mode .board-point {
 
 /* ===== DOUBLING CUBE ===== */
 .doubling-cube {
-    fill: #3D3D3D;
-    stroke: #FFD700;
+    fill: var(--theme-cube-background);
+    stroke: var(--theme-cube-border);
     stroke-width: 3;
     transition: all 0.3s ease;
     filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
@@ -674,14 +719,14 @@ body.spectator-mode .board-point {
 .cube-value {
     font-size: 36px;
     font-weight: bold;
-    fill: #FFD700;
+    fill: var(--theme-cube-text);
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     pointer-events: none;
 }
 
 .cube-owner {
     font-size: 11px;
-    fill: #FFD700;
+    fill: var(--theme-cube-text);
     opacity: 0.8;
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
     pointer-events: none;
