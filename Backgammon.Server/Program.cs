@@ -73,6 +73,9 @@ builder.Services.AddSingleton<IMatchService, MatchService>();
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
+// Player connection tracking service
+builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
+
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
 

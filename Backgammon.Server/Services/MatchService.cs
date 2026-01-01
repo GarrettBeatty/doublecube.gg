@@ -32,6 +32,22 @@ public class MatchService : IMatchService
     {
         try
         {
+            // Input validation
+            if (string.IsNullOrWhiteSpace(player1Id) || string.IsNullOrWhiteSpace(player2Id))
+            {
+                throw new ArgumentException("Player IDs cannot be null or empty");
+            }
+
+            if (targetScore <= 0 || targetScore > 25)
+            {
+                throw new ArgumentException("Target score must be between 1 and 25");
+            }
+
+            if (player1Id == player2Id)
+            {
+                throw new ArgumentException("Cannot create a match against yourself");
+            }
+
             // Get player names
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
@@ -42,8 +58,8 @@ public class MatchService : IMatchService
                 TargetScore = targetScore,
                 Player1Id = player1Id,
                 Player2Id = player2Id,
-                Player1Name = player1?.DisplayName ?? $"Player {player1Id.Substring(0, 8)}",
-                Player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, 8)}",
+                Player1Name = player1?.DisplayName ?? (player1Id.Length >= 8 ? $"Player {player1Id.Substring(0, 8)}" : $"Player {player1Id}"),
+                Player2Name = player2?.DisplayName ?? (player2Id.Length >= 8 ? $"Player {player2Id.Substring(0, 8)}" : $"Player {player2Id}"),
                 Status = "InProgress"
             };
 
