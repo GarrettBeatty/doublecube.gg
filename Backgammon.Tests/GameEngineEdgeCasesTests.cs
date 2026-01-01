@@ -14,7 +14,7 @@ public class GameEngineEdgeCasesTests
         // Place a white checker on the bar
         game.WhitePlayer.CheckersOnBar = 1;
         // Ensure it's White's turn
-        game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
+        game.GetType().GetProperty("CurrentPlayer")!.SetValue(game, game.WhitePlayer);
         game.Dice.SetDice(3, 4);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
@@ -67,7 +67,7 @@ public class GameEngineEdgeCasesTests
         game.WhitePlayer.CheckersOnBar = 0;
         game.RedPlayer.CheckersOnBar = 0;
         // Ensure it's White's turn
-        game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
+        game.GetType().GetProperty("CurrentPlayer")!.SetValue(game, game.WhitePlayer);
         game.Dice.SetDice(6, 5);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
@@ -92,7 +92,7 @@ public class GameEngineEdgeCasesTests
         game.WhitePlayer.CheckersOnBar = 0;
         game.RedPlayer.CheckersOnBar = 0;
         // Ensure it's White's turn
-        game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
+        game.GetType().GetProperty("CurrentPlayer")!.SetValue(game, game.WhitePlayer);
         game.Dice.SetDice(6, 1);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
@@ -136,7 +136,7 @@ public class GameEngineEdgeCasesTests
         game.WhitePlayer.CheckersOnBar = 0;
         game.RedPlayer.CheckersOnBar = 0;
         // Ensure it's White's turn
-        game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
+        game.GetType().GetProperty("CurrentPlayer")!.SetValue(game, game.WhitePlayer);
         game.Dice.SetDice(1, 1);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
@@ -246,7 +246,7 @@ public class GameEngineEdgeCasesTests
         game.WhitePlayer.CheckersOnBar = 0;
         game.RedPlayer.CheckersOnBar = 0;
         // Ensure it's White's turn
-        game.GetType().GetProperty("CurrentPlayer").SetValue(game, game.WhitePlayer);
+        game.GetType().GetProperty("CurrentPlayer")!.SetValue(game, game.WhitePlayer);
         game.Dice.SetDice(1, 2);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
