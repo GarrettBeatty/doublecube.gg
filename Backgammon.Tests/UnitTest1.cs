@@ -1,4 +1,4 @@
-﻿using Backgammon.Core;
+using Backgammon.Core;
 
 namespace Backgammon.Tests;
 

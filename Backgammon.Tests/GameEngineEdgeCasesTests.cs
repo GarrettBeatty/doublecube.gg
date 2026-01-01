@@ -57,6 +57,7 @@ public class GameEngineEdgeCasesTests
         {
             game.Board.GetPoint(i).Checkers.Clear();
         }
+
         // Place all 15 white checkers on point 6 (home board)
         for (int i = 0; i < 15; i++)
         {
@@ -85,6 +86,7 @@ public class GameEngineEdgeCasesTests
         {
             game.Board.GetPoint(i).Checkers.Clear();
         }
+
         // Place a single white checker on point 6, make sure point 5 is empty (so move is possible)
         game.Board.GetPoint(6).AddChecker(CheckerColor.White);
         game.WhitePlayer.CheckersOnBar = 0;
@@ -234,6 +236,7 @@ public class GameEngineEdgeCasesTests
         {
             game.Board.GetPoint(i).Checkers.Clear();
         }
+
         // Place all 15 white checkers on point 1 (home board)
         for (int i = 0; i < 15; i++)
         {
