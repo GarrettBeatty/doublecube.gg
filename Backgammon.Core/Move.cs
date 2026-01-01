@@ -51,9 +51,15 @@ public class Move
     public override string ToString()
     {
         if (From == 0)
+        {
             return $"Bar -> {To}";
+        }
+
         if (IsBearOff)
+        {
             return $"{From} -> Off";
-        return $"{From} -> {To}{(IsHit ? " (hit)" : "")}";
+        }
+
+        return $"{From} -> {To}{(IsHit ? " (hit)" : string.Empty)}";
     }
 }

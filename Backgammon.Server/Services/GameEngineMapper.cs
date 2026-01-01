@@ -109,13 +109,13 @@ public static class GameEngineMapper
         // Restore player assignments (connections will be empty until players reconnect)
         if (!string.IsNullOrEmpty(game.WhitePlayerId))
         {
-            session.AddPlayer(game.WhitePlayerId, ""); // Empty connection ID
+            session.AddPlayer(game.WhitePlayerId, string.Empty); // Empty connection ID
             session.WhitePlayerName = game.WhitePlayerName;
         }
 
         if (!string.IsNullOrEmpty(game.RedPlayerId))
         {
-            session.AddPlayer(game.RedPlayerId, ""); // Empty connection ID
+            session.AddPlayer(game.RedPlayerId, string.Empty); // Empty connection ID
             session.RedPlayerName = game.RedPlayerName;
         }
 
@@ -277,6 +277,7 @@ public static class GameEngineMapper
                 count += point.Count;
             }
         }
+
         return count;
     }
 
@@ -286,7 +287,9 @@ public static class GameEngineMapper
     private static bool IsRegisteredUserId(string? playerId)
     {
         if (string.IsNullOrEmpty(playerId))
+        {
             return false;
+        }
 
         return Guid.TryParse(playerId, out _);
     }

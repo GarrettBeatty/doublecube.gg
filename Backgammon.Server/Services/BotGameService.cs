@@ -29,7 +29,7 @@ public class BotGameService : BackgroundService
     {
         ("greedy", "greedy"),  // Greedy vs Greedy
         ("greedy", "random"),  // Greedy vs Random
-        ("random", "random")   // Random vs Random
+        ("random", "random") // Random vs Random
     };
 
     public BotGameService(
@@ -55,7 +55,8 @@ public class BotGameService : BackgroundService
             return;
         }
 
-        _logger.LogInformation("Bot game service starting. MaxBotGames={MaxGames}, RestartDelay={Delay}s",
+        _logger.LogInformation(
+            "Bot game service starting. MaxBotGames={MaxGames}, RestartDelay={Delay}s",
             _features.Value.MaxBotGames, _features.Value.BotGameRestartDelaySeconds);
 
         // Start initial bot games
@@ -92,8 +93,8 @@ public class BotGameService : BackgroundService
             var whitePlayerId = _aiMoveService.GenerateAiPlayerId(whiteAi);
             var redPlayerId = _aiMoveService.GenerateAiPlayerId(redAi);
 
-            session.AddPlayer(whitePlayerId, "");  // Empty connection ID for bots
-            session.AddPlayer(redPlayerId, "");
+            session.AddPlayer(whitePlayerId, string.Empty);  // Empty connection ID for bots
+            session.AddPlayer(redPlayerId, string.Empty);
 
             // Set friendly names
             session.SetPlayerName(whitePlayerId, GetBotName(whiteAi, "White"));
@@ -101,7 +102,8 @@ public class BotGameService : BackgroundService
 
             _activeBotGameIds.Add(session.Id);
 
-            _logger.LogInformation("Started bot game {GameId}: {White} vs {Red}",
+            _logger.LogInformation(
+                "Started bot game {GameId}: {White} vs {Red}",
                 session.Id, session.WhitePlayerName, session.RedPlayerName);
 
             // Start autonomous game loop (non-blocking)
@@ -153,7 +155,8 @@ public class BotGameService : BackgroundService
                 var winnerName = winner.Color == CheckerColor.White ? session.WhitePlayerName : session.RedPlayerName;
                 var stakes = engine.GetGameResult();
 
-                _logger.LogInformation("Bot game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
+                _logger.LogInformation(
+                    "Bot game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
                     session.Id, winnerName, stakes);
 
                 // Broadcast final state to spectators

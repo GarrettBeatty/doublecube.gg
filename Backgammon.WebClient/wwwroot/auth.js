@@ -1,3 +1,6 @@
+/* global log, getOrCreatePlayerId, navigateToProfile, loadFriends, loadFriendRequests */
+/* exported logout, checkAuth, isAuthenticated, getEffectivePlayerId, showLoginModal, showRegisterModal, showProfileModal, hideProfileModal, updateProfile */
+
 // ==== AUTH STATE ====
 let authToken = null;
 let currentUser = null;

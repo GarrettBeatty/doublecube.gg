@@ -1,3 +1,6 @@
+/* global connection, sendFriendRequest */
+/* exported getProfileUsernameFromUrl, navigateToProfile, saveProfileSettings, editProfile */
+
 // Profile page functionality
 let currentProfileUsername = null;
 let currentProfileData = null;
@@ -92,11 +95,11 @@ function updateProfileHeader(profile) {
     // Update actions based on whether it's own profile
     const actionsDiv = document.getElementById('profileActions');
     const currentUser = getCurrentUsername();
-    
+
     if (currentUser === profile.username) {
         // Own profile - show settings
         actionsDiv.innerHTML = `
-            <button class="btn btn-primary btn-sm" onclick="editProfile()">
+            <button class="btn btn-primary btn-sm" data-action="editProfile">
                 Edit Profile
             </button>
         `;
@@ -114,12 +117,15 @@ function updateProfileHeader(profile) {
             `;
         } else {
             actionsDiv.innerHTML = `
-                <button class="btn btn-primary btn-sm" onclick="sendFriendRequest('${profile.username}')">
+                <button class="btn btn-primary btn-sm" data-action="sendFriendRequest" data-username="${profile.username}">
                     Add Friend
                 </button>
             `;
         }
     }
+
+    // Add event delegation for profile actions
+    setupProfileActionsHandler(actionsDiv);
 }
 
 function updateProfileStats(profile) {
@@ -242,7 +248,7 @@ async function loadFriendsList() {
                             </div>
                         </div>
                         <div>
-                            <p class="font-semibold cursor-pointer hover:underline" onclick="navigateToProfile('${friend.username}')">
+                            <p class="font-semibold cursor-pointer hover:underline" data-action="navigateToProfile" data-username="${friend.username}">
                                 ${friend.displayName}
                             </p>
                             <p class="text-sm text-base-content/60">@${friend.username}</p>
@@ -324,3 +330,53 @@ function showSuccess(message) {
     console.log(message);
     alert(message);
 }
+
+// ==== EVENT DELEGATION HANDLERS ====
+
+function setupProfileActionsHandler(container) {
+    // Remove any existing listeners to avoid duplicates
+    const oldHandler = container._profileActionsHandler;
+    if (oldHandler) {
+        container.removeEventListener('click', oldHandler);
+    }
+
+    // Create new handler
+    const handler = (e) => {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+
+        const action = target.dataset.action;
+        const username = target.dataset.username;
+
+        switch (action) {
+            case 'editProfile':
+                editProfile();
+                break;
+            case 'sendFriendRequest':
+                if (username) sendFriendRequest(username);
+                break;
+        }
+    };
+
+    // Store reference for removal later
+    container._profileActionsHandler = handler;
+    container.addEventListener('click', handler);
+}
+
+// Setup event delegation for friends list on page load
+document.addEventListener('DOMContentLoaded', () => {
+    const friendsContainer = document.getElementById('profileFriendsList');
+    if (friendsContainer) {
+        friendsContainer.addEventListener('click', (e) => {
+            const target = e.target.closest('[data-action]');
+            if (!target) return;
+
+            const action = target.dataset.action;
+            const username = target.dataset.username;
+
+            if (action === 'navigateToProfile' && username) {
+                navigateToProfile(username);
+            }
+        });
+    }
+});

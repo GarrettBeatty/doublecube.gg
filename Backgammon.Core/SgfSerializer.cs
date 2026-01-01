@@ -33,6 +33,7 @@ public static class SgfSerializer
                     sb.Append($"[{coord}[{count}]]");
                 }
             }
+
             sb.AppendLine();
         }
 
@@ -52,6 +53,7 @@ public static class SgfSerializer
                     sb.Append($"[{coord}[{count}]]");
                 }
             }
+
             sb.AppendLine();
         }
 
@@ -97,7 +99,10 @@ public static class SgfSerializer
             {
                 case "GM":
                     if (values.Count > 0 && values[0] != "6")
+                    {
                         throw new ArgumentException($"Invalid game type: {values[0]}. Expected 6 for Backgammon.");
+                    }
+
                     break;
 
                 case "AW":
@@ -113,6 +118,7 @@ public static class SgfSerializer
                     {
                         engine.SetCurrentPlayer(values[0] == "W" ? CheckerColor.White : CheckerColor.Red);
                     }
+
                     break;
 
                 case "DI":
@@ -124,6 +130,7 @@ public static class SgfSerializer
                         engine.RemainingMoves.Clear();
                         engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
                     }
+
                     break;
 
                 case "CO":
@@ -136,6 +143,7 @@ public static class SgfSerializer
                         // Set cube value - requires reflection or a public setter
                         // For now, skip as DoublingCube doesn't expose a setter
                     }
+
                     break;
             }
         }
@@ -195,7 +203,9 @@ public static class SgfSerializer
     private static char PointToSgf(int point, CheckerColor color)
     {
         if (point < 1 || point > 24)
+        {
             throw new ArgumentException($"Point must be between 1 and 24, got {point}");
+        }
 
         if (color == CheckerColor.White)
         {
@@ -215,10 +225,14 @@ public static class SgfSerializer
     private static int SgfToPoint(char coord, CheckerColor color)
     {
         if (coord == 'y' || coord == 'z')
+        {
             throw new ArgumentException($"Coordinate '{coord}' is not a board point");
+        }
 
         if (coord < 'a' || coord > 'x')
+        {
             throw new ArgumentException($"Invalid SGF coordinate: {coord}");
+        }
 
         if (color == CheckerColor.White)
         {
@@ -283,7 +297,9 @@ public static class SgfSerializer
             // Parse coordinate and optional count: "a" or "a[2]"
             System.Text.RegularExpressions.Match match = Regex.Match(value, @"^([a-z])(?:\[(\d+)\])?$");
             if (!match.Success)
+            {
                 continue;
+            }
 
             char coord = match.Groups[1].Value[0];
             int count = match.Groups[2].Success ? int.Parse(match.Groups[2].Value) : 1;
@@ -339,9 +355,14 @@ public static class SgfSerializer
         int redCount = CountCheckers(engine, CheckerColor.Red);
 
         if (whiteCount > 15)
+        {
             throw new ArgumentException($"Invalid position: White has {whiteCount} checkers (max 15)");
+        }
+
         if (redCount > 15)
+        {
             throw new ArgumentException($"Invalid position: Red has {redCount} checkers (max 15)");
+        }
     }
 
     /// <summary>
@@ -355,7 +376,9 @@ public static class SgfSerializer
         {
             var point = engine.Board.GetPoint(i);
             if (point.Color == color)
+            {
                 count += point.Count;
+            }
         }
 
         var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;

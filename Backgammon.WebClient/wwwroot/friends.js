@@ -1,3 +1,6 @@
+/* global log, isAuthenticated, authFetch, currentUser, currentGameId */
+/* exported sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend, inviteFriendToGame */
+
 // ==== FRIENDS STATE ====
 let friendsList = [];
 let pendingRequests = [];

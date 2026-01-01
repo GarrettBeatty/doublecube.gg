@@ -17,17 +17,19 @@ public class GreedyAI : IBackgammonAI
     public List<Move> ChooseMoves(GameEngine engine)
     {
         var chosenMoves = new List<Move>();
-        
+
         while (engine.RemainingMoves.Count > 0)
         {
             var validMoves = engine.GetValidMoves();
-            
+
             if (validMoves.Count == 0)
+            {
                 break;
+            }
 
             // Choose the best move based on priorities
             var move = SelectBestMove(validMoves, engine);
-            
+
             if (engine.ExecuteMove(move))
             {
                 chosenMoves.Add(move);
@@ -48,24 +50,26 @@ public class GreedyAI : IBackgammonAI
         if (bearOffMoves.Any())
         {
             // Prefer bearing off from the furthest point
-            return bearOffMoves.OrderByDescending(m => 
-                engine.CurrentPlayer.Color == CheckerColor.White ? m.From : 25 - m.From
-            ).First();
+            return bearOffMoves.OrderByDescending(m =>
+                engine.CurrentPlayer.Color == CheckerColor.White ? m.From : 25 - m.From).First();
         }
 
         // Priority 2: Hit opponent's blot if possible
         var hitMoves = new List<Move>();
         foreach (var move in validMoves)
         {
-            if (move.From == 0) continue; // Skip bar entry for this check
-            
+            if (move.From == 0)
+            {
+                continue; // Skip bar entry for this check
+            }
+
             var toPoint = engine.Board.GetPoint(move.To);
             if (toPoint.IsBlot && toPoint.Color != engine.CurrentPlayer.Color)
             {
                 hitMoves.Add(move);
             }
         }
-        
+
         if (hitMoves.Any())
         {
             // Return the first hitting move
@@ -90,13 +94,17 @@ public class GreedyAI : IBackgammonAI
         // Simple heuristic: accept if we've borne off at least some checkers
         // or opponent hasn't borne off many
         var opponent = engine.GetOpponent();
-        
+
         if (engine.CurrentPlayer.CheckersBornOff >= 5)
+        {
             return true;
-            
+        }
+
         if (opponent.CheckersBornOff < 10)
+        {
             return true;
-            
+        }
+
         return false;
     }
 

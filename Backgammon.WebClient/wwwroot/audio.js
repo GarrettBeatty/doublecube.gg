@@ -3,6 +3,7 @@
  * Manages sound effects for the Backgammon game
  * Uses IIFE pattern for encapsulation
  */
+/* exported AudioManager */
 const AudioManager = (function() {
     // Private state
     let initialized = false;

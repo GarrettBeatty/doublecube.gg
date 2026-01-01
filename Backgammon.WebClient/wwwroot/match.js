@@ -1,9 +1,11 @@
+/* global debug, connection, myPlayerId, setGameUrl, joinGame, showGamePage, joinSpecificGame, showError, isAuthenticated, apiBaseUrl */
+/* exported createMatch, continueMatch, acceptMatchInvite, declineMatchInvite, showMatchHistory */
+
 // Match play functionality for Backgammon
 
 // ==== MATCH STATE ====
 // Note: Match state is now managed by MatchController (match-state.js)
 // Use window.matchController.getCurrentMatch() / setCurrentMatch() instead
-let matchHistory = [];
 
 // ==== MATCH UI COMPONENTS ====
 class MatchStatusDisplay {
@@ -118,8 +120,9 @@ function initializeMatchEvents() {
             });
             window.matchController.navigateToGame(data.matchId, data.gameId);
             // Join the game directly without page reload
-            if (typeof joinGame === 'function') {
-                joinGame(data.gameId);
+            if (typeof showGamePage === 'function' && typeof joinSpecificGame === 'function') {
+                showGamePage();
+                joinSpecificGame(data.gameId);
             }
         }
     });

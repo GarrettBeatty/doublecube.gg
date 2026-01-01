@@ -1,0 +1,12 @@
+{
+  "name": "backgammon-webclient",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "eslint wwwroot/**/*.js",
+    "lint:fix": "eslint wwwroot/**/*.js --fix"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}

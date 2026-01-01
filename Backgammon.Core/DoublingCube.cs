@@ -6,6 +6,7 @@ namespace Backgammon.Core;
 public class DoublingCube
 {
     public int Value { get; private set; }
+
     public CheckerColor? Owner { get; private set; }
 
     public DoublingCube()

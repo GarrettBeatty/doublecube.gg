@@ -1,3 +1,5 @@
+/* global */
+
 // MatchController - Centralized match state management
 // Singleton pattern for managing match state, persistence, and navigation
 
@@ -151,7 +153,7 @@ class MatchController {
         }
     }
 
-    handleGameComplete(data) {
+    handleGameComplete(_data) {
         // Update current game ID if needed
         if (this.currentMatch) {
             this.saveToLocalStorage();

@@ -6,19 +6,30 @@ namespace Backgammon.Core;
 public class GameEngine
 {
     public Board Board { get; }
+
     public Player WhitePlayer { get; }
+
     public Player RedPlayer { get; }
+
     public Player CurrentPlayer { get; private set; }
+
     public Dice Dice { get; }
+
     public DoublingCube DoublingCube { get; }
+
     public List<int> RemainingMoves { get; private set; }
+
     public List<Move> MoveHistory { get; private set; }
+
     public bool GameStarted { get; private set; }
+
     public bool GameOver { get; private set; }
+
     public Player? Winner { get; private set; }
-    
+
     // Match-related properties
     public bool IsCrawfordGame { get; set; }
+
     public string? MatchId { get; set; }
 
     public GameEngine(string whiteName = "White", string redName = "Red")
@@ -64,10 +75,11 @@ public class GameEngine
         {
             whiteRoll = Dice.RollSingle();
             redRoll = Dice.RollSingle();
-        } while (whiteRoll == redRoll);
+        }
+        while (whiteRoll == redRoll);
 
         CurrentPlayer = whiteRoll > redRoll ? WhitePlayer : RedPlayer;
-        
+
         // Use the opening rolls as the first move
         Dice.SetDice(Math.Max(whiteRoll, redRoll), Math.Min(whiteRoll, redRoll));
         RemainingMoves = Dice.GetMoves();
@@ -79,7 +91,9 @@ public class GameEngine
     public void RollDice()
     {
         if (!GameStarted || GameOver)
+        {
             throw new InvalidOperationException("Game is not in progress");
+        }
 
         Dice.Roll();
         RemainingMoves = new List<int>(Dice.GetMoves());
@@ -92,7 +106,9 @@ public class GameEngine
     public bool ExecuteMove(Move move)
     {
         if (!IsValidMove(move))
+        {
             return false;
+        }
 
         // Capture state BEFORE executing (for undo)
         move.OpponentCheckersOnBarBefore = GetOpponent().CheckersOnBar;
@@ -102,7 +118,7 @@ public class GameEngine
         if (move.From == 0)
         {
             CurrentPlayer.CheckersOnBar--;
-            
+
             var destPoint = Board.GetPoint(move.To);
             if (destPoint.IsBlot && destPoint.Color != CurrentPlayer.Color)
             {
@@ -112,9 +128,10 @@ public class GameEngine
                 opponent.CheckersOnBar++;
                 move.IsHit = true;
             }
-            
+
             destPoint.AddChecker(CurrentPlayer.Color);
         }
+
         // Handle bearing off
         else if (move.IsBearOff)
         {
@@ -122,6 +139,7 @@ public class GameEngine
             fromPoint.RemoveChecker();
             CurrentPlayer.CheckersBornOff++;
         }
+
         // Normal move
         else
         {
@@ -165,17 +183,23 @@ public class GameEngine
     {
         // Must have this die value available
         if (!RemainingMoves.Contains(move.DieValue))
+        {
             return false;
+        }
 
         // If checkers on bar, must enter first
         if (CurrentPlayer.CheckersOnBar > 0 && move.From != 0)
+        {
             return false;
+        }
 
         // Entering from bar
         if (move.From == 0)
         {
             if (CurrentPlayer.CheckersOnBar == 0)
+            {
                 return false;
+            }
 
             var destPoint = Board.GetPoint(move.To);
             return destPoint.IsOpen(CurrentPlayer.Color);
@@ -190,7 +214,9 @@ public class GameEngine
         // Normal move
         var fromPoint = Board.GetPoint(move.From);
         if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+        {
             return false;
+        }
 
         var toPoint = Board.GetPoint(move.To);
         return toPoint.IsOpen(CurrentPlayer.Color);
@@ -203,23 +229,31 @@ public class GameEngine
     {
         // Must have all checkers in home board
         if (!Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
+        {
             return false;
+        }
 
         var fromPoint = Board.GetPoint(from);
         if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+        {
             return false;
+        }
 
         var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
-        
+
         // Point must be in home board
         if (CurrentPlayer.Color == CheckerColor.White)
         {
             if (from < homeStart || from > homeEnd)
+            {
                 return false;
+            }
 
             // Exact die value match
             if (from == dieValue)
+            {
                 return true;
+            }
 
             // If die is higher than point, can bear off if no checkers on higher points
             if (dieValue > from)
@@ -231,13 +265,17 @@ public class GameEngine
         else // Red
         {
             if (from < homeStart || from > homeEnd)
+            {
                 return false;
+            }
 
             int normalizedPosition = 25 - from; // Convert to 1-6 range
-            
+
             // Exact die value match
             if (normalizedPosition == dieValue)
+            {
                 return true;
+            }
 
             // If die is higher than normalized position, can bear off if no checkers on higher points
             if (dieValue > normalizedPosition)
@@ -265,8 +303,11 @@ public class GameEngine
                 int entryPoint = CurrentPlayer.Color == CheckerColor.White ? 25 - die : die;
                 var move = new Move(0, entryPoint, die);
                 if (IsValidMove(move))
+                {
                     validMoves.Add(move);
+                }
             }
+
             return validMoves;
         }
 
@@ -283,7 +324,9 @@ public class GameEngine
                     {
                         var move = new Move(pos, CurrentPlayer.Color == CheckerColor.White ? 0 : 25, die);
                         if (IsValidMove(move))
+                        {
                             validMoves.Add(move);
+                        }
                     }
                 }
             }
@@ -294,7 +337,9 @@ public class GameEngine
         {
             var fromPoint = Board.GetPoint(from);
             if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+            {
                 continue;
+            }
 
             foreach (var die in RemainingMoves.Distinct())
             {
@@ -303,7 +348,9 @@ public class GameEngine
                 {
                     var move = new Move(from, to, die);
                     if (IsValidMove(move))
+                    {
                         validMoves.Add(move);
+                    }
                 }
             }
         }
@@ -329,7 +376,9 @@ public class GameEngine
     public bool UndoLastMove()
     {
         if (MoveHistory.Count == 0)
+        {
             return false;
+        }
 
         var move = MoveHistory[^1]; // Get last move
         MoveHistory.RemoveAt(MoveHistory.Count - 1);
@@ -398,8 +447,10 @@ public class GameEngine
     {
         // Crawford rule - no doubling allowed
         if (IsCrawfordGame)
+        {
             return false;
-            
+        }
+
         return DoublingCube.CanDouble(CurrentPlayer.Color);
     }
 
@@ -417,7 +468,9 @@ public class GameEngine
     public void ForfeitGame(Player winner)
     {
         if (!GameStarted || GameOver)
+        {
             throw new InvalidOperationException("Cannot forfeit - game is not in progress");
+        }
 
         Winner = winner;
         GameOver = true;
@@ -429,7 +482,9 @@ public class GameEngine
     public int GetGameResult()
     {
         if (!GameOver || Winner == null)
+        {
             return 0;
+        }
 
         var loser = Winner.Color == CheckerColor.White ? RedPlayer : WhitePlayer;
 
@@ -437,14 +492,18 @@ public class GameEngine
         if (loser.CheckersBornOff == 0)
         {
             if (loser.CheckersOnBar > 0)
+            {
                 return 3 * DoublingCube.Value;
+            }
 
             var (winnerHomeStart, winnerHomeEnd) = Winner.GetHomeBoardRange();
             for (int i = winnerHomeStart; i <= winnerHomeEnd; i++)
             {
                 var point = Board.GetPoint(i);
                 if (point.Color == loser.Color && point.Count > 0)
+                {
                     return 3 * DoublingCube.Value;
+                }
             }
 
             // Gammon (2x) - loser has not borne off any checkers
@@ -461,7 +520,9 @@ public class GameEngine
     public WinType DetermineWinType()
     {
         if (!GameOver || Winner == null)
+        {
             throw new InvalidOperationException("Game is not over yet");
+        }
 
         var loser = Winner.Color == CheckerColor.White ? RedPlayer : WhitePlayer;
 
@@ -470,14 +531,18 @@ public class GameEngine
         {
             // Backgammon - loser has checkers on bar or in winner's home board
             if (loser.CheckersOnBar > 0)
+            {
                 return WinType.Backgammon;
+            }
 
             var (winnerHomeStart, winnerHomeEnd) = Winner.GetHomeBoardRange();
             for (int i = winnerHomeStart; i <= winnerHomeEnd; i++)
             {
                 var point = Board.GetPoint(i);
                 if (point.Color == loser.Color && point.Count > 0)
+                {
                     return WinType.Backgammon;
+                }
             }
 
             // Gammon - loser has not borne off any checkers
@@ -494,7 +559,9 @@ public class GameEngine
     public GameResult CreateGameResult()
     {
         if (!GameOver || Winner == null)
+        {
             throw new InvalidOperationException("Game is not over yet");
+        }
 
         var winType = DetermineWinType();
         return new GameResult(Winner.Color == CheckerColor.White ? WhitePlayer.Name : RedPlayer.Name, winType, DoublingCube.Value);

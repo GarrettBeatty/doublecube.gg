@@ -54,7 +54,8 @@ public class DynamoDbInitializer : IHostedService
 
             if (!_isLocalEnvironment)
             {
-                _logger.LogWarning("Table '{TableName}' does not exist in production environment. " +
+                _logger.LogWarning(
+                    "Table '{TableName}' does not exist in production environment. " +
                     "Table should be created via CDK. Skipping table creation.", _tableName);
                 _initializationTcs.SetResult(true);
                 return;

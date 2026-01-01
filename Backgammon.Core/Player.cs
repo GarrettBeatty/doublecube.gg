@@ -6,8 +6,11 @@ namespace Backgammon.Core;
 public class Player
 {
     public CheckerColor Color { get; }
+
     public string Name { get; }
+
     public int CheckersOnBar { get; set; }
+
     public int CheckersBornOff { get; set; }
 
     public Player(CheckerColor color, string name)

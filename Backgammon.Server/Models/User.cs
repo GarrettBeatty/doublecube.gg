@@ -171,12 +171,12 @@ public enum ProfilePrivacyLevel
     /// Visible to everyone
     /// </summary>
     Public = 0,
-    
+
     /// <summary>
     /// Visible only to friends
     /// </summary>
     FriendsOnly = 1,
-    
+
     /// <summary>
     /// Hidden from everyone
     /// </summary>

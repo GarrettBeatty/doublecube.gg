@@ -56,7 +56,8 @@ public class Game
         Status = GameStatus.InProgress;
     }
 
-    public Game(string gameId) : this()
+    public Game(string gameId)
+        : this()
     {
         GameId = gameId;
     }

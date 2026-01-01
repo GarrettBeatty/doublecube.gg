@@ -1,3 +1,6 @@
+/* global AudioManager, BoardSVG, checkAuth, updateAuthUI, getEffectivePlayerId, isAuthenticated, loadFriends, loadFriendRequests, getProfileUsernameFromUrl, showProfilePage, loadProfile, initializeMatchEvents, continueMatch, authToken, showError */
+/* exported toggleDebugPanel, clearDebugLog, goHome, createGame, createAnalysisGame, createAiGame, joinGameById, showAbandonConfirm, cancelAbandon, confirmAbandon, confirmOfferDouble, cancelOfferDouble, acceptDouble, declineDouble, toggleChatSidebar, handleChatKeyPress, clearLog, toggleBoardFlip, drawBarCheckers, drawBornOff, setupBoardClickHandler, getPointAtPosition, exportPosition, showImportModal, copyPosition, applyPosition, closePositionModal, spectateGame */
+
 // ==== DEBUG LOGGING ====
 let debugEnabled = false;
 
@@ -102,11 +105,11 @@ function detectRoute() {
     const path = window.location.pathname;
 
     // Match routes: /match/{matchId}, /match/{matchId}/lobby, /match/{matchId}/results, /match/{matchId}/game/{gameId}
-    const matchLobbyPattern = /^\/match\/([^\/]+)\/lobby$/;
-    const matchResultsPattern = /^\/match\/([^\/]+)\/results$/;
-    const matchGamePattern = /^\/match\/([^\/]+)\/game\/([^\/]+)$/;
-    const matchPattern = /^\/match\/([^\/]+)$/;
-    const gamePattern = /^\/game\/([^\/]+)$/;
+    const matchLobbyPattern = /^\/match\/([^/]+)\/lobby$/;
+    const matchResultsPattern = /^\/match\/([^/]+)\/results$/;
+    const matchGamePattern = /^\/match\/([^/]+)\/game\/([^/]+)$/;
+    const matchPattern = /^\/match\/([^/]+)$/;
+    const gamePattern = /^\/game\/([^/]+)$/;
 
     if (matchLobbyPattern.test(path)) {
         const matchId = path.match(matchLobbyPattern)[1];
@@ -329,7 +332,7 @@ window.addEventListener('load', async () => {
             try {
                 await undoLastMove();
             } finally {
-                setTimeout(() => updateControls(currentGameState), 100);
+                undoBtn.disabled = false;
             }
         });
     }
@@ -388,7 +391,7 @@ window.addEventListener('load', async () => {
 });
 
 // Handle browser back/forward buttons
-window.addEventListener('popstate', (event) => {
+window.addEventListener('popstate', (_event) => {
     // Check for profile URL first
     const profileUsername = getProfileUsernameFromUrl();
     if (profileUsername) {
@@ -528,7 +531,7 @@ function setupEventHandlers() {
         showGamePage(); // Show game page so player can see board while waiting
     });
 
-    connection.on("OpponentJoined", (opponentId) => {
+    connection.on("OpponentJoined", (_opponentId) => {
         log(`👋 Opponent joined`, 'success');
     });
 
@@ -1244,15 +1247,6 @@ function clearLog() {
 }
 
 // ==== HELPER FUNCTIONS ====
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // ==== PIP COUNT CALCULATION ====
 function calculatePipCount(state, color) {
     if (!state || !state.board) return 0;
@@ -1483,91 +1477,67 @@ function updateGameState(state, isSpectator = false) {
         // setupBoardClickHandler(); // Disabled - using drag-and-drop only
     }
 
-    // Update controls
-    // Handle both PascalCase and camelCase (SignalR may use either)
-    const isMyTurn = state.isYourTurn ?? state.IsYourTurn ?? false;
-    const hasRemainingMoves = (state.remainingMoves ?? state.RemainingMoves ?? []).length > 0;
-    const dice = state.dice ?? state.Dice ?? [];
-    const hasDice = dice.length > 0 && (dice[0] > 0 || dice[1] > 0);
-    const movesMade = state.movesMadeThisTurn ?? state.MovesMadeThisTurn ?? 0;
-    const isWaitingForPlayer = (state.status ?? state.Status ?? 1) === 0; // GameStatus.WaitingForPlayer = 0
-
-    debug('Button state calculation', {
-        isMyTurn,
-        hasRemainingMoves,
-        hasDice,
-        movesMade,
-        isWaitingForPlayer,
-        dice
-    }, 'trace');
-
-    const rollBtn = document.getElementById('rollBtn');
-    if (rollBtn) {
-        // Can only roll at the START of your turn (no dice rolled yet)
-        // Once you roll, you must end turn before rolling again
-        // Also disable if waiting for another player to join
-        const shouldDisable = isWaitingForPlayer || !isMyTurn || hasDice;
-        debug('Roll button state update', {
-            wasDisabled: rollBtn.disabled,
-            willBeDisabled: shouldDisable,
-            reason: shouldDisable ? (isWaitingForPlayer ? 'waiting for player' : (!isMyTurn ? 'not your turn' : 'has dice')) : 'enabled'
-        }, 'trace');
-        rollBtn.disabled = shouldDisable;
-    }
-
-    const endTurnBtn = document.getElementById('endTurnBtn');
-    if (endTurnBtn) {
-        // Can end turn only if:
-        // 1. You've rolled dice (hasDice is true), AND
-        // 2. All moves are made (no remaining moves), OR no valid moves are possible
-        const allMovesMade = !hasRemainingMoves;
-        const validMoves = state.validMoves ?? state.ValidMoves ?? [];
-        const noValidMoves = validMoves.length === 0;
-        const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
-        endTurnBtn.disabled = !canEndTurn;
-    }
-
-    // Update Undo button
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) {
-        const hasMoves = movesMade > 0;
-        const canUndo = isMyTurn && hasMoves;
-        undoBtn.disabled = !canUndo;
-    }
-
-    const doubleBtn = document.getElementById('doubleBtn');
-    if (doubleBtn) {
-        // Can offer double only if:
-        // 1. It's your turn
-        // 2. You haven't rolled dice yet (before rolling)
-        // 3. Game is in progress (not waiting for player)
-        // 4. You own the cube OR it's centered (null)
-        const myColorString = myColor; // myColor is already "White" or "Red" string
-        const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
-        const canDouble = isMyTurn &&
-                          !hasDice &&
-                          !isWaitingForPlayer &&
-                          (doublingCubeOwner == null ||  // null or undefined
-                           doublingCubeOwner === myColorString);
-
-        debug('Double button state update', {
-            isMyTurn,
-            hasDice,
-            isWaitingForPlayer,
-            doublingCubeOwner,
-            myColorString,
-            canDouble,
-            willDisable: !canDouble
-        }, 'trace');
-
-        doubleBtn.disabled = !canDouble;
-    }
+    // Update controls - centralized button state management
+    updateAllButtonStates(state);
 
     // Update match-related UI if this is a match game
     updateMatchUI();
 
     // Note: Winner detection and game-over handling is done by the GameOver event handler
     // (see setupEventHandlers), not here. updateGameState() only updates UI with current state.
+}
+
+/**
+ * Centralized button state management - ensures all buttons
+ * are in sync with current game state after every update
+ */
+function updateAllButtonStates(state) {
+    if (!state) return;
+
+    const isMyTurn = state.isYourTurn ?? state.IsYourTurn ?? false;
+    const hasRemainingMoves = (state.remainingMoves ?? state.RemainingMoves ?? []).length > 0;
+    const dice = state.dice ?? state.Dice ?? [];
+    const hasDice = dice.length > 0 && (dice[0] > 0 || dice[1] > 0);
+    const movesMade = state.movesMadeThisTurn ?? state.MovesMadeThisTurn ?? 0;
+    const isWaitingForPlayer = (state.status ?? state.Status ?? 1) === 0;
+    const validMoves = state.validMoves ?? state.ValidMoves ?? [];
+
+    // Roll button: can only roll at start of turn (no dice yet)
+    const rollBtn = document.getElementById('rollBtn');
+    if (rollBtn) {
+        rollBtn.disabled = isWaitingForPlayer || !isMyTurn || hasDice;
+    }
+
+    // End Turn button: can end if dice rolled AND (no moves left OR no valid moves)
+    const endTurnBtn = document.getElementById('endTurnBtn');
+    if (endTurnBtn) {
+        const allMovesMade = !hasRemainingMoves;
+        const noValidMoves = validMoves.length === 0;
+        const canEndTurn = isMyTurn && hasDice && (allMovesMade || noValidMoves);
+
+        debug('End Turn button state', {
+            isMyTurn, hasDice, hasRemainingMoves,
+            validMovesCount: validMoves.length,
+            allMovesMade, noValidMoves, canEndTurn
+        }, 'trace');
+
+        endTurnBtn.disabled = !canEndTurn;
+    }
+
+    // Undo button: can undo if moves made this turn
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.disabled = !(isMyTurn && movesMade > 0);
+    }
+
+    // Double button: can double before rolling, if you own cube or it's centered
+    const doubleBtn = document.getElementById('doubleBtn');
+    if (doubleBtn) {
+        const doublingCubeOwner = state.doublingCubeOwner ?? state.DoublingCubeOwner;
+        const canDouble = isMyTurn && !hasDice && !isWaitingForPlayer &&
+                         (doublingCubeOwner == null || doublingCubeOwner === myColor);
+        doubleBtn.disabled = !canDouble;
+    }
 }
 
 function updateMatchUI() {
@@ -1901,7 +1871,7 @@ function setupBoardClickHandler() {
     boardClickHandlerSetup = true;
 }
 
-async function handleBoardClick(event) {
+async function handleBoardClick(_event) {
     // DISABLED: Click-to-move functionality removed in favor of drag-and-drop only
     console.log('=== BOARD CLICK (DISABLED) ===');
     return;
@@ -1926,7 +1896,7 @@ async function handleBoardClick(event) {
     if (currentGameState.remainingMoves.length === 0) {
         console.log('No remaining moves');
         return;
-    }*/
+    }
 
     // Get clicked point from SVG coordinates
     const clickedPoint = BoardSVG.getPointAtPosition(event.clientX, event.clientY);
@@ -1959,6 +1929,7 @@ async function handleBoardClick(event) {
     // Try to select this checker
     console.log('Trying to select checker at point', clickedPoint);
     await selectChecker(clickedPoint);
+    */
 }
 
 async function selectChecker(point) {
@@ -2040,7 +2011,6 @@ function getPointAtPosition(x, y, canvasWidth, canvasHeight) {
     
     // Check if in bar area
     if (x >= barX && x <= barX + barWidth) {
-        const myColorValue = myColor === 'White' ? 0 : 1;
         const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
         if (onBar > 0) {
             return 0; // Bar point

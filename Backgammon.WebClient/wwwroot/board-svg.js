@@ -1,4 +1,5 @@
 // board-svg.js - SVG Board Rendering Module for Backgammon
+/* exported BoardSVG */
 
 const BoardSVG = (function() {
     // SVG Namespace
@@ -111,7 +112,6 @@ const BoardSVG = (function() {
     let diceGroup = null;
     let cubeGroup = null;
     let initialized = false;
-    let clickHandler = null;
 
     // Drag and drop state
     let dragState = {
@@ -1428,8 +1428,8 @@ const BoardSVG = (function() {
         const hasRemainingMoves = diceState && diceState.remainingMoves && diceState.remainingMoves.length > 0;
 
         // Check if it's the player's turn (not opponent's turn)
-        const isPlayerTurn = gameState && gameState.yourColor !== undefined &&
-                             gameState.currentPlayer === gameState.yourColor;
+        // Use server-provided isYourTurn which handles analysis mode correctly
+        const isPlayerTurn = gameState && (gameState.isYourTurn ?? gameState.IsYourTurn ?? false);
 
         // Check if game is waiting for player (Status: 0 = WaitingForPlayer)
         const isWaitingForPlayer = gameState && gameState.status === 0;
