@@ -1,3 +1,5 @@
+/* global */
+
 // Match Results View - Post-match results and statistics
 
 class MatchResultsView {

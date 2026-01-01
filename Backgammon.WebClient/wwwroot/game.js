@@ -1,3 +1,6 @@
+/* global AudioManager, BoardSVG, checkAuth, updateAuthUI, getEffectivePlayerId, isAuthenticated, loadFriends, loadFriendRequests, getProfileUsernameFromUrl, showProfilePage, loadProfile, initializeMatchEvents, continueMatch, authToken, showError */
+/* exported toggleDebugPanel, clearDebugLog, goHome, createGame, createAnalysisGame, createAiGame, joinGameById, showAbandonConfirm, cancelAbandon, confirmAbandon, confirmOfferDouble, cancelOfferDouble, acceptDouble, declineDouble, toggleChatSidebar, handleChatKeyPress, clearLog, toggleBoardFlip, drawBarCheckers, drawBornOff, setupBoardClickHandler, getPointAtPosition, exportPosition, showImportModal, copyPosition, applyPosition, closePositionModal, spectateGame */
+
 // ==== DEBUG LOGGING ====
 let debugEnabled = false;
 
@@ -102,11 +105,11 @@ function detectRoute() {
     const path = window.location.pathname;
 
     // Match routes: /match/{matchId}, /match/{matchId}/lobby, /match/{matchId}/results, /match/{matchId}/game/{gameId}
-    const matchLobbyPattern = /^\/match\/([^\/]+)\/lobby$/;
-    const matchResultsPattern = /^\/match\/([^\/]+)\/results$/;
-    const matchGamePattern = /^\/match\/([^\/]+)\/game\/([^\/]+)$/;
-    const matchPattern = /^\/match\/([^\/]+)$/;
-    const gamePattern = /^\/game\/([^\/]+)$/;
+    const matchLobbyPattern = /^\/match\/([^/]+)\/lobby$/;
+    const matchResultsPattern = /^\/match\/([^/]+)\/results$/;
+    const matchGamePattern = /^\/match\/([^/]+)\/game\/([^/]+)$/;
+    const matchPattern = /^\/match\/([^/]+)$/;
+    const gamePattern = /^\/game\/([^/]+)$/;
 
     if (matchLobbyPattern.test(path)) {
         const matchId = path.match(matchLobbyPattern)[1];
@@ -329,7 +332,7 @@ window.addEventListener('load', async () => {
             try {
                 await undoLastMove();
             } finally {
-                setTimeout(() => updateControls(currentGameState), 100);
+                undoBtn.disabled = false;
             }
         });
     }
@@ -388,7 +391,7 @@ window.addEventListener('load', async () => {
 });
 
 // Handle browser back/forward buttons
-window.addEventListener('popstate', (event) => {
+window.addEventListener('popstate', (_event) => {
     // Check for profile URL first
     const profileUsername = getProfileUsernameFromUrl();
     if (profileUsername) {
@@ -528,7 +531,7 @@ function setupEventHandlers() {
         showGamePage(); // Show game page so player can see board while waiting
     });
 
-    connection.on("OpponentJoined", (opponentId) => {
+    connection.on("OpponentJoined", (_opponentId) => {
         log(`👋 Opponent joined`, 'success');
     });
 
@@ -1244,15 +1247,6 @@ function clearLog() {
 }
 
 // ==== HELPER FUNCTIONS ====
-/**
- * Escape HTML to prevent XSS
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
 // ==== PIP COUNT CALCULATION ====
 function calculatePipCount(state, color) {
     if (!state || !state.board) return 0;
@@ -1877,7 +1871,7 @@ function setupBoardClickHandler() {
     boardClickHandlerSetup = true;
 }
 
-async function handleBoardClick(event) {
+async function handleBoardClick(_event) {
     // DISABLED: Click-to-move functionality removed in favor of drag-and-drop only
     console.log('=== BOARD CLICK (DISABLED) ===');
     return;
@@ -1902,7 +1896,7 @@ async function handleBoardClick(event) {
     if (currentGameState.remainingMoves.length === 0) {
         console.log('No remaining moves');
         return;
-    }*/
+    }
 
     // Get clicked point from SVG coordinates
     const clickedPoint = BoardSVG.getPointAtPosition(event.clientX, event.clientY);
@@ -1935,6 +1929,7 @@ async function handleBoardClick(event) {
     // Try to select this checker
     console.log('Trying to select checker at point', clickedPoint);
     await selectChecker(clickedPoint);
+    */
 }
 
 async function selectChecker(point) {
@@ -2016,7 +2011,6 @@ function getPointAtPosition(x, y, canvasWidth, canvasHeight) {
     
     // Check if in bar area
     if (x >= barX && x <= barX + barWidth) {
-        const myColorValue = myColor === 'White' ? 0 : 1;
         const onBar = myColor === 'White' ? currentGameState.whiteCheckersOnBar : currentGameState.redCheckersOnBar;
         if (onBar > 0) {
             return 0; // Bar point

@@ -1,4 +1,5 @@
 // board-svg.js - SVG Board Rendering Module for Backgammon
+/* exported BoardSVG */
 
 const BoardSVG = (function() {
     // SVG Namespace
@@ -111,7 +112,6 @@ const BoardSVG = (function() {
     let diceGroup = null;
     let cubeGroup = null;
     let initialized = false;
-    let clickHandler = null;
 
     // Drag and drop state
     let dragState = {

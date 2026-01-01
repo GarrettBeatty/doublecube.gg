@@ -13,14 +13,14 @@
     <header id="appHeader" class="bg-gradient-to-br from-primary to-secondary text-white px-6 py-4 sticky top-0 z-50 shadow-lg">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <!-- Left: Logo -->
-            <div class="flex items-center gap-4 cursor-pointer" onclick="goHome()">
+            <div class="flex items-center gap-4 cursor-pointer">
                 <h1 class="text-2xl font-bold">Backgammon Online</h1>
             </div>
 
             <!-- Right: Connection + Auth -->
             <div class="flex items-center gap-4">
                 <!-- Debug Toggle Button -->
-                <button id="debugToggleBtn" class="btn btn-ghost btn-sm text-white" onclick="toggleDebugPanel()" title="Toggle Debug Panel">
+                <button id="debugToggleBtn" class="btn btn-ghost btn-sm text-white" title="Toggle Debug Panel">
                     🐛
                 </button>
 
@@ -31,15 +31,15 @@
 
                 <!-- Auth Section (unauthenticated) -->
                 <div id="authSection" class="flex gap-2">
-                    <button class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary" onclick="showLoginModal()">Login</button>
-                    <button class="btn btn-accent btn-sm" onclick="showRegisterModal()">Sign Up</button>
+                    <button id="loginBtn" class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary">Login</button>
+                    <button id="signupBtn" class="btn btn-accent btn-sm">Sign Up</button>
                 </div>
 
                 <!-- User Section (authenticated) -->
                 <div id="userSection" style="display: none;" class="flex items-center gap-2">
                     <span id="usernameDisplay" class="font-semibold"></span>
-                    <button class="btn btn-ghost btn-sm text-white" onclick="showProfileModal()">Profile</button>
-                    <button class="btn btn-error btn-sm" onclick="logout()">Logout</button>
+                    <button id="profileBtn" class="btn btn-ghost btn-sm text-white">Profile</button>
+                    <button id="logoutBtn" class="btn btn-error btn-sm">Logout</button>
                 </div>
             </div>
         </div>
@@ -53,22 +53,22 @@
                 <div class="card-body">
                     <!-- Action Buttons -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                        <button class="btn btn-primary btn-lg h-auto py-6 flex-col gap-2" onclick="createGame()">
+                        <button id="createGameBtn" class="btn btn-primary btn-lg h-auto py-6 flex-col gap-2">
                             <span class="text-3xl">+</span>
                             <span class="text-lg">Play vs Human</span>
                             <span class="text-sm opacity-70">Multiplayer</span>
                         </button>
-                        <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="createAiGame()">
+                        <button id="createAiGameBtn" class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2">
                             <span class="text-3xl">&#129302;</span>
                             <span class="text-lg">Play vs Computer</span>
                             <span class="text-sm opacity-70">Single player</span>
                         </button>
-                        <button class="btn btn-accent btn-lg h-auto py-6 flex-col gap-2" onclick="showCreateMatchDialog()">
+                        <button id="createMatchBtn" class="btn btn-accent btn-lg h-auto py-6 flex-col gap-2">
                             <span class="text-3xl">🏆</span>
                             <span class="text-lg">Create Match</span>
                             <span class="text-sm opacity-70">Play to target score</span>
                         </button>
-                        <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="createAnalysisGame()">
+                        <button id="createAnalysisBtn" class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2">
                             <span class="text-3xl">📊</span>
                             <span class="text-lg">Analysis Mode</span>
                             <span class="text-xs opacity-70">Practice & test positions</span>
@@ -99,7 +99,7 @@
                         <h2 class="text-xl font-bold mb-4">Friends</h2>
                         <div class="join w-full mb-4">
                             <input type="text" id="friendSearch" placeholder="Search users to add..." class="input input-bordered join-item flex-1">
-                            <button onclick="performUserSearch()" class="btn btn-primary join-item">Search</button>
+                            <button id="userSearchBtn" class="btn btn-primary join-item">Search</button>
                         </div>
                         <div id="userSearchResults" class="space-y-2"></div>
                         <div id="friendRequests" class="space-y-2"></div>
@@ -182,16 +182,16 @@
 
                             <!-- Secondary Game Controls -->
                             <div class="game-controls-secondary" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
-                                <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" onclick="toggleBoardFlip()" title="Flip board orientation">
+                                <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" title="Flip board orientation">
                                     🔄 Flip Board
                                 </button>
-                                <button id="abandonBtn" class="btn btn-error btn-sm gap-2" onclick="showAbandonConfirm()">
+                                <button id="abandonBtn" class="btn btn-error btn-sm gap-2">
                                     ⚠️ Abandon
                                 </button>
-                                <button id="exportBtn" class="btn btn-ghost btn-sm gap-2" onclick="exportPosition()">
+                                <button id="exportBtn" class="btn btn-ghost btn-sm gap-2">
                                     📋 Export
                                 </button>
-                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" onclick="showImportModal()" style="display: none;">
+                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" style="display: none;">
                                     📥 Import
                                 </button>
                             </div>
@@ -267,10 +267,10 @@
 
                     <!-- Tabs -->
                     <div class="tabs tabs-boxed mb-6">
-                        <a class="tab tab-active" onclick="showProfileTab('games')" id="tabGames">Recent Games</a>
-                        <a class="tab" onclick="showProfileTab('friends')" id="tabFriends">Friends</a>
-                        <a class="tab" onclick="showProfileTab('stats')" id="tabStats">Detailed Stats</a>
-                        <a class="tab" onclick="showProfileTab('settings')" id="tabSettings" style="display: none;">Settings</a>
+                        <a class="tab tab-active" id="tabGames">Recent Games</a>
+                        <a class="tab" id="tabFriends">Friends</a>
+                        <a class="tab" id="tabStats">Detailed Stats</a>
+                        <a class="tab" id="tabSettings" style="display: none;">Settings</a>
                     </div>
 
                     <!-- Tab Content -->
@@ -344,7 +344,7 @@
                                     <option value="2">Private</option>
                                 </select>
                             </div>
-                            <button class="btn btn-primary mt-4" onclick="saveProfileSettings()">Save Privacy Settings</button>
+                            <button id="saveProfileSettingsBtn" class="btn btn-primary mt-4">Save Privacy Settings</button>
                         </div>
                     </div>
                 </div>
@@ -378,12 +378,12 @@
             </div>
             <p id="loginError" class="text-error text-sm mt-2 min-h-5"></p>
             <div class="modal-action flex-col gap-2 mt-4">
-                <button onclick="performLogin()" class="btn btn-primary w-full">Login</button>
-                <button onclick="hideLoginModal()" class="btn btn-ghost w-full">Cancel</button>
+                <button id="performLoginBtn" class="btn btn-primary w-full">Login</button>
+                <button id="cancelLoginBtn" class="btn btn-ghost w-full">Cancel</button>
             </div>
             <p class="text-center text-sm mt-4 text-base-content/70">
                 Don't have an account?
-                <a href="#" class="link link-primary" onclick="hideLoginModal(); showRegisterModal();">Sign up</a>
+                <a href="#" id="switchToRegisterLink" class="link link-primary">Sign up</a>
             </p>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -415,12 +415,12 @@
             </div>
             <p id="registerError" class="text-error text-sm mt-2 min-h-5"></p>
             <div class="modal-action flex-col gap-2 mt-4">
-                <button onclick="performRegister()" class="btn btn-primary w-full">Create Account</button>
-                <button onclick="hideRegisterModal()" class="btn btn-ghost w-full">Cancel</button>
+                <button id="performRegisterBtn" class="btn btn-primary w-full">Create Account</button>
+                <button id="cancelLoginBtn" class="btn btn-ghost w-full">Cancel</button>
             </div>
             <p class="text-center text-sm mt-4 text-base-content/70">
                 Already have an account?
-                <a href="#" class="link link-primary" onclick="hideRegisterModal(); showLoginModal();">Login</a>
+                <a href="#" id="switchToLoginLink" class="link link-primary">Login</a>
             </p>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -443,7 +443,7 @@
                     </label>
                     <input type="text" id="profileDisplayName" class="input input-bordered w-full">
                 </div>
-                <button onclick="updateProfile()" class="btn btn-primary btn-sm mt-3">Update</button>
+                <button id="updateProfileBtn" class="btn btn-primary btn-sm mt-3">Update</button>
             </div>
 
             <div class="divider"></div>
@@ -500,7 +500,7 @@
             </div>
 
             <div class="modal-action">
-                <button onclick="hideProfileModal()" class="btn btn-ghost">Close</button>
+                <button id="closeProfileModalBtn" class="btn btn-ghost">Close</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -517,8 +517,8 @@
                 This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">1x</span>
             </p>
             <div class="modal-action gap-2">
-                <button onclick="confirmAbandon()" class="btn btn-error">Abandon Game</button>
-                <button onclick="cancelAbandon()" class="btn btn-ghost">Cancel</button>
+                <button id="confirmAbandonBtn" class="btn btn-error">Abandon Game</button>
+                <button class="btn btn-ghost">Cancel</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -539,8 +539,8 @@
                 Declining will concede the game at current stakes.
             </p>
             <div class="modal-action gap-2">
-                <button onclick="acceptDouble()" class="btn btn-success">Accept</button>
-                <button onclick="declineDouble()" class="btn btn-error">Decline (Lose)</button>
+                <button id="acceptDoubleBtn" class="btn btn-success">Accept</button>
+                <button id="declineDoubleBtn" class="btn btn-error">Decline (Lose)</button>
             </div>
         </div>
     </dialog>
@@ -558,8 +558,8 @@
                 If your opponent declines, they lose at the current stakes.
             </p>
             <div class="modal-action gap-2">
-                <button onclick="confirmOfferDouble()" class="btn btn-success">Confirm Double</button>
-                <button onclick="cancelOfferDouble()" class="btn btn-ghost">Cancel</button>
+                <button id="confirmOfferDoubleBtn" class="btn btn-success">Confirm Double</button>
+                <button class="btn btn-ghost">Cancel</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -604,8 +604,8 @@
             </div>
             
             <div class="modal-action gap-2">
-                <button onclick="createMatchFromDialog()" class="btn btn-primary">Create Match</button>
-                <button onclick="hideCreateMatchDialog()" class="btn btn-ghost">Cancel</button>
+                <button id="createMatchConfirmBtn" class="btn btn-primary">Create Match</button>
+                <button class="btn btn-ghost">Cancel</button>
             </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -642,13 +642,13 @@
 )"></textarea>
             </div>
             <div class="modal-action gap-2 flex-wrap">
-                <button id="copyPositionBtn" onclick="copyPosition()" class="btn btn-primary">
+                <button id="copyPositionBtn" class="btn btn-primary">
                     📋 Copy to Clipboard
                 </button>
-                <button id="importPositionBtn" onclick="applyPosition()" class="btn btn-success">
+                <button id="importPositionBtn" class="btn btn-success">
                     📥 Import Position
                 </button>
-                <button onclick="closePositionModal()" class="btn btn-ghost">Close</button>
+                <button id="closeProfileModalBtn" class="btn btn-ghost">Close</button>
             </div>
             <div class="alert alert-warning mt-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
@@ -674,8 +674,8 @@
                 </label>
             </div>
             <div style="display: flex; gap: 4px;">
-                <button onclick="clearDebugLog()" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Clear</button>
-                <button onclick="toggleDebugPanel()" style="background: #6366f1; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Close</button>
+                <button id="clearDebugBtn" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Clear</button>
+                <button id="closeDebugBtn" style="background: #6366f1; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Close</button>
             </div>
         </div>
         <div id="debugLog" style="padding: 10px; overflow-y: auto; max-height: 550px; color: #e2e8f0;">
@@ -695,5 +695,6 @@
     <script src="/match.js"></script>
     <script src="/game.js"></script>
     <script src="/profile.js"></script>
+    <script src="/event-handlers.js"></script>
 </body>
 </html>

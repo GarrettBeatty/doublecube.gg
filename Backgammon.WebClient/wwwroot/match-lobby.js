@@ -1,3 +1,6 @@
+/* global connection, getDisplayName, waitForConnection */
+/* exported connection */
+
 // Match Lobby View - Pre-game lobby screen
 
 class MatchLobbyView {
