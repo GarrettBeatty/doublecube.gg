@@ -3,6 +3,7 @@ using Backgammon.Core;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using ServerGame = Backgammon.Server.Models.Game;
@@ -37,6 +38,7 @@ public class GameHub : Hub
     private readonly IAiMoveService _aiMoveService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMemoryCache _cache;
+    private readonly HybridCache _hybridCache;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
     private readonly ILogger<GameHub> _logger;
@@ -49,6 +51,7 @@ public class GameHub : Hub
         IAiMoveService aiMoveService,
         IHubContext<GameHub> hubContext,
         IMemoryCache cache,
+        HybridCache hybridCache,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
         ILogger<GameHub> logger)
@@ -60,6 +63,7 @@ public class GameHub : Hub
         _aiMoveService = aiMoveService;
         _hubContext = hubContext;
         _cache = cache;
+        _hybridCache = hybridCache;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
         _logger = logger;
@@ -624,6 +628,9 @@ public class GameHub : Hub
                         {
                             var game = GameEngineMapper.ToGame(session);
                             await UpdateUserStatsAfterGame(game);
+
+                            // Invalidate player caches
+                            await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                         }
                         else
                         {
@@ -943,6 +950,9 @@ public class GameHub : Hub
                                 {
                                     var game = GameEngineMapper.ToGame(session);
                                     await UpdateUserStatsAfterGame(game);
+
+                                    // Invalidate player caches
+                                    await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                                 }
 
                                 _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
@@ -1081,6 +1091,9 @@ public class GameHub : Hub
                     {
                         var game = GameEngineMapper.ToGame(session);
                         await UpdateUserStatsAfterGame(game);
+
+                        // Invalidate player caches
+                        await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                     }
                     else
                     {
@@ -1478,6 +1491,9 @@ public class GameHub : Hub
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
                         var game = GameEngineMapper.ToGame(session);
                         await UpdateUserStatsAfterGame(game);
+
+                        // Invalidate player caches
+                        await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                     }
                     catch (Exception ex)
                     {
@@ -1489,6 +1505,32 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AI turn in game {GameId}", session.Id);
+        }
+    }
+
+    /// <summary>
+    /// Invalidate caches for players after game completion
+    /// </summary>
+    private async Task InvalidatePlayerCachesAsync(string? whitePlayerId, string? redPlayerId)
+    {
+        try
+        {
+            // Invalidate game history and stats caches for both players
+            if (!string.IsNullOrEmpty(whitePlayerId))
+            {
+                await _hybridCache.RemoveByTagAsync($"player:{whitePlayerId}");
+                _logger.LogDebug("Invalidated cache for player {PlayerId}", whitePlayerId);
+            }
+
+            if (!string.IsNullOrEmpty(redPlayerId))
+            {
+                await _hybridCache.RemoveByTagAsync($"player:{redPlayerId}");
+                _logger.LogDebug("Invalidated cache for player {PlayerId}", redPlayerId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate player caches");
         }
     }
 

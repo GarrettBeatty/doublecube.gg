@@ -32,6 +32,18 @@ builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();
 
+// Add HybridCache for user profiles, game history, and friend lists
+builder.Services.AddHybridCache(options =>
+{
+    options.MaximumPayloadBytes = 1024 * 1024; // 1MB
+    options.MaximumKeyLength = 512;
+    options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+    {
+        Expiration = TimeSpan.FromMinutes(5),
+        LocalCacheExpiration = TimeSpan.FromMinutes(1)
+    };
+});
+
 // ========== DYNAMODB CONFIGURATION ==========
 Console.WriteLine("=== DynamoDB Configuration ===");
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
@@ -58,7 +70,14 @@ builder.Services.AddSingleton<Amazon.DynamoDBv2.IAmazonDynamoDB>(sp =>
 
 // Register DynamoDB services
 builder.Services.AddSingleton<IGameRepository, Backgammon.Server.Services.DynamoDb.DynamoDbGameRepository>();
-builder.Services.AddSingleton<IUserRepository, Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+builder.Services.AddSingleton<Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+builder.Services.AddSingleton<IUserRepository>(sp =>
+{
+    var dynamoDbUserRepo = sp.GetRequiredService<Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+    var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
+    var logger = sp.GetRequiredService<ILogger<CachedUserService>>();
+    return new CachedUserService(dynamoDbUserRepo, cache, logger);
+});
 builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
 builder.Services.AddSingleton<IMatchRepository, Backgammon.Server.Services.DynamoDb.DynamoDbMatchRepository>();
 
@@ -310,17 +329,45 @@ app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
     };
 }).RequireCors(selectedCorsPolicy);
 
-// Player game history endpoint
-app.MapGet("/api/player/{playerId}/games", async (string playerId, IGameRepository gameRepository, int limit = 20, int skip = 0) =>
+// Player game history endpoint (with caching)
+app.MapGet("/api/player/{playerId}/games", async (
+    string playerId,
+    Microsoft.Extensions.Caching.Hybrid.HybridCache cache,
+    IGameRepository gameRepository,
+    int limit = 20,
+    int skip = 0) =>
 {
-    var games = await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip);
+    var cacheKey = $"player-games:{playerId}:completed:limit={limit}:skip={skip}";
+
+    var games = await cache.GetOrCreateAsync(
+        cacheKey,
+        async ct => await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip),
+        new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromMinutes(10)
+        },
+        tags: [$"player:{playerId}"]
+    );
+
     return games;
 }).RequireCors(selectedCorsPolicy);
 
-// Player statistics endpoint
-app.MapGet("/api/player/{playerId}/stats", async (string playerId, IGameRepository gameRepository) =>
+// Player statistics endpoint (with caching)
+app.MapGet("/api/player/{playerId}/stats", async (
+    string playerId,
+    Microsoft.Extensions.Caching.Hybrid.HybridCache cache,
+    IGameRepository gameRepository) =>
 {
-    var stats = await gameRepository.GetPlayerStatsAsync(playerId);
+    var stats = await cache.GetOrCreateAsync(
+        $"player-stats:{playerId}",
+        async ct => await gameRepository.GetPlayerStatsAsync(playerId),
+        new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+        {
+            Expiration = TimeSpan.FromMinutes(15) // Stats change infrequently
+        },
+        tags: [$"player:{playerId}"]
+    );
+
     return stats;
 }).RequireCors(selectedCorsPolicy);
 
