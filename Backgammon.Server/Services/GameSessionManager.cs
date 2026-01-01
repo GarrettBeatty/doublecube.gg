@@ -27,8 +27,9 @@ public interface IGameSessionManager
     
     /// <summary>
     /// Join an existing game by ID, or create a new game (no matchmaking)
+    /// Loads from database if game not in memory but exists as InProgress
     /// </summary>
-    GameSession JoinOrCreate(string playerId, string connectionId, string? gameId = null);
+    Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null);
     
     /// <summary>
     /// Remove a player from their current game
@@ -76,6 +77,12 @@ public class GameSessionManager : IGameSessionManager
     private readonly Dictionary<string, GameSession> _games = new();
     private readonly Dictionary<string, string> _playerToGame = new();
     private readonly object _lock = new object();
+    private readonly IGameRepository _gameRepository;
+
+    public GameSessionManager(IGameRepository gameRepository)
+    {
+        _gameRepository = gameRepository;
+    }
     
     public GameSession CreateGame(string? gameId = null)
     {
@@ -126,8 +133,9 @@ public class GameSessionManager : IGameSessionManager
         }
     }
     
-    public GameSession JoinOrCreate(string playerId, string connectionId, string? gameId = null)
+    public async Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null)
     {
+        // Check memory first (inside lock)
         lock (_lock)
         {
             // Check if player is already in a game (reconnection scenario)
@@ -139,8 +147,8 @@ public class GameSessionManager : IGameSessionManager
                     return playerGame; // Already in this game
                 }
             }
-            
-            // If specific game ID provided, try to join that game
+
+            // If specific game ID provided, try to join that game from memory
             if (!string.IsNullOrEmpty(gameId))
             {
                 if (_games.TryGetValue(gameId, out var existingGame))
@@ -158,15 +166,52 @@ public class GameSessionManager : IGameSessionManager
                     }
                     return existingGame;
                 }
-                
-                // Create the game with the specified ID
+                // Game not in memory - will check database outside lock
+            }
+        }
+
+        // If specific gameId provided but not in memory, try database (outside lock to avoid blocking)
+        if (!string.IsNullOrEmpty(gameId))
+        {
+            var game = await _gameRepository.GetGameByGameIdAsync(gameId);
+
+            if (game != null && game.Status == "InProgress")
+            {
+                // Verify player is part of this game
+                if (game.WhitePlayerId == playerId || game.RedPlayerId == playerId)
+                {
+                    lock (_lock)
+                    {
+                        // Double-check not loaded by another thread
+                        if (!_games.ContainsKey(gameId))
+                        {
+                            var session = GameEngineMapper.FromGame(game);
+                            _games[gameId] = session;
+                        }
+
+                        var loadedSession = _games[gameId];
+                        loadedSession.AddPlayer(playerId, connectionId);
+                        _playerToGame[connectionId] = gameId;
+                        loadedSession.UpdateActivity();
+                        return loadedSession;
+                    }
+                }
+                throw new InvalidOperationException("You are not a player in this game");
+            }
+
+            // Game doesn't exist in DB or not resumable - create new with specified ID
+            lock (_lock)
+            {
                 var newGame = CreateGame(gameId);
                 newGame.AddPlayer(playerId, connectionId);
                 _playerToGame[connectionId] = gameId;
                 return newGame;
             }
-            
-            // When gameId is null, ALWAYS create a new game (no matchmaking)
+        }
+
+        // When gameId is null, ALWAYS create a new game (no matchmaking)
+        lock (_lock)
+        {
             var game = CreateGame();
             game.AddPlayer(playerId, connectionId);
             _playerToGame[connectionId] = game.Id;

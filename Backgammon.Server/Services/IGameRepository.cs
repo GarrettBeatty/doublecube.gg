@@ -62,6 +62,14 @@ public interface IGameRepository
     /// Delete a game from the database (use sparingly - prefer status updates)
     /// </summary>
     Task DeleteGameAsync(string gameId);
+
+    /// <summary>
+    /// Get all games with a specific status that were last updated before a given timestamp
+    /// Used for cleanup/abandonment detection
+    /// </summary>
+    /// <param name="timestamp">The timestamp cutoff</param>
+    /// <param name="status">Game status to filter by</param>
+    Task<List<Game>> GetGamesLastUpdatedBeforeAsync(DateTime timestamp, string status);
 }
 
 /// <summary>

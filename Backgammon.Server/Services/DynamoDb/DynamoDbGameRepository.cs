@@ -52,6 +52,7 @@ public class DynamoDbGameRepository : IGameRepository
                     "White",
                     game.RedPlayerId ?? "",
                     game.Status,
+                    game.CreatedAt,
                     game.LastUpdatedAt
                 );
 
@@ -74,6 +75,7 @@ public class DynamoDbGameRepository : IGameRepository
                     "Red",
                     game.WhitePlayerId ?? "",
                     game.Status,
+                    game.CreatedAt,
                     game.LastUpdatedAt
                 );
 
@@ -321,14 +323,14 @@ public class DynamoDbGameRepository : IGameRepository
                         break;
                 }
 
-                if (response.LastEvaluatedKey.Count == 0)
+                if (response.LastEvaluatedKey == null || response.LastEvaluatedKey.Count == 0)
                     break;
 
                 lastKey = response.LastEvaluatedKey;
             }
 
-            // Get full game details
-            var gameIds = playerGameItems.Select(item => item["gameId"].S).ToList();
+            // Get full game details (deduplicate game IDs - same game may have multiple index items from different saves)
+            var gameIds = playerGameItems.Select(item => item["gameId"].S).Distinct().ToList();
             var games = new List<Game>();
 
             foreach (var gameId in gameIds)
@@ -564,6 +566,31 @@ public class DynamoDbGameRepository : IGameRepository
         {
             _logger.LogError(ex, "Failed to delete game {GameId}", gameId);
             throw;
+        }
+    }
+
+    public async Task<List<Game>> GetGamesLastUpdatedBeforeAsync(DateTime timestamp, string status)
+    {
+        try
+        {
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI3",
+                KeyConditionExpression = "GSI3PK = :pk AND GSI3SK < :timestamp",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = $"GAME_STATUS#{status}" },
+                    [":timestamp"] = new AttributeValue { S = timestamp.Ticks.ToString("D19") }
+                }
+            });
+
+            return response.Items.Select(DynamoDbHelpers.UnmarshalGame).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to query games before {Timestamp} with status {Status}", timestamp, status);
+            return new List<Game>();
         }
     }
 }

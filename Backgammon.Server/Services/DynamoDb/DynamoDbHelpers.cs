@@ -412,10 +412,11 @@ public static class DynamoDbHelpers
         string playerColor,
         string opponentId,
         string status,
+        DateTime createdAt,
         DateTime lastUpdatedAt)
     {
-        // Use reversed timestamp for latest-first sorting
-        var reversedTimestamp = (DateTime.MaxValue.Ticks - lastUpdatedAt.Ticks).ToString("D19");
+        // Use reversed createdAt timestamp for latest-first sorting (stays constant for same game)
+        var reversedTimestamp = (DateTime.MaxValue.Ticks - createdAt.Ticks).ToString("D19");
 
         return new Dictionary<string, AttributeValue>
         {

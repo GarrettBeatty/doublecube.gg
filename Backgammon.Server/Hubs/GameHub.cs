@@ -97,7 +97,7 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            var session = _sessionManager.JoinOrCreate(effectivePlayerId, connectionId, gameId);
+            var session = await _sessionManager.JoinOrCreateAsync(effectivePlayerId, connectionId, gameId);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
                 effectivePlayerId, connectionId, session.Id);
@@ -139,7 +139,9 @@ public class GameHub : Hub
             }
             else
             {
-                // Waiting for opponent
+                // Waiting for opponent - save to database so it shows in dashboard
+                await SaveGameStateAsync(session);
+
                 var state = session.GetState(connectionId);
                 await Clients.Caller.SendAsync("GameUpdate", state);
                 await Clients.Caller.SendAsync("WaitingForOpponent", session.Id);
@@ -164,7 +166,7 @@ public class GameHub : Hub
             var userId = GetAuthenticatedUserId() ?? connectionId;
 
             // Create new session
-            var session = _sessionManager.JoinOrCreate(userId, connectionId, null);
+            var session = await _sessionManager.JoinOrCreateAsync(userId, connectionId, null);
             session.IsAnalysisMode = true;
 
             // Directly set same player for both sides (bypassing AddPlayer logic)

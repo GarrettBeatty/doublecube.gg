@@ -238,21 +238,22 @@ app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
 }).RequireCors(selectedCorsPolicy);
 
 // My games endpoint - returns active games for a specific player
-app.MapGet("/api/player/{playerId}/active-games", (string playerId, IGameSessionManager sessionManager) =>
+app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameRepository gameRepository) =>
 {
-    var playerGames = sessionManager.GetPlayerGames(playerId).ToList();
+    // Query database for all InProgress games (source of truth)
+    var dbGames = await gameRepository.GetPlayerGamesAsync(playerId, "InProgress", limit: 50);
 
-    return playerGames.Select(g => new
+    return dbGames.Select(g => new
     {
-        gameId = g.Id,
+        gameId = g.GameId,
         myColor = g.WhitePlayerId == playerId ? "White" : "Red",
         opponent = g.WhitePlayerId == playerId
             ? (g.RedPlayerName ?? "Waiting for opponent")
             : (g.WhitePlayerName ?? "Waiting for opponent"),
-        isFull = g.IsFull,
-        isMyTurn = g.Engine.CurrentPlayer?.Color == (g.WhitePlayerId == playerId ? CheckerColor.White : CheckerColor.Red),
+        isFull = !string.IsNullOrEmpty(g.WhitePlayerId) && !string.IsNullOrEmpty(g.RedPlayerId),
+        isMyTurn = g.CurrentPlayer == (g.WhitePlayerId == playerId ? "White" : "Red"),
         createdAt = g.CreatedAt,
-        lastActivity = g.LastActivityAt
+        lastActivity = g.LastUpdatedAt
     }).ToList();
 }).RequireCors(selectedCorsPolicy);
 
@@ -523,32 +524,52 @@ var cleanupTask = Task.Run(async () =>
 {
     while (true)
     {
-        await Task.Delay(TimeSpan.FromMinutes(5));
+        await Task.Delay(TimeSpan.FromMinutes(30));
 
         var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
         var gameRepository = app.Services.GetRequiredService<IGameRepository>();
 
-        // Get all games before cleanup to identify abandoned ones
+        // Evict from memory after 6 hours of inactivity (but keep in DB as "InProgress")
         var allGames = sessionManager.GetAllGames();
-        var cutoff = DateTime.UtcNow - TimeSpan.FromHours(1);
-        var inactiveGames = allGames.Where(g => g.LastActivityAt < cutoff && g.Engine.Winner == null).ToList();
+        var evictionCutoff = DateTime.UtcNow - TimeSpan.FromHours(6);
+        var inactiveGames = allGames
+            .Where(g => g.LastActivityAt < evictionCutoff && g.Engine.Winner == null)
+            .ToList();
 
-        // Mark abandoned games in database
-        foreach (var abandonedGame in inactiveGames)
+        foreach (var game in inactiveGames)
         {
             try
             {
-                await gameRepository.UpdateGameStatusAsync(abandonedGame.Id, "Abandoned");
-                Console.WriteLine($"[Cleanup] Marked game {abandonedGame.Id} as Abandoned");
+                // Save current state before eviction
+                await gameRepository.SaveGameAsync(GameEngineMapper.ToGame(game));
+
+                // Remove from memory (status stays "InProgress" in DB!)
+                sessionManager.RemoveGame(game.Id);
+
+                Console.WriteLine($"[Cleanup] Evicted game {game.Id} from memory (still resumable in DB)");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Cleanup] Failed to mark game {abandonedGame.Id} as abandoned: {ex.Message}");
+                Console.WriteLine($"[Cleanup] Failed to evict game {game.Id}: {ex.Message}");
             }
         }
 
-        // Clean up from memory
-        sessionManager.CleanupInactiveGames(TimeSpan.FromHours(1));
+        // True abandonment: 90 days without activity
+        var abandonmentCutoff = DateTime.UtcNow - TimeSpan.FromDays(90);
+        var abandonedGames = await gameRepository.GetGamesLastUpdatedBeforeAsync(abandonmentCutoff, "InProgress");
+
+        foreach (var abandonedGame in abandonedGames)
+        {
+            try
+            {
+                await gameRepository.UpdateGameStatusAsync(abandonedGame.GameId, "Abandoned");
+                Console.WriteLine($"[Cleanup] Marked game {abandonedGame.GameId} as Abandoned (90+ days inactive)");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Cleanup] Failed to mark game {abandonedGame.GameId} as abandoned: {ex.Message}");
+            }
+        }
     }
 });
 

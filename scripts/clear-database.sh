@@ -2,6 +2,7 @@
 # Script to clear all games and game-related data from DynamoDB
 # Usage:
 #   Local: ./clear-database.sh local
+#   Dev: ./clear-database.sh dev
 #   Production: ./clear-database.sh prod
 
 set -e
@@ -30,6 +31,11 @@ if [ "$ENVIRONMENT" == "prod" ]; then
     TABLE_NAME="backgammon-prod"
     ENDPOINT_ARGS=""
     REGION="us-east-1"
+elif [ "$ENVIRONMENT" == "dev" ]; then
+    echo "Clearing dev database..."
+    TABLE_NAME="backgammon-dev"
+    ENDPOINT_ARGS=""
+    REGION="us-east-1"
 else
     echo "Clearing local database..."
     TABLE_NAME="backgammon-local"
@@ -40,7 +46,7 @@ fi
 echo ""
 echo -e "${YELLOW}Scanning for game data...${NC}"
 
-# Function to delete items
+# Function to delete items in batches
 delete_items() {
     local pk_pattern=$1
     local description=$2
@@ -65,24 +71,30 @@ delete_items() {
 
     echo "  Found $count items to delete..."
 
-    # Delete each item
+    # Delete in batches of 25 (DynamoDB batch limit)
     deleted=0
-    while IFS= read -r item; do
-        pk=$(echo "$item" | jq -r '.PK.S')
-        sk=$(echo "$item" | jq -r '.SK.S')
+    batch_size=25
+    keys=$(echo "$items" | jq -c '[.Items[] | {PK: .PK, SK: .SK}]')
+    total_batches=$(( (count + batch_size - 1) / batch_size ))
 
-        aws dynamodb delete-item \
-            --table-name "$TABLE_NAME" \
-            --key "{\"PK\":{\"S\":\"$pk\"},\"SK\":{\"S\":\"$sk\"}}" \
+    for ((i=0; i<count; i+=batch_size)); do
+        # Extract batch of keys
+        batch=$(echo "$keys" | jq -c ".[${i}:${i}+${batch_size}]")
+
+        # Build batch delete request
+        request=$(echo "$batch" | jq -c "{\"$TABLE_NAME\": [.[] | {DeleteRequest: {Key: .}}]}")
+
+        # Execute batch delete
+        aws dynamodb batch-write-item \
+            --request-items "$request" \
             --region "$REGION" \
             $ENDPOINT_ARGS \
             > /dev/null 2>&1
 
-        deleted=$((deleted + 1))
-        if [ $((deleted % 10)) -eq 0 ]; then
-            echo "    Deleted $deleted/$count items..."
-        fi
-    done < <(echo "$items" | jq -c '.Items[]')
+        deleted=$((deleted + $(echo "$batch" | jq -r 'length')))
+        batch_num=$(( (i / batch_size) + 1 ))
+        echo "    Batch $batch_num/$total_batches: Deleted $deleted/$count items..."
+    done
 
     echo -e "  ${GREEN}✓ Deleted $deleted items${NC}"
 }
@@ -105,23 +117,31 @@ if [ "$pg_count" -eq 0 ]; then
     echo "  No player-game entries found."
 else
     echo "  Found $pg_count player-game entries to delete..."
-    pg_deleted=0
-    while IFS= read -r item; do
-        pk=$(echo "$item" | jq -r '.PK.S')
-        sk=$(echo "$item" | jq -r '.SK.S')
 
-        aws dynamodb delete-item \
-            --table-name "$TABLE_NAME" \
-            --key "{\"PK\":{\"S\":\"$pk\"},\"SK\":{\"S\":\"$sk\"}}" \
+    # Delete in batches of 25
+    pg_deleted=0
+    batch_size=25
+    pg_keys=$(echo "$player_game_items" | jq -c '[.Items[] | {PK: .PK, SK: .SK}]')
+    total_batches=$(( (pg_count + batch_size - 1) / batch_size ))
+
+    for ((i=0; i<pg_count; i+=batch_size)); do
+        # Extract batch of keys
+        batch=$(echo "$pg_keys" | jq -c ".[${i}:${i}+${batch_size}]")
+
+        # Build batch delete request
+        request=$(echo "$batch" | jq -c "{\"$TABLE_NAME\": [.[] | {DeleteRequest: {Key: .}}]}")
+
+        # Execute batch delete
+        aws dynamodb batch-write-item \
+            --request-items "$request" \
             --region "$REGION" \
             $ENDPOINT_ARGS \
             > /dev/null 2>&1
 
-        pg_deleted=$((pg_deleted + 1))
-        if [ $((pg_deleted % 10)) -eq 0 ]; then
-            echo "    Deleted $pg_deleted/$pg_count items..."
-        fi
-    done < <(echo "$player_game_items" | jq -c '.Items[]')
+        pg_deleted=$((pg_deleted + $(echo "$batch" | jq -r 'length')))
+        batch_num=$(( (i / batch_size) + 1 ))
+        echo "    Batch $batch_num/$total_batches: Deleted $pg_deleted/$pg_count items..."
+    done
 
     echo -e "  ${GREEN}✓ Deleted $pg_deleted player-game entries${NC}"
 fi
@@ -141,6 +161,8 @@ echo ""
 echo -e "${YELLOW}💡 Tip: If you have stale WebSocket connections, restart the server:${NC}"
 if [ "$ENVIRONMENT" == "local" ]; then
     echo "   cd Backgammon.AppHost && dotnet run"
+elif [ "$ENVIRONMENT" == "dev" ]; then
+    echo "   docker compose -f docker-compose.dev.yml restart server"
 else
     echo "   docker compose -f docker-compose.prod.yml restart server"
 fi
