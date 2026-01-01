@@ -1,6 +1,48 @@
 /* ===== GAME-SPECIFIC STYLES ===== */
 /* These styles are for the canvas board and game controls that aren't covered by DaisyUI */
 
+/* ===== MODAL FIX ===== */
+/* Ensure modals appear above everything and are interactive */
+dialog.modal {
+    z-index: 9999 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+dialog.modal[open] {
+    display: grid !important;
+    place-items: center !important;
+}
+
+dialog.modal .modal-box {
+    position: relative;
+    z-index: 10001 !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    background-color: oklch(var(--b1)) !important;
+    display: block !important;
+}
+
+dialog.modal .modal-box * {
+    pointer-events: auto !important;
+}
+
+dialog.modal .modal-box button {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+dialog.modal::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000 !important;
+}
+
+dialog.modal .modal-backdrop {
+    z-index: 10000 !important;
+    background: rgba(0, 0, 0, 0.5);
+}
+
 /* ===== SHARED HEADER ===== */
 #appHeader {
     background: linear-gradient(135deg, var(--p) 0%, var(--s) 100%);

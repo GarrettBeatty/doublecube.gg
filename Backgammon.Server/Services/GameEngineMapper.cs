@@ -1,6 +1,7 @@
 using System.Reflection;
 using Backgammon.Core;
 using Backgammon.Server.Models;
+using ServerGame = Backgammon.Server.Models.Game;
 
 namespace Backgammon.Server.Services;
 
@@ -14,7 +15,7 @@ public static class GameEngineMapper
     /// Convert GameSession to Game model for database storage.
     /// Captures complete game state including board, players, dice, and move history.
     /// </summary>
-    public static Game ToGame(GameSession session)
+    public static ServerGame ToGame(GameSession session)
     {
         var engine = session.Engine;
 
@@ -22,7 +23,7 @@ public static class GameEngineMapper
         var whiteUserId = IsRegisteredUserId(session.WhitePlayerId) ? session.WhitePlayerId : null;
         var redUserId = IsRegisteredUserId(session.RedPlayerId) ? session.RedPlayerId : null;
 
-        var game = new Game
+        var game = new ServerGame
         {
             GameId = session.Id,
 
@@ -93,7 +94,7 @@ public static class GameEngineMapper
     /// Restore GameSession from Game model (for server restart).
     /// Reconstructs the complete game state including board position and turn state.
     /// </summary>
-    public static GameSession FromGame(Game game)
+    public static GameSession FromGame(ServerGame game)
     {
         var session = new GameSession(game.GameId);
 

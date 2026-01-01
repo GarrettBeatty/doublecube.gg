@@ -16,6 +16,10 @@ public class GameEngine
     public bool GameStarted { get; private set; }
     public bool GameOver { get; private set; }
     public Player? Winner { get; private set; }
+    
+    // Match-related properties
+    public bool IsCrawfordGame { get; set; }
+    public string? MatchId { get; set; }
 
     public GameEngine(string whiteName = "White", string redName = "Red")
     {
@@ -392,6 +396,10 @@ public class GameEngine
     /// </summary>
     public bool OfferDouble()
     {
+        // Crawford rule - no doubling allowed
+        if (IsCrawfordGame)
+            return false;
+            
         return DoublingCube.CanDouble(CurrentPlayer.Color);
     }
 
@@ -445,6 +453,51 @@ public class GameEngine
 
         // Normal win (1x)
         return DoublingCube.Value;
+    }
+
+    /// <summary>
+    /// Determine the type of win (Normal, Gammon, or Backgammon)
+    /// </summary>
+    public WinType DetermineWinType()
+    {
+        if (!GameOver || Winner == null)
+            throw new InvalidOperationException("Game is not over yet");
+
+        var loser = Winner.Color == CheckerColor.White ? RedPlayer : WhitePlayer;
+
+        // If loser hasn't borne off any checkers
+        if (loser.CheckersBornOff == 0)
+        {
+            // Backgammon - loser has checkers on bar or in winner's home board
+            if (loser.CheckersOnBar > 0)
+                return WinType.Backgammon;
+
+            var (winnerHomeStart, winnerHomeEnd) = Winner.GetHomeBoardRange();
+            for (int i = winnerHomeStart; i <= winnerHomeEnd; i++)
+            {
+                var point = Board.GetPoint(i);
+                if (point.Color == loser.Color && point.Count > 0)
+                    return WinType.Backgammon;
+            }
+
+            // Gammon - loser has not borne off any checkers
+            return WinType.Gammon;
+        }
+
+        // Normal win
+        return WinType.Normal;
+    }
+
+    /// <summary>
+    /// Create a GameResult for the current game state
+    /// </summary>
+    public GameResult CreateGameResult()
+    {
+        if (!GameOver || Winner == null)
+            throw new InvalidOperationException("Game is not over yet");
+
+        var winType = DetermineWinType();
+        return new GameResult(Winner.Color == CheckerColor.White ? WhitePlayer.Name : RedPlayer.Name, winType, DoublingCube.Value);
     }
 
     /// <summary>

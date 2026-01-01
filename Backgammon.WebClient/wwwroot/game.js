@@ -98,6 +98,36 @@ function setGameUrl(gameId) {
     }
 }
 
+function detectRoute() {
+    const path = window.location.pathname;
+
+    // Match routes: /match/{matchId}, /match/{matchId}/lobby, /match/{matchId}/results, /match/{matchId}/game/{gameId}
+    const matchLobbyPattern = /^\/match\/([^\/]+)\/lobby$/;
+    const matchResultsPattern = /^\/match\/([^\/]+)\/results$/;
+    const matchGamePattern = /^\/match\/([^\/]+)\/game\/([^\/]+)$/;
+    const matchPattern = /^\/match\/([^\/]+)$/;
+    const gamePattern = /^\/game\/([^\/]+)$/;
+
+    if (matchLobbyPattern.test(path)) {
+        const matchId = path.match(matchLobbyPattern)[1];
+        return { type: 'match-lobby', matchId };
+    } else if (matchResultsPattern.test(path)) {
+        const matchId = path.match(matchResultsPattern)[1];
+        return { type: 'match-results', matchId };
+    } else if (matchGamePattern.test(path)) {
+        const matches = path.match(matchGamePattern);
+        return { type: 'match-game', matchId: matches[1], gameId: matches[2] };
+    } else if (matchPattern.test(path)) {
+        const matchId = path.match(matchPattern)[1];
+        return { type: 'match', matchId };
+    } else if (gamePattern.test(path)) {
+        const gameId = path.match(gamePattern)[1];
+        return { type: 'game', gameId };
+    }
+
+    return { type: 'home' };
+}
+
 function setHomeUrl() {
     if (window.location.pathname !== '/') {
         window.history.pushState({}, '', '/');
@@ -140,18 +170,21 @@ window.addEventListener('load', async () => {
         ? getEffectivePlayerId()
         : getOrCreatePlayerId();
 
+    // Expose myPlayerId globally for other modules
+    window.myPlayerId = myPlayerId;
+
     // Check if URL contains a profile username
     const profileUsername = getProfileUsernameFromUrl();
     if (profileUsername) {
         // Show profile page immediately
         showProfilePage();
-        
+
         // Connect to server first
         await autoConnect();
-        
+
         // Wait for connection to be ready
         const isConnected = await waitForConnection();
-        
+
         if (isConnected) {
             await loadProfile(profileUsername);
         } else {
@@ -160,9 +193,13 @@ window.addEventListener('load', async () => {
             log('Failed to connect to server', 'error');
         }
     } else {
-        // Check if URL contains a game ID
-        const urlGameId = getGameIdFromUrl();
-        if (urlGameId) {
+        // Detect route and handle accordingly
+        const route = detectRoute();
+        debug('Route detected', route, 'info');
+
+        switch (route.type) {
+            case 'game':
+            case 'match-game':
             // Show game page immediately
             showGamePage();
 
@@ -179,7 +216,7 @@ window.addEventListener('load', async () => {
             const isConnected = await waitForConnection();
 
             if (isConnected) {
-                await joinSpecificGame(urlGameId);
+                await joinSpecificGame(route.gameId);
             } else {
                 // Connection failed - show error UI
                 if (boardPlaceholder) {
@@ -194,9 +231,52 @@ window.addEventListener('load', async () => {
                     `;
                 }
             }
-        } else {
+            break;
+
+        case 'match-lobby':
+            // Show match lobby
+            if (typeof window.matchLobbyView !== 'undefined') {
+                await autoConnect();
+                // Wait for connection to be ready
+                const isConnected = await waitForConnection();
+                if (isConnected) {
+                    await window.matchLobbyView.show(route.matchId);
+                } else {
+                    console.error('Failed to connect to server for match lobby');
+                    showLandingPage();
+                }
+            } else {
+                console.error('MatchLobbyView not loaded');
+                showLandingPage();
+            }
+            break;
+
+        case 'match-results':
+            // Show match results
+            if (typeof window.matchResultsView !== 'undefined') {
+                await autoConnect();
+                await window.matchResultsView.show(route.matchId);
+            } else {
+                console.error('MatchResultsView not loaded');
+                showLandingPage();
+            }
+            break;
+
+        case 'match':
+            // Generic match route - redirect to lobby
+            if (typeof window.matchController !== 'undefined') {
+                window.matchController.navigateToLobby(route.matchId);
+                location.reload();
+            } else {
+                showLandingPage();
+            }
+            break;
+
+        default:
+            // Home route
             showLandingPage();
             await autoConnect();
+            break;
         }
     }
 
@@ -365,7 +445,13 @@ async function autoConnect() {
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
+    // Expose connection globally for other modules
+    window.connection = connection;
+
     setupEventHandlers();
+    
+    // Initialize match events
+    initializeMatchEvents();
 
     try {
         await connection.start();
@@ -509,15 +595,46 @@ function setupEventHandlers() {
         // Clear saved game ID
         localStorage.removeItem('currentGameId');
 
-        // Show confirm dialog and navigate if user agrees
-        setTimeout(() => {
-            if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
-                // Clear game state
-                currentGameId = null;
-                myColor = null;
-                leaveGameAndReturn();
-            }
-        }, 1500);
+        // Check if this is a match game
+        const match = typeof window.matchController !== 'undefined'
+            ? window.matchController.getCurrentMatch()
+            : null;
+
+        if (match && match.status === 'InProgress') {
+            // This is part of an ongoing match
+            setTimeout(() => {
+                const matchComplete = window.matchController.isMatchComplete();
+
+                if (matchComplete) {
+                    // Match is complete - navigate to results
+                    debug('Match complete, navigating to results', { matchId: match.matchId }, 'success');
+                    window.matchController.navigateToResults(match.matchId);
+                    window.location.href = `/match/${match.matchId}/results`;
+                } else {
+                    // Match continues - show continue dialog
+                    if (confirm(`Game complete! Score: ${match.player1Score} - ${match.player2Score}. Continue to next game?`)) {
+                        // Continue the match
+                        continueMatch(match.matchId);
+                    } else if (confirm('Do you want to abandon this match? Your opponent will win.')) {
+                        // Abandon the match
+                        currentGameId = null;
+                        myColor = null;
+                        window.matchController.clearMatch();
+                        leaveGameAndReturn();
+                    }
+                }
+            }, 1500);
+        } else {
+            // Single game - use existing behavior
+            setTimeout(() => {
+                if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
+                    // Clear game state
+                    currentGameId = null;
+                    myColor = null;
+                    leaveGameAndReturn();
+                }
+            }, 1500);
+        }
     });
 
     connection.onreconnecting(() => {
@@ -1446,8 +1563,33 @@ function updateGameState(state, isSpectator = false) {
         doubleBtn.disabled = !canDouble;
     }
 
+    // Update match-related UI if this is a match game
+    updateMatchUI();
+
     // Note: Winner detection and game-over handling is done by the GameOver event handler
     // (see setupEventHandlers), not here. updateGameState() only updates UI with current state.
+}
+
+function updateMatchUI() {
+    // Get match data from MatchController
+    const match = typeof window.matchController !== 'undefined'
+        ? window.matchController.getCurrentMatch()
+        : null;
+
+    if (match && match.targetScore) {
+        // Update match length display
+        const matchLengthEl = document.getElementById('matchLength');
+        if (matchLengthEl) {
+            matchLengthEl.textContent = match.targetScore;
+        }
+
+        // Update match stake display (doubling cube value or game stakes)
+        const matchStakeEl = document.getElementById('matchStake');
+        if (matchStakeEl && currentGameState) {
+            const cubeValue = currentGameState.doublingCubeValue ?? currentGameState.DoublingCubeValue ?? 1;
+            matchStakeEl.textContent = cubeValue;
+        }
+    }
 }
 
 function resetGameUI() {

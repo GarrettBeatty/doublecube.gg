@@ -6,7 +6,7 @@
     <title>Backgammon Online</title>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/styles.css?v=2">
+    <link rel="stylesheet" href="/styles.css?v=5">
 </head>
 <body>
     <!-- Shared Header (visible on all pages) -->
@@ -62,6 +62,11 @@
                             <span class="text-3xl">&#129302;</span>
                             <span class="text-lg">Play vs Computer</span>
                             <span class="text-sm opacity-70">Single player</span>
+                        </button>
+                        <button class="btn btn-accent btn-lg h-auto py-6 flex-col gap-2" onclick="showCreateMatchDialog()">
+                            <span class="text-3xl">🏆</span>
+                            <span class="text-lg">Create Match</span>
+                            <span class="text-sm opacity-70">Play to target score</span>
                         </button>
                         <button class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2" onclick="createAnalysisGame()">
                             <span class="text-3xl">📊</span>
@@ -134,6 +139,7 @@
 
                 <!-- Match Score -->
                 <div class="match-score">
+                    <div id="match-status-container"></div>
                     <div class="score-label">Match Length: <span id="matchLength">1</span></div>
                     <div class="score-label">Stake: <span id="matchStake">0</span></div>
                 </div>
@@ -346,6 +352,20 @@
         </div>
     </div>
 
+    <!-- Match Lobby Page -->
+    <div id="match-lobby-container" class="page" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div id="match-lobby-content"></div>
+        </div>
+    </div>
+
+    <!-- Match Results Page -->
+    <div id="match-results-container" class="page" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div id="match-results-content"></div>
+        </div>
+    </div>
+
     <!-- Login Modal -->
     <dialog id="loginModal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box">
@@ -547,6 +567,55 @@
         </form>
     </dialog>
 
+    <!-- Create Match Dialog -->
+    <dialog id="createMatchDialog" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create Match</h3>
+            <p class="mb-4">Create a competitive match played to a target score.</p>
+            
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Select Opponent</span>
+                </label>
+                <select id="matchOpponentSelect" class="select select-bordered w-full">
+                    <option value="" disabled selected>Choose an opponent...</option>
+                </select>
+            </div>
+            
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Target Score</span>
+                </label>
+                <select id="matchTargetScore" class="select select-bordered w-full">
+                    <option value="3">3 points (short)</option>
+                    <option value="5">5 points</option>
+                    <option value="7" selected>7 points (standard)</option>
+                    <option value="11">11 points</option>
+                    <option value="15">15 points</option>
+                    <option value="21">21 points (long)</option>
+                </select>
+            </div>
+            
+            <div class="alert alert-info mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div>
+                    <div class="text-sm">Crawford rule will apply when a player reaches match point minus 1.</div>
+                </div>
+            </div>
+            
+            <div class="modal-action gap-2">
+                <button onclick="createMatchFromDialog()" class="btn btn-primary">Create Match</button>
+                <button onclick="hideCreateMatchDialog()" class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Match List Container (for active matches) -->
+    <div id="match-list-container"></div>
+
     <!-- Position Import/Export Modal -->
     <dialog id="positionModal" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box max-w-4xl">
@@ -620,6 +689,10 @@
     <script src="/friends.js"></script>
     <script src="/board-svg.js"></script>
     <script src="/audio.js"></script>
+    <script src="/match-state.js"></script>
+    <script src="/match-lobby.js"></script>
+    <script src="/match-results.js"></script>
+    <script src="/match.js"></script>
     <script src="/game.js"></script>
     <script src="/profile.js"></script>
 </body>

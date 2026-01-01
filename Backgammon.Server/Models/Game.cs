@@ -5,20 +5,21 @@ namespace Backgammon.Server.Models;
 /// <summary>
 /// Cosmos DB document for storing both in-progress and completed games.
 /// Stores complete game state for reconstruction after server restart.
+/// Wraps Core.Game domain object and adds server/infrastructure metadata.
 /// </summary>
 public class Game
 {
+    /// <summary>
+    /// Core domain object containing pure game outcome data
+    /// </summary>
+    [JsonPropertyName("coreGame")]
+    public Core.Game CoreGame { get; set; } = new();
+
     /// <summary>
     /// Cosmos DB document id - uses gameId as the unique identifier
     /// </summary>
     [JsonPropertyName("id")]
     public string Id { get; set; } = Guid.NewGuid().ToString();
-
-    /// <summary>
-    /// Unique game session ID from GameSession
-    /// </summary>
-    [JsonPropertyName("gameId")]
-    public string GameId { get; set; } = string.Empty;
 
     // Player information
     /// <summary>
@@ -57,12 +58,7 @@ public class Game
     [JsonPropertyName("redPlayerName")]
     public string? RedPlayerName { get; set; }
 
-    // Game status
-    /// <summary>
-    /// Game state: "InProgress", "Completed", or "Abandoned"
-    /// </summary>
-    [JsonPropertyName("status")]
-    public string Status { get; set; } = "InProgress";
+    // Game status (delegates to CoreGame via convenience property below)
 
     /// <summary>
     /// Whether game has been started (both players joined and first roll happened)
@@ -142,27 +138,14 @@ public class Game
     [JsonPropertyName("doublingCubeOwner")]
     public string? DoublingCubeOwner { get; set; }
 
-    // Move history
+    // Completion data (delegates to CoreGame via convenience properties below)
+
     /// <summary>
     /// Array of moves in notation "from/to" (e.g., ["24/20", "13/9", "bar/24", "6/off"])
-    /// Preserves order and allows full game replay
+    /// Preserves order and allows full game replay (for DynamoDB serialization)
     /// </summary>
     [JsonPropertyName("moves")]
     public List<string> Moves { get; set; } = new();
-
-    // Completion data
-    /// <summary>
-    /// Winning player color: "White" or "Red" (null if game not complete)
-    /// </summary>
-    [JsonPropertyName("winner")]
-    public string? Winner { get; set; }
-
-    /// <summary>
-    /// Game result stakes: 1=normal, 2=gammon, 3=backgammon
-    /// Includes doubling cube value
-    /// </summary>
-    [JsonPropertyName("stakes")]
-    public int Stakes { get; set; }
 
     /// <summary>
     /// Total number of moves executed in the game
@@ -200,6 +183,99 @@ public class Game
     /// </summary>
     [JsonPropertyName("isAiOpponent")]
     public bool IsAiOpponent { get; set; }
+
+    // Convenience properties that delegate to CoreGame
+    // These maintain backward compatibility with existing code
+
+    /// <summary>
+    /// Unique game session ID (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public string GameId
+    {
+        get => CoreGame.GameId;
+        set => CoreGame.GameId = value;
+    }
+
+    /// <summary>
+    /// Game status (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public string Status
+    {
+        get => CoreGame.Status.ToString();
+        set => CoreGame.Status = Enum.Parse<Core.GameStatus>(value);
+    }
+
+    /// <summary>
+    /// Winning player color (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public string? Winner
+    {
+        get => CoreGame.Winner?.ToString();
+        set => CoreGame.Winner = value != null ? Enum.Parse<Core.CheckerColor>(value) : null;
+    }
+
+    /// <summary>
+    /// Game result stakes (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public int Stakes
+    {
+        get => CoreGame.Stakes;
+        set => CoreGame.Stakes = value;
+    }
+
+    /// <summary>
+    /// Win type (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public string? WinType
+    {
+        get => CoreGame.WinType.ToString();
+        set => CoreGame.WinType = value != null ? Enum.Parse<Core.WinType>(value) : Core.WinType.Normal;
+    }
+
+    /// <summary>
+    /// Match ID (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public string? MatchId
+    {
+        get => CoreGame.MatchId;
+        set => CoreGame.MatchId = value;
+    }
+
+    /// <summary>
+    /// Whether this is a match game (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public bool IsMatchGame
+    {
+        get => CoreGame.IsMatchGame;
+        set => CoreGame.IsMatchGame = value;
+    }
+
+    /// <summary>
+    /// Whether Crawford rule applies (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public bool IsCrawfordGame
+    {
+        get => CoreGame.IsCrawfordGame;
+        set => CoreGame.IsCrawfordGame = value;
+    }
+
+    /// <summary>
+    /// Move history (delegates to CoreGame)
+    /// </summary>
+    [JsonIgnore]
+    public List<Core.Move> MoveHistory
+    {
+        get => CoreGame.MoveHistory;
+        set => CoreGame.MoveHistory = value;
+    }
 }
 
 /// <summary>

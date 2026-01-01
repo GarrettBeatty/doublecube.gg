@@ -61,10 +61,14 @@ builder.Services.AddSingleton<Amazon.DynamoDBv2.IAmazonDynamoDB>(sp =>
 builder.Services.AddSingleton<IGameRepository, Backgammon.Server.Services.DynamoDb.DynamoDbGameRepository>();
 builder.Services.AddSingleton<IUserRepository, Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
 builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
+builder.Services.AddSingleton<IMatchRepository, Backgammon.Server.Services.DynamoDb.DynamoDbMatchRepository>();
 
 // User and authentication services
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddSingleton<IFriendService, FriendService>();
+
+// Match service
+builder.Services.AddSingleton<IMatchService, MatchService>();
 
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
