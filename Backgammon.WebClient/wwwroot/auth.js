@@ -191,7 +191,16 @@ function updateAuthUI() {
     if (currentUser) {
         if (authSection) authSection.style.display = 'none';
         if (userSection) userSection.style.display = 'flex';
-        if (usernameDisplay) usernameDisplay.textContent = currentUser.displayName;
+        if (usernameDisplay) {
+            usernameDisplay.textContent = currentUser.displayName;
+            // Make username clickable
+            usernameDisplay.style.cursor = 'pointer';
+            usernameDisplay.style.textDecoration = 'underline';
+            usernameDisplay.style.textDecorationColor = 'rgba(255,255,255,0.3)';
+            usernameDisplay.onclick = () => navigateToProfile(currentUser.username);
+            usernameDisplay.onmouseover = () => usernameDisplay.style.textDecorationColor = 'rgba(255,255,255,0.6)';
+            usernameDisplay.onmouseout = () => usernameDisplay.style.textDecorationColor = 'rgba(255,255,255,0.3)';
+        }
         if (friendsSection) friendsSection.style.display = 'block';
     } else {
         if (authSection) authSection.style.display = 'flex';

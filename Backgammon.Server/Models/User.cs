@@ -109,6 +109,24 @@ public class User
     /// </summary>
     [JsonPropertyName("bannedUntil")]
     public DateTime? BannedUntil { get; set; }
+
+    /// <summary>
+    /// Profile privacy settings
+    /// </summary>
+    [JsonPropertyName("profilePrivacy")]
+    public ProfilePrivacyLevel ProfilePrivacy { get; set; } = ProfilePrivacyLevel.Public;
+
+    /// <summary>
+    /// Game history privacy settings
+    /// </summary>
+    [JsonPropertyName("gameHistoryPrivacy")]
+    public ProfilePrivacyLevel GameHistoryPrivacy { get; set; } = ProfilePrivacyLevel.Public;
+
+    /// <summary>
+    /// Friends list privacy settings
+    /// </summary>
+    [JsonPropertyName("friendsListPrivacy")]
+    public ProfilePrivacyLevel FriendsListPrivacy { get; set; } = ProfilePrivacyLevel.Public;
 }
 
 /// <summary>
@@ -142,4 +160,25 @@ public class UserStats
 
     [JsonPropertyName("bestWinStreak")]
     public int BestWinStreak { get; set; }
+}
+
+/// <summary>
+/// Privacy levels for profile visibility
+/// </summary>
+public enum ProfilePrivacyLevel
+{
+    /// <summary>
+    /// Visible to everyone
+    /// </summary>
+    Public = 0,
+    
+    /// <summary>
+    /// Visible only to friends
+    /// </summary>
+    FriendsOnly = 1,
+    
+    /// <summary>
+    /// Hidden from everyone
+    /// </summary>
+    Private = 2
 }

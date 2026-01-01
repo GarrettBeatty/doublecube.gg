@@ -29,6 +29,9 @@ builder.Services.AddSignalR(options =>
 });
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 
+// Add memory cache for profile caching
+builder.Services.AddMemoryCache();
+
 // ========== DYNAMODB CONFIGURATION ==========
 Console.WriteLine("=== DynamoDB Configuration ===");
 Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
@@ -388,6 +391,22 @@ app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContex
         }
         user.Email = request.Email;
         user.EmailNormalized = request.Email.ToLowerInvariant();
+    }
+
+    // Update privacy settings
+    if (request.ProfilePrivacy.HasValue)
+    {
+        user.ProfilePrivacy = request.ProfilePrivacy.Value;
+    }
+
+    if (request.GameHistoryPrivacy.HasValue)
+    {
+        user.GameHistoryPrivacy = request.GameHistoryPrivacy.Value;
+    }
+
+    if (request.FriendsListPrivacy.HasValue)
+    {
+        user.FriendsListPrivacy = request.FriendsListPrivacy.Value;
     }
 
     await userRepository.UpdateUserAsync(user);
