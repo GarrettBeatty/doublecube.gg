@@ -200,6 +200,43 @@ public class Game
     /// </summary>
     [JsonPropertyName("isAiOpponent")]
     public bool IsAiOpponent { get; set; }
+
+    // Time Control
+    /// <summary>
+    /// Time control mode: "Untimed", "Blitz", "Rapid", "Classical", "Custom"
+    /// </summary>
+    [JsonPropertyName("timeControlMode")]
+    public string? TimeControlMode { get; set; }
+
+    /// <summary>
+    /// Initial time in seconds for each player
+    /// </summary>
+    [JsonPropertyName("initialTimeSeconds")]
+    public int InitialTimeSeconds { get; set; }
+
+    /// <summary>
+    /// White player's remaining time in milliseconds
+    /// </summary>
+    [JsonPropertyName("whiteRemainingMs")]
+    public long WhiteRemainingMs { get; set; }
+
+    /// <summary>
+    /// Red player's remaining time in milliseconds
+    /// </summary>
+    [JsonPropertyName("redRemainingMs")]
+    public long RedRemainingMs { get; set; }
+
+    /// <summary>
+    /// Whether the clock is currently paused
+    /// </summary>
+    [JsonPropertyName("isClockPaused")]
+    public bool IsClockPaused { get; set; }
+
+    /// <summary>
+    /// When the clock was started for the current turn (null if not running)
+    /// </summary>
+    [JsonPropertyName("clockStartTime")]
+    public DateTime? ClockStartTime { get; set; }
 }
 
 /// <summary>

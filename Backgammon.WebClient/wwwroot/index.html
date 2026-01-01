@@ -129,6 +129,7 @@
                         <span id="redPlayerName" class="player-name">Red Player</span>
                         <span id="redPlayerId" class="player-id">-</span>
                         <span id="redPipCount" class="pip-count">Pips: -</span>
+                        <span id="redPlayerClock" class="player-clock" style="display: none;">0:00</span>
                     </div>
                 </div>
 
@@ -147,6 +148,7 @@
                         <span id="whitePlayerName" class="player-name">White Player</span>
                         <span id="whitePlayerId" class="player-id">-</span>
                         <span id="whitePipCount" class="pip-count">Pips: -</span>
+                        <span id="whitePlayerClock" class="player-clock" style="display: none;">0:00</span>
                     </div>
                 </div>
             </div>
@@ -594,6 +596,43 @@
     <!-- Quick Join Modal (hidden) -->
     <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
 
+    <!-- Time Control Selection Modal -->
+    <dialog id="timeControlModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Select Time Control</h3>
+            <p class="mb-6 text-sm text-base-content/70">Choose how much time each player has for the entire game</p>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Untimed -->
+                <button onclick="selectTimeControl(0)" class="btn btn-outline btn-lg flex-col h-auto py-4 hover:btn-primary">
+                    <span class="text-2xl">∞</span>
+                    <span class="font-bold">Untimed</span>
+                    <span class="text-xs opacity-70">No time limit</span>
+                </button>
+                <!-- Blitz -->
+                <button onclick="selectTimeControl(1)" class="btn btn-outline btn-lg flex-col h-auto py-4 hover:btn-warning">
+                    <span class="text-2xl">⚡</span>
+                    <span class="font-bold">Blitz</span>
+                    <span class="text-xs opacity-70">30 seconds</span>
+                </button>
+                <!-- Rapid -->
+                <button onclick="selectTimeControl(2)" class="btn btn-outline btn-lg flex-col h-auto py-4 hover:btn-info">
+                    <span class="text-2xl">🎯</span>
+                    <span class="font-bold">Rapid</span>
+                    <span class="text-xs opacity-70">2 minutes</span>
+                </button>
+                <!-- Classical -->
+                <button onclick="selectTimeControl(3)" class="btn btn-outline btn-lg flex-col h-auto py-4 hover:btn-success">
+                    <span class="text-2xl">♟️</span>
+                    <span class="font-bold">Classical</span>
+                    <span class="text-xs opacity-70">5 minutes</span>
+                </button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
     <!-- Debug Panel (floating) -->
     <div id="debugPanel" style="display: none; position: fixed; bottom: 20px; right: 20px; width: 500px; max-height: 600px; background: rgba(0, 0, 0, 0.95); border: 2px solid #4ade80; border-radius: 8px; z-index: 9999; font-family: monospace; font-size: 11px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #1a1a1a; border-bottom: 1px solid #4ade80; border-radius: 6px 6px 0 0;">
@@ -620,6 +659,7 @@
     <script src="/friends.js"></script>
     <script src="/board-svg.js"></script>
     <script src="/audio.js"></script>
+    <script src="/time-control.js"></script>
     <script src="/game.js"></script>
     <script src="/profile.js"></script>
 </body>

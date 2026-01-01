@@ -875,6 +875,12 @@ async function leaveGameAndReturn() {
         currentGameId = null;
         myColor = null;
         localStorage.removeItem('currentGameId'); // Clear saved game
+
+        // Stop clock updates
+        if (typeof stopClockUpdates === 'function') {
+            stopClockUpdates();
+        }
+
         resetGameUI();
         resetBoardFlipPreference();
         showLandingPage();
@@ -1448,6 +1454,12 @@ function updateGameState(state, isSpectator = false) {
 
     // Note: Winner detection and game-over handling is done by the GameOver event handler
     // (see setupEventHandlers), not here. updateGameState() only updates UI with current state.
+
+    // Update time control clocks
+    if (typeof updateClocks === 'function') {
+        updateClocks(state);
+        startClockUpdates(state);
+    }
 }
 
 function resetGameUI() {

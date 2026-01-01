@@ -87,7 +87,8 @@ public class GameHub : Hub
     /// </summary>
     /// <param name="playerId">Persistent player ID (anonymous ID if not authenticated)</param>
     /// <param name="gameId">Optional game ID. If null, uses matchmaking.</param>
-    public async Task JoinGame(string playerId, string? gameId = null)
+    /// <param name="timeControlMode">Optional time control mode (for new games)</param>
+    public async Task JoinGame(string playerId, string? gameId = null, TimeControlMode? timeControlMode = null)
     {
         try
         {
@@ -97,7 +98,7 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            var session = await _sessionManager.JoinOrCreateAsync(effectivePlayerId, connectionId, gameId);
+            var session = await _sessionManager.JoinOrCreateAsync(effectivePlayerId, connectionId, gameId, timeControlMode);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
                 effectivePlayerId, connectionId, session.Id);
@@ -116,6 +117,12 @@ public class GameHub : Hub
             if (!string.IsNullOrEmpty(displayName))
             {
                 session.SetPlayerName(effectivePlayerId, displayName);
+            }
+
+            // Resume clock if player reconnects and it's their turn
+            if (session.TimeControl != null && session.IsPlayerTurn(connectionId))
+            {
+                session.ResumeClock();
             }
 
             if (session.IsFull)
@@ -207,7 +214,8 @@ public class GameHub : Hub
     /// The human player is always White (moves first).
     /// </summary>
     /// <param name="playerId">The human player's persistent ID</param>
-    public async Task CreateAiGame(string playerId)
+    /// <param name="timeControlMode">Optional time control mode</param>
+    public async Task CreateAiGame(string playerId, TimeControlMode? timeControlMode = null)
     {
         try
         {
@@ -221,8 +229,8 @@ public class GameHub : Hub
             _logger.LogDebug("Effective player ID: {EffectivePlayerId}, Display name: {DisplayName}",
                 effectivePlayerId, displayName);
 
-            // Create a new game session
-            var session = _sessionManager.CreateGame();
+            // Create a new game session with time control
+            var session = _sessionManager.CreateGame(null, timeControlMode);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogDebug("Created game session {GameId}", session.Id);
 
@@ -409,6 +417,9 @@ public class GameHub : Hub
 
             session.Engine.RollDice();
             session.UpdateActivity();
+
+            // Start the clock when dice are rolled
+            session.StartClock();
 
             _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}: [{Die1}, {Die2}]",
                 Context.ConnectionId, session.Id, session.Engine.Dice.Die1, session.Engine.Dice.Die2);
@@ -608,6 +619,35 @@ public class GameHub : Hub
                     await Clients.Caller.SendAsync("Error", "You still have valid moves available");
                     return;
                 }
+            }
+
+            // Stop the clock and check for timeout
+            bool timedOut = session.StopClock();
+            if (timedOut)
+            {
+                // Player ran out of time - they lose
+                var losingPlayer = session.Engine.CurrentPlayer;
+                var winningPlayer = losingPlayer?.Color == CheckerColor.White ?
+                    session.Engine.RedPlayer : session.Engine.WhitePlayer;
+
+                // Set winner using reflection (Winner is read-only)
+                var winnerField = session.Engine.GetType()
+                    .GetField("<Winner>k__BackingField", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                if (winnerField != null)
+                {
+                    winnerField.SetValue(session.Engine, winningPlayer);
+                }
+
+                // Broadcast game over
+                var gameOverState = session.GetState(null);
+                await Clients.Group(session.Id).SendAsync("GameOver", gameOverState);
+
+                _logger.LogInformation("Player {Color} lost on time in game {GameId}",
+                    losingPlayer?.Color.ToString() ?? "Unknown", session.Id);
+
+                // Save final game state
+                await SaveGameStateAsync(session);
+                return;
             }
 
             session.Engine.EndTurn();

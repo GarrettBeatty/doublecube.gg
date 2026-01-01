@@ -32,6 +32,7 @@ public class GameSession
     public bool IsStarted => IsFull && Engine.GameStarted;
     public bool IsAnalysisMode { get; set; } = false;
     public bool IsBotGame { get; set; } = false;
+    public TimeControl? TimeControl { get; set; }
 
     public GameSession(string id)
     {
@@ -259,7 +260,13 @@ public class GameSession
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
-            IsAnalysisMode = this.IsAnalysisMode
+            IsAnalysisMode = this.IsAnalysisMode,
+
+            // Time Control
+            TimeControlMode = this.TimeControl?.Mode,
+            WhiteRemainingMs = this.TimeControl != null ? GetRemainingTime(CheckerColor.White) : 0,
+            RedRemainingMs = this.TimeControl != null ? GetRemainingTime(CheckerColor.Red) : 0,
+            IsClockPaused = this.TimeControl?.IsClockPaused ?? false
         };
 
         // Get valid moves for current player
@@ -363,5 +370,150 @@ public class GameSession
     public void UpdateActivity()
     {
         LastActivityAt = DateTime.UtcNow;
+    }
+
+    // ========== TIME CONTROL METHODS ==========
+
+    /// <summary>
+    /// Start the clock for the current player (call when dice are rolled)
+    /// </summary>
+    public void StartClock()
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return;
+
+        if (TimeControl.IsClockPaused)
+            return;
+
+        TimeControl.ClockStartTime = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Stop the clock and deduct time from current player (call when turn ends)
+    /// Returns true if player has run out of time
+    /// </summary>
+    public bool StopClock()
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return false;
+
+        if (TimeControl.ClockStartTime == null)
+            return false;
+
+        if (TimeControl.IsClockPaused)
+            return false;
+
+        var elapsed = DateTime.UtcNow - TimeControl.ClockStartTime.Value;
+        var elapsedMs = (long)elapsed.TotalMilliseconds;
+
+        var currentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White;
+        if (currentPlayer == CheckerColor.White)
+        {
+            TimeControl.WhiteRemainingMs -= elapsedMs;
+            if (TimeControl.WhiteRemainingMs <= 0)
+            {
+                TimeControl.WhiteRemainingMs = 0;
+                return true; // White ran out of time
+            }
+        }
+        else
+        {
+            TimeControl.RedRemainingMs -= elapsedMs;
+            if (TimeControl.RedRemainingMs <= 0)
+            {
+                TimeControl.RedRemainingMs = 0;
+                return true; // Red ran out of time
+            }
+        }
+
+        TimeControl.ClockStartTime = null;
+        return false;
+    }
+
+    /// <summary>
+    /// Pause the clock (e.g., during disconnection)
+    /// </summary>
+    public void PauseClock()
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return;
+
+        // Deduct time elapsed so far before pausing
+        if (TimeControl.ClockStartTime != null && !TimeControl.IsClockPaused)
+        {
+            var elapsed = DateTime.UtcNow - TimeControl.ClockStartTime.Value;
+            var elapsedMs = (long)elapsed.TotalMilliseconds;
+
+            var currentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White;
+            if (currentPlayer == CheckerColor.White)
+            {
+                TimeControl.WhiteRemainingMs -= elapsedMs;
+                if (TimeControl.WhiteRemainingMs < 0)
+                    TimeControl.WhiteRemainingMs = 0;
+            }
+            else
+            {
+                TimeControl.RedRemainingMs -= elapsedMs;
+                if (TimeControl.RedRemainingMs < 0)
+                    TimeControl.RedRemainingMs = 0;
+            }
+
+            TimeControl.ClockStartTime = null;
+        }
+
+        TimeControl.IsClockPaused = true;
+    }
+
+    /// <summary>
+    /// Resume the clock (e.g., after reconnection)
+    /// </summary>
+    public void ResumeClock()
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return;
+
+        TimeControl.IsClockPaused = false;
+
+        // Restart clock if it's someone's turn and dice are rolled
+        if (Engine.RemainingMoves.Count > 0 && Engine.Dice.Die1 > 0)
+        {
+            TimeControl.ClockStartTime = DateTime.UtcNow;
+        }
+    }
+
+    /// <summary>
+    /// Get the remaining time for a specific color (accounting for running clock)
+    /// </summary>
+    public long GetRemainingTime(CheckerColor color)
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return 0;
+
+        long remainingMs = color == CheckerColor.White ? TimeControl.WhiteRemainingMs : TimeControl.RedRemainingMs;
+
+        // If clock is running for this color, deduct elapsed time
+        if (!TimeControl.IsClockPaused &&
+            TimeControl.ClockStartTime != null &&
+            Engine.CurrentPlayer?.Color == color)
+        {
+            var elapsed = DateTime.UtcNow - TimeControl.ClockStartTime.Value;
+            remainingMs -= (long)elapsed.TotalMilliseconds;
+            if (remainingMs < 0)
+                remainingMs = 0;
+        }
+
+        return remainingMs;
+    }
+
+    /// <summary>
+    /// Check if current player's time has expired
+    /// </summary>
+    public bool IsTimeExpired()
+    {
+        if (TimeControl == null || TimeControl.Mode == TimeControlMode.Untimed)
+            return false;
+
+        var currentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White;
+        return GetRemainingTime(currentPlayer) <= 0;
     }
 }
