@@ -50,11 +50,10 @@ public class DynamoDbGameRepository : IGameRepository
                     game.WhitePlayerId,
                     game.GameId,
                     "White",
-                    game.RedPlayerId ?? "",
+                    game.RedPlayerId ?? string.Empty,
                     game.Status,
                     game.CreatedAt,
-                    game.LastUpdatedAt
-                );
+                    game.LastUpdatedAt);
 
                 transactItems.Add(new TransactWriteItem
                 {
@@ -73,11 +72,10 @@ public class DynamoDbGameRepository : IGameRepository
                     game.RedPlayerId,
                     game.GameId,
                     "Red",
-                    game.WhitePlayerId ?? "",
+                    game.WhitePlayerId ?? string.Empty,
                     game.Status,
                     game.CreatedAt,
-                    game.LastUpdatedAt
-                );
+                    game.LastUpdatedAt);
 
                 transactItems.Add(new TransactWriteItem
                 {
@@ -118,7 +116,9 @@ public class DynamoDbGameRepository : IGameRepository
             });
 
             if (!response.IsItemSet)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalGame(response.Item);
         }
@@ -306,7 +306,9 @@ public class DynamoDbGameRepository : IGameRepository
             while (playerGameItems.Count < limit)
             {
                 if (lastKey != null)
+                {
                     request.ExclusiveStartKey = lastKey;
+                }
 
                 var response = await _dynamoDbClient.QueryAsync(request);
 
@@ -320,11 +322,15 @@ public class DynamoDbGameRepository : IGameRepository
 
                     playerGameItems.Add(item);
                     if (playerGameItems.Count >= limit)
+                    {
                         break;
+                    }
                 }
 
                 if (response.LastEvaluatedKey == null || response.LastEvaluatedKey.Count == 0)
+                {
                     break;
+                }
 
                 lastKey = response.LastEvaluatedKey;
             }

@@ -26,18 +26,20 @@ public class RandomAI : IBackgammonAI
     public List<Move> ChooseMoves(GameEngine engine)
     {
         var chosenMoves = new List<Move>();
-        
+
         // Keep making moves until no valid moves remain
         while (engine.RemainingMoves.Count > 0)
         {
             var validMoves = engine.GetValidMoves();
-            
+
             if (validMoves.Count == 0)
+            {
                 break;
+            }
 
             // Choose a random valid move
             var move = validMoves[_random.Next(validMoves.Count)];
-            
+
             // Execute it
             if (engine.ExecuteMove(move))
             {

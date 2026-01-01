@@ -25,7 +25,11 @@ public class AiMoveService : IAiMoveService
 
     public bool IsAiPlayer(string? playerId)
     {
-        if (playerId == null) return false;
+        if (playerId == null)
+        {
+            return false;
+        }
+
         return playerId.StartsWith(GreedyAiPrefix) || playerId.StartsWith(RandomAiPrefix);
     }
 
@@ -44,6 +48,7 @@ public class AiMoveService : IAiMoveService
         {
             return new RandomAI("RandomBot");
         }
+
         return new GreedyAI("GreedyBot");
     }
 
@@ -133,15 +138,17 @@ public class AiMoveService : IAiMoveService
         {
             // Prefer bearing off from the furthest point
             return bearOffMoves.OrderByDescending(m =>
-                engine.CurrentPlayer.Color == CheckerColor.White ? m.From : 25 - m.From
-            ).First();
+                engine.CurrentPlayer.Color == CheckerColor.White ? m.From : 25 - m.From).First();
         }
 
         // Priority 2: Hit opponent's blot if possible
         var hitMoves = new List<Move>();
         foreach (var move in validMoves)
         {
-            if (move.From == 0) continue; // Skip bar entry for this check
+            if (move.From == 0)
+            {
+                continue; // Skip bar entry for this check
+            }
 
             var toPoint = engine.Board.GetPoint(move.To);
             if (toPoint.IsBlot && toPoint.Color != engine.CurrentPlayer.Color)

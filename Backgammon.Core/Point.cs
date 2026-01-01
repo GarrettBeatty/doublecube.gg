@@ -6,6 +6,7 @@ namespace Backgammon.Core;
 public class Point
 {
     public int Position { get; }
+
     public List<CheckerColor> Checkers { get; }
 
     public Point(int position)
@@ -46,6 +47,7 @@ public class Point
         {
             throw new InvalidOperationException("Cannot add different color to point");
         }
+
         Checkers.Add(color);
     }
 
@@ -58,6 +60,7 @@ public class Point
         {
             throw new InvalidOperationException("No checkers to remove");
         }
+
         var color = Checkers[^1];
         Checkers.RemoveAt(Checkers.Count - 1);
         return color;

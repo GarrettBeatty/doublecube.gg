@@ -48,16 +48,14 @@ public class DynamoDbMatchRepository : IMatchRepository
                 match.MatchId,
                 match.Player2Id,
                 match.Status,
-                match.CreatedAt
-            );
+                match.CreatedAt);
 
             var player2Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
                 match.Player2Id,
                 match.MatchId,
                 match.Player1Id,
                 match.Status,
-                match.CreatedAt
-            );
+                match.CreatedAt);
 
             transactItems.Add(new TransactWriteItem
             {
@@ -106,7 +104,9 @@ public class DynamoDbMatchRepository : IMatchRepository
             });
 
             if (!response.IsItemSet)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalMatch(response.Item);
         }
@@ -122,7 +122,7 @@ public class DynamoDbMatchRepository : IMatchRepository
         try
         {
             match.LastUpdatedAt = DateTime.UtcNow;
-            
+
             var updateExpression = @"
                 SET player1Score = :p1Score, 
                     player2Score = :p2Score,
@@ -140,8 +140,8 @@ public class DynamoDbMatchRepository : IMatchRepository
                 [":p2Score"] = new AttributeValue { N = match.Player2Score.ToString() },
                 [":crawford"] = new AttributeValue { BOOL = match.IsCrawfordGame },
                 [":hadCrawford"] = new AttributeValue { BOOL = match.HasCrawfordGameBeenPlayed },
-                [":currentGame"] = string.IsNullOrEmpty(match.CurrentGameId) 
-                    ? new AttributeValue { NULL = true } 
+                [":currentGame"] = string.IsNullOrEmpty(match.CurrentGameId)
+                    ? new AttributeValue { NULL = true }
                     : new AttributeValue { S = match.CurrentGameId },
                 [":now"] = new AttributeValue { S = match.LastUpdatedAt.ToString("O") },
                 [":status"] = new AttributeValue { S = match.Status },
@@ -158,9 +158,9 @@ public class DynamoDbMatchRepository : IMatchRepository
             if (match.GameIds.Any())
             {
                 updateExpression += ", gameIds = :gameIds";
-                expressionAttributeValues[":gameIds"] = new AttributeValue 
-                { 
-                    L = match.GameIds.Select(id => new AttributeValue { S = id }).ToList() 
+                expressionAttributeValues[":gameIds"] = new AttributeValue
+                {
+                    L = match.GameIds.Select(id => new AttributeValue { S = id }).ToList()
                 };
             }
 
@@ -191,7 +191,7 @@ public class DynamoDbMatchRepository : IMatchRepository
 
             // Update player-match index items
             var reversedTimestamp = (DateTime.MaxValue.Ticks - match.CreatedAt.Ticks).ToString("D19");
-            
+
             var playerIndexUpdateTasks = new[]
             {
                 UpdatePlayerMatchIndex(match.Player1Id, match.MatchId, reversedTimestamp, match.Status),
@@ -200,7 +200,8 @@ public class DynamoDbMatchRepository : IMatchRepository
 
             await Task.WhenAll(playerIndexUpdateTasks);
 
-            _logger.LogInformation("Updated match {MatchId} - P1: {P1Score}, P2: {P2Score}, Status: {Status}", 
+            _logger.LogInformation(
+                "Updated match {MatchId} - P1: {P1Score}, P2: {P2Score}, Status: {Status}",
                 match.MatchId, match.Player1Score, match.Player2Score, match.Status);
         }
         catch (Exception ex)
@@ -266,7 +267,9 @@ public class DynamoDbMatchRepository : IMatchRepository
             while (playerMatchItems.Count < limit)
             {
                 if (lastKey != null)
+                {
                     request.ExclusiveStartKey = lastKey;
+                }
 
                 var response = await _dynamoDbClient.QueryAsync(request);
 
@@ -280,11 +283,15 @@ public class DynamoDbMatchRepository : IMatchRepository
 
                     playerMatchItems.Add(item);
                     if (playerMatchItems.Count >= limit)
+                    {
                         break;
+                    }
                 }
 
                 if (response.LastEvaluatedKey.Count == 0)
+                {
                     break;
+                }
 
                 lastKey = response.LastEvaluatedKey;
             }
@@ -372,7 +379,7 @@ public class DynamoDbMatchRepository : IMatchRepository
         {
             // Get all completed matches for the player
             var matches = await GetPlayerMatchesAsync(playerId, "Completed", limit: 1000);
-            
+
             var stats = new MatchStats
             {
                 PlayerId = playerId,
@@ -449,7 +456,7 @@ public class DynamoDbMatchRepository : IMatchRepository
 
             // Delete player-match index items
             var reversedTimestamp = (DateTime.MaxValue.Ticks - match.CreatedAt.Ticks).ToString("D19");
-            
+
             transactItems.Add(new TransactWriteItem
             {
                 Delete = new Delete

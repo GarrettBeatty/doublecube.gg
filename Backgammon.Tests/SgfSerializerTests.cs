@@ -1,5 +1,5 @@
-using Xunit;
 using Backgammon.Core;
+using Xunit;
 
 namespace Backgammon.Tests;
 

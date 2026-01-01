@@ -8,7 +8,9 @@ namespace Backgammon.AI;
 public class AISimulator
 {
     public IBackgammonAI WhiteAI { get; }
+
     public IBackgammonAI RedAI { get; }
+
     public bool Verbose { get; set; }
 
     public AISimulator(IBackgammonAI whiteAI, IBackgammonAI redAI, bool verbose = false)
@@ -88,7 +90,10 @@ public class AISimulator
             if (turnCount > 1000)
             {
                 if (Verbose)
+                {
                     Console.WriteLine("Game exceeded 1000 turns - aborting");
+                }
+
                 break;
             }
         }
@@ -97,7 +102,7 @@ public class AISimulator
         {
             var result = engine.GetGameResult();
             var winnerAI = engine.Winner.Color == CheckerColor.White ? WhiteAI : RedAI;
-            
+
             if (Verbose)
             {
                 Console.WriteLine($"\n=== Game Over ===");
@@ -172,11 +177,17 @@ public class AISimulator
     private string FormatMove(Move move)
     {
         if (move.From == 0)
+        {
             return $"Bar → {move.To} (die: {move.DieValue})";
+        }
         else if (move.IsBearOff)
+        {
             return $"{move.From} → Off (die: {move.DieValue})";
+        }
         else
-            return $"{move.From} → {move.To} (die: {move.DieValue}){(move.IsHit ? " [HIT]" : "")}";
+        {
+            return $"{move.From} → {move.To} (die: {move.DieValue}){(move.IsHit ? " [HIT]" : string.Empty)}";
+        }
     }
 
     private string GetResultType(int multiplier)
@@ -197,9 +208,13 @@ public class AISimulator
 public class GameResult
 {
     public CheckerColor Winner { get; set; }
+
     public int Points { get; set; }
+
     public int Turns { get; set; }
+
     public int WhiteBornOff { get; set; }
+
     public int RedBornOff { get; set; }
 }
 
@@ -209,16 +224,25 @@ public class GameResult
 public class SimulationStats
 {
     public int TotalGames { get; set; }
-    public string WhiteAIName { get; set; } = "";
-    public string RedAIName { get; set; } = "";
+
+    public string WhiteAIName { get; set; } = string.Empty;
+
+    public string RedAIName { get; set; } = string.Empty;
+
     public int WhiteWins { get; set; }
+
     public int RedWins { get; set; }
+
     public int WhitePoints { get; set; }
+
     public int RedPoints { get; set; }
+
     public int TotalTurns { get; set; }
 
     public double WhiteWinPercentage => TotalGames > 0 ? (double)WhiteWins / TotalGames * 100 : 0;
+
     public double RedWinPercentage => TotalGames > 0 ? (double)RedWins / TotalGames * 100 : 0;
+
     public double AverageTurnsPerGame => TotalGames > 0 ? (double)TotalTurns / TotalGames : 0;
 
     public void PrintSummary()

@@ -20,24 +20,38 @@ public class GameSession
     public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
 
     public string Id { get; }
+
     public GameEngine Engine { get; }
-    public string? WhitePlayerId { get; private set; }  // Persistent player ID
-    public string? RedPlayerId { get; private set; }    // Persistent player ID
-    public string? WhitePlayerName { get; set; }  // Display name for White player
-    public string? RedPlayerName { get; set; }    // Display name for Red player
-    public string? WhiteConnectionId { get; private set; }  // Current connection
-    public string? RedConnectionId { get; private set; }    // Current connection
+
+    public string? WhitePlayerId { get; private set; } // Persistent player ID
+
+    public string? RedPlayerId { get; private set; } // Persistent player ID
+
+    public string? WhitePlayerName { get; set; } // Display name for White player
+
+    public string? RedPlayerName { get; set; } // Display name for Red player
+
+    public string? WhiteConnectionId { get; private set; } // Current connection
+
+    public string? RedConnectionId { get; private set; } // Current connection
+
     public DateTime CreatedAt { get; }
+
     public DateTime LastActivityAt { get; private set; }
-    
+
     public bool IsFull => WhitePlayerId != null && RedPlayerId != null;
+
     public bool IsStarted => IsFull && Engine.GameStarted;
+
     public IGameMode GameMode { get; private set; }
+
     public bool IsAnalysisMode => GameMode is AnalysisMode;  // Helper property for backwards compatibility
+
     public bool IsBotGame { get; set; } = false;
-    
+
     // Match-related properties
     public string? MatchId { get; set; }
+
     public bool IsMatchGame { get; set; } = false;
 
     public GameSession(string id)
@@ -50,33 +64,39 @@ public class GameSession
         LastActivityAt = DateTime.UtcNow;
         GameMode = new MultiplayerMode();  // Default to multiplayer mode
     }
-    
+
     /// <summary>
     /// Add a player to the game session
     /// </summary>
     public bool AddPlayer(string playerId, string connectionId)
     {
         LastActivityAt = DateTime.UtcNow;
-        
+
         // Check if player is already in this game (reconnection)
         if (WhitePlayerId == playerId)
         {
             WhiteConnectionId = connectionId;
             // Set name if not already set (for existing games before this feature)
             if (string.IsNullOrEmpty(WhitePlayerName))
+            {
                 WhitePlayerName = GenerateFriendlyName(playerId);
+            }
+
             return true;
         }
-        
+
         if (RedPlayerId == playerId)
         {
             RedConnectionId = connectionId;
             // Set name if not already set (for existing games before this feature)
             if (string.IsNullOrEmpty(RedPlayerName))
+            {
                 RedPlayerName = GenerateFriendlyName(playerId);
+            }
+
             return true;
         }
-        
+
         // Add as new player
         if (WhitePlayerId == null)
         {
@@ -85,7 +105,7 @@ public class GameSession
             WhitePlayerName = GenerateFriendlyName(playerId);
             return true;
         }
-        
+
         if (RedPlayerId == null)
         {
             RedPlayerId = playerId;
@@ -96,9 +116,10 @@ public class GameSession
             {
                 Engine.StartNewGame();
             }
+
             return true;
         }
-        
+
         return false; // Game is full
     }
 
@@ -113,6 +134,7 @@ public class GameSession
         {
             RedPlayerName = GenerateFriendlyName(playerId);
         }
+
         LastActivityAt = DateTime.UtcNow;
     }
 
@@ -150,7 +172,7 @@ public class GameSession
     {
         return _spectatorConnections.Contains(connectionId);
     }
-    
+
     /// <summary>
     /// Generate a friendly display name from a player ID
     /// </summary>
@@ -162,6 +184,7 @@ public class GameSession
             var suffix = playerId.Substring(playerId.Length - 4);
             return $"Player {suffix}";
         }
+
         return playerId;
     }
 
@@ -179,7 +202,7 @@ public class GameSession
             RedPlayerName = displayName;
         }
     }
-    
+
     /// <summary>
     /// Update player's connection ID (for reconnection scenarios)
     /// </summary>
@@ -191,42 +214,53 @@ public class GameSession
             LastActivityAt = DateTime.UtcNow;
             return true;
         }
-        
+
         if (RedPlayerId == playerId)
         {
             RedConnectionId = newConnectionId;
             LastActivityAt = DateTime.UtcNow;
             return true;
         }
-        
+
         return false;
     }
-    
+
     /// <summary>
     /// Remove a player from the game session
     /// </summary>
     public void RemovePlayer(string connectionId)
     {
         if (WhiteConnectionId == connectionId)
+        {
             WhiteConnectionId = null;
+        }
+
         if (RedConnectionId == connectionId)
+        {
             RedConnectionId = null;
-            
+        }
+
         LastActivityAt = DateTime.UtcNow;
     }
-    
+
     /// <summary>
     /// Get the color assigned to a specific player connection
     /// </summary>
     public CheckerColor? GetPlayerColor(string connectionId)
     {
         if (connectionId == WhiteConnectionId)
+        {
             return CheckerColor.White;
+        }
+
         if (connectionId == RedConnectionId)
+        {
             return CheckerColor.Red;
+        }
+
         return null;
     }
-    
+
     /// <summary>
     /// Check if it's a specific player's turn
     /// </summary>
@@ -234,7 +268,7 @@ public class GameSession
     {
         return GameMode.IsPlayerTurn(connectionId, this);
     }
-    
+
     /// <summary>
     /// Convert the current engine state to a DTO for clients
     /// </summary>
@@ -246,14 +280,14 @@ public class GameSession
         {
             playerColor = GetPlayerColor(forConnectionId);
         }
-        
+
         var features = GameMode.GetFeatures();
 
         var state = new GameState
         {
             GameId = Id,
-            WhitePlayerId = WhitePlayerId ?? "",
-            RedPlayerId = RedPlayerId ?? "",
+            WhitePlayerId = WhitePlayerId ?? string.Empty,
+            RedPlayerId = RedPlayerId ?? string.Empty,
             WhitePlayerName = WhitePlayerName ?? WhitePlayerId ?? "Waiting...",
             RedPlayerName = RedPlayerName ?? RedPlayerId ?? "Waiting...",
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
@@ -286,7 +320,7 @@ public class GameSession
             DieValue = Math.Abs(m.To - m.From),
             IsHit = WillHit(m)
         }).ToList();
-        
+
         if (Engine.Winner != null)
         {
             var stakes = Engine.GetGameResult();
@@ -298,14 +332,14 @@ public class GameSession
                 _ => "Normal"
             };
         }
-        
+
         return state;
     }
-    
+
     private PointState[] GetBoardState()
     {
         var points = new List<PointState>();
-        
+
         // Points 1-24 on the board
         for (int i = 1; i <= 24; i++)
         {
@@ -317,19 +351,23 @@ public class GameSession
                 Count = point.Count
             });
         }
-        
+
         return points.ToArray();
     }
-    
+
     private bool WillHit(Move move)
     {
         // Bear-off moves (To = 0 or 25) cannot hit
         if (move.IsBearOff)
+        {
             return false;
+        }
 
         var targetPoint = Engine.Board.GetPoint(move.To);
         if (targetPoint.Color == null || targetPoint.Count == 0)
+        {
             return false;
+        }
 
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
     }

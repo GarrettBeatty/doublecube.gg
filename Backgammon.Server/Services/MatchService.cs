@@ -49,7 +49,8 @@ public class MatchService : IMatchService
 
             await _matchRepository.SaveMatchAsync(match);
 
-            _logger.LogInformation("Created match {MatchId} between {Player1} and {Player2}, target score: {TargetScore}",
+            _logger.LogInformation(
+                "Created match {MatchId} between {Player1} and {Player2}, target score: {TargetScore}",
                 match.MatchId, match.Player1Name, match.Player2Name, targetScore);
 
             return match;
@@ -72,10 +73,14 @@ public class MatchService : IMatchService
         {
             var match = await _matchRepository.GetMatchByIdAsync(matchId);
             if (match == null)
+            {
                 throw new InvalidOperationException($"Match {matchId} not found");
+            }
 
             if (match.Status != "InProgress")
+            {
                 throw new InvalidOperationException($"Cannot start new game in completed match {matchId}");
+            }
 
             // Create new game
             var gameId = Guid.NewGuid().ToString();
@@ -103,7 +108,7 @@ public class MatchService : IMatchService
             var session = _gameSessionManager.CreateGame(gameId);
             session.WhitePlayerName = match.Player1Name;
             session.RedPlayerName = match.Player2Name;
-            
+
             // Configure Crawford rule if applicable
             if (match.IsCrawfordGame)
             {
@@ -111,7 +116,8 @@ public class MatchService : IMatchService
                 session.Engine.MatchId = matchId;
             }
 
-            _logger.LogInformation("Started game {GameId} for match {MatchId} (Crawford: {IsCrawford})",
+            _logger.LogInformation(
+                "Started game {GameId} for match {MatchId} (Crawford: {IsCrawford})",
                 gameId, matchId, match.IsCrawfordGame);
 
             return game;
@@ -129,11 +135,15 @@ public class MatchService : IMatchService
         {
             var game = await _gameRepository.GetGameByGameIdAsync(gameId);
             if (game == null || !game.IsMatchGame || string.IsNullOrEmpty(game.MatchId))
+            {
                 return;
+            }
 
             var match = await _matchRepository.GetMatchByIdAsync(game.MatchId);
             if (match == null)
+            {
                 return;
+            }
 
             // Create Core.Game from result
             var coreGame = new Core.Game(gameId)
@@ -174,7 +184,8 @@ public class MatchService : IMatchService
                 match.WinnerId = match.CoreMatch.GetWinnerId();
                 match.DurationSeconds = (int)(DateTime.UtcNow - match.CreatedAt).TotalSeconds;
 
-                _logger.LogInformation("Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",
+                _logger.LogInformation(
+                    "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",
                     match.MatchId, match.WinnerId, match.Player1Score, match.Player2Score);
             }
 
@@ -213,12 +224,14 @@ public class MatchService : IMatchService
         {
             var match = await _matchRepository.GetMatchByIdAsync(matchId);
             if (match == null || match.Status != "InProgress")
+            {
                 return;
+            }
 
             match.Status = "Abandoned";
             match.CompletedAt = DateTime.UtcNow;
             match.DurationSeconds = (int)(match.CompletedAt.Value - match.CreatedAt).TotalSeconds;
-            
+
             // The non-abandoning player wins by default
             match.WinnerId = match.Player1Id == abandoningPlayerId ? match.Player2Id : match.Player1Id;
 
@@ -270,7 +283,8 @@ public class MatchService : IMatchService
 
             await _matchRepository.SaveMatchAsync(match);
 
-            _logger.LogInformation("Created match lobby {MatchId} for player {Player1Id} (type: {OpponentType})",
+            _logger.LogInformation(
+                "Created match lobby {MatchId} for player {Player1Id} (type: {OpponentType})",
                 match.MatchId, player1Id, opponentType);
 
             return match;
@@ -288,13 +302,19 @@ public class MatchService : IMatchService
         {
             var match = await _matchRepository.GetMatchByIdAsync(matchId);
             if (match == null)
+            {
                 throw new InvalidOperationException($"Match {matchId} not found");
+            }
 
             if (!match.IsOpenLobby)
+            {
                 throw new InvalidOperationException($"Match {matchId} is not an open lobby");
+            }
 
             if (!string.IsNullOrEmpty(match.Player2Id))
+            {
                 throw new InvalidOperationException($"Match {matchId} already has a second player");
+            }
 
             // Get player 2 name
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
@@ -323,7 +343,9 @@ public class MatchService : IMatchService
     {
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
         if (match == null)
+        {
             throw new InvalidOperationException($"Match {matchId} not found");
+        }
 
         return await StartMatchFirstGameAsync(match);
     }
@@ -333,7 +355,9 @@ public class MatchService : IMatchService
         try
         {
             if (string.IsNullOrEmpty(match.Player2Id))
+            {
                 throw new InvalidOperationException($"Match {match.MatchId} does not have a second player");
+            }
 
             // Create the first game
             var game = new ServerGame
@@ -389,7 +413,9 @@ public class MatchService : IMatchService
         {
             var match = await _matchRepository.GetMatchByIdAsync(matchId);
             if (match == null || match.LobbyStatus == "InGame")
+            {
                 return;
+            }
 
             // If creator leaves, delete the match
             if (match.Player1Id == playerId)
@@ -397,6 +423,7 @@ public class MatchService : IMatchService
                 await _matchRepository.DeleteMatchAsync(matchId);
                 _logger.LogInformation("Match lobby {MatchId} deleted as creator left", matchId);
             }
+
             // If joiner leaves, reset to waiting
             else if (match.Player2Id == playerId)
             {

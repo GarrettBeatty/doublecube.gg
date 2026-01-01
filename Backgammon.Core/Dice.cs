@@ -8,6 +8,7 @@ public class Dice
     private readonly Random _random = new();
 
     public int Die1 { get; private set; }
+
     public int Die2 { get; private set; }
 
     /// <summary>
@@ -24,6 +25,7 @@ public class Dice
         {
             return new List<int> { Die1, Die1, Die1, Die1 };
         }
+
         return new List<int> { Die1, Die2 };
     }
 

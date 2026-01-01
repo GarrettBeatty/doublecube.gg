@@ -1,6 +1,10 @@
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using Backgammon.Core;
+using Backgammon.Server.Hubs;
+using Backgammon.Server.Models;
+using Backgammon.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -8,10 +12,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using Backgammon.Core;
-using Backgammon.Server.Hubs;
-using Backgammon.Server.Services;
-using Backgammon.Server.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,7 +55,6 @@ builder.Services.AddSingleton<Amazon.DynamoDBv2.IAmazonDynamoDB>(sp =>
     // - AWS credentials and region from environment/config
     return new Amazon.DynamoDBv2.AmazonDynamoDBClient();
 });
-
 
 // Register DynamoDB services
 builder.Services.AddSingleton<IGameRepository, Backgammon.Server.Services.DynamoDb.DynamoDbGameRepository>();
@@ -114,6 +113,7 @@ builder.Services.AddAuthentication(options =>
             {
                 context.Token = accessToken;
             }
+
             return Task.CompletedTask;
         }
     };
@@ -127,7 +127,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true)  // Allow any origin in development
+        policy.SetIsOriginAllowed(_ => true) // Allow any origin in development
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials();  // Required for SignalR
@@ -326,7 +326,9 @@ app.MapGet("/api/game/{gameId}", async (string gameId, IGameRepository gameRepos
 {
     var game = await gameRepository.GetGameByGameIdAsync(gameId);
     if (game == null)
+    {
         return Results.NotFound(new { error = "Game not found" });
+    }
 
     return Results.Ok(game);
 }).RequireCors(selectedCorsPolicy);
@@ -350,9 +352,11 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authSer
 // Get current user (requires auth)
 app.MapGet("/api/auth/me", async (HttpContext context, IAuthService authService) =>
 {
-    var token = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+    var token = context.Request.Headers["Authorization"].ToString().Replace("Bearer ", string.Empty);
     if (string.IsNullOrEmpty(token))
+    {
         return Results.Unauthorized();
+    }
 
     var user = await authService.GetUserFromTokenAsync(token);
     return user != null ? Results.Ok(user) : Results.Unauthorized();
@@ -365,7 +369,9 @@ app.MapGet("/api/users/{userId}", async (string userId, IUserRepository userRepo
 {
     var user = await userRepository.GetByUserIdAsync(userId);
     if (user == null)
+    {
         return Results.NotFound(new { error = "User not found" });
+    }
 
     return Results.Ok(UserDto.FromUser(user));
 }).RequireCors(selectedCorsPolicy);
@@ -375,11 +381,15 @@ app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContex
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var user = await userRepository.GetByUserIdAsync(userId);
     if (user == null)
+    {
         return Results.NotFound(new { error = "User not found" });
+    }
 
     if (!string.IsNullOrWhiteSpace(request.DisplayName))
     {
@@ -394,6 +404,7 @@ app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContex
         {
             return Results.BadRequest(new { error = "Email already in use" });
         }
+
         user.Email = request.Email;
         user.EmailNormalized = request.Email.ToLowerInvariant();
     }
@@ -422,7 +433,9 @@ app.MapPut("/api/users/profile", async (UpdateProfileRequest request, HttpContex
 app.MapGet("/api/users/search", async (string q, IUserRepository userRepository) =>
 {
     if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+    {
         return Results.BadRequest(new { error = "Search query must be at least 2 characters" });
+    }
 
     var users = await userRepository.SearchUsersAsync(q, 10);
     return Results.Ok(users.Select(u => new
@@ -440,7 +453,9 @@ app.MapGet("/api/friends", async (HttpContext context, IFriendService friendServ
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var friends = await friendService.GetFriendsAsync(userId);
     return Results.Ok(friends);
@@ -451,7 +466,9 @@ app.MapGet("/api/friends/requests", async (HttpContext context, IFriendService f
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var requests = await friendService.GetPendingRequestsAsync(userId);
     return Results.Ok(requests);
@@ -462,7 +479,9 @@ app.MapPost("/api/friends/request/{toUserId}", async (string toUserId, HttpConte
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.SendFriendRequestAsync(userId, toUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -473,7 +492,9 @@ app.MapPost("/api/friends/accept/{friendUserId}", async (string friendUserId, Ht
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.AcceptFriendRequestAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -484,7 +505,9 @@ app.MapPost("/api/friends/decline/{friendUserId}", async (string friendUserId, H
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.DeclineFriendRequestAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -495,7 +518,9 @@ app.MapDelete("/api/friends/{friendUserId}", async (string friendUserId, HttpCon
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.RemoveFriendAsync(userId, friendUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -506,7 +531,9 @@ app.MapPost("/api/friends/block/{blockedUserId}", async (string blockedUserId, H
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.BlockUserAsync(userId, blockedUserId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -517,7 +544,9 @@ app.MapPost("/api/friends/invite/{friendUserId}/game/{gameId}", async (string fr
 {
     var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
     if (string.IsNullOrEmpty(userId))
+    {
         return Results.Unauthorized();
+    }
 
     var (success, error) = await friendService.InviteFriendToGameAsync(userId, friendUserId, gameId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
@@ -667,4 +696,6 @@ static async Task EnsureTableExistsAsync(Amazon.DynamoDBv2.IAmazonDynamoDB dynam
 }
 
 // Expose Program class for integration testing
-public partial class Program { }
+public partial class Program
+{
+}

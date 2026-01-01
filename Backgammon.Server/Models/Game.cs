@@ -22,6 +22,7 @@ public class Game
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
     // Player information
+
     /// <summary>
     /// Player ID for white (starting player)
     /// </summary>
@@ -67,6 +68,7 @@ public class Game
     public bool GameStarted { get; set; }
 
     // Board state
+
     /// <summary>
     /// Array of 24 point states (positions 1-24)
     /// Each element: { position: int, color: string?, count: int }
@@ -75,6 +77,7 @@ public class Game
     public List<PointStateDto> BoardState { get; set; } = new();
 
     // Player states
+
     /// <summary>
     /// Number of white checkers on the bar
     /// </summary>
@@ -100,6 +103,7 @@ public class Game
     public int RedBornOff { get; set; }
 
     // Current turn state
+
     /// <summary>
     /// Current player color: "White" or "Red"
     /// </summary>
@@ -107,6 +111,7 @@ public class Game
     public string CurrentPlayer { get; set; } = "White";
 
     // Dice state
+
     /// <summary>
     /// First die value (0 if not rolled yet)
     /// </summary>
@@ -126,6 +131,7 @@ public class Game
     public List<int> RemainingMoves { get; set; } = new();
 
     // Doubling cube
+
     /// <summary>
     /// Current value of the doubling cube (1, 2, 4, 8, 16, 32, 64)
     /// </summary>
@@ -154,6 +160,7 @@ public class Game
     public int MoveCount { get; set; }
 
     // Timestamps
+
     /// <summary>
     /// When the game was created
     /// </summary>

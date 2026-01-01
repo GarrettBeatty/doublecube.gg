@@ -37,7 +37,9 @@ public class DynamoDbUserRepository : IUserRepository
             });
 
             if (!response.IsItemSet)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalUser(response.Item);
         }
@@ -68,7 +70,9 @@ public class DynamoDbUserRepository : IUserRepository
             });
 
             if (response.Items.Count == 0)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalUser(response.Items[0]);
         }
@@ -99,7 +103,9 @@ public class DynamoDbUserRepository : IUserRepository
             });
 
             if (response.Items.Count == 0)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalUser(response.Items[0]);
         }
@@ -338,7 +344,9 @@ public class DynamoDbUserRepository : IUserRepository
         {
             var userIdList = userIds.ToList();
             if (!userIdList.Any())
+            {
                 return new List<User>();
+            }
 
             // DynamoDB BatchGetItem has a limit of 100 items
             var users = new List<User>();

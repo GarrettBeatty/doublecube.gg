@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
 
@@ -61,6 +61,7 @@ public class FriendService : IFriendService
                 {
                     return (false, "Already friends with this user");
                 }
+
                 if (existing.Status == FriendshipStatus.Pending)
                 {
                     return (false, "Friend request already pending");
@@ -78,8 +79,7 @@ public class FriendService : IFriendService
             await _friendshipRepository.SendFriendRequestAsync(
                 fromUserId, toUserId,
                 fromUser.Username, fromUser.DisplayName,
-                toUser.Username, toUser.DisplayName
-            );
+                toUser.Username, toUser.DisplayName);
 
             // Send real-time notification to recipient if online
             // Note: This requires tracking user connections by userId

@@ -226,11 +226,17 @@ public class Match
         {
             // For setter, we need to create or update CurrentGame
             if (value == null)
+            {
                 CoreMatch.CurrentGame = null;
+            }
             else if (CoreMatch.CurrentGame == null)
+            {
                 CoreMatch.CurrentGame = new Core.Game(value);
+            }
             else
+            {
                 CoreMatch.CurrentGame.GameId = value;
+            }
         }
     }
 

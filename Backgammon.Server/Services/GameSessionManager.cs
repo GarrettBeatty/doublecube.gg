@@ -19,18 +19,18 @@ public interface IGameSessionManager
     /// Get a game session by ID
     /// </summary>
     GameSession? GetGame(string gameId);
-    
+
     /// <summary>
     /// Get the game session a player is in
     /// </summary>
     GameSession? GetGameByPlayer(string connectionId);
-    
+
     /// <summary>
     /// Join an existing game by ID, or create a new game (no matchmaking)
     /// Loads from database if game not in memory but exists as InProgress
     /// </summary>
     Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null);
-    
+
     /// <summary>
     /// Remove a player from their current game
     /// </summary>
@@ -45,12 +45,12 @@ public interface IGameSessionManager
     /// Get all active game sessions
     /// </summary>
     IEnumerable<GameSession> GetAllGames();
-    
+
     /// <summary>
     /// Get all active games for a specific player
     /// </summary>
     IEnumerable<GameSession> GetPlayerGames(string playerId);
-    
+
     /// <summary>
     /// Clean up old/abandoned games
     /// </summary>
@@ -83,7 +83,7 @@ public class GameSessionManager : IGameSessionManager
     {
         _gameRepository = gameRepository;
     }
-    
+
     public GameSession CreateGame(string? gameId = null)
     {
         lock (_lock)
@@ -91,7 +91,9 @@ public class GameSessionManager : IGameSessionManager
             gameId ??= Guid.NewGuid().ToString();
 
             if (_games.ContainsKey(gameId))
+            {
                 throw new InvalidOperationException($"Game {gameId} already exists");
+            }
 
             var session = new GameSession(gameId);
             _games[gameId] = session;
@@ -112,7 +114,7 @@ public class GameSessionManager : IGameSessionManager
             }
         }
     }
-    
+
     public GameSession? GetGame(string gameId)
     {
         lock (_lock)
@@ -120,7 +122,7 @@ public class GameSessionManager : IGameSessionManager
             return _games.GetValueOrDefault(gameId);
         }
     }
-    
+
     public GameSession? GetGameByPlayer(string connectionId)
     {
         lock (_lock)
@@ -129,10 +131,11 @@ public class GameSessionManager : IGameSessionManager
             {
                 return _games.GetValueOrDefault(gameId);
             }
+
             return null;
         }
     }
-    
+
     public async Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null)
     {
         // Check memory first (inside lock)
@@ -164,8 +167,10 @@ public class GameSessionManager : IGameSessionManager
                         // Game is full, but register connection for spectator tracking
                         _playerToGame[connectionId] = gameId;
                     }
+
                     return existingGame;
                 }
+
                 // Game not in memory - will check database outside lock
             }
         }
@@ -196,6 +201,7 @@ public class GameSessionManager : IGameSessionManager
                         return loadedSession;
                     }
                 }
+
                 throw new InvalidOperationException("You are not a player in this game");
             }
 
@@ -218,7 +224,7 @@ public class GameSessionManager : IGameSessionManager
             return game;
         }
     }
-    
+
     public void RemovePlayer(string connectionId)
     {
         lock (_lock)
@@ -249,9 +255,14 @@ public class GameSessionManager : IGameSessionManager
             {
                 // Remove player-to-game mappings
                 if (game.WhiteConnectionId != null)
+                {
                     _playerToGame.Remove(game.WhiteConnectionId);
+                }
+
                 if (game.RedConnectionId != null)
+                {
                     _playerToGame.Remove(game.RedConnectionId);
+                }
 
                 // Remove game from dictionary
                 _games.Remove(gameId);
@@ -269,7 +280,7 @@ public class GameSessionManager : IGameSessionManager
                 .ToList();
         }
     }
-    
+
     public IEnumerable<GameSession> GetPlayerGames(string playerId)
     {
         lock (_lock)
@@ -279,7 +290,7 @@ public class GameSessionManager : IGameSessionManager
                 .ToList();
         }
     }
-    
+
     public void CleanupInactiveGames(TimeSpan maxInactivity)
     {
         lock (_lock)
@@ -292,9 +303,14 @@ public class GameSessionManager : IGameSessionManager
                 _games.Remove(gameId);
 
                 if (game.WhitePlayerId != null)
+                {
                     _playerToGame.Remove(game.WhitePlayerId);
+                }
+
                 if (game.RedPlayerId != null)
+                {
                     _playerToGame.Remove(game.RedPlayerId);
+                }
             }
         }
     }

@@ -18,6 +18,7 @@ public static class DynamoDbHelpers
         {
             return DateTime.Parse(value.S).ToUniversalTime();
         }
+
         return DateTime.UtcNow;
     }
 
@@ -28,6 +29,7 @@ public static class DynamoDbHelpers
         {
             return DateTime.Parse(value.S).ToUniversalTime();
         }
+
         return null;
     }
 
@@ -38,6 +40,7 @@ public static class DynamoDbHelpers
         {
             return int.Parse(value.N);
         }
+
         return defaultValue;
     }
 
@@ -48,6 +51,7 @@ public static class DynamoDbHelpers
         {
             return value.BOOL.Value;
         }
+
         return defaultValue;
     }
 
@@ -58,6 +62,7 @@ public static class DynamoDbHelpers
         {
             return value.L.Select(v => v.S).ToList();
         }
+
         return new List<string>();
     }
 
@@ -253,17 +258,34 @@ public static class DynamoDbHelpers
 
         // Player IDs
         if (!string.IsNullOrEmpty(game.WhitePlayerId))
+        {
             item["whitePlayerId"] = new AttributeValue { S = game.WhitePlayerId };
+        }
+
         if (!string.IsNullOrEmpty(game.RedPlayerId))
+        {
             item["redPlayerId"] = new AttributeValue { S = game.RedPlayerId };
+        }
+
         if (!string.IsNullOrEmpty(game.WhiteUserId))
+        {
             item["whiteUserId"] = new AttributeValue { S = game.WhiteUserId };
+        }
+
         if (!string.IsNullOrEmpty(game.RedUserId))
+        {
             item["redUserId"] = new AttributeValue { S = game.RedUserId };
+        }
+
         if (!string.IsNullOrEmpty(game.WhitePlayerName))
+        {
             item["whitePlayerName"] = new AttributeValue { S = game.WhitePlayerName };
+        }
+
         if (!string.IsNullOrEmpty(game.RedPlayerName))
+        {
             item["redPlayerName"] = new AttributeValue { S = game.RedPlayerName };
+        }
 
         // Remaining moves
         if (game.RemainingMoves.Any())
@@ -309,6 +331,7 @@ public static class DynamoDbHelpers
         {
             item["matchId"] = new AttributeValue { S = game.MatchId };
         }
+
         item["isMatchGame"] = new AttributeValue { BOOL = game.IsMatchGame };
         item["isCrawfordGame"] = new AttributeValue { BOOL = game.IsCrawfordGame };
         if (!string.IsNullOrEmpty(game.WinType))
@@ -410,7 +433,7 @@ public static class DynamoDbHelpers
 
         return new Friendship
         {
-            UserId = item["PK"].S.Replace("USER#", ""),
+            UserId = item["PK"].S.Replace("USER#", string.Empty),
             FriendUserId = item["friendUserId"].S,
             FriendUsername = item["friendUsername"].S,
             FriendDisplayName = item["friendDisplayName"].S,

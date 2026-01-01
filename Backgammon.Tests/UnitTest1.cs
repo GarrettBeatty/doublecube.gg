@@ -9,10 +9,10 @@ public class GameEngineTests
     {
         // Arrange
         var game = new GameEngine();
-        
+
         // Act
         game.StartNewGame();
-        
+
         // Assert - White's positions (moves 24->1)
         Assert.Equal(2, game.Board.GetPoint(24).Count);
         Assert.Equal(CheckerColor.White, game.Board.GetPoint(24).Color);
@@ -22,7 +22,7 @@ public class GameEngineTests
         Assert.Equal(CheckerColor.White, game.Board.GetPoint(8).Color);
         Assert.Equal(5, game.Board.GetPoint(6).Count);
         Assert.Equal(CheckerColor.White, game.Board.GetPoint(6).Color);
-        
+
         // Assert - Red's positions (moves 1->24)
         Assert.Equal(2, game.Board.GetPoint(1).Count);
         Assert.Equal(CheckerColor.Red, game.Board.GetPoint(1).Color);
@@ -40,22 +40,24 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.StartNewGame();
-        
+
         // Clear and set up simple scenario
         game.Board.GetPoint(1).Checkers.Clear();
         game.Board.GetPoint(1).AddChecker(CheckerColor.White);
-        
+
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
-        
+        }
+
         game.Dice.SetDice(3, 4);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
-        
+
         // Act
         var move = new Move(1, 4, 3);
         var isValid = game.IsValidMove(move);
-        
+
         // Assert
         Assert.True(isValid);
     }
@@ -66,24 +68,28 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.StartNewGame();
-        
+
         for (int i = 1; i <= 24; i++)
+        {
             game.Board.GetPoint(i).Checkers.Clear();
-        
+        }
+
         game.Board.GetPoint(5).AddChecker(CheckerColor.White);
         game.Board.GetPoint(8).AddChecker(CheckerColor.Red);
-        
+
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
-        
+        }
+
         game.Dice.SetDice(3, 4);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
-        
+
         // Act
         var move = new Move(5, 8, 3);
         game.ExecuteMove(move);
-        
+
         // Assert
         Assert.Equal(1, game.RedPlayer.CheckersOnBar);
         Assert.Equal(CheckerColor.White, game.Board.GetPoint(8).Color);
@@ -95,25 +101,29 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.StartNewGame();
-        
+
         for (int i = 1; i <= 24; i++)
+        {
             game.Board.GetPoint(i).Checkers.Clear();
-        
+        }
+
         game.Board.GetPoint(3).AddChecker(CheckerColor.White);
         game.Board.GetPoint(5).AddChecker(CheckerColor.White);
-        
+
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
-        
+        }
+
         game.WhitePlayer.CheckersOnBar = 0;
         game.Dice.SetDice(3, 5);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
-        
+
         // Act
         var move = new Move(3, 0, 3);
         var isValid = game.IsValidMove(move);
-        
+
         // Assert
         Assert.True(isValid);
         Assert.True(game.Board.AreAllCheckersInHomeBoard(game.WhitePlayer, 0));
@@ -125,10 +135,10 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.Dice.SetDice(4, 4);
-        
+
         // Act
         var moves = game.Dice.GetMoves();
-        
+
         // Assert
         Assert.Equal(4, moves.Count);
         Assert.All(moves, m => Assert.Equal(4, m));
@@ -140,19 +150,21 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.StartNewGame();
-        
+
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
-        
+        }
+
         game.WhitePlayer.CheckersOnBar = 1;
         game.Dice.SetDice(2, 5);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
-        
+
         // Act
         var move = new Move(0, 23, 2);
         var isValid = game.IsValidMove(move);
-        
+
         // Assert
         Assert.True(isValid);
     }
@@ -165,7 +177,9 @@ public class GameEngineTests
         game.StartNewGame();
 
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
+        }
 
         game.WhitePlayer.CheckersOnBar = 1;
         game.Dice.SetDice(1, 3);
@@ -188,7 +202,9 @@ public class GameEngineTests
         game.StartNewGame();
 
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
+        }
 
         // Clear point 19 so White can enter (initially has 5 Red checkers)
         game.Board.GetPoint(19).Checkers.Clear();
@@ -214,7 +230,9 @@ public class GameEngineTests
         game.StartNewGame();
 
         while (game.CurrentPlayer.Color != CheckerColor.Red)
+        {
             game.EndTurn();
+        }
 
         game.RedPlayer.CheckersOnBar = 1;
         game.Dice.SetDice(1, 3);
@@ -237,7 +255,9 @@ public class GameEngineTests
         game.StartNewGame();
 
         while (game.CurrentPlayer.Color != CheckerColor.Red)
+        {
             game.EndTurn();
+        }
 
         // Clear point 6 so Red can enter (initially has 5 White checkers)
         game.Board.GetPoint(6).Checkers.Clear();
@@ -261,24 +281,28 @@ public class GameEngineTests
         // Arrange
         var game = new GameEngine();
         game.StartNewGame();
-        
+
         while (game.CurrentPlayer.Color != CheckerColor.White)
+        {
             game.EndTurn();
-        
+        }
+
         game.WhitePlayer.CheckersBornOff = 14;
-        
+
         for (int i = 1; i <= 24; i++)
+        {
             game.Board.GetPoint(i).Checkers.Clear();
-        
+        }
+
         game.Board.GetPoint(1).AddChecker(CheckerColor.White);
         game.Dice.SetDice(1, 2);
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
-        
+
         // Act
         var move = new Move(1, 0, 1);
         game.ExecuteMove(move);
-        
+
         // Assert
         Assert.True(game.GameOver);
         Assert.Equal(game.WhitePlayer, game.Winner);
@@ -289,7 +313,7 @@ public class GameEngineTests
     {
         // Arrange
         var cube = new DoublingCube();
-        
+
         // Act & Assert
         Assert.True(cube.CanDouble(CheckerColor.White));
         Assert.True(cube.CanDouble(CheckerColor.Red));
@@ -301,10 +325,10 @@ public class GameEngineTests
     {
         // Arrange
         var cube = new DoublingCube();
-        
+
         // Act
         cube.Double(CheckerColor.White);
-        
+
         // Assert
         Assert.Equal(2, cube.Value);
         Assert.Equal(CheckerColor.White, cube.Owner);

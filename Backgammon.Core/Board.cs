@@ -22,7 +22,10 @@ public class Board
     public Point GetPoint(int position)
     {
         if (position < 1 || position > 24)
+        {
             throw new ArgumentOutOfRangeException(nameof(position));
+        }
+
         return _points[position];
     }
 
@@ -67,22 +70,31 @@ public class Board
     public bool AreAllCheckersInHomeBoard(Player player, int checkersOnBar)
     {
         if (checkersOnBar > 0)
+        {
             return false;
+        }
 
         var (homeStart, homeEnd) = player.GetHomeBoardRange();
-        
+
         for (int i = 1; i <= 24; i++)
         {
             // Skip home board range
             if (player.Color == CheckerColor.White && i >= homeStart && i <= homeEnd)
+            {
                 continue;
+            }
+
             if (player.Color == CheckerColor.Red && i >= homeStart && i <= homeEnd)
+            {
                 continue;
+            }
 
             // Check if any checkers outside home board
             var point = _points[i];
             if (point.Color == player.Color && point.Count > 0)
+            {
                 return false;
+            }
         }
 
         return true;
@@ -98,7 +110,9 @@ public class Board
             for (int i = 6; i >= 1; i--)
             {
                 if (_points[i].Color == color && _points[i].Count > 0)
+                {
                     return i;
+                }
             }
         }
         else
@@ -106,9 +120,12 @@ public class Board
             for (int i = 19; i <= 24; i++)
             {
                 if (_points[i].Color == color && _points[i].Count > 0)
+                {
                     return i;
+                }
             }
         }
+
         return 0;
     }
 
@@ -121,8 +138,11 @@ public class Board
         for (int i = 1; i <= 24; i++)
         {
             if (_points[i].Color == color)
+            {
                 count += _points[i].Count;
+            }
         }
+
         return count;
     }
 }

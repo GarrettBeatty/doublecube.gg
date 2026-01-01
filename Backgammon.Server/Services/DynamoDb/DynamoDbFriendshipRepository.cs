@@ -117,7 +117,9 @@ public class DynamoDbFriendshipRepository : IFriendshipRepository
             });
 
             if (response.Items.Count == 0)
+            {
                 return null;
+            }
 
             return DynamoDbHelpers.UnmarshalFriendship(response.Items[0]);
         }
@@ -266,8 +268,8 @@ public class DynamoDbFriendshipRepository : IFriendshipRepository
                             ["PK"] = new AttributeValue { S = $"USER#{friendUserId}" },
                             ["SK"] = new AttributeValue { S = $"FRIEND#{FriendshipStatus.Accepted}#{userId}" },
                             ["friendUserId"] = new AttributeValue { S = userId },
-                            ["friendUsername"] = new AttributeValue { S = "" },  // Would need to pass this in
-                            ["friendDisplayName"] = new AttributeValue { S = "" },  // Would need to pass this in
+                            ["friendUsername"] = new AttributeValue { S = string.Empty },  // Would need to pass this in
+                            ["friendDisplayName"] = new AttributeValue { S = string.Empty },  // Would need to pass this in
                             ["status"] = new AttributeValue { S = FriendshipStatus.Accepted.ToString() },
                             ["initiatedBy"] = new AttributeValue { S = existingFriendship.InitiatedBy },
                             ["createdAt"] = new AttributeValue { S = existingFriendship.CreatedAt.ToString("O") },
@@ -375,8 +377,8 @@ public class DynamoDbFriendshipRepository : IFriendshipRepository
                         ["PK"] = new AttributeValue { S = $"USER#{userId}" },
                         ["SK"] = new AttributeValue { S = $"FRIEND#{FriendshipStatus.Blocked}#{blockedUserId}" },
                         ["friendUserId"] = new AttributeValue { S = blockedUserId },
-                        ["friendUsername"] = new AttributeValue { S = "" },
-                        ["friendDisplayName"] = new AttributeValue { S = "" },
+                        ["friendUsername"] = new AttributeValue { S = string.Empty },
+                        ["friendDisplayName"] = new AttributeValue { S = string.Empty },
                         ["status"] = new AttributeValue { S = FriendshipStatus.Blocked.ToString() },
                         ["initiatedBy"] = new AttributeValue { S = userId },
                         ["createdAt"] = new AttributeValue { S = DateTime.UtcNow.ToString("O") },
