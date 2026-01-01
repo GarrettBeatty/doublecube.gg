@@ -80,6 +80,30 @@ public class User
     public UserStats Stats { get; set; } = new();
 
     /// <summary>
+    /// Current ELO rating (1500 = starting rating)
+    /// </summary>
+    [JsonPropertyName("rating")]
+    public int Rating { get; set; } = 1500;
+
+    /// <summary>
+    /// Highest rating ever achieved
+    /// </summary>
+    [JsonPropertyName("peakRating")]
+    public int PeakRating { get; set; } = 1500;
+
+    /// <summary>
+    /// When the rating was last updated
+    /// </summary>
+    [JsonPropertyName("ratingLastUpdatedAt")]
+    public DateTime? RatingLastUpdatedAt { get; set; }
+
+    /// <summary>
+    /// Number of rated games played (used for K-factor calculation)
+    /// </summary>
+    [JsonPropertyName("ratedGamesCount")]
+    public int RatedGamesCount { get; set; } = 0;
+
+    /// <summary>
     /// Anonymous player IDs that have been linked to this account
     /// Used to claim game history when signing up
     /// </summary>

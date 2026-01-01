@@ -69,6 +69,9 @@ builder.Services.AddSingleton<IFriendService, FriendService>();
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
+// ELO rating service
+builder.Services.AddSingleton<IEloRatingService, EloRatingService>();
+
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
 

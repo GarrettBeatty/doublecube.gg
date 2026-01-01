@@ -33,6 +33,7 @@ public class GameHub : Hub
     private readonly IUserRepository _userRepository;
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IEloRatingService _eloRatingService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMemoryCache _cache;
     private readonly ILogger<GameHub> _logger;
@@ -43,6 +44,7 @@ public class GameHub : Hub
         IUserRepository userRepository,
         IFriendshipRepository friendshipRepository,
         IAiMoveService aiMoveService,
+        IEloRatingService eloRatingService,
         IHubContext<GameHub> hubContext,
         IMemoryCache cache,
         ILogger<GameHub> logger)
@@ -52,6 +54,7 @@ public class GameHub : Hub
         _userRepository = userRepository;
         _friendshipRepository = friendshipRepository;
         _aiMoveService = aiMoveService;
+        _eloRatingService = eloRatingService;
         _hubContext = hubContext;
         _cache = cache;
         _logger = logger;
@@ -1371,7 +1374,7 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Update user statistics after a game is completed
+    /// Update user statistics and ratings after a game is completed
     /// </summary>
     private async Task UpdateUserStatsAfterGame(Game game)
     {
@@ -1393,27 +1396,99 @@ public class GameHub : Hub
                 return;
             }
 
-            // Update white player stats if registered
-            if (!string.IsNullOrEmpty(game.WhiteUserId))
+            // Both players must be registered for rating updates
+            var shouldUpdateRatings = game.IsRanked &&
+                                     !string.IsNullOrEmpty(game.WhiteUserId) &&
+                                     !string.IsNullOrEmpty(game.RedUserId);
+
+            if (shouldUpdateRatings)
             {
-                var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
-                if (user != null)
+                // Get both users
+                var whiteUser = await _userRepository.GetByUserIdAsync(game.WhiteUserId!);
+                var redUser = await _userRepository.GetByUserIdAsync(game.RedUserId!);
+
+                if (whiteUser != null && redUser != null)
                 {
-                    var isWinner = game.Winner == "White";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    // Store ratings before the game
+                    game.WhiteRatingBefore = whiteUser.Rating;
+                    game.RedRatingBefore = redUser.Rating;
+
+                    // Calculate new ratings
+                    var whiteWon = game.Winner == "White";
+                    var (whiteNewRating, redNewRating) = _eloRatingService.CalculateNewRatings(
+                        whiteUser.Rating,
+                        redUser.Rating,
+                        whiteUser.RatedGamesCount,
+                        redUser.RatedGamesCount,
+                        whiteWon
+                    );
+
+                    // Update white player
+                    whiteUser.Rating = whiteNewRating;
+                    whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteNewRating);
+                    whiteUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    whiteUser.RatedGamesCount++;
+                    UpdateStats(whiteUser.Stats, whiteWon, game.Stakes);
+                    await _userRepository.UpdateUserAsync(whiteUser);
+
+                    // Update red player
+                    redUser.Rating = redNewRating;
+                    redUser.PeakRating = Math.Max(redUser.PeakRating, redNewRating);
+                    redUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    redUser.RatedGamesCount++;
+                    UpdateStats(redUser.Stats, !whiteWon, game.Stakes);
+                    await _userRepository.UpdateUserAsync(redUser);
+
+                    // Store ratings after the game
+                    game.WhiteRatingAfter = whiteNewRating;
+                    game.RedRatingAfter = redNewRating;
+
+                    _logger.LogInformation(
+                        "Updated ratings for game {GameId}: White {WhiteBefore}→{WhiteAfter} ({WhiteChange:+#;-#;0}), " +
+                        "Red {RedBefore}→{RedAfter} ({RedChange:+#;-#;0})",
+                        game.GameId,
+                        game.WhiteRatingBefore, game.WhiteRatingAfter, whiteNewRating - game.WhiteRatingBefore.Value,
+                        game.RedRatingBefore, game.RedRatingAfter, redNewRating - game.RedRatingBefore.Value);
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to get users for rating update in game {GameId}", game.GameId);
                 }
             }
-
-            // Update red player stats if registered
-            if (!string.IsNullOrEmpty(game.RedUserId))
+            else
             {
-                var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
-                if (user != null)
+                // Update stats only (no rating changes)
+                // Update white player stats if registered
+                if (!string.IsNullOrEmpty(game.WhiteUserId))
                 {
-                    var isWinner = game.Winner == "Red";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
+                    if (user != null)
+                    {
+                        var isWinner = game.Winner == "White";
+                        UpdateStats(user.Stats, isWinner, game.Stakes);
+                        await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    }
+                }
+
+                // Update red player stats if registered
+                if (!string.IsNullOrEmpty(game.RedUserId))
+                {
+                    var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
+                    if (user != null)
+                    {
+                        var isWinner = game.Winner == "Red";
+                        UpdateStats(user.Stats, isWinner, game.Stakes);
+                        await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    }
+                }
+
+                if (!game.IsRanked)
+                {
+                    _logger.LogInformation("Skipping rating update for game {GameId} - unranked game", game.GameId);
+                }
+                else
+                {
+                    _logger.LogInformation("Skipping rating update for game {GameId} - anonymous player", game.GameId);
                 }
             }
         }

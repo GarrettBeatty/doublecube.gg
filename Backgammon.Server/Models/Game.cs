@@ -200,6 +200,36 @@ public class Game
     /// </summary>
     [JsonPropertyName("isAiOpponent")]
     public bool IsAiOpponent { get; set; }
+
+    /// <summary>
+    /// Whether this game affects player ratings (ranked vs casual)
+    /// </summary>
+    [JsonPropertyName("isRanked")]
+    public bool IsRanked { get; set; } = true;
+
+    /// <summary>
+    /// White player's rating before the game
+    /// </summary>
+    [JsonPropertyName("whiteRatingBefore")]
+    public int? WhiteRatingBefore { get; set; }
+
+    /// <summary>
+    /// Red player's rating before the game
+    /// </summary>
+    [JsonPropertyName("redRatingBefore")]
+    public int? RedRatingBefore { get; set; }
+
+    /// <summary>
+    /// White player's rating after the game
+    /// </summary>
+    [JsonPropertyName("whiteRatingAfter")]
+    public int? WhiteRatingAfter { get; set; }
+
+    /// <summary>
+    /// Red player's rating after the game
+    /// </summary>
+    [JsonPropertyName("redRatingAfter")]
+    public int? RedRatingAfter { get; set; }
 }
 
 /// <summary>
