@@ -21,14 +21,12 @@ backgammon.beatty.codes, doublecube.gg {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
-            header_up Connection {>Connection}
-            header_up Upgrade {>Upgrade}
 
-            # Force HTTP/1.1 for WebSocket support with long timeouts for game sessions
+            # Force HTTP/1.1 for WebSocket support
             transport http {
                 versions 1.1
-                read_timeout 2h
-                write_timeout 2h
+                read_timeout 5m
+                write_timeout 5m
             }
         }
     }
