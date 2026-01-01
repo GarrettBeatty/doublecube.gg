@@ -1,0 +1,40 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Backgammon.WebClient/wwwroot/**/*.js'
+      - 'Backgammon.WebClient/wwwroot/.eslintrc.json'
+      - 'Backgammon.WebClient/package.json'
+      - '.github/workflows/lint.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'Backgammon.WebClient/wwwroot/**/*.js'
+      - 'Backgammon.WebClient/wwwroot/.eslintrc.json'
+      - 'Backgammon.WebClient/package.json'
+
+jobs:
+  eslint:
+    name: ESLint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'Backgammon.WebClient/package.json'
+
+      - name: Install dependencies
+        working-directory: Backgammon.WebClient
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: Backgammon.WebClient
+        run: npx eslint wwwroot/*.js --max-warnings 0
