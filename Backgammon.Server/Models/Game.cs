@@ -200,6 +200,37 @@ public class Game
     /// </summary>
     [JsonPropertyName("isAiOpponent")]
     public bool IsAiOpponent { get; set; }
+
+    // Time control
+    /// <summary>
+    /// Time control mode for this game
+    /// </summary>
+    [JsonPropertyName("timeControlMode")]
+    public string? TimeControlMode { get; set; }
+
+    /// <summary>
+    /// Initial time in seconds per player
+    /// </summary>
+    [JsonPropertyName("initialTimeSeconds")]
+    public int InitialTimeSeconds { get; set; }
+
+    /// <summary>
+    /// White player's remaining time in milliseconds
+    /// </summary>
+    [JsonPropertyName("whiteRemainingMs")]
+    public long WhiteRemainingMs { get; set; }
+
+    /// <summary>
+    /// Red player's remaining time in milliseconds
+    /// </summary>
+    [JsonPropertyName("redRemainingMs")]
+    public long RedRemainingMs { get; set; }
+
+    /// <summary>
+    /// Whether the clock is paused
+    /// </summary>
+    [JsonPropertyName("isClockPaused")]
+    public bool IsClockPaused { get; set; }
 }
 
 /// <summary>

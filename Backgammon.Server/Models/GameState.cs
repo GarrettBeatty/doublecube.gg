@@ -34,6 +34,12 @@ public class GameState
     public int DoublingCubeValue { get; set; }
     public string? DoublingCubeOwner { get; set; }
     public bool IsAnalysisMode { get; set; }
+
+    // Time control
+    public TimeControlMode TimeControlMode { get; set; }
+    public long WhiteRemainingMs { get; set; }
+    public long RedRemainingMs { get; set; }
+    public bool IsClockPaused { get; set; }
 }
 
 /// <summary>

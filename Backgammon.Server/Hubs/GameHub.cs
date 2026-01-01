@@ -87,7 +87,8 @@ public class GameHub : Hub
     /// </summary>
     /// <param name="playerId">Persistent player ID (anonymous ID if not authenticated)</param>
     /// <param name="gameId">Optional game ID. If null, uses matchmaking.</param>
-    public async Task JoinGame(string playerId, string? gameId = null)
+    /// <param name="timeControlMode">Optional time control mode (default: Untimed)</param>
+    public async Task JoinGame(string playerId, string? gameId = null, string? timeControlMode = null)
     {
         try
         {
@@ -97,7 +98,17 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            var session = await _sessionManager.JoinOrCreateAsync(effectivePlayerId, connectionId, gameId);
+            // Parse time control mode
+            TimeControl? timeControl = null;
+            if (!string.IsNullOrEmpty(timeControlMode))
+            {
+                if (Enum.TryParse<TimeControlMode>(timeControlMode, ignoreCase: true, out var mode))
+                {
+                    timeControl = TimeControl.FromMode(mode);
+                }
+            }
+
+            var session = await _sessionManager.JoinOrCreateAsync(effectivePlayerId, connectionId, gameId, timeControl);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogInformation("Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
                 effectivePlayerId, connectionId, session.Id);
@@ -116,6 +127,17 @@ public class GameHub : Hub
             if (!string.IsNullOrEmpty(displayName))
             {
                 session.SetPlayerName(effectivePlayerId, displayName);
+            }
+
+            // Resume clock if this player's turn and clock was paused
+            var playerColor = session.GetPlayerColor(connectionId);
+            if (playerColor.HasValue &&
+                session.TimeControl.IsPaused &&
+                session.Engine.CurrentPlayer?.Color == playerColor.Value)
+            {
+                session.ResumeClock();
+                _logger.LogInformation("Resumed clock for reconnected player {PlayerId} in game {GameId}",
+                    effectivePlayerId, session.Id);
             }
 
             if (session.IsFull)
@@ -207,7 +229,8 @@ public class GameHub : Hub
     /// The human player is always White (moves first).
     /// </summary>
     /// <param name="playerId">The human player's persistent ID</param>
-    public async Task CreateAiGame(string playerId)
+    /// <param name="timeControlMode">Optional time control mode (default: Untimed)</param>
+    public async Task CreateAiGame(string playerId, string? timeControlMode = null)
     {
         try
         {
@@ -221,8 +244,18 @@ public class GameHub : Hub
             _logger.LogDebug("Effective player ID: {EffectivePlayerId}, Display name: {DisplayName}",
                 effectivePlayerId, displayName);
 
+            // Parse time control mode
+            TimeControl? timeControl = null;
+            if (!string.IsNullOrEmpty(timeControlMode))
+            {
+                if (Enum.TryParse<TimeControlMode>(timeControlMode, ignoreCase: true, out var mode))
+                {
+                    timeControl = TimeControl.FromMode(mode);
+                }
+            }
+
             // Create a new game session
-            var session = _sessionManager.CreateGame();
+            var session = _sessionManager.CreateGame(null, timeControl);
             await Groups.AddToGroupAsync(connectionId, session.Id);
             _logger.LogDebug("Created game session {GameId}", session.Id);
 
@@ -409,6 +442,9 @@ public class GameHub : Hub
 
             session.Engine.RollDice();
             session.UpdateActivity();
+
+            // Start the clock for this turn
+            session.StartClock();
 
             _logger.LogInformation("Player {ConnectionId} rolled dice in game {GameId}: [{Die1}, {Die2}]",
                 Context.ConnectionId, session.Id, session.Engine.Dice.Die1, session.Engine.Dice.Die2);
@@ -608,6 +644,46 @@ public class GameHub : Hub
                     await Clients.Caller.SendAsync("Error", "You still have valid moves available");
                     return;
                 }
+            }
+
+            // Stop the clock and check for timeout
+            var timeExpired = session.StopClock();
+            if (timeExpired)
+            {
+                // Current player lost on time
+                var opponentPlayer = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+                    ? session.Engine.RedPlayer
+                    : session.Engine.WhitePlayer;
+
+                session.Engine.ForfeitGame(opponentPlayer);
+                var stakes = session.Engine.GetGameResult();
+
+                _logger.LogInformation("Game {GameId} ended - player ran out of time. Winner: {Winner} (Stakes: {Stakes})",
+                    session.Id, opponentPlayer.Name, stakes);
+
+                // Broadcast game over
+                var finalState = session.GetState();
+                await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+                // Update database and stats
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+                        if (!session.IsAnalysisMode)
+                        {
+                            var game = GameEngineMapper.ToGame(session);
+                            await UpdateUserStatsAfterGame(game);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to update game after timeout {GameId}", session.Id);
+                    }
+                });
+
+                return;
             }
 
             session.Engine.EndTurn();
@@ -1229,6 +1305,15 @@ public class GameHub : Hub
                 }
                 else
                 {
+                    // Pause the clock if this is the current player
+                    var playerColor = session.GetPlayerColor(connectionId);
+                    if (playerColor.HasValue && session.Engine.CurrentPlayer?.Color == playerColor.Value)
+                    {
+                        session.PauseClock();
+                        _logger.LogInformation("Paused clock for disconnected player {ConnectionId} in game {GameId}",
+                            connectionId, session.Id);
+                    }
+
                     // Notify opponent
                     await Clients.Group(session.Id).SendAsync("OpponentLeft");
 

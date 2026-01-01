@@ -77,6 +77,13 @@ public static class GameEngineMapper
         // Check if this is an AI game
         game.IsAiOpponent = IsAiPlayer(session.WhitePlayerId) || IsAiPlayer(session.RedPlayerId);
 
+        // Time control
+        game.TimeControlMode = session.TimeControl.Mode.ToString();
+        game.InitialTimeSeconds = session.TimeControl.InitialTimeSeconds;
+        game.WhiteRemainingMs = session.GetRemainingTime(CheckerColor.White);
+        game.RedRemainingMs = session.GetRemainingTime(CheckerColor.Red);
+        game.IsClockPaused = session.TimeControl.IsPaused;
+
         // If game is completed, add completion data
         if (engine.Winner != null)
         {
@@ -95,7 +102,22 @@ public static class GameEngineMapper
     /// </summary>
     public static GameSession FromGame(Game game)
     {
-        var session = new GameSession(game.GameId);
+        // Restore time control
+        TimeControl? timeControl = null;
+        if (!string.IsNullOrEmpty(game.TimeControlMode))
+        {
+            var mode = Enum.Parse<TimeControlMode>(game.TimeControlMode);
+            timeControl = new TimeControl
+            {
+                Mode = mode,
+                InitialTimeSeconds = game.InitialTimeSeconds,
+                WhiteRemainingMs = game.WhiteRemainingMs,
+                RedRemainingMs = game.RedRemainingMs,
+                IsPaused = game.IsClockPaused
+            };
+        }
+
+        var session = new GameSession(game.GameId, timeControl);
 
         // Restore timestamps using reflection
         var createdAtField = typeof(GameSession)

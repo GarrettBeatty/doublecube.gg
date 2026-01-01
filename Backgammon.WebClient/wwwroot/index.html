@@ -129,6 +129,7 @@
                         <span id="redPlayerName" class="player-name">Red Player</span>
                         <span id="redPlayerId" class="player-id">-</span>
                         <span id="redPipCount" class="pip-count">Pips: -</span>
+                        <span id="redPlayerClock" class="player-clock" style="display: none;">⏱️ --:--</span>
                     </div>
                 </div>
 
@@ -147,6 +148,7 @@
                         <span id="whitePlayerName" class="player-name">White Player</span>
                         <span id="whitePlayerId" class="player-id">-</span>
                         <span id="whitePipCount" class="pip-count">Pips: -</span>
+                        <span id="whitePlayerClock" class="player-clock" style="display: none;">⏱️ --:--</span>
                     </div>
                 </div>
             </div>
@@ -591,6 +593,48 @@
         </form>
     </dialog>
 
+    <!-- Time Control Selector Modal -->
+    <dialog id="timeControlModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Select Time Control</h3>
+            <div class="space-y-3">
+                <button class="btn btn-block btn-outline" onclick="selectTimeControl('Untimed')">
+                    <span class="text-xl">♾️</span>
+                    <div class="text-left flex-1">
+                        <div class="font-bold">Untimed</div>
+                        <div class="text-xs opacity-70">No time limit</div>
+                    </div>
+                </button>
+                <button class="btn btn-block btn-outline" onclick="selectTimeControl('Blitz')">
+                    <span class="text-xl">⚡</span>
+                    <div class="text-left flex-1">
+                        <div class="font-bold">Blitz</div>
+                        <div class="text-xs opacity-70">30 seconds per player</div>
+                    </div>
+                </button>
+                <button class="btn btn-block btn-outline" onclick="selectTimeControl('Rapid')">
+                    <span class="text-xl">⏱️</span>
+                    <div class="text-left flex-1">
+                        <div class="font-bold">Rapid</div>
+                        <div class="text-xs opacity-70">2 minutes per player</div>
+                    </div>
+                </button>
+                <button class="btn btn-block btn-outline" onclick="selectTimeControl('Classical')">
+                    <span class="text-xl">⏳</span>
+                    <div class="text-left flex-1">
+                        <div class="font-bold">Classical</div>
+                        <div class="text-xs opacity-70">5 minutes per player</div>
+                    </div>
+                </button>
+            </div>
+            <div class="modal-action">
+                <form method="dialog">
+                    <button class="btn">Cancel</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
     <!-- Quick Join Modal (hidden) -->
     <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
 
@@ -620,6 +664,7 @@
     <script src="/friends.js"></script>
     <script src="/board-svg.js"></script>
     <script src="/audio.js"></script>
+    <script src="/time-control.js"></script>
     <script src="/game.js"></script>
     <script src="/profile.js"></script>
 </body>

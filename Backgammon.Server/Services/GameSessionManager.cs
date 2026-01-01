@@ -6,9 +6,9 @@ namespace Backgammon.Server.Services;
 public interface IGameSessionManager
 {
     /// <summary>
-    /// Create a new game session with a specific ID
+    /// Create a new game session with a specific ID and optional time control
     /// </summary>
-    GameSession CreateGame(string? gameId = null);
+    GameSession CreateGame(string? gameId = null, TimeControl? timeControl = null);
 
     /// <summary>
     /// Register a player's connection to a game session (for manual game creation)
@@ -29,7 +29,7 @@ public interface IGameSessionManager
     /// Join an existing game by ID, or create a new game (no matchmaking)
     /// Loads from database if game not in memory but exists as InProgress
     /// </summary>
-    Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null);
+    Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null, TimeControl? timeControl = null);
     
     /// <summary>
     /// Remove a player from their current game
@@ -84,7 +84,7 @@ public class GameSessionManager : IGameSessionManager
         _gameRepository = gameRepository;
     }
     
-    public GameSession CreateGame(string? gameId = null)
+    public GameSession CreateGame(string? gameId = null, TimeControl? timeControl = null)
     {
         lock (_lock)
         {
@@ -93,7 +93,7 @@ public class GameSessionManager : IGameSessionManager
             if (_games.ContainsKey(gameId))
                 throw new InvalidOperationException($"Game {gameId} already exists");
 
-            var session = new GameSession(gameId);
+            var session = new GameSession(gameId, timeControl);
             _games[gameId] = session;
             return session;
         }
@@ -133,7 +133,7 @@ public class GameSessionManager : IGameSessionManager
         }
     }
     
-    public async Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null)
+    public async Task<GameSession> JoinOrCreateAsync(string playerId, string connectionId, string? gameId = null, TimeControl? timeControl = null)
     {
         // Check memory first (inside lock)
         lock (_lock)
@@ -202,7 +202,7 @@ public class GameSessionManager : IGameSessionManager
             // Game doesn't exist in DB or not resumable - create new with specified ID
             lock (_lock)
             {
-                var newGame = CreateGame(gameId);
+                var newGame = CreateGame(gameId, timeControl);
                 newGame.AddPlayer(playerId, connectionId);
                 _playerToGame[connectionId] = gameId;
                 return newGame;
@@ -212,7 +212,7 @@ public class GameSessionManager : IGameSessionManager
         // When gameId is null, ALWAYS create a new game (no matchmaking)
         lock (_lock)
         {
-            var game = CreateGame();
+            var game = CreateGame(null, timeControl);
             game.AddPlayer(playerId, connectionId);
             _playerToGame[connectionId] = game.Id;
             return game;
