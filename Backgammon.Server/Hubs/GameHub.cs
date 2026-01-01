@@ -34,6 +34,7 @@ public class GameHub : Hub
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IEloRatingService _eloRatingService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
@@ -52,6 +53,7 @@ public class GameHub : Hub
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
         IAiMoveService aiMoveService,
+        IEloRatingService eloRatingService,
         IHubContext<GameHub> hubContext,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
@@ -69,6 +71,7 @@ public class GameHub : Hub
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _aiMoveService = aiMoveService;
+        _eloRatingService = eloRatingService;
         _hubContext = hubContext;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
@@ -1457,9 +1460,6 @@ public class GameHub : Hub
         return null;
     }
 
-    /// <summary>
-    /// Removes a checker from a point and returns its color
-    /// </summary>
     /// <summary>
     /// Removes a checker from a point and returns its color
     /// </summary>
