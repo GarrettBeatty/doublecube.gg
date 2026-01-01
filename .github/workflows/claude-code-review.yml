@@ -29,14 +29,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history for rebasing
-          ref: ${{ github.event.pull_request.head.ref }}
-
-      - name: Fetch and update main branch
-        run: |
-          git fetch origin main:main
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          fetch-depth: 1
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -51,11 +44,6 @@ jobs:
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
-
-            IMPORTANT: Before making any commits or changes to this PR, always rebase on top of the latest main branch:
-            1. Run `git fetch origin main:main` to ensure main is up-to-date
-            2. Run `git rebase main` to rebase the current branch
-            3. If there are conflicts, resolve them before proceeding
 
             IMPORTANT: After making any code changes, always verify they work:
             1. Run `dotnet build` to ensure the solution compiles
@@ -76,7 +64,5 @@ jobs:
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-          claude_args: |
-            --allowedTools "Bash(git *),Bash(gh *),Bash(dotnet *)"
-            --allowedTools "Bash(git rebase:*)"
+          claude_args: '--allowed-tools "Bash(git *),Bash(gh *),Bash(dotnet *)"'
 
