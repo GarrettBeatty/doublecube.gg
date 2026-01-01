@@ -24,16 +24,9 @@ class MatchResultsView {
             this.matchData = match;
         }
 
-        // Fetch detailed game results from server
-        if (window.connection && window.connection.state === 'Connected') {
-            try {
-                // TODO: Add GetMatchGames hub method
-                // this.games = await window.connection.invoke('GetMatchGames', this.matchId);
-                console.log('Would fetch game list for match:', this.matchId);
-            } catch (error) {
-                console.error('Error fetching match games:', error);
-            }
-        }
+        // Note: Detailed game-by-game results not yet implemented
+        // This would require storing individual game results in the match
+        // and a GetMatchGames SignalR method
     }
 
     showContainer() {
@@ -176,7 +169,13 @@ class MatchResultsView {
     }
 
     formatDuration() {
-        // TODO: Calculate actual duration from match data
+        // Duration calculation not yet implemented
+        // Would require tracking match start/end timestamps
+        if (this.matchData && this.matchData.durationSeconds) {
+            const minutes = Math.floor(this.matchData.durationSeconds / 60);
+            const seconds = this.matchData.durationSeconds % 60;
+            return `${minutes}m ${seconds}s`;
+        }
         return 'N/A';
     }
 
@@ -189,17 +188,8 @@ class MatchResultsView {
     async requestRematch() {
         if (!this.matchId) return;
 
-        if (confirm('Request a rematch with the same opponent and settings?')) {
-            try {
-                // TODO: Add RequestMatchRematch hub method
-                // await window.connection.invoke('RequestMatchRematch', this.matchId);
-                console.log('Would request rematch for match:', this.matchId);
-                alert('Rematch feature coming soon!');
-            } catch (error) {
-                console.error('Error requesting rematch:', error);
-                alert('Failed to request rematch: ' + error.message);
-            }
-        }
+        // Rematch feature not yet implemented
+        alert('Rematch feature coming soon! You can create a new match from the home page.');
     }
 
     hide() {

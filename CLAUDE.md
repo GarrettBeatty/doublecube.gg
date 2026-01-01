@@ -73,6 +73,42 @@ All entities (Users, Games, Friendships) stored in one table with composite PK/S
 
 ## Core Domain Model
 
+### Match Play Architecture
+
+The application supports multi-game matches with proper match scoring and Crawford rule:
+
+**Domain Layer** (`Backgammon.Core`):
+- `Match` - Pure match logic, tracks score, Crawford state, game history
+- `Game` - Individual game within a match (wraps GameEngine result)
+- `GameResult` - Captures win type (Normal/Gammon/Backgammon) and points scored
+- `MatchStatus` enum - InProgress, Completed, Abandoned
+
+**Server Layer** (`Backgammon.Server`):
+- `MatchService` - Orchestrates match lifecycle (create, start games, complete)
+- `DynamoDbMatchRepository` - Persists matches and games to DynamoDB
+- `Match` (server model) - Wraps `Core.Match` with server metadata (lobby status, opponent type, duration)
+
+**Key Match Patterns**:
+- Match created → First game starts automatically
+- Game completes → `MatchService.CompleteGameAsync()` updates match score
+- Crawford rule enforced automatically when score reaches targetScore-1
+- Match completes when a player reaches targetScore
+
+**Crawford Rule Implementation**:
+```csharp
+// Backgammon.Core.Match handles Crawford logic
+match.RecordGameResult(gameResult);  // Auto-activates Crawford if needed
+if (match.IsCrawfordGame) {
+    // Doubling cube disabled for this game
+}
+```
+
+**Match Lobby Flow**:
+1. Player creates match lobby via `CreateMatchLobbyAsync()` (friend/AI/open lobby)
+2. Opponent joins via `JoinMatchLobby()` SignalR method
+3. Creator starts match via `StartMatchFromLobby()`
+4. First game begins, players join game session
+
 ### Board Representation
 - 24 points (positions 1-24) as `Point[]` array
 - Point 0 = bar, Point 25 = bear off

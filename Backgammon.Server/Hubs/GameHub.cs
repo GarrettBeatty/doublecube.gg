@@ -38,10 +38,8 @@ public class GameHub : Hub
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMemoryCache _cache;
     private readonly IMatchService _matchService;
+    private readonly IPlayerConnectionService _playerConnectionService;
     private readonly ILogger<GameHub> _logger;
-
-    // Track player connections (playerId -> connectionId)
-    private static readonly Dictionary<string, string> _playerConnections = new();
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -52,6 +50,7 @@ public class GameHub : Hub
         IHubContext<GameHub> hubContext,
         IMemoryCache cache,
         IMatchService matchService,
+        IPlayerConnectionService playerConnectionService,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
@@ -62,6 +61,7 @@ public class GameHub : Hub
         _hubContext = hubContext;
         _cache = cache;
         _matchService = matchService;
+        _playerConnectionService = playerConnectionService;
         _logger = logger;
     }
 
@@ -152,8 +152,18 @@ public class GameHub : Hub
                 if (_aiMoveService.IsAiPlayer(currentPlayerId))
                 {
                     _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                    // Trigger AI turn in background
-                    _ = ExecuteAiTurnWithBroadcastAsync(session, currentPlayerId);
+                    // Trigger AI turn in background with error handling
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await ExecuteAiTurnWithBroadcastAsync(session, currentPlayerId);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
+                        }
+                    });
                 }
             }
             else
@@ -290,8 +300,18 @@ public class GameHub : Hub
             if (_aiMoveService.IsAiPlayer(currentPlayerId))
             {
                 _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                // Trigger AI turn in background
-                _ = ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
+                // Trigger AI turn in background with error handling
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
+                    }
+                });
             }
 
             _logger.LogInformation("AI game {GameId} started", session.Id);
@@ -697,7 +717,18 @@ public class GameHub : Hub
                 _logger.LogInformation(
                     "Triggering AI turn for player {AiPlayerId} in game {GameId}",
                     nextPlayerId, session.Id);
-                _ = ExecuteAiTurnWithBroadcastAsync(session, nextPlayerId!);
+                // Trigger AI turn in background with error handling
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await ExecuteAiTurnWithBroadcastAsync(session, nextPlayerId!);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
+                    }
+                });
             }
         }
         catch (Exception ex)
@@ -1282,15 +1313,7 @@ public class GameHub : Hub
     {
         // Remove from player connections tracking
         var playerId = GetEffectivePlayerId(Context.ConnectionId);
-        lock (_playerConnections)
-        {
-            if (_playerConnections.Remove(playerId))
-            {
-                _logger.LogInformation(
-                    "Removed player connection on disconnect: playerId={PlayerId}, connectionId={ConnectionId}, dictionary now has {Count} entries",
-                    playerId, Context.ConnectionId, _playerConnections.Count);
-            }
-        }
+        _playerConnectionService.RemoveConnection(playerId);
 
         await HandleDisconnection(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
@@ -1931,10 +1954,20 @@ public class GameHub : Hub
     {
         try
         {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
             var match = await _matchService.GetMatchAsync(matchId);
             if (match == null)
             {
                 await Clients.Caller.SendAsync("Error", "Match not found");
+                return;
+            }
+
+            // Authorization: only participants can view match status
+            if (match.Player1Id != playerId && match.Player2Id != playerId)
+            {
+                await Clients.Caller.SendAsync("Error", "Access denied");
+                _logger.LogWarning("Player {PlayerId} attempted to access match {MatchId} without authorization",
+                    playerId, matchId);
                 return;
             }
 
@@ -2125,13 +2158,7 @@ public class GameHub : Hub
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
 
             // Track this player's connection
-            lock (_playerConnections)
-            {
-                _playerConnections[playerId] = Context.ConnectionId;
-                _logger.LogInformation(
-                    "Tracking player connection: playerId={PlayerId}, connectionId={ConnectionId}, dictionary now has {Count} entries",
-                    playerId, Context.ConnectionId, _playerConnections.Count);
-            }
+            _playerConnectionService.AddConnection(playerId, Context.ConnectionId);
 
             // Get match to check if it exists
             var existingMatch = await _matchService.GetMatchLobbyAsync(matchId);
@@ -2485,30 +2512,23 @@ public class GameHub : Hub
     /// </summary>
     private string? GetPlayerConnection(string playerId)
     {
-        // First check our connection tracking dictionary (for lobby players)
-        lock (_playerConnections)
+        // First check our connection tracking service (for lobby players)
+        var connectionId = _playerConnectionService.GetConnectionId(playerId);
+        if (connectionId != null)
         {
-            _logger.LogInformation(
-                "GetPlayerConnection: Looking for playerId={PlayerId} in dictionary. Dictionary has {Count} entries: {Keys}",
-                playerId, _playerConnections.Count, string.Join(", ", _playerConnections.Keys));
-
-            if (_playerConnections.TryGetValue(playerId, out var connectionId))
-            {
-                _logger.LogInformation(
-                    "GetPlayerConnection: Found playerId={PlayerId} in dictionary with connectionId={ConnectionId}",
-                    playerId, connectionId);
-                return connectionId;
-            }
+            _logger.LogDebug("GetPlayerConnection: Found playerId={PlayerId} via connection service with connectionId={ConnectionId}",
+                playerId, connectionId);
+            return connectionId;
         }
 
-        _logger.LogInformation("GetPlayerConnection: playerId={PlayerId} not found in dictionary, checking game sessions", playerId);
+        _logger.LogDebug("GetPlayerConnection: playerId={PlayerId} not found in connection service, checking game sessions", playerId);
 
         // Fall back to checking game sessions (for players in active games)
         var sessions = _sessionManager.GetPlayerGames(playerId);
         var session = sessions.FirstOrDefault();
         if (session == null)
         {
-            _logger.LogInformation("GetPlayerConnection: No game session found for playerId={PlayerId}", playerId);
+            _logger.LogDebug("GetPlayerConnection: No game session found for playerId={PlayerId}", playerId);
             return null;
         }
 
