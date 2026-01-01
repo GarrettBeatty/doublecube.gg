@@ -31,6 +31,7 @@ public class GameHub : Hub
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IUserRepository _userRepository;
+    private readonly IFriendshipRepository _friendshipRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMemoryCache _cache;
@@ -40,6 +41,7 @@ public class GameHub : Hub
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
         IUserRepository userRepository,
+        IFriendshipRepository friendshipRepository,
         IAiMoveService aiMoveService,
         IHubContext<GameHub> hubContext,
         IMemoryCache cache,
@@ -48,6 +50,7 @@ public class GameHub : Hub
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _userRepository = userRepository;
+        _friendshipRepository = friendshipRepository;
         _aiMoveService = aiMoveService;
         _hubContext = hubContext;
         _cache = cache;
@@ -1567,7 +1570,7 @@ public class GameHub : Hub
             // Check if viewer is friends with target
             if (!string.IsNullOrEmpty(viewingUserId) && !isOwnProfile)
             {
-                var friendships = await _userRepository.GetFriendsAsync(viewingUserId);
+                var friendships = await _friendshipRepository.GetFriendsAsync(viewingUserId);
                 isFriend = friendships.Any(f => f.FriendUserId == targetUser.UserId && f.Status == FriendshipStatus.Accepted);
             }
 
@@ -1586,7 +1589,7 @@ public class GameHub : Hub
                     OpponentUsername = GetOpponentUsername(g, targetUser.UserId),
                     Won = DetermineIfPlayerWon(g, targetUser.UserId),
                     Stakes = g.Stakes,
-                    CompletedAt = g.CompletedAt ?? g.UpdatedAt,
+                    CompletedAt = g.CompletedAt ?? g.LastUpdatedAt,
                     WinType = DetermineWinType(g, targetUser.UserId)
                 }).ToList();
             }
@@ -1596,7 +1599,7 @@ public class GameHub : Hub
                 targetUser.FriendsListPrivacy == ProfilePrivacyLevel.Public ||
                 (targetUser.FriendsListPrivacy == ProfilePrivacyLevel.FriendsOnly && isFriend))
             {
-                var friendships = await _userRepository.GetFriendsAsync(targetUser.UserId);
+                var friendships = await _friendshipRepository.GetFriendsAsync(targetUser.UserId);
                 var friendUsers = new List<FriendDto>();
                 
                 foreach (var friendship in friendships.Where(f => f.Status == FriendshipStatus.Accepted))
