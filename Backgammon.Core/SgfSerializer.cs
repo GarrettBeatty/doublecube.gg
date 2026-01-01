@@ -256,13 +256,13 @@ public static class SgfSerializer
         var pattern = @"([A-Z]+)(\[(?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\])+";
         var matches = Regex.Matches(content, pattern);
 
-        foreach (Match match in matches)
+        foreach (System.Text.RegularExpressions.Match match in matches)
         {
             var key = match.Groups[1].Value;
             var valueMatches = Regex.Matches(match.Groups[2].Value, @"\[([^\[\]]*(?:\[[^\[\]]*\])?)\]");
 
             var values = new List<string>();
-            foreach (Match valueMatch in valueMatches)
+            foreach (System.Text.RegularExpressions.Match valueMatch in valueMatches)
             {
                 values.Add(valueMatch.Groups[1].Value);
             }
@@ -281,7 +281,7 @@ public static class SgfSerializer
         foreach (var value in values)
         {
             // Parse coordinate and optional count: "a" or "a[2]"
-            var match = Regex.Match(value, @"^([a-z])(?:\[(\d+)\])?$");
+            System.Text.RegularExpressions.Match match = Regex.Match(value, @"^([a-z])(?:\[(\d+)\])?$");
             if (!match.Success)
                 continue;
 

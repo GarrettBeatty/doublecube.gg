@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Server.Models;
+using ServerGameStatus = Backgammon.Server.Models.GameStatus;
 
 namespace Backgammon.Server.Services;
 
@@ -32,6 +33,10 @@ public class GameSession
     public bool IsStarted => IsFull && Engine.GameStarted;
     public bool IsAnalysisMode { get; set; } = false;
     public bool IsBotGame { get; set; } = false;
+    
+    // Match-related properties
+    public string? MatchId { get; set; }
+    public bool IsMatchGame { get; set; } = false;
 
     public GameSession(string id)
     {
@@ -255,7 +260,7 @@ public class GameSession
             RedBornOff = Engine.RedPlayer.CheckersBornOff,
             WhitePipCount = CalculatePipCount(CheckerColor.White),
             RedPipCount = CalculatePipCount(CheckerColor.Red),
-            Status = IsFull ? (Engine.Winner != null ? GameStatus.Completed : GameStatus.InProgress) : GameStatus.WaitingForPlayer,
+            Status = IsFull ? (Engine.Winner != null ? ServerGameStatus.Completed : ServerGameStatus.InProgress) : ServerGameStatus.WaitingForPlayer,
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),

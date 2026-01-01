@@ -304,6 +304,18 @@ public static class DynamoDbHelpers
         // AI opponent flag
         item["isAiOpponent"] = new AttributeValue { BOOL = game.IsAiOpponent };
 
+        // Match-related properties
+        if (!string.IsNullOrEmpty(game.MatchId))
+        {
+            item["matchId"] = new AttributeValue { S = game.MatchId };
+        }
+        item["isMatchGame"] = new AttributeValue { BOOL = game.IsMatchGame };
+        item["isCrawfordGame"] = new AttributeValue { BOOL = game.IsCrawfordGame };
+        if (!string.IsNullOrEmpty(game.WinType))
+        {
+            item["winType"] = new AttributeValue { S = game.WinType };
+        }
+
         return item;
     }
 
@@ -338,7 +350,11 @@ public static class DynamoDbHelpers
             Winner = GetStringOrNull(item, "winner"),
             CompletedAt = GetNullableDateTime(item, "completedAt"),
             DurationSeconds = GetInt(item, "durationSeconds"),
-            IsAiOpponent = GetBool(item, "isAiOpponent", false)
+            IsAiOpponent = GetBool(item, "isAiOpponent", false),
+            MatchId = GetStringOrNull(item, "matchId"),
+            IsMatchGame = GetBool(item, "isMatchGame", false),
+            IsCrawfordGame = GetBool(item, "isCrawfordGame", false),
+            WinType = GetStringOrNull(item, "winType")
         };
 
         // Board state
@@ -428,6 +444,146 @@ public static class DynamoDbHelpers
             ["status"] = new AttributeValue { S = status },
             ["lastUpdatedAt"] = new AttributeValue { S = lastUpdatedAt.ToString("O") },
             ["entityType"] = new AttributeValue { S = "PLAYER_GAME" }
+        };
+    }
+
+    // Marshal Match to DynamoDB item
+    public static Dictionary<string, AttributeValue> MarshalMatch(Match match)
+    {
+        var item = new Dictionary<string, AttributeValue>
+        {
+            ["PK"] = new AttributeValue { S = $"MATCH#{match.MatchId}" },
+            ["SK"] = new AttributeValue { S = "METADATA" },
+            ["matchId"] = new AttributeValue { S = match.MatchId },
+            ["targetScore"] = new AttributeValue { N = match.TargetScore.ToString() },
+            ["player1Id"] = new AttributeValue { S = match.Player1Id },
+            ["player2Id"] = new AttributeValue { S = match.Player2Id },
+            ["player1Name"] = new AttributeValue { S = match.Player1Name },
+            ["player2Name"] = new AttributeValue { S = match.Player2Name },
+            ["player1Score"] = new AttributeValue { N = match.Player1Score.ToString() },
+            ["player2Score"] = new AttributeValue { N = match.Player2Score.ToString() },
+            ["isCrawfordGame"] = new AttributeValue { BOOL = match.IsCrawfordGame },
+            ["hasCrawfordGameBeenPlayed"] = new AttributeValue { BOOL = match.HasCrawfordGameBeenPlayed },
+            ["status"] = new AttributeValue { S = match.Status },
+            ["createdAt"] = new AttributeValue { S = match.CreatedAt.ToString("O") },
+            ["lastUpdatedAt"] = new AttributeValue { S = match.LastUpdatedAt.ToString("O") },
+            ["entityType"] = new AttributeValue { S = "MATCH" }
+        };
+
+        // GSI3 for match status queries
+        item["GSI3PK"] = new AttributeValue { S = $"MATCH_STATUS#{match.Status}" };
+        item["GSI3SK"] = new AttributeValue { S = match.LastUpdatedAt.Ticks.ToString("D19") };
+
+        // Game IDs
+        if (match.GameIds.Any())
+        {
+            item["gameIds"] = new AttributeValue { L = match.GameIds.Select(id => new AttributeValue { S = id }).ToList() };
+        }
+
+        // Current game ID
+        if (!string.IsNullOrEmpty(match.CurrentGameId))
+        {
+            item["currentGameId"] = new AttributeValue { S = match.CurrentGameId };
+        }
+
+        // Completed at
+        if (match.CompletedAt.HasValue)
+        {
+            item["completedAt"] = new AttributeValue { S = match.CompletedAt.Value.ToString("O") };
+        }
+
+        // Winner ID
+        if (!string.IsNullOrEmpty(match.WinnerId))
+        {
+            item["winnerId"] = new AttributeValue { S = match.WinnerId };
+        }
+
+        // Duration
+        if (match.DurationSeconds > 0)
+        {
+            item["durationSeconds"] = new AttributeValue { N = match.DurationSeconds.ToString() };
+        }
+
+        // Lobby-specific fields
+        if (!string.IsNullOrEmpty(match.OpponentType))
+        {
+            item["opponentType"] = new AttributeValue { S = match.OpponentType };
+        }
+
+        item["isOpenLobby"] = new AttributeValue { BOOL = match.IsOpenLobby };
+
+        if (!string.IsNullOrEmpty(match.LobbyStatus))
+        {
+            item["lobbyStatus"] = new AttributeValue { S = match.LobbyStatus };
+        }
+
+        if (!string.IsNullOrEmpty(match.Player1DisplayName))
+        {
+            item["player1DisplayName"] = new AttributeValue { S = match.Player1DisplayName };
+        }
+
+        if (!string.IsNullOrEmpty(match.Player2DisplayName))
+        {
+            item["player2DisplayName"] = new AttributeValue { S = match.Player2DisplayName };
+        }
+
+        return item;
+    }
+
+    // Unmarshal Match from DynamoDB item
+    public static Match UnmarshalMatch(Dictionary<string, AttributeValue> item)
+    {
+        var match = new Match
+        {
+            MatchId = item["matchId"].S,
+            TargetScore = GetInt(item, "targetScore"),
+            Player1Id = item["player1Id"].S,
+            Player2Id = item["player2Id"].S,
+            Player1Name = item["player1Name"].S,
+            Player2Name = item["player2Name"].S,
+            Player1Score = GetInt(item, "player1Score"),
+            Player2Score = GetInt(item, "player2Score"),
+            IsCrawfordGame = GetBool(item, "isCrawfordGame"),
+            HasCrawfordGameBeenPlayed = GetBool(item, "hasCrawfordGameBeenPlayed"),
+            Status = item["status"].S,
+            CreatedAt = GetDateTime(item, "createdAt"),
+            LastUpdatedAt = GetDateTime(item, "lastUpdatedAt"),
+            CurrentGameId = GetStringOrNull(item, "currentGameId"),
+            CompletedAt = GetNullableDateTime(item, "completedAt"),
+            WinnerId = GetStringOrNull(item, "winnerId"),
+            DurationSeconds = GetInt(item, "durationSeconds"),
+            GameIds = GetStringList(item, "gameIds"),
+            // Lobby-specific fields
+            OpponentType = GetStringOrNull(item, "opponentType") ?? "Friend",
+            IsOpenLobby = GetBool(item, "isOpenLobby"),
+            LobbyStatus = GetStringOrNull(item, "lobbyStatus") ?? "WaitingForOpponent",
+            Player1DisplayName = GetStringOrNull(item, "player1DisplayName"),
+            Player2DisplayName = GetStringOrNull(item, "player2DisplayName")
+        };
+
+        return match;
+    }
+
+    // Create player-match index item
+    public static Dictionary<string, AttributeValue> CreatePlayerMatchIndexItem(
+        string playerId,
+        string matchId,
+        string opponentId,
+        string status,
+        DateTime createdAt)
+    {
+        // Use reversed timestamp for latest-first sorting
+        var reversedTimestamp = (DateTime.MaxValue.Ticks - createdAt.Ticks).ToString("D19");
+
+        return new Dictionary<string, AttributeValue>
+        {
+            ["PK"] = new AttributeValue { S = $"USER#{playerId}" },
+            ["SK"] = new AttributeValue { S = $"MATCH#{reversedTimestamp}#{matchId}" },
+            ["matchId"] = new AttributeValue { S = matchId },
+            ["opponentId"] = new AttributeValue { S = opponentId },
+            ["status"] = new AttributeValue { S = status },
+            ["createdAt"] = new AttributeValue { S = createdAt.ToString("O") },
+            ["entityType"] = new AttributeValue { S = "PLAYER_MATCH" }
         };
     }
 }
