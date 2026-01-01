@@ -22,12 +22,19 @@ backgammon.beatty.codes, doublecube.gg {
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
 
+            # WebSocket upgrade headers (critical for SignalR)
+            header_up Upgrade {http.request.header.Upgrade}
+            header_up Connection {http.request.header.Connection}
+
             # Force HTTP/1.1 for WebSocket support
             transport http {
                 versions 1.1
                 read_timeout 5m
                 write_timeout 5m
             }
+
+            # Disable buffering for SSE/WebSocket keepalive
+            flush_interval -1
         }
     }
 
