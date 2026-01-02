@@ -25,18 +25,27 @@ public class CachedUserService : IUserRepository
 
     public async Task<User?> GetByUserIdAsync(string userId)
     {
-        return await _cache.GetOrCreateAsync(
-            $"user:id:{userId}",
-            async cancel => await _userRepository.GetByUserIdAsync(userId),
+        var cacheKey = $"user:id:{userId}";
+        return await GetOrCreateWithLoggingAsync(
+            cacheKey,
+            async () => await _userRepository.GetByUserIdAsync(userId),
+            new HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(5),
+                LocalCacheExpiration = TimeSpan.FromMinutes(1)
+            },
             tags: [$"user:{userId}"]
         );
     }
 
     public async Task<User?> GetByUsernameAsync(string username)
     {
-        return await _cache.GetOrCreateAsync(
-            $"user:username:{username.ToLowerInvariant()}",
-            async cancel => await _userRepository.GetByUsernameAsync(username),
+        // Note: Cannot tag with user:id because we don't know the userId until after cache miss
+        // Must invalidate manually when user profile changes (see UpdateUserAsync)
+        var cacheKey = $"user:username:{username.ToLowerInvariant()}";
+        return await GetOrCreateWithLoggingAsync(
+            cacheKey,
+            async () => await _userRepository.GetByUsernameAsync(username),
             new HybridCacheEntryOptions
             {
                 Expiration = TimeSpan.FromMinutes(5),
@@ -47,9 +56,12 @@ public class CachedUserService : IUserRepository
 
     public async Task<User?> GetByEmailAsync(string email)
     {
-        return await _cache.GetOrCreateAsync(
-            $"user:email:{email.ToLowerInvariant()}",
-            async cancel => await _userRepository.GetByEmailAsync(email),
+        // Note: Cannot tag with user:id because we don't know the userId until after cache miss
+        // Must invalidate manually when user profile changes (see UpdateUserAsync)
+        var cacheKey = $"user:email:{email.ToLowerInvariant()}";
+        return await GetOrCreateWithLoggingAsync(
+            cacheKey,
+            async () => await _userRepository.GetByEmailAsync(email),
             new HybridCacheEntryOptions
             {
                 Expiration = TimeSpan.FromMinutes(5),
@@ -66,10 +78,63 @@ public class CachedUserService : IUserRepository
 
     public async Task UpdateUserAsync(User user)
     {
+        // Get old user data to check if username/email changed
+        var oldUser = await _userRepository.GetByUserIdAsync(user.UserId);
+
         await _userRepository.UpdateUserAsync(user);
 
-        // Invalidate all user caches
+        // Invalidate user:id tag (covers GetByUserIdAsync)
         await InvalidateUserCacheAsync(user.UserId);
+
+        // Invalidate old username cache if username changed
+        if (oldUser != null && oldUser.UsernameNormalized != user.UsernameNormalized)
+        {
+            try
+            {
+                await _cache.RemoveAsync($"user:username:{oldUser.UsernameNormalized}");
+                _logger.LogDebug("Invalidated old username cache for {OldUsername}", oldUser.UsernameNormalized);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate old username cache");
+            }
+        }
+
+        // Invalidate new username cache (in case it was cached before)
+        try
+        {
+            await _cache.RemoveAsync($"user:username:{user.UsernameNormalized}");
+            _logger.LogDebug("Invalidated new username cache for {Username}", user.UsernameNormalized);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate new username cache");
+        }
+
+        // Invalidate old email cache if email changed
+        if (oldUser != null && oldUser.EmailNormalized != user.EmailNormalized)
+        {
+            try
+            {
+                await _cache.RemoveAsync($"user:email:{oldUser.EmailNormalized}");
+                _logger.LogDebug("Invalidated old email cache for {OldEmail}", oldUser.EmailNormalized);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to invalidate old email cache");
+            }
+        }
+
+        // Invalidate new email cache (in case it was cached before)
+        try
+        {
+            await _cache.RemoveAsync($"user:email:{user.EmailNormalized}");
+            _logger.LogDebug("Invalidated new email cache for {Email}", user.EmailNormalized);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate new email cache");
+        }
     }
 
     public async Task UpdateLastLoginAsync(string userId)
@@ -84,8 +149,19 @@ public class CachedUserService : IUserRepository
     {
         await _userRepository.UpdateStatsAsync(userId, stats);
 
-        // Invalidate cache since stats changed
+        // Invalidate user cache (user:id tag)
         await InvalidateUserCacheAsync(userId);
+
+        // Also invalidate player stats cache (uses player:id tag in Program.cs endpoints)
+        try
+        {
+            await _cache.RemoveByTagAsync($"player:{userId}");
+            _logger.LogDebug("Invalidated player stats cache for {UserId}", userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate player stats cache for {UserId}", userId);
+        }
     }
 
     public async Task LinkAnonymousIdAsync(string userId, string anonymousId)
@@ -136,5 +212,45 @@ public class CachedUserService : IUserRepository
         {
             _logger.LogWarning(ex, "Failed to invalidate cache for user {UserId}", userId);
         }
+    }
+
+    /// <summary>
+    /// Get or create cache entry with hit/miss logging
+    /// </summary>
+    private async Task<User?> GetOrCreateWithLoggingAsync(
+        string cacheKey,
+        Func<Task<User?>> factory,
+        HybridCacheEntryOptions? options = null,
+        string[]? tags = null)
+    {
+        // Check if item exists in cache (simple heuristic: measure time)
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        User? result;
+        if (options != null && tags != null)
+        {
+            result = await _cache.GetOrCreateAsync(cacheKey, async cancel => await factory(), options, tags: tags);
+        }
+        else if (options != null)
+        {
+            result = await _cache.GetOrCreateAsync(cacheKey, async cancel => await factory(), options);
+        }
+        else if (tags != null)
+        {
+            result = await _cache.GetOrCreateAsync(cacheKey, async cancel => await factory(), tags: tags);
+        }
+        else
+        {
+            result = await _cache.GetOrCreateAsync(cacheKey, async cancel => await factory());
+        }
+
+        sw.Stop();
+
+        // Log cache operation (heuristic: <10ms likely hit, >10ms likely miss)
+        var operation = sw.ElapsedMilliseconds < 10 ? "HIT" : "MISS";
+        _logger.LogDebug("Cache {Operation} for key {CacheKey} ({ElapsedMs}ms)",
+            operation, cacheKey, sw.ElapsedMilliseconds);
+
+        return result;
     }
 }

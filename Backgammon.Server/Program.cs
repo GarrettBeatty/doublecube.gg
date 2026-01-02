@@ -345,7 +345,8 @@ app.MapGet("/api/player/{playerId}/games", async (
         async ct => await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip),
         new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
         {
-            Expiration = TimeSpan.FromMinutes(10)
+            Expiration = TimeSpan.FromMinutes(10),
+            LocalCacheExpiration = TimeSpan.FromMinutes(2) // Shorter local cache to reduce memory for pagination
         },
         tags: [$"player:{playerId}"]
     );
