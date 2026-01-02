@@ -269,7 +269,7 @@ public class DynamoDbMatchRepository : IMatchRepository
                     }
                 }
 
-                if (response.LastEvaluatedKey.Count == 0)
+                if (response.LastEvaluatedKey == null || response.LastEvaluatedKey.Count == 0)
                 {
                     break;
                 }
