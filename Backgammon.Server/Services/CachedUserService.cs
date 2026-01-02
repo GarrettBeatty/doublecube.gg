@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 using Backgammon.Server.Models;
@@ -91,8 +93,9 @@ public class CachedUserService : IUserRepository
         {
             try
             {
-                await _cache.RemoveAsync($"user:username:{oldUser.UsernameNormalized}");
-                _logger.LogDebug("Invalidated old username cache for {OldUsername}", oldUser.UsernameNormalized);
+                var oldUsernameKey = $"user:username:{oldUser.UsernameNormalized}";
+                await _cache.RemoveAsync(oldUsernameKey);
+                _logger.LogDebug("Invalidated old username cache (hash: {CacheKeyHash})", HashCacheKey(oldUsernameKey));
             }
             catch (Exception ex)
             {
@@ -103,8 +106,9 @@ public class CachedUserService : IUserRepository
         // Invalidate new username cache (in case it was cached before)
         try
         {
-            await _cache.RemoveAsync($"user:username:{user.UsernameNormalized}");
-            _logger.LogDebug("Invalidated new username cache for {Username}", user.UsernameNormalized);
+            var newUsernameKey = $"user:username:{user.UsernameNormalized}";
+            await _cache.RemoveAsync(newUsernameKey);
+            _logger.LogDebug("Invalidated new username cache (hash: {CacheKeyHash})", HashCacheKey(newUsernameKey));
         }
         catch (Exception ex)
         {
@@ -116,8 +120,9 @@ public class CachedUserService : IUserRepository
         {
             try
             {
-                await _cache.RemoveAsync($"user:email:{oldUser.EmailNormalized}");
-                _logger.LogDebug("Invalidated old email cache for {OldEmail}", oldUser.EmailNormalized);
+                var oldEmailKey = $"user:email:{oldUser.EmailNormalized}";
+                await _cache.RemoveAsync(oldEmailKey);
+                _logger.LogDebug("Invalidated old email cache (hash: {CacheKeyHash})", HashCacheKey(oldEmailKey));
             }
             catch (Exception ex)
             {
@@ -128,8 +133,9 @@ public class CachedUserService : IUserRepository
         // Invalidate new email cache (in case it was cached before)
         try
         {
-            await _cache.RemoveAsync($"user:email:{user.EmailNormalized}");
-            _logger.LogDebug("Invalidated new email cache for {Email}", user.EmailNormalized);
+            var newEmailKey = $"user:email:{user.EmailNormalized}";
+            await _cache.RemoveAsync(newEmailKey);
+            _logger.LogDebug("Invalidated new email cache (hash: {CacheKeyHash})", HashCacheKey(newEmailKey));
         }
         catch (Exception ex)
         {
@@ -247,10 +253,23 @@ public class CachedUserService : IUserRepository
         sw.Stop();
 
         // Log cache operation (heuristic: <10ms likely hit, >10ms likely miss)
+        // Hash the cache key to avoid logging sensitive data (email addresses, usernames)
         var operation = sw.ElapsedMilliseconds < 10 ? "HIT" : "MISS";
-        _logger.LogDebug("Cache {Operation} for key {CacheKey} ({ElapsedMs}ms)",
-            operation, cacheKey, sw.ElapsedMilliseconds);
+        var hashedKey = HashCacheKey(cacheKey);
+        _logger.LogDebug("Cache {Operation} for key hash {CacheKeyHash} ({ElapsedMs}ms)",
+            operation, hashedKey, sw.ElapsedMilliseconds);
 
         return result;
+    }
+
+    /// <summary>
+    /// Hash a cache key to avoid logging sensitive data.
+    /// Returns a short hash that preserves diagnostic usefulness while protecting privacy.
+    /// </summary>
+    private static string HashCacheKey(string cacheKey)
+    {
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(cacheKey));
+        // Return first 8 bytes as hex (16 characters) - enough to correlate operations
+        return Convert.ToHexString(hashBytes[..8]);
     }
 }
