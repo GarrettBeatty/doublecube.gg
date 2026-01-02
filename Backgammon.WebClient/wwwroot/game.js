@@ -444,7 +444,9 @@ async function autoConnect() {
 
     connection = new signalR.HubConnectionBuilder()
         .withUrl(serverUrl, connectionOptions)
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])  // Custom retry delays
+        .withServerTimeout(60 * 1000)          // 60s - matches server ClientTimeoutInterval
+        .withKeepAliveInterval(15 * 1000)      // 15s - faster than server's 20s KeepAliveInterval
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
