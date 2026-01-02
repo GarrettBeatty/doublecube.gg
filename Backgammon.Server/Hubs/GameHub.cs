@@ -3,7 +3,6 @@ using Backgammon.Core;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using ServerGame = Backgammon.Server.Models.Game;
@@ -39,7 +38,6 @@ public class GameHub : Hub
     private readonly IAiMoveService _aiMoveService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMemoryCache _cache;
-    private readonly HybridCache _hybridCache;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
     private readonly ILogger<GameHub> _logger;
@@ -52,7 +50,6 @@ public class GameHub : Hub
         IAiMoveService aiMoveService,
         IHubContext<GameHub> hubContext,
         IMemoryCache cache,
-        HybridCache hybridCache,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
         ILogger<GameHub> logger)
@@ -64,7 +61,6 @@ public class GameHub : Hub
         _aiMoveService = aiMoveService;
         _hubContext = hubContext;
         _cache = cache;
-        _hybridCache = hybridCache;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
         _logger = logger;
