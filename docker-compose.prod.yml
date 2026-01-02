@@ -1,10 +1,10 @@
 services:
-  server:
+  server-1:
     image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
-    container_name: backgammon-server
+    container_name: backgammon-server-1
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    expose:
+      - "5000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - AWS_REGION=${AWS_REGION:-us-east-1}
@@ -14,8 +14,47 @@ services:
       - Jwt__Audience=BackgammonClient
       - Jwt__ExpirationDays=7
       - DOMAIN=${DOMAIN:-localhost}
+      - INSTANCE_ID=1
     networks:
       - backgammon-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  server-2:
+    image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
+    container_name: backgammon-server-2
+    restart: unless-stopped
+    expose:
+      - "5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - DynamoDb__TableName=${DYNAMODB_TABLE_NAME:-backgammon-dev}
+      - Jwt__Secret=${JWT_SECRET}
+      - Jwt__Issuer=BackgammonServer
+      - Jwt__Audience=BackgammonClient
+      - Jwt__ExpirationDays=7
+      - DOMAIN=${DOMAIN:-localhost}
+      - INSTANCE_ID=2
+    networks:
+      - backgammon-net
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
     logging:
       driver: "json-file"
       options:
@@ -33,7 +72,17 @@ services:
     networks:
       - backgammon-net
     depends_on:
-      - server
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 30s
     logging:
       driver: "json-file"
       options:
@@ -57,8 +106,12 @@ services:
     networks:
       - backgammon-net
     depends_on:
-      - server
-      - webclient
+      server-1:
+        condition: service_healthy
+      server-2:
+        condition: service_healthy
+      webclient:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:

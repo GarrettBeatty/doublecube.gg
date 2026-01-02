@@ -80,66 +80,35 @@ public class CachedUserService : IUserRepository
 
     public async Task UpdateUserAsync(User user)
     {
-        // Get old user data to check if username/email changed
-        var oldUser = await _userRepository.GetByUserIdAsync(user.UserId);
-
         await _userRepository.UpdateUserAsync(user);
 
-        // Invalidate user:id tag (covers GetByUserIdAsync)
+        // Invalidate all user-related caches
+        // Note: We invalidate broadly to avoid race conditions from fetching old user data through the cache
         await InvalidateUserCacheAsync(user.UserId);
 
-        // Invalidate old username cache if username changed
-        if (oldUser != null && oldUser.UsernameNormalized != user.UsernameNormalized)
-        {
-            try
-            {
-                var oldUsernameKey = $"user:username:{oldUser.UsernameNormalized}";
-                await _cache.RemoveAsync(oldUsernameKey);
-                _logger.LogDebug("Invalidated old username cache (hash: {CacheKeyHash})", HashCacheKey(oldUsernameKey));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to invalidate old username cache");
-            }
-        }
-
-        // Invalidate new username cache (in case it was cached before)
+        // Invalidate current username/email caches
+        // Note: We don't know the old values without risking stale cache reads,
+        // so we only invalidate the current values. Old username/email caches will expire naturally.
         try
         {
-            var newUsernameKey = $"user:username:{user.UsernameNormalized}";
-            await _cache.RemoveAsync(newUsernameKey);
-            _logger.LogDebug("Invalidated new username cache (hash: {CacheKeyHash})", HashCacheKey(newUsernameKey));
+            var usernameKey = $"user:username:{user.UsernameNormalized}";
+            await _cache.RemoveAsync(usernameKey);
+            _logger.LogDebug("Invalidated username cache (hash: {CacheKeyHash})", HashCacheKey(usernameKey));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to invalidate new username cache");
+            _logger.LogWarning(ex, "Failed to invalidate username cache");
         }
 
-        // Invalidate old email cache if email changed
-        if (oldUser != null && oldUser.EmailNormalized != user.EmailNormalized)
-        {
-            try
-            {
-                var oldEmailKey = $"user:email:{oldUser.EmailNormalized}";
-                await _cache.RemoveAsync(oldEmailKey);
-                _logger.LogDebug("Invalidated old email cache (hash: {CacheKeyHash})", HashCacheKey(oldEmailKey));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to invalidate old email cache");
-            }
-        }
-
-        // Invalidate new email cache (in case it was cached before)
         try
         {
-            var newEmailKey = $"user:email:{user.EmailNormalized}";
-            await _cache.RemoveAsync(newEmailKey);
-            _logger.LogDebug("Invalidated new email cache (hash: {CacheKeyHash})", HashCacheKey(newEmailKey));
+            var emailKey = $"user:email:{user.EmailNormalized}";
+            await _cache.RemoveAsync(emailKey);
+            _logger.LogDebug("Invalidated email cache (hash: {CacheKeyHash})", HashCacheKey(emailKey));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to invalidate new email cache");
+            _logger.LogWarning(ex, "Failed to invalidate email cache");
         }
     }
 
@@ -221,7 +190,7 @@ public class CachedUserService : IUserRepository
     }
 
     /// <summary>
-    /// Get or create cache entry with hit/miss logging
+    /// Get or create cache entry with logging
     /// </summary>
     private async Task<User?> GetOrCreateWithLoggingAsync(
         string cacheKey,
@@ -229,8 +198,9 @@ public class CachedUserService : IUserRepository
         HybridCacheEntryOptions? options = null,
         string[]? tags = null)
     {
-        // Check if item exists in cache (simple heuristic: measure time)
-        var sw = System.Diagnostics.Stopwatch.StartNew();
+        // Hash the cache key to avoid logging sensitive data (email addresses, usernames)
+        var hashedKey = HashCacheKey(cacheKey);
+        _logger.LogTrace("Cache lookup for key hash {CacheKeyHash}", hashedKey);
 
         User? result;
         if (options != null && tags != null)
@@ -249,15 +219,6 @@ public class CachedUserService : IUserRepository
         {
             result = await _cache.GetOrCreateAsync(cacheKey, async cancel => await factory());
         }
-
-        sw.Stop();
-
-        // Log cache operation (heuristic: <10ms likely hit, >10ms likely miss)
-        // Hash the cache key to avoid logging sensitive data (email addresses, usernames)
-        var operation = sw.ElapsedMilliseconds < 10 ? "HIT" : "MISS";
-        var hashedKey = HashCacheKey(cacheKey);
-        _logger.LogDebug("Cache {Operation} for key hash {CacheKeyHash} ({ElapsedMs}ms)",
-            operation, hashedKey, sw.ElapsedMilliseconds);
 
         return result;
     }

@@ -427,12 +427,23 @@ async function autoConnect() {
         // Extract base API URL by removing /gamehub suffix
         apiBaseUrl = serverUrl.replace('/gamehub', '');
 
+        // Update matchController with API base URL
+        if (typeof window.matchController !== 'undefined') {
+            window.matchController.setApiBaseUrl(apiBaseUrl);
+        }
+
         log(`Using SignalR URL: ${serverUrl}`, 'info');
         log(`Using API Base URL: ${apiBaseUrl}`, 'info');
     } catch (error) {
         // Fallback to hardcoded URL if config endpoint fails
         serverUrl = document.getElementById('serverUrl').value;
         apiBaseUrl = serverUrl.replace('/gamehub', '');
+
+        // Update matchController with fallback API base URL
+        if (typeof window.matchController !== 'undefined') {
+            window.matchController.setApiBaseUrl(apiBaseUrl);
+        }
+
         log(`Using fallback URL: ${serverUrl}`, 'warning');
     }
 
@@ -444,7 +455,9 @@ async function autoConnect() {
 
     connection = new signalR.HubConnectionBuilder()
         .withUrl(serverUrl, connectionOptions)
-        .withAutomaticReconnect()
+        .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])  // Custom retry delays
+        .withServerTimeout(60 * 1000)          // 60s - matches server ClientTimeoutInterval
+        .withKeepAliveInterval(15 * 1000)      // 15s - faster than server's 20s KeepAliveInterval
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
@@ -460,6 +473,15 @@ async function autoConnect() {
         await connection.start();
         updateConnectionStatus(true);
         log('Connected to server', 'success');
+
+        // Load active match from server (if any)
+        if (typeof window.matchController !== 'undefined' && myPlayerId) {
+            await window.matchController.loadActiveMatch(myPlayerId);
+            const activeMatch = window.matchController.getCurrentMatch();
+            if (activeMatch) {
+                debug('Loaded active match from server', activeMatch, 'info');
+            }
+        }
 
         // Always start on landing page and refresh games list
         // User can manually rejoin games from "My Games" section
@@ -526,7 +548,6 @@ function setupEventHandlers() {
     connection.on("WaitingForOpponent", (gameId) => {
         log(`⏳ Waiting for opponent... Game ID: ${gameId}`, 'info');
         currentGameId = gameId;
-        localStorage.setItem('currentGameId', gameId);
         setGameUrl(gameId);
         showGamePage(); // Show game page so player can see board while waiting
     });
@@ -594,9 +615,6 @@ function setupEventHandlers() {
         } else {
             log('Game Over!', 'info');
         }
-
-        // Clear saved game ID
-        localStorage.removeItem('currentGameId');
 
         // Check if this is a match game
         const match = typeof window.matchController !== 'undefined'
@@ -872,7 +890,6 @@ async function joinSpecificGame(gameId) {
 
     try {
         currentGameId = gameId;
-        localStorage.setItem('currentGameId', gameId);
         setGameUrl(gameId);
         await connection.invoke("JoinGame", myPlayerId, gameId);
         log(`🎮 Joining game ${gameId}...`, 'info');
@@ -908,7 +925,6 @@ async function createGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId'); // Clear any old game
         await connection.invoke("JoinGame", myPlayerId, null);
         log('🎮 Creating new game...', 'info');
         showGamePage();
@@ -933,7 +949,6 @@ async function createAnalysisGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId');
         await connection.invoke("CreateAnalysisGame");
         log('📊 Creating analysis game...', 'info');
         showGamePage();
@@ -958,7 +973,6 @@ async function createAiGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId'); // Clear any old game
         debug('Invoking CreateAiGame on server', { myPlayerId }, 'info');
         await connection.invoke("CreateAiGame", myPlayerId);
         log('🤖 Creating AI game...', 'info');
@@ -994,7 +1008,6 @@ async function leaveGameAndReturn() {
         log('👋 Left game', 'info');
         currentGameId = null;
         myColor = null;
-        localStorage.removeItem('currentGameId'); // Clear saved game
         resetGameUI();
         resetBoardFlipPreference();
         showLandingPage();
@@ -1058,10 +1071,6 @@ function showAbandonConfirm() {
     } else {
         // Has opponent - show forfeit message
         abandonMessage.textContent = 'Your opponent will win if you abandon this game.';
-        if (currentGameState && currentGameState.doublingCubeValue) {
-            document.getElementById('abandonStakes').textContent =
-                `${currentGameState.doublingCubeValue}x`;
-        }
         abandonStakesMessage.innerHTML = 'This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">' +
             (currentGameState && currentGameState.doublingCubeValue ? currentGameState.doublingCubeValue : 1) + 'x</span>';
     }
@@ -1393,10 +1402,6 @@ function updateGameState(state, isSpectator = false) {
 
     // Update current game ID (no need to display it, it's in the URL)
     currentGameId = state.gameId;
-    // Save to localStorage for reconnection
-    if (state.gameId) {
-        localStorage.setItem('currentGameId', state.gameId);
-    }
 
     // Store player color
     if (state.yourColor !== null && state.yourColor !== undefined) {
@@ -1546,7 +1551,14 @@ function updateMatchUI() {
         ? window.matchController.getCurrentMatch()
         : null;
 
+    const matchScoreContainer = document.querySelector('.match-score');
+
     if (match && match.targetScore) {
+        // Show match score container
+        if (matchScoreContainer) {
+            matchScoreContainer.style.display = '';
+        }
+
         // Update match length display
         const matchLengthEl = document.getElementById('matchLength');
         if (matchLengthEl) {
@@ -1558,6 +1570,11 @@ function updateMatchUI() {
         if (matchStakeEl && currentGameState) {
             const cubeValue = currentGameState.doublingCubeValue ?? currentGameState.DoublingCubeValue ?? 1;
             matchStakeEl.textContent = cubeValue;
+        }
+    } else {
+        // Hide match score container for regular games
+        if (matchScoreContainer) {
+            matchScoreContainer.style.display = 'none';
         }
     }
 }

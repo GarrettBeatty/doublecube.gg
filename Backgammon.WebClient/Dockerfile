@@ -20,6 +20,10 @@ RUN dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no
 
 # Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+
+# Install wget for health checks
+RUN apk add --no-cache wget
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 

@@ -22,10 +22,10 @@ builder.AddServiceDefaults();
 // Add services to the container
 builder.Services.AddSignalR(options =>
 {
-    // Production-friendly timeout settings for long-lived WebSocket connections
-    options.ClientTimeoutInterval = TimeSpan.FromMinutes(2);  // Default: 30s
-    options.HandshakeTimeout = TimeSpan.FromSeconds(30);      // Default: 15s
-    options.KeepAliveInterval = TimeSpan.FromSeconds(30);     // Default: 15s
+    // Optimized timeouts for real-time gameplay
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);  // Client must respond within 60s
+    options.KeepAliveInterval = TimeSpan.FromSeconds(20);      // Send keepalive pings every 20s
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30);       // Keep at 30s
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
@@ -352,6 +352,33 @@ app.MapGet("/api/player/{playerId}/games", async (
     );
 
     return games;
+}).RequireCors(selectedCorsPolicy);
+
+// Player active matches endpoint
+app.MapGet("/api/player/{playerId}/active-match", async (string playerId, IMatchRepository matchRepository) =>
+{
+    var matches = await matchRepository.GetPlayerMatchesAsync(playerId, "InProgress", limit: 1);
+    var activeMatch = matches.FirstOrDefault();
+
+    if (activeMatch == null)
+    {
+        return Results.Ok(new { hasActiveMatch = false });
+    }
+
+    return Results.Ok(new
+    {
+        hasActiveMatch = true,
+        matchId = activeMatch.MatchId,
+        targetScore = activeMatch.TargetScore,
+        player1Id = activeMatch.Player1Id,
+        player2Id = activeMatch.Player2Id,
+        player1Score = activeMatch.Player1Score,
+        player2Score = activeMatch.Player2Score,
+        status = activeMatch.Status,
+        currentGameId = activeMatch.CurrentGameId,
+        isCrawfordGame = activeMatch.IsCrawfordGame,
+        hasCrawfordGameBeenPlayed = activeMatch.HasCrawfordGameBeenPlayed
+    });
 }).RequireCors(selectedCorsPolicy);
 
 // Player statistics endpoint (with caching)

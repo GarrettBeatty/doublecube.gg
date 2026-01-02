@@ -85,6 +85,10 @@ public class FriendService : IFriendService
                 fromUser.Username, fromUser.DisplayName,
                 toUser.Username, toUser.DisplayName);
 
+            // Invalidate friend list caches for both users (pending requests changed)
+            await _cache.RemoveByTagAsync($"friends:{fromUserId}");
+            await _cache.RemoveByTagAsync($"friends:{toUserId}");
+
             // Send real-time notification to recipient if online
             // Note: This requires tracking user connections by userId
             // For now, we'll skip the real-time notification
@@ -155,6 +159,10 @@ public class FriendService : IFriendService
             }
 
             await _friendshipRepository.DeclineFriendRequestAsync(userId, friendUserId);
+
+            // Invalidate friend list caches for both users
+            await _cache.RemoveByTagAsync($"friends:{userId}");
+            await _cache.RemoveByTagAsync($"friends:{friendUserId}");
 
             _logger.LogInformation("Friend request declined between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);

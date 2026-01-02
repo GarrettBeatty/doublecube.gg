@@ -102,11 +102,70 @@ jobs:
           # Pull new images
           docker-compose -f docker-compose.prod.yml pull
 
-          # Restart services with zero downtime
-          docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          # Rolling update strategy for zero downtime
+          echo "Starting rolling update..."
 
-          # Wait for services to start
-          sleep 10
+          # Update server-1 first
+          echo "Updating server-1..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps server-1
+
+          # Wait for server-1 to be healthy (using docker health check)
+          echo "Waiting for server-1 to become healthy..."
+          for i in {1..60}; do
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server-1 2>/dev/null || echo "unknown")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "✓ server-1 is healthy"
+              break
+            fi
+            echo "Attempt $i/60: server-1 status = $HEALTH"
+            sleep 2
+          done
+
+          # Give it extra time to stabilize
+          sleep 5
+
+          # Update server-2
+          echo "Updating server-2..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps server-2
+
+          # Wait for server-2 to be healthy (using docker health check)
+          echo "Waiting for server-2 to become healthy..."
+          for i in {1..60}; do
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server-2 2>/dev/null || echo "unknown")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "✓ server-2 is healthy"
+              break
+            fi
+            echo "Attempt $i/60: server-2 status = $HEALTH"
+            sleep 2
+          done
+
+          # Give it extra time to stabilize
+          sleep 5
+
+          # Update webclient
+          echo "Updating webclient..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps webclient
+
+          # Wait for webclient to be healthy
+          echo "Waiting for webclient to become healthy..."
+          for i in {1..60}; do
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "unknown")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "✓ webclient is healthy"
+              break
+            fi
+            echo "Attempt $i/60: webclient status = $HEALTH"
+            sleep 2
+          done
+
+          # Update Caddy (reload config - no restart needed)
+          echo "Reloading Caddy configuration..."
+          docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
+
+          # Final health check
+          echo "Deployment complete! Final status:"
+          docker ps --format 'table {{.Names}}\t{{.Status}}'
 
           # Cleanup old images
           docker image prune -af --filter "until=24h"

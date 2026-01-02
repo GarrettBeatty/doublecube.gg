@@ -1,18 +1,18 @@
 /* global */
 
 // MatchController - Centralized match state management
-// Singleton pattern for managing match state, persistence, and navigation
+// Singleton pattern for managing match state and navigation
+// Match state is now server-authoritative (no localStorage persistence)
 
 class MatchController {
     constructor() {
         this.currentMatch = null;
-        this.loadFromLocalStorage();
+        this.apiBaseUrl = 'http://localhost:5000'; // Default, will be updated from config
     }
 
     // State management
     setCurrentMatch(match) {
         this.currentMatch = match;
-        this.saveToLocalStorage();
     }
 
     getCurrentMatch() {
@@ -21,14 +21,12 @@ class MatchController {
 
     clearMatch() {
         this.currentMatch = null;
-        localStorage.removeItem('backgammon_current_match');
     }
 
     updateMatchScores(player1Score, player2Score) {
         if (this.currentMatch) {
             this.currentMatch.player1Score = player1Score;
             this.currentMatch.player2Score = player2Score;
-            this.saveToLocalStorage();
         }
     }
 
@@ -36,7 +34,6 @@ class MatchController {
         if (this.currentMatch) {
             this.currentMatch.isCrawfordGame = isCrawfordGame;
             this.currentMatch.hasCrawfordGameBeenPlayed = hasCrawfordGameBeenPlayed;
-            this.saveToLocalStorage();
         }
     }
 
@@ -46,51 +43,40 @@ class MatchController {
                this.currentMatch.player2Score >= this.currentMatch.targetScore;
     }
 
-    // LocalStorage persistence
-    saveToLocalStorage() {
-        if (this.currentMatch) {
-            const matchData = {
-                matchId: this.currentMatch.matchId,
-                targetScore: this.currentMatch.targetScore,
-                player1Score: this.currentMatch.player1Score,
-                player2Score: this.currentMatch.player2Score,
-                myScore: this.currentMatch.myScore,
-                opponentScore: this.currentMatch.opponentScore,
-                isCrawfordGame: this.currentMatch.isCrawfordGame,
-                hasCrawfordGameBeenPlayed: this.currentMatch.hasCrawfordGameBeenPlayed,
-                currentGameId: this.currentMatch.currentGameId,
-                status: this.currentMatch.status,
-                player1Name: this.currentMatch.player1Name,
-                player2Name: this.currentMatch.player2Name,
-                // Match lobby fields
-                opponentType: this.currentMatch.opponentType,
-                isOpenLobby: this.currentMatch.isOpenLobby,
-                player1Id: this.currentMatch.player1Id,
-                player2Id: this.currentMatch.player2Id,
-                lobbyStatus: this.currentMatch.lobbyStatus,
-                lastUpdated: Date.now()
-            };
-            localStorage.setItem('backgammon_current_match', JSON.stringify(matchData));
+    // Server-based state loading
+    async loadActiveMatch(playerId) {
+        if (!playerId) return null;
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/api/player/${playerId}/active-match`);
+            const data = await response.json();
+
+            if (data.hasActiveMatch) {
+                this.currentMatch = {
+                    matchId: data.matchId,
+                    targetScore: data.targetScore,
+                    player1Id: data.player1Id,
+                    player2Id: data.player2Id,
+                    player1Score: data.player1Score,
+                    player2Score: data.player2Score,
+                    status: data.status,
+                    currentGameId: data.currentGameId,
+                    isCrawfordGame: data.isCrawfordGame,
+                    hasCrawfordGameBeenPlayed: data.hasCrawfordGameBeenPlayed
+                };
+                return this.currentMatch;
+            } else {
+                this.currentMatch = null;
+                return null;
+            }
+        } catch (error) {
+            console.error('Failed to load active match from server:', error);
+            return null;
         }
     }
 
-    loadFromLocalStorage() {
-        const stored = localStorage.getItem('backgammon_current_match');
-        if (stored) {
-            try {
-                const matchData = JSON.parse(stored);
-                // Only load if not too old (24 hours)
-                const age = Date.now() - (matchData.lastUpdated || 0);
-                if (age < 24 * 60 * 60 * 1000) {
-                    this.currentMatch = matchData;
-                } else {
-                    this.clearMatch();
-                }
-            } catch (e) {
-                console.error('Failed to load match from localStorage', e);
-                this.clearMatch();
-            }
-        }
+    setApiBaseUrl(url) {
+        this.apiBaseUrl = url;
     }
 
     // Navigation helpers
