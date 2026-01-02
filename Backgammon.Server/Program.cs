@@ -27,7 +27,8 @@ builder.Services.AddSingleton(sp =>
 builder.AddServiceDefaults();
 
 // Add services to the container
-builder.Services.AddSignalR(options =>
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+var signalRBuilder = builder.Services.AddSignalR(options =>
 {
     // Optimized timeouts for real-time gameplay
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);  // Client must respond within 60s
@@ -35,6 +36,28 @@ builder.Services.AddSignalR(options =>
     options.HandshakeTimeout = TimeSpan.FromSeconds(30);       // Keep at 30s
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
+
+// Add Redis backplane for scaling across multiple server instances
+// This enables SignalR messages to be broadcast across all servers
+if (!string.IsNullOrEmpty(redisConnectionString))
+{
+    Console.WriteLine($"=== Configuring SignalR Redis Backplane ===");
+    Console.WriteLine($"Redis Connection: {redisConnectionString}");
+    signalRBuilder.AddStackExchangeRedis(redisConnectionString, options =>
+    {
+        options.Configuration.ChannelPrefix = StackExchange.Redis.RedisChannel.Literal("BackgammonSignalR");
+    });
+    Console.WriteLine("SignalR Redis backplane configured");
+    Console.WriteLine("========================================\n");
+}
+else
+{
+    Console.WriteLine("=== SignalR Running in Single-Server Mode ===");
+    Console.WriteLine("WARNING: Redis not configured. Real-time updates will NOT work across multiple server instances.");
+    Console.WriteLine("Set Redis:ConnectionString in configuration to enable backplane.");
+    Console.WriteLine("=============================================\n");
+}
+
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 
 // Add memory cache for profile caching

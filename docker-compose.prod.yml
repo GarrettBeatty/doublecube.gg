@@ -1,4 +1,27 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: backgammon-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - backgammon-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   server-1:
     image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
     container_name: backgammon-server-1
@@ -15,8 +38,12 @@ services:
       - Jwt__ExpirationDays=7
       - DOMAIN=${DOMAIN:-localhost}
       - INSTANCE_ID=1
+      - Redis__ConnectionString=redis:6379
     networks:
       - backgammon-net
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:5000/health"]
       interval: 10s
@@ -46,8 +73,12 @@ services:
       - Jwt__ExpirationDays=7
       - DOMAIN=${DOMAIN:-localhost}
       - INSTANCE_ID=2
+      - Redis__ConnectionString=redis:6379
     networks:
       - backgammon-net
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:5000/health"]
       interval: 10s
@@ -125,3 +156,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  redis_data:
