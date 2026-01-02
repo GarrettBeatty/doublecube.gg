@@ -672,10 +672,8 @@ public class GameHub : Hub
                         if (session.GameMode.ShouldTrackStats)
                         {
                             var game = GameEngineMapper.ToGame(session);
+                            // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                             await UpdateUserStatsAfterGame(game);
-
-                            // Invalidate player caches
-                            await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                         }
                         else
                         {
@@ -994,10 +992,8 @@ public class GameHub : Hub
                                 if (session.GameMode.ShouldTrackStats)
                                 {
                                     var game = GameEngineMapper.ToGame(session);
+                                    // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                                     await UpdateUserStatsAfterGame(game);
-
-                                    // Invalidate player caches
-                                    await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                                 }
 
                                 _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
@@ -1135,10 +1131,8 @@ public class GameHub : Hub
                     if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
+                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                         await UpdateUserStatsAfterGame(game);
-
-                        // Invalidate player caches
-                        await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                     }
                     else
                     {
@@ -1550,10 +1544,8 @@ public class GameHub : Hub
                     {
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
                         var game = GameEngineMapper.ToGame(session);
+                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                         await UpdateUserStatsAfterGame(game);
-
-                        // Invalidate player caches
-                        await InvalidatePlayerCachesAsync(session.WhitePlayerId, session.RedPlayerId);
                     }
                     catch (Exception ex)
                     {
@@ -1565,32 +1557,6 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AI turn in game {GameId}", session.Id);
-        }
-    }
-
-    /// <summary>
-    /// Invalidate caches for players after game completion
-    /// </summary>
-    private async Task InvalidatePlayerCachesAsync(string? whitePlayerId, string? redPlayerId)
-    {
-        try
-        {
-            // Invalidate game history and stats caches for both players
-            if (!string.IsNullOrEmpty(whitePlayerId))
-            {
-                await _hybridCache.RemoveByTagAsync($"player:{whitePlayerId}");
-                _logger.LogDebug("Invalidated cache for player {PlayerId}", whitePlayerId);
-            }
-
-            if (!string.IsNullOrEmpty(redPlayerId))
-            {
-                await _hybridCache.RemoveByTagAsync($"player:{redPlayerId}");
-                _logger.LogDebug("Invalidated cache for player {PlayerId}", redPlayerId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to invalidate player caches");
         }
     }
 

@@ -80,35 +80,80 @@ public class CachedUserService : IUserRepository
 
     public async Task UpdateUserAsync(User user)
     {
+        // Fetch current user to get old username/email values for cache invalidation
+        User? currentUser = null;
+        try
+        {
+            // Use repository directly to bypass cache and get current values from DB
+            currentUser = await _userRepository.GetByUserIdAsync(user.UserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to fetch current user for cache invalidation, will invalidate new values only");
+        }
+
         await _userRepository.UpdateUserAsync(user);
 
         // Invalidate all user-related caches
-        // Note: We invalidate broadly to avoid race conditions from fetching old user data through the cache
         await InvalidateUserCacheAsync(user.UserId);
 
-        // Invalidate current username/email caches
-        // Note: We don't know the old values without risking stale cache reads,
-        // so we only invalidate the current values. Old username/email caches will expire naturally.
+        // Invalidate both old and new username/email caches
+        if (currentUser != null)
+        {
+            // Invalidate old username cache if it changed
+            if (!string.IsNullOrEmpty(currentUser.UsernameNormalized) &&
+                currentUser.UsernameNormalized != user.UsernameNormalized)
+            {
+                try
+                {
+                    var oldUsernameKey = $"user:username:{currentUser.UsernameNormalized}";
+                    await _cache.RemoveAsync(oldUsernameKey);
+                    _logger.LogDebug("Invalidated old username cache (hash: {CacheKeyHash})", HashCacheKey(oldUsernameKey));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate old username cache");
+                }
+            }
+
+            // Invalidate old email cache if it changed
+            if (!string.IsNullOrEmpty(currentUser.EmailNormalized) &&
+                currentUser.EmailNormalized != user.EmailNormalized)
+            {
+                try
+                {
+                    var oldEmailKey = $"user:email:{currentUser.EmailNormalized}";
+                    await _cache.RemoveAsync(oldEmailKey);
+                    _logger.LogDebug("Invalidated old email cache (hash: {CacheKeyHash})", HashCacheKey(oldEmailKey));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to invalidate old email cache");
+                }
+            }
+        }
+
+        // Invalidate new username/email caches
         try
         {
             var usernameKey = $"user:username:{user.UsernameNormalized}";
             await _cache.RemoveAsync(usernameKey);
-            _logger.LogDebug("Invalidated username cache (hash: {CacheKeyHash})", HashCacheKey(usernameKey));
+            _logger.LogDebug("Invalidated new username cache (hash: {CacheKeyHash})", HashCacheKey(usernameKey));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to invalidate username cache");
+            _logger.LogWarning(ex, "Failed to invalidate new username cache");
         }
 
         try
         {
             var emailKey = $"user:email:{user.EmailNormalized}";
             await _cache.RemoveAsync(emailKey);
-            _logger.LogDebug("Invalidated email cache (hash: {CacheKeyHash})", HashCacheKey(emailKey));
+            _logger.LogDebug("Invalidated new email cache (hash: {CacheKeyHash})", HashCacheKey(emailKey));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to invalidate email cache");
+            _logger.LogWarning(ex, "Failed to invalidate new email cache");
         }
     }
 

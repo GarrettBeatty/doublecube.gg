@@ -335,23 +335,43 @@ app.MapGet("/api/player/{playerId}/games", async (
     string playerId,
     Microsoft.Extensions.Caching.Hybrid.HybridCache cache,
     IGameRepository gameRepository,
+    ILogger<Program> logger,
     int limit = 20,
     int skip = 0) =>
 {
     var cacheKey = $"player-games:{playerId}:completed:limit={limit}:skip={skip}";
 
-    var games = await cache.GetOrCreateAsync(
-        cacheKey,
-        async ct => await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip),
-        new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
-        {
-            Expiration = TimeSpan.FromMinutes(10),
-            LocalCacheExpiration = TimeSpan.FromMinutes(2) // Shorter local cache to reduce memory for pagination
-        },
-        tags: [$"player:{playerId}"]
-    );
+    try
+    {
+        var games = await cache.GetOrCreateAsync(
+            cacheKey,
+            async ct =>
+            {
+                try
+                {
+                    return await gameRepository.GetPlayerGamesAsync(playerId, "Completed", limit, skip);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Failed to fetch games for player {PlayerId}", playerId);
+                    throw; // Re-throw to prevent caching the error
+                }
+            },
+            new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(10),
+                LocalCacheExpiration = TimeSpan.FromMinutes(2) // Shorter local cache to reduce memory for pagination
+            },
+            tags: [$"player:{playerId}"]
+        );
 
-    return games;
+        return Results.Ok(games);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error retrieving game history for player {PlayerId}", playerId);
+        return Results.Problem("Failed to retrieve game history", statusCode: 500);
+    }
 }).RequireCors(selectedCorsPolicy);
 
 // Player active matches endpoint
