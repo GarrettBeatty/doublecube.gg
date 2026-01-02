@@ -19,58 +19,37 @@ public static class GameEngineMapper
     {
         var engine = session.Engine;
 
-        // Determine if players are authenticated users (GUID format vs anonymous)
         var whiteUserId = IsRegisteredUserId(session.WhitePlayerId) ? session.WhitePlayerId : null;
         var redUserId = IsRegisteredUserId(session.RedPlayerId) ? session.RedPlayerId : null;
 
         var game = new ServerGame
         {
             GameId = session.Id,
-
-            // Player information
             WhitePlayerId = session.WhitePlayerId,
             RedPlayerId = session.RedPlayerId,
             WhiteUserId = whiteUserId,
             RedUserId = redUserId,
             WhitePlayerName = session.WhitePlayerName,
             RedPlayerName = session.RedPlayerName,
-
-            // Game state
             Status = engine.Winner != null ? "Completed" : "InProgress",
             GameStarted = engine.GameStarted,
-
-            // Board state (serialize all 24 points)
             BoardState = SerializeBoardState(engine.Board),
-
-            // Player states
             WhiteCheckersOnBar = engine.WhitePlayer.CheckersOnBar,
             RedCheckersOnBar = engine.RedPlayer.CheckersOnBar,
             WhiteBornOff = engine.WhitePlayer.CheckersBornOff,
             RedBornOff = engine.RedPlayer.CheckersBornOff,
-
-            // Current turn state
             CurrentPlayer = engine.CurrentPlayer?.Color.ToString() ?? "White",
-
-            // Dice state
             Die1 = engine.Dice.Die1,
             Die2 = engine.Dice.Die2,
             RemainingMoves = new List<int>(engine.RemainingMoves),
-
-            // Doubling cube
             DoublingCubeValue = engine.DoublingCube.Value,
             DoublingCubeOwner = engine.DoublingCube.Owner?.ToString(),
-
-            // Move history (convert to string notation)
             Moves = engine.MoveHistory
                 .Select(m => m.IsBearOff ? $"{m.From}/off" :
                              m.From == 0 ? $"bar/{m.To}" :
                              $"{m.From}/{m.To}")
                 .ToList(),
-
-            // Move count
             MoveCount = engine.MoveHistory.Count,
-
-            // Timestamps
             CreatedAt = session.CreatedAt,
             LastUpdatedAt = DateTime.UtcNow
         };
@@ -98,7 +77,6 @@ public static class GameEngineMapper
     {
         var session = new GameSession(game.GameId);
 
-        // Restore timestamps using reflection
         var createdAtField = typeof(GameSession)
             .GetField("<CreatedAt>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
         if (createdAtField != null)
@@ -106,39 +84,33 @@ public static class GameEngineMapper
             createdAtField.SetValue(session, game.CreatedAt);
         }
 
-        // Restore player assignments (connections will be empty until players reconnect)
         if (!string.IsNullOrEmpty(game.WhitePlayerId))
         {
-            session.AddPlayer(game.WhitePlayerId, string.Empty); // Empty connection ID
+            session.AddPlayer(game.WhitePlayerId, string.Empty);
             session.WhitePlayerName = game.WhitePlayerName;
         }
 
         if (!string.IsNullOrEmpty(game.RedPlayerId))
         {
-            session.AddPlayer(game.RedPlayerId, string.Empty); // Empty connection ID
+            session.AddPlayer(game.RedPlayerId, string.Empty);
             session.RedPlayerName = game.RedPlayerName;
         }
 
         var engine = session.Engine;
 
-        // Restore board state
         RestoreBoardState(engine.Board, game.BoardState);
 
-        // Restore player states
         engine.WhitePlayer.CheckersOnBar = game.WhiteCheckersOnBar;
         engine.RedPlayer.CheckersOnBar = game.RedCheckersOnBar;
         engine.WhitePlayer.CheckersBornOff = game.WhiteBornOff;
         engine.RedPlayer.CheckersBornOff = game.RedBornOff;
 
-        // Restore dice state
         engine.Dice.SetDice(game.Die1, game.Die2);
         engine.RemainingMoves.Clear();
         engine.RemainingMoves.AddRange(game.RemainingMoves);
 
-        // Restore doubling cube
         if (game.DoublingCubeValue > 1)
         {
-            // Set cube value using reflection (DoublingCube doesn't expose public setters)
             var cubeValueField = engine.DoublingCube.GetType()
                 .GetField("<Value>k__BackingField", BindingFlags.NonPublic | BindingFlags.Instance);
             if (cubeValueField != null)
@@ -158,7 +130,6 @@ public static class GameEngineMapper
             }
         }
 
-        // Restore current player using reflection (CurrentPlayer is read-only)
         var currentPlayer = game.CurrentPlayer == "White"
             ? engine.WhitePlayer
             : engine.RedPlayer;
@@ -170,7 +141,6 @@ public static class GameEngineMapper
             currentPlayerField.SetValue(engine, currentPlayer);
         }
 
-        // Restore GameStarted flag using reflection
         if (game.GameStarted)
         {
             var gameStartedField = engine.GetType()
@@ -181,7 +151,6 @@ public static class GameEngineMapper
             }
         }
 
-        // Validate restored state
         ValidateRestoredState(engine);
 
         return session;

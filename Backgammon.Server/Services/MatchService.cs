@@ -67,13 +67,20 @@ public class MatchService : IMatchService
 
             _logger.LogInformation(
                 "Created match {MatchId} between {Player1} and {Player2}, target score: {TargetScore}",
-                match.MatchId, match.Player1Name, match.Player2Name, targetScore);
+                match.MatchId,
+                match.Player1Name,
+                match.Player2Name,
+                targetScore);
 
             return match;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create match between {Player1Id} and {Player2Id}", player1Id, player2Id);
+            _logger.LogError(
+                ex,
+                "Failed to create match between {Player1Id} and {Player2Id}",
+                player1Id,
+                player2Id);
             throw;
         }
     }
