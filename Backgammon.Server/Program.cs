@@ -63,7 +63,30 @@ builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();
 
+// Add Redis distributed cache for HybridCache L2 (distributed) layer
+// This enables cache sharing across multiple server instances
+if (!string.IsNullOrEmpty(redisConnectionString))
+{
+    Console.WriteLine($"=== Configuring Redis Distributed Cache for HybridCache ===");
+    Console.WriteLine($"Redis Connection: {redisConnectionString}");
+    builder.Services.AddStackExchangeRedisCache(options =>
+    {
+        options.Configuration = redisConnectionString;
+        options.InstanceName = "BackgammonCache:";
+    });
+    Console.WriteLine("Redis distributed cache configured for HybridCache");
+    Console.WriteLine("=========================================================\n");
+}
+else
+{
+    Console.WriteLine("=== HybridCache Running with L1 (Memory) Only ===");
+    Console.WriteLine("WARNING: Redis not configured. Cache will NOT be shared across multiple server instances.");
+    Console.WriteLine("Set Redis:ConnectionString in configuration to enable distributed caching.");
+    Console.WriteLine("==================================================\n");
+}
+
 // Add HybridCache for user profiles, game history, and friend lists
+// HybridCache automatically uses the configured IDistributedCache (Redis) as L2
 builder.Services.AddHybridCache(options =>
 {
     options.MaximumPayloadBytes = 1024 * 1024; // 1MB
