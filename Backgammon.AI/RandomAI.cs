@@ -9,8 +9,6 @@ public class RandomAI : IBackgammonAI
 {
     private readonly Random _random;
 
-    public string Name { get; }
-
     public RandomAI(string name = "RandomAI")
     {
         Name = name;
@@ -22,6 +20,8 @@ public class RandomAI : IBackgammonAI
         Name = name;
         _random = new Random(seed);
     }
+
+    public string Name { get; }
 
     public List<Move> ChooseMoves(GameEngine engine)
     {

@@ -13,6 +13,17 @@ public class GameSession
 {
     private readonly HashSet<string> _spectatorConnections = new();
 
+    public GameSession(string id)
+    {
+        Id = id;
+        Engine = new GameEngine();
+        // Initialize board with default checker positions so players can see them while waiting
+        Engine.Board.SetupInitialPosition();
+        CreatedAt = DateTime.UtcNow;
+        LastActivityAt = DateTime.UtcNow;
+        GameMode = new MultiplayerMode();  // Default to multiplayer mode
+    }
+
     public string Id { get; }
 
     public GameEngine Engine { get; }
@@ -48,17 +59,6 @@ public class GameSession
     public bool IsMatchGame { get; set; } = false;
 
     public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
-
-    public GameSession(string id)
-    {
-        Id = id;
-        Engine = new GameEngine();
-        // Initialize board with default checker positions so players can see them while waiting
-        Engine.Board.SetupInitialPosition();
-        CreatedAt = DateTime.UtcNow;
-        LastActivityAt = DateTime.UtcNow;
-        GameMode = new MultiplayerMode();  // Default to multiplayer mode
-    }
 
     /// <summary>
     /// Add a player to the game session

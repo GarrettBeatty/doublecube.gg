@@ -39,19 +39,6 @@ public class AiMoveService : IAiMoveService
         return $"{prefix}{Guid.NewGuid()}";
     }
 
-    /// <summary>
-    /// Creates an AI instance based on the player ID prefix.
-    /// </summary>
-    private IBackgammonAI CreateAI(string playerId)
-    {
-        if (playerId.StartsWith(RandomAiPrefix))
-        {
-            return new RandomAI("RandomBot");
-        }
-
-        return new GreedyAI("GreedyBot");
-    }
-
     public async Task ExecuteAiTurnAsync(GameSession session, string aiPlayerId, Func<Task> broadcastUpdate)
     {
         var engine = session.Engine;
@@ -115,6 +102,19 @@ public class AiMoveService : IAiMoveService
             _logger.LogError(ex, "Error during AI turn in game {GameId}", session.Id);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Creates an AI instance based on the player ID prefix.
+    /// </summary>
+    private IBackgammonAI CreateAI(string playerId)
+    {
+        if (playerId.StartsWith(RandomAiPrefix))
+        {
+            return new RandomAI("RandomBot");
+        }
+
+        return new GreedyAI("GreedyBot");
     }
 
     /// <summary>

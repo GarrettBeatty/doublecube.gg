@@ -7,18 +7,18 @@ namespace Backgammon.AI;
 /// </summary>
 public class AISimulator
 {
-    public IBackgammonAI WhiteAI { get; }
-
-    public IBackgammonAI RedAI { get; }
-
-    public bool Verbose { get; set; }
-
     public AISimulator(IBackgammonAI whiteAI, IBackgammonAI redAI, bool verbose = false)
     {
         WhiteAI = whiteAI;
         RedAI = redAI;
         Verbose = verbose;
     }
+
+    public IBackgammonAI WhiteAI { get; }
+
+    public IBackgammonAI RedAI { get; }
+
+    public bool Verbose { get; set; }
 
     /// <summary>
     /// Run a single game between the two AIs
@@ -199,62 +199,5 @@ public class AISimulator
             3 => "Backgammon",
             _ => "Unknown"
         };
-    }
-}
-
-/// <summary>
-/// Result of a single game
-/// </summary>
-public class GameResult
-{
-    public CheckerColor Winner { get; set; }
-
-    public int Points { get; set; }
-
-    public int Turns { get; set; }
-
-    public int WhiteBornOff { get; set; }
-
-    public int RedBornOff { get; set; }
-}
-
-/// <summary>
-/// Statistics from running multiple games
-/// </summary>
-public class SimulationStats
-{
-    public int TotalGames { get; set; }
-
-    public string WhiteAIName { get; set; } = string.Empty;
-
-    public string RedAIName { get; set; } = string.Empty;
-
-    public int WhiteWins { get; set; }
-
-    public int RedWins { get; set; }
-
-    public int WhitePoints { get; set; }
-
-    public int RedPoints { get; set; }
-
-    public int TotalTurns { get; set; }
-
-    public double WhiteWinPercentage => TotalGames > 0 ? (double)WhiteWins / TotalGames * 100 : 0;
-
-    public double RedWinPercentage => TotalGames > 0 ? (double)RedWins / TotalGames * 100 : 0;
-
-    public double AverageTurnsPerGame => TotalGames > 0 ? (double)TotalTurns / TotalGames : 0;
-
-    public void PrintSummary()
-    {
-        Console.WriteLine("\n=== Simulation Results ===");
-        Console.WriteLine($"Total Games: {TotalGames}");
-        Console.WriteLine($"\n{WhiteAIName} (White):");
-        Console.WriteLine($"  Wins: {WhiteWins} ({WhiteWinPercentage:F2}%)");
-        Console.WriteLine($"  Points: {WhitePoints}");
-        Console.WriteLine($"\n{RedAIName} (Red):");
-        Console.WriteLine($"  Wins: {RedWins} ({RedWinPercentage:F2}%)");
-        Console.WriteLine($"  Points: {RedPoints}");
-        Console.WriteLine($"\nAverage turns per game: {AverageTurnsPerGame:F1}");
     }
 }

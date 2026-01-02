@@ -131,7 +131,7 @@ public class PlayerConnectionServiceTests
     }
 
     [Fact]
-    public void PlayerConnectionService_IsThreadSafe_ConcurrentOperations()
+    public async Task PlayerConnectionService_IsThreadSafe_ConcurrentOperations()
     {
         // This test verifies thread-safety by performing concurrent operations
         // Arrange
@@ -146,7 +146,7 @@ public class PlayerConnectionServiceTests
             tasks.Add(Task.Run(() => _service.AddConnection(playerId, connectionId)));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks.ToArray());
 
         // Assert
         Assert.Equal(playerCount, _service.GetConnectionCount());
@@ -167,7 +167,7 @@ public class PlayerConnectionServiceTests
             tasks.Add(Task.Run(() => _service.RemoveConnection(playerId)));
         }
 
-        Task.WaitAll(tasks.ToArray());
+        await Task.WhenAll(tasks.ToArray());
 
         // Assert
         Assert.Equal(0, _service.GetConnectionCount());

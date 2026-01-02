@@ -5,14 +5,14 @@ namespace Backgammon.Server.Services.GameModes;
 /// </summary>
 public class MultiplayerMode : IGameMode
 {
+    public bool ShouldTrackStats => true;
+
     public bool IsPlayerTurn(string connectionId, GameSession session)
     {
         var playerColor = session.GetPlayerColor(connectionId);
         return playerColor.HasValue &&
                session.Engine.CurrentPlayer?.Color == playerColor.Value;
     }
-
-    public bool ShouldTrackStats => true;
 
     public GameModeFeatures GetFeatures() => new()
     {

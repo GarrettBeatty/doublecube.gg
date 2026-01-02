@@ -5,6 +5,21 @@ namespace Backgammon.Core;
 
 public class Match
 {
+    public Match()
+    {
+        CreatedAt = DateTime.UtcNow;
+        Status = MatchStatus.InProgress;
+    }
+
+    public Match(string matchId, string player1Id, string player2Id, int targetScore)
+        : this()
+    {
+        MatchId = matchId;
+        Player1Id = player1Id;
+        Player2Id = player2Id;
+        TargetScore = targetScore;
+    }
+
     public string MatchId { get; set; } = string.Empty;
 
     public int TargetScore { get; set; }
@@ -32,21 +47,6 @@ public class Match
     public DateTime? CompletedAt { get; set; }
 
     public int TotalGamesPlayed => Games.Count;
-
-    public Match()
-    {
-        CreatedAt = DateTime.UtcNow;
-        Status = MatchStatus.InProgress;
-    }
-
-    public Match(string matchId, string player1Id, string player2Id, int targetScore)
-        : this()
-    {
-        MatchId = matchId;
-        Player1Id = player1Id;
-        Player2Id = player2Id;
-        TargetScore = targetScore;
-    }
 
     public bool IsMatchComplete()
     {
@@ -110,11 +110,4 @@ public class Match
             HasCrawfordGameBeenPlayed = true;
         }
     }
-}
-
-public enum MatchStatus
-{
-    InProgress,
-    Completed,
-    Abandoned
 }

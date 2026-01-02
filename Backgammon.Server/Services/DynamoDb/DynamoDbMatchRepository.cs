@@ -202,35 +202,16 @@ public class DynamoDbMatchRepository : IMatchRepository
 
             _logger.LogInformation(
                 "Updated match {MatchId} - P1: {P1Score}, P2: {P2Score}, Status: {Status}",
-                match.MatchId, match.Player1Score, match.Player2Score, match.Status);
+                match.MatchId,
+                match.Player1Score,
+                match.Player2Score,
+                match.Status);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to update match {MatchId}", match.MatchId);
             throw;
         }
-    }
-
-    private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)
-    {
-        await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
-        {
-            TableName = _tableName,
-            Key = new Dictionary<string, AttributeValue>
-            {
-                ["PK"] = new AttributeValue { S = $"USER#{playerId}" },
-                ["SK"] = new AttributeValue { S = $"MATCH#{reversedTimestamp}#{matchId}" }
-            },
-            UpdateExpression = "SET #status = :status",
-            ExpressionAttributeNames = new Dictionary<string, string>
-            {
-                ["#status"] = "status"
-            },
-            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
-            {
-                [":status"] = new AttributeValue { S = status }
-            }
-        });
     }
 
     public async Task<List<Match>> GetPlayerMatchesAsync(string playerId, string? status = null, int limit = 50, int skip = 0)
@@ -570,5 +551,27 @@ public class DynamoDbMatchRepository : IMatchRepository
             _logger.LogError(ex, "Failed to update match status for {MatchId}", matchId);
             throw;
         }
+    }
+
+    private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)
+    {
+        await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
+        {
+            TableName = _tableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                ["PK"] = new AttributeValue { S = $"USER#{playerId}" },
+                ["SK"] = new AttributeValue { S = $"MATCH#{reversedTimestamp}#{matchId}" }
+            },
+            UpdateExpression = "SET #status = :status",
+            ExpressionAttributeNames = new Dictionary<string, string>
+            {
+                ["#status"] = "status"
+            },
+            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+            {
+                [":status"] = new AttributeValue { S = status }
+            }
+        });
     }
 }

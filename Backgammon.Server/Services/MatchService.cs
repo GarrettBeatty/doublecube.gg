@@ -141,7 +141,9 @@ public class MatchService : IMatchService
 
             _logger.LogInformation(
                 "Started game {GameId} for match {MatchId} (Crawford: {IsCrawford})",
-                gameId, matchId, match.IsCrawfordGame);
+                gameId,
+                matchId,
+                match.IsCrawfordGame);
 
             return game;
         }
@@ -209,7 +211,10 @@ public class MatchService : IMatchService
 
                 _logger.LogInformation(
                     "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",
-                    match.MatchId, match.WinnerId, match.Player1Score, match.Player2Score);
+                    match.MatchId,
+                    match.WinnerId,
+                    match.Player1Score,
+                    match.Player2Score);
             }
 
             await _matchRepository.UpdateMatchAsync(match);
@@ -308,7 +313,9 @@ public class MatchService : IMatchService
 
             _logger.LogInformation(
                 "Created match lobby {MatchId} for player {Player1Id} (type: {OpponentType})",
-                match.MatchId, player1Id, opponentType);
+                match.MatchId,
+                player1Id,
+                opponentType);
 
             return match;
         }

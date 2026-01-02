@@ -85,9 +85,12 @@ public class FriendService : IFriendService
 
             // Send the request
             await _friendshipRepository.SendFriendRequestAsync(
-                fromUserId, toUserId,
-                fromUser.Username, fromUser.DisplayName,
-                toUser.Username, toUser.DisplayName);
+                fromUserId,
+                toUserId,
+                fromUser.Username,
+                fromUser.DisplayName,
+                toUser.Username,
+                toUser.DisplayName);
 
             // Invalidate friend list caches for both users (pending requests changed)
             await _cache.RemoveByTagAsync($"friends:{fromUserId}");
@@ -244,8 +247,7 @@ public class FriendService : IFriendService
                     Expiration = _cacheSettings.Friends.Expiration,
                     LocalCacheExpiration = _cacheSettings.Friends.LocalCacheExpiration
                 },
-                tags: [$"friends:{userId}"]
-            );
+                tags: [$"friends:{userId}"]);
 
             var result = new List<FriendDto>();
 

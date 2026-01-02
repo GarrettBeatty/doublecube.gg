@@ -29,8 +29,7 @@ public class MatchServiceValidationTests
             _gameRepositoryMock.Object,
             _gameSessionManagerMock.Object,
             _userRepositoryMock.Object,
-            _loggerMock.Object
-        );
+            _loggerMock.Object);
     }
 
     [Fact]
@@ -43,8 +42,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id!, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id!, player2Id, targetScore));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -52,14 +50,13 @@ public class MatchServiceValidationTests
     public async Task CreateMatchAsync_ThrowsException_WhenPlayer1IdIsEmpty()
     {
         // Arrange
-        var player1Id = "";
+        var player1Id = string.Empty;
         var player2Id = "player2";
         var targetScore = 7;
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -73,8 +70,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -88,8 +84,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id!, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id!, targetScore));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -98,13 +93,12 @@ public class MatchServiceValidationTests
     {
         // Arrange
         var player1Id = "player1";
-        var player2Id = "";
+        var player2Id = string.Empty;
         var targetScore = 7;
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -118,8 +112,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -133,8 +126,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -148,8 +140,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -208,8 +199,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(playerId, playerId, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(playerId, playerId, targetScore));
         Assert.Contains("Cannot create a match against yourself", exception.Message);
     }
 
@@ -329,8 +319,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore)
-        );
+            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
 
         // Verify error was logged
         _loggerMock.Verify(

@@ -153,7 +153,6 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 // Add CORS for web clients (SignalR requires specific origins with credentials)
-var corsPolicy = "CorsPolicy";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -373,8 +372,7 @@ app.MapGet("/api/player/{playerId}/games", async (
                 Expiration = cacheSettings.PlayerGames.Expiration,
                 LocalCacheExpiration = cacheSettings.PlayerGames.LocalCacheExpiration
             },
-            tags: [$"player:{playerId}"]
-        );
+            tags: [$"player:{playerId}"]);
 
         return Results.Ok(games);
     }
@@ -427,8 +425,7 @@ app.MapGet("/api/player/{playerId}/stats", async (
             Expiration = cacheSettings.PlayerStats.Expiration,
             LocalCacheExpiration = cacheSettings.PlayerStats.LocalCacheExpiration
         },
-        tags: [$"player:{playerId}"]
-    );
+        tags: [$"player:{playerId}"]);
 
     return stats;
 }).RequireCors(selectedCorsPolicy);

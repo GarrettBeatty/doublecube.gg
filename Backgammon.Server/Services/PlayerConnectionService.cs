@@ -20,8 +20,11 @@ public class PlayerConnectionService : IPlayerConnectionService
     public void AddConnection(string playerId, string connectionId)
     {
         _connections[playerId] = connectionId;
-        _logger.LogInformation("Tracking player connection: playerId={PlayerId}, connectionId={ConnectionId}, total connections: {Count}",
-            playerId, connectionId, _connections.Count);
+        _logger.LogInformation(
+            "Tracking player connection: playerId={PlayerId}, connectionId={ConnectionId}, total connections: {Count}",
+            playerId,
+            connectionId,
+            _connections.Count);
     }
 
     public bool RemoveConnection(string playerId)
@@ -29,9 +32,13 @@ public class PlayerConnectionService : IPlayerConnectionService
         var removed = _connections.TryRemove(playerId, out var connectionId);
         if (removed)
         {
-            _logger.LogInformation("Removed player connection: playerId={PlayerId}, connectionId={ConnectionId}, remaining connections: {Count}",
-                playerId, connectionId, _connections.Count);
+            _logger.LogInformation(
+                "Removed player connection: playerId={PlayerId}, connectionId={ConnectionId}, remaining connections: {Count}",
+                playerId,
+                connectionId,
+                _connections.Count);
         }
+
         return removed;
     }
 
@@ -40,9 +47,12 @@ public class PlayerConnectionService : IPlayerConnectionService
         _connections.TryGetValue(playerId, out var connectionId);
         if (connectionId != null)
         {
-            _logger.LogDebug("Found connection for playerId={PlayerId}: connectionId={ConnectionId}",
-                playerId, connectionId);
+            _logger.LogDebug(
+                "Found connection for playerId={PlayerId}: connectionId={ConnectionId}",
+                playerId,
+                connectionId);
         }
+
         return connectionId;
     }
 

@@ -20,17 +20,17 @@ public class BotGameService : BackgroundService
     private readonly IOptions<FeatureFlags> _features;
     private readonly ILogger<BotGameService> _logger;
 
-    // Track active bot game IDs
-    private readonly List<string> _activeBotGameIds = new();
-    private int _currentMatchupIndex = 0;
-
     // Matchup definitions (White vs Red)
-    private readonly (string white, string red)[] _matchups = new[]
+    private readonly (string White, string Red)[] _matchups = new[]
     {
         ("greedy", "greedy"),  // Greedy vs Greedy
         ("greedy", "random"),  // Greedy vs Random
         ("random", "random") // Random vs Random
     };
+
+    // Track active bot game IDs
+    private readonly List<string> _activeBotGameIds = new();
+    private int _currentMatchupIndex = 0;
 
     public BotGameService(
         IGameSessionManager sessionManager,
@@ -57,7 +57,8 @@ public class BotGameService : BackgroundService
 
         _logger.LogInformation(
             "Bot game service starting. MaxBotGames={MaxGames}, RestartDelay={Delay}s",
-            _features.Value.MaxBotGames, _features.Value.BotGameRestartDelaySeconds);
+            _features.Value.MaxBotGames,
+            _features.Value.BotGameRestartDelaySeconds);
 
         // Start initial bot games
         for (int i = 0; i < _features.Value.MaxBotGames; i++)
@@ -82,7 +83,9 @@ public class BotGameService : BackgroundService
         try
         {
             // Select next matchup
-            var (whiteAi, redAi) = _matchups[_currentMatchupIndex];
+            var (white, red) = _matchups[_currentMatchupIndex];
+            var whiteAi = white;
+            var redAi = red;
             _currentMatchupIndex = (_currentMatchupIndex + 1) % _matchups.Length;
 
             // Create game session
@@ -104,7 +107,9 @@ public class BotGameService : BackgroundService
 
             _logger.LogInformation(
                 "Started bot game {GameId}: {White} vs {Red}",
-                session.Id, session.WhitePlayerName, session.RedPlayerName);
+                session.Id,
+                session.WhitePlayerName,
+                session.RedPlayerName);
 
             // Start autonomous game loop (non-blocking)
             _ = Task.Run(() => ExecuteBotGameLoopAsync(session, ct), ct);
@@ -157,7 +162,9 @@ public class BotGameService : BackgroundService
 
                 _logger.LogInformation(
                     "Bot game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id, winnerName, stakes);
+                    session.Id,
+                    winnerName,
+                    stakes);
 
                 // Broadcast final state to spectators
                 var finalState = session.GetState(null);
