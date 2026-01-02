@@ -1,7 +1,4 @@
 backgammon.beatty.codes, doublecube.gg {
-    # Force HTTP/1.1 for WebSocket compatibility (disables HTTP/2)
-    protocols h1
-
     # Client configuration endpoint (served by WebClient for service discovery)
     handle /api/config {
         reverse_proxy webclient:3000 {
