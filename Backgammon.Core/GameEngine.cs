@@ -5,6 +5,20 @@ namespace Backgammon.Core;
 /// </summary>
 public class GameEngine
 {
+    public GameEngine(string whiteName = "White", string redName = "Red")
+    {
+        Board = new Board();
+        WhitePlayer = new Player(CheckerColor.White, whiteName);
+        RedPlayer = new Player(CheckerColor.Red, redName);
+        CurrentPlayer = WhitePlayer;
+        Dice = new Dice();
+        DoublingCube = new DoublingCube();
+        RemainingMoves = new List<int>();
+        MoveHistory = new List<Move>();
+        GameStarted = false;
+        GameOver = false;
+    }
+
     public Board Board { get; }
 
     public Player WhitePlayer { get; }
@@ -32,20 +46,6 @@ public class GameEngine
 
     public string? MatchId { get; set; }
 
-    public GameEngine(string whiteName = "White", string redName = "Red")
-    {
-        Board = new Board();
-        WhitePlayer = new Player(CheckerColor.White, whiteName);
-        RedPlayer = new Player(CheckerColor.Red, redName);
-        CurrentPlayer = WhitePlayer;
-        Dice = new Dice();
-        DoublingCube = new DoublingCube();
-        RemainingMoves = new List<int>();
-        MoveHistory = new List<Move>();
-        GameStarted = false;
-        GameOver = false;
-    }
-
     /// <summary>
     /// Start a new game
     /// </summary>
@@ -63,26 +63,6 @@ public class GameEngine
 
         // Determine who goes first
         DetermineFirstPlayer();
-    }
-
-    /// <summary>
-    /// Determine which player goes first by rolling dice
-    /// </summary>
-    private void DetermineFirstPlayer()
-    {
-        int whiteRoll, redRoll;
-        do
-        {
-            whiteRoll = Dice.RollSingle();
-            redRoll = Dice.RollSingle();
-        }
-        while (whiteRoll == redRoll);
-
-        CurrentPlayer = whiteRoll > redRoll ? WhitePlayer : RedPlayer;
-
-        // Use the opening rolls as the first move
-        Dice.SetDice(Math.Max(whiteRoll, redRoll), Math.Min(whiteRoll, redRoll));
-        RemainingMoves = Dice.GetMoves();
     }
 
     /// <summary>
@@ -220,72 +200,6 @@ public class GameEngine
 
         var toPoint = Board.GetPoint(move.To);
         return toPoint.IsOpen(CurrentPlayer.Color);
-    }
-
-    /// <summary>
-    /// Check if bearing off from a point is valid
-    /// </summary>
-    private bool CanBearOff(int from, int dieValue)
-    {
-        // Must have all checkers in home board
-        if (!Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
-        {
-            return false;
-        }
-
-        var fromPoint = Board.GetPoint(from);
-        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-        {
-            return false;
-        }
-
-        var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
-
-        // Point must be in home board
-        if (CurrentPlayer.Color == CheckerColor.White)
-        {
-            if (from < homeStart || from > homeEnd)
-            {
-                return false;
-            }
-
-            // Exact die value match
-            if (from == dieValue)
-            {
-                return true;
-            }
-
-            // If die is higher than point, can bear off if no checkers on higher points
-            if (dieValue > from)
-            {
-                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
-                return from == highestPoint;
-            }
-        }
-        else // Red
-        {
-            if (from < homeStart || from > homeEnd)
-            {
-                return false;
-            }
-
-            int normalizedPosition = 25 - from; // Convert to 1-6 range
-
-            // Exact die value match
-            if (normalizedPosition == dieValue)
-            {
-                return true;
-            }
-
-            // If die is higher than normalized position, can bear off if no checkers on higher points
-            if (dieValue > normalizedPosition)
-            {
-                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
-                return from == highestPoint;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>
@@ -581,5 +495,93 @@ public class GameEngine
     public void SetGameStarted(bool started)
     {
         GameStarted = started;
+    }
+
+    /// <summary>
+    /// Determine which player goes first by rolling dice
+    /// </summary>
+    private void DetermineFirstPlayer()
+    {
+        int whiteRoll, redRoll;
+        do
+        {
+            whiteRoll = Dice.RollSingle();
+            redRoll = Dice.RollSingle();
+        }
+        while (whiteRoll == redRoll);
+
+        CurrentPlayer = whiteRoll > redRoll ? WhitePlayer : RedPlayer;
+
+        // Use the opening rolls as the first move
+        Dice.SetDice(Math.Max(whiteRoll, redRoll), Math.Min(whiteRoll, redRoll));
+        RemainingMoves = Dice.GetMoves();
+    }
+
+    /// <summary>
+    /// Check if bearing off from a point is valid
+    /// </summary>
+    private bool CanBearOff(int from, int dieValue)
+    {
+        // Must have all checkers in home board
+        if (!Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
+        {
+            return false;
+        }
+
+        var fromPoint = Board.GetPoint(from);
+        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+        {
+            return false;
+        }
+
+        var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
+
+        // Point must be in home board
+        if (CurrentPlayer.Color == CheckerColor.White)
+        {
+            if (from < homeStart || from > homeEnd)
+            {
+                return false;
+            }
+
+            // Exact die value match
+            if (from == dieValue)
+            {
+                return true;
+            }
+
+            // If die is higher than point, can bear off if no checkers on higher points
+            if (dieValue > from)
+            {
+                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
+                return from == highestPoint;
+            }
+        }
+
+        // Red
+        else
+        {
+            if (from < homeStart || from > homeEnd)
+            {
+                return false;
+            }
+
+            int normalizedPosition = 25 - from; // Convert to 1-6 range
+
+            // Exact die value match
+            if (normalizedPosition == dieValue)
+            {
+                return true;
+            }
+
+            // If die is higher than normalized position, can bear off if no checkers on higher points
+            if (dieValue > normalizedPosition)
+            {
+                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
+                return from == highestPoint;
+            }
+        }
+
+        return false;
     }
 }

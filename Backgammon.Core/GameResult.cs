@@ -2,18 +2,6 @@ namespace Backgammon.Core;
 
 public class GameResult
 {
-    public string WinnerId { get; set; } = string.Empty;
-
-    public CheckerColor? WinnerColor { get; set; }
-
-    public int PointsWon { get; set; }
-
-    public WinType WinType { get; set; }
-
-    public int CubeValue { get; set; }
-
-    public List<Move> MoveHistory { get; set; } = new();
-
     public GameResult()
     {
         CubeValue = 1;
@@ -29,16 +17,17 @@ public class GameResult
         CalculatePoints();
     }
 
-    private void CalculatePoints()
-    {
-        PointsWon = WinType switch
-        {
-            WinType.Normal => 1 * CubeValue,
-            WinType.Gammon => 2 * CubeValue,
-            WinType.Backgammon => 3 * CubeValue,
-            _ => 1 * CubeValue
-        };
-    }
+    public string WinnerId { get; set; } = string.Empty;
+
+    public CheckerColor? WinnerColor { get; set; }
+
+    public int PointsWon { get; set; }
+
+    public WinType WinType { get; set; }
+
+    public int CubeValue { get; set; }
+
+    public List<Move> MoveHistory { get; set; } = new();
 
     public void SetWinType(WinType winType)
     {
@@ -51,11 +40,15 @@ public class GameResult
         CubeValue = cubeValue;
         CalculatePoints();
     }
-}
 
-public enum WinType
-{
-    Normal,
-    Gammon,
-    Backgammon
+    private void CalculatePoints()
+    {
+        PointsWon = WinType switch
+        {
+            WinType.Normal => 1 * CubeValue,
+            WinType.Gammon => 2 * CubeValue,
+            WinType.Backgammon => 3 * CubeValue,
+            _ => 1 * CubeValue
+        };
+    }
 }

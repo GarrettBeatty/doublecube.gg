@@ -5,15 +5,15 @@ namespace Backgammon.Core;
 /// </summary>
 public class DoublingCube
 {
-    public int Value { get; private set; }
-
-    public CheckerColor? Owner { get; private set; }
-
     public DoublingCube()
     {
         Value = 1;
         Owner = null; // Cube is in the middle
     }
+
+    public int Value { get; private set; }
+
+    public CheckerColor? Owner { get; private set; }
 
     /// <summary>
     /// Whether the specified player can offer a double

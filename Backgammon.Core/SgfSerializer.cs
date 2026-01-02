@@ -161,7 +161,7 @@ public static class SgfSerializer
     /// <summary>
     /// Get checker positions for a specific color
     /// </summary>
-    private static List<(char coord, int count)> GetCheckerPositions(GameEngine engine, CheckerColor color)
+    private static List<(char Coord, int Count)> GetCheckerPositions(GameEngine engine, CheckerColor color)
     {
         var positions = new List<(char, int)>();
 

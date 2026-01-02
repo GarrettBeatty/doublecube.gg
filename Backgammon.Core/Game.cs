@@ -6,6 +6,17 @@ namespace Backgammon.Core;
 /// </summary>
 public class Game
 {
+    public Game()
+    {
+        Status = GameStatus.InProgress;
+    }
+
+    public Game(string gameId)
+        : this()
+    {
+        GameId = gameId;
+    }
+
     /// <summary>
     /// Unique game identifier
     /// </summary>
@@ -50,25 +61,4 @@ public class Game
     /// Current status of the game
     /// </summary>
     public GameStatus Status { get; set; }
-
-    public Game()
-    {
-        Status = GameStatus.InProgress;
-    }
-
-    public Game(string gameId)
-        : this()
-    {
-        GameId = gameId;
-    }
-}
-
-/// <summary>
-/// Game status enumeration
-/// </summary>
-public enum GameStatus
-{
-    InProgress,
-    Completed,
-    Abandoned
 }

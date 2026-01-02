@@ -54,17 +54,6 @@ public class Board
     }
 
     /// <summary>
-    /// Add multiple checkers to a point
-    /// </summary>
-    private void AddCheckers(int position, CheckerColor color, int count)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            _points[position].AddChecker(color);
-        }
-    }
-
-    /// <summary>
     /// Check if all checkers of a color are in the home board
     /// </summary>
     public bool AreAllCheckersInHomeBoard(Player player, int checkersOnBar)
@@ -144,5 +133,16 @@ public class Board
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// Add multiple checkers to a point
+    /// </summary>
+    private void AddCheckers(int position, CheckerColor color, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            _points[position].AddChecker(color);
+        }
     }
 }

@@ -5,14 +5,6 @@ namespace Backgammon.Core;
 /// </summary>
 public class Player
 {
-    public CheckerColor Color { get; }
-
-    public string Name { get; }
-
-    public int CheckersOnBar { get; set; }
-
-    public int CheckersBornOff { get; set; }
-
     public Player(CheckerColor color, string name)
     {
         Color = color;
@@ -21,10 +13,18 @@ public class Player
         CheckersBornOff = 0;
     }
 
+    public CheckerColor Color { get; }
+
+    public string Name { get; }
+
+    public int CheckersOnBar { get; set; }
+
+    public int CheckersBornOff { get; set; }
+
     /// <summary>
     /// Get the home board range for this player (1-6 or 19-24)
     /// </summary>
-    public (int start, int end) GetHomeBoardRange()
+    public (int Start, int End) GetHomeBoardRange()
     {
         return Color == CheckerColor.White ? (1, 6) : (19, 24);
     }

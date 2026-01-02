@@ -5,15 +5,15 @@ namespace Backgammon.Core;
 /// </summary>
 public class Point
 {
-    public int Position { get; }
-
-    public List<CheckerColor> Checkers { get; }
-
     public Point(int position)
     {
         Position = position;
         Checkers = new List<CheckerColor>();
     }
+
+    public int Position { get; }
+
+    public List<CheckerColor> Checkers { get; }
 
     /// <summary>
     /// The color of checkers on this point (null if empty)

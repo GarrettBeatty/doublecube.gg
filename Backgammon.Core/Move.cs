@@ -5,6 +5,14 @@ namespace Backgammon.Core;
 /// </summary>
 public class Move
 {
+    public Move(int from, int to, int dieValue, bool isHit = false)
+    {
+        From = from;
+        To = to;
+        DieValue = dieValue;
+        IsHit = isHit;
+    }
+
     /// <summary>
     /// Starting point (0 = bar, 25 = bear off)
     /// </summary>
@@ -39,14 +47,6 @@ public class Move
     /// Whether this is a bear-off move
     /// </summary>
     public bool IsBearOff => To == 0 || To == 25;
-
-    public Move(int from, int to, int dieValue, bool isHit = false)
-    {
-        From = from;
-        To = to;
-        DieValue = dieValue;
-        IsHit = isHit;
-    }
 
     public override string ToString()
     {
