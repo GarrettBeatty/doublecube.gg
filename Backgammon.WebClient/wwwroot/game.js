@@ -427,12 +427,23 @@ async function autoConnect() {
         // Extract base API URL by removing /gamehub suffix
         apiBaseUrl = serverUrl.replace('/gamehub', '');
 
+        // Update matchController with API base URL
+        if (typeof window.matchController !== 'undefined') {
+            window.matchController.setApiBaseUrl(apiBaseUrl);
+        }
+
         log(`Using SignalR URL: ${serverUrl}`, 'info');
         log(`Using API Base URL: ${apiBaseUrl}`, 'info');
     } catch (error) {
         // Fallback to hardcoded URL if config endpoint fails
         serverUrl = document.getElementById('serverUrl').value;
         apiBaseUrl = serverUrl.replace('/gamehub', '');
+
+        // Update matchController with fallback API base URL
+        if (typeof window.matchController !== 'undefined') {
+            window.matchController.setApiBaseUrl(apiBaseUrl);
+        }
+
         log(`Using fallback URL: ${serverUrl}`, 'warning');
     }
 
@@ -462,6 +473,15 @@ async function autoConnect() {
         await connection.start();
         updateConnectionStatus(true);
         log('Connected to server', 'success');
+
+        // Load active match from server (if any)
+        if (typeof window.matchController !== 'undefined' && myPlayerId) {
+            await window.matchController.loadActiveMatch(myPlayerId);
+            const activeMatch = window.matchController.getCurrentMatch();
+            if (activeMatch) {
+                debug('Loaded active match from server', activeMatch, 'info');
+            }
+        }
 
         // Always start on landing page and refresh games list
         // User can manually rejoin games from "My Games" section
@@ -1060,10 +1080,6 @@ function showAbandonConfirm() {
     } else {
         // Has opponent - show forfeit message
         abandonMessage.textContent = 'Your opponent will win if you abandon this game.';
-        if (currentGameState && currentGameState.doublingCubeValue) {
-            document.getElementById('abandonStakes').textContent =
-                `${currentGameState.doublingCubeValue}x`;
-        }
         abandonStakesMessage.innerHTML = 'This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">' +
             (currentGameState && currentGameState.doublingCubeValue ? currentGameState.doublingCubeValue : 1) + 'x</span>';
     }
@@ -1548,7 +1564,14 @@ function updateMatchUI() {
         ? window.matchController.getCurrentMatch()
         : null;
 
+    const matchScoreContainer = document.querySelector('.match-score');
+
     if (match && match.targetScore) {
+        // Show match score container
+        if (matchScoreContainer) {
+            matchScoreContainer.style.display = '';
+        }
+
         // Update match length display
         const matchLengthEl = document.getElementById('matchLength');
         if (matchLengthEl) {
@@ -1560,6 +1583,11 @@ function updateMatchUI() {
         if (matchStakeEl && currentGameState) {
             const cubeValue = currentGameState.doublingCubeValue ?? currentGameState.DoublingCubeValue ?? 1;
             matchStakeEl.textContent = cubeValue;
+        }
+    } else {
+        // Hide match score container for regular games
+        if (matchScoreContainer) {
+            matchScoreContainer.style.display = 'none';
         }
     }
 }

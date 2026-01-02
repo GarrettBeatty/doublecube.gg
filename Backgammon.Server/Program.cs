@@ -317,6 +317,33 @@ app.MapGet("/api/player/{playerId}/games", async (string playerId, IGameReposito
     return games;
 }).RequireCors(selectedCorsPolicy);
 
+// Player active matches endpoint
+app.MapGet("/api/player/{playerId}/active-match", async (string playerId, IMatchRepository matchRepository) =>
+{
+    var matches = await matchRepository.GetPlayerMatchesAsync(playerId, "InProgress", limit: 1);
+    var activeMatch = matches.FirstOrDefault();
+
+    if (activeMatch == null)
+    {
+        return Results.Ok(new { hasActiveMatch = false });
+    }
+
+    return Results.Ok(new
+    {
+        hasActiveMatch = true,
+        matchId = activeMatch.MatchId,
+        targetScore = activeMatch.TargetScore,
+        player1Id = activeMatch.Player1Id,
+        player2Id = activeMatch.Player2Id,
+        player1Score = activeMatch.Player1Score,
+        player2Score = activeMatch.Player2Score,
+        status = activeMatch.Status,
+        currentGameId = activeMatch.CurrentGameId,
+        isCrawfordGame = activeMatch.IsCrawfordGame,
+        hasCrawfordGameBeenPlayed = activeMatch.HasCrawfordGameBeenPlayed
+    });
+}).RequireCors(selectedCorsPolicy);
+
 // Player statistics endpoint
 app.MapGet("/api/player/{playerId}/stats", async (string playerId, IGameRepository gameRepository) =>
 {
