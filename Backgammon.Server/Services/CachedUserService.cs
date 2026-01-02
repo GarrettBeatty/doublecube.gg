@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Models;
 
 namespace Backgammon.Server.Services;
@@ -13,15 +14,18 @@ public class CachedUserService : IUserRepository
 {
     private readonly IUserRepository _userRepository;
     private readonly HybridCache _cache;
+    private readonly CacheSettings _cacheSettings;
     private readonly ILogger<CachedUserService> _logger;
 
     public CachedUserService(
         IUserRepository userRepository,
         HybridCache cache,
+        CacheSettings cacheSettings,
         ILogger<CachedUserService> logger)
     {
         _userRepository = userRepository;
         _cache = cache;
+        _cacheSettings = cacheSettings;
         _logger = logger;
     }
 
@@ -33,8 +37,8 @@ public class CachedUserService : IUserRepository
             async () => await _userRepository.GetByUserIdAsync(userId),
             new HybridCacheEntryOptions
             {
-                Expiration = TimeSpan.FromMinutes(5),
-                LocalCacheExpiration = TimeSpan.FromMinutes(1)
+                Expiration = _cacheSettings.UserProfile.Expiration,
+                LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
             },
             tags: [$"user:{userId}"]
         );
@@ -50,8 +54,8 @@ public class CachedUserService : IUserRepository
             async () => await _userRepository.GetByUsernameAsync(username),
             new HybridCacheEntryOptions
             {
-                Expiration = TimeSpan.FromMinutes(5),
-                LocalCacheExpiration = TimeSpan.FromMinutes(1)
+                Expiration = _cacheSettings.UserProfile.Expiration,
+                LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
             }
         );
     }
@@ -66,8 +70,8 @@ public class CachedUserService : IUserRepository
             async () => await _userRepository.GetByEmailAsync(email),
             new HybridCacheEntryOptions
             {
-                Expiration = TimeSpan.FromMinutes(5),
-                LocalCacheExpiration = TimeSpan.FromMinutes(1)
+                Expiration = _cacheSettings.UserProfile.Expiration,
+                LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
             }
         );
     }
@@ -78,6 +82,14 @@ public class CachedUserService : IUserRepository
         // No need to cache on create - user will be cached on first read
     }
 
+    /// <summary>
+    /// Updates a user and invalidates all related caches.
+    ///
+    /// KNOWN LIMITATION: In rare concurrent update scenarios where username/email changes happen
+    /// simultaneously from multiple threads, some cache entries may not be invalidated immediately.
+    /// These will expire naturally within 5 minutes. To fully prevent this, implement optimistic
+    /// concurrency control with a Version field in the User model and conditional writes in DynamoDB.
+    /// </summary>
     public async Task UpdateUserAsync(User user)
     {
         // Fetch current user to get old username/email values for cache invalidation
@@ -165,6 +177,14 @@ public class CachedUserService : IUserRepository
         await InvalidateUserCacheAsync(userId);
     }
 
+    /// <summary>
+    /// Updates user statistics and invalidates all related caches.
+    ///
+    /// This invalidates:
+    /// - user:{userId} tag: user profile cache
+    /// - player:{userId} tag: player stats AND all player game history caches
+    ///   (including all pagination variants with different limit/skip values)
+    /// </summary>
     public async Task UpdateStatsAsync(string userId, UserStats stats)
     {
         await _userRepository.UpdateStatsAsync(userId, stats);
@@ -172,15 +192,18 @@ public class CachedUserService : IUserRepository
         // Invalidate user cache (user:id tag)
         await InvalidateUserCacheAsync(userId);
 
-        // Also invalidate player stats cache (uses player:id tag in Program.cs endpoints)
+        // Also invalidate player stats and game history caches (uses player:id tag in Program.cs endpoints)
+        // This invalidates ALL cache entries tagged with player:{userId}, including:
+        // - player:stats:{userId}
+        // - player:games:{userId}:completed:limit=*:skip=* (all pagination variants)
         try
         {
             await _cache.RemoveByTagAsync($"player:{userId}");
-            _logger.LogDebug("Invalidated player stats cache for {UserId}", userId);
+            _logger.LogDebug("Invalidated player stats and game history caches for {UserId}", userId);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to invalidate player stats cache for {UserId}", userId);
+            _logger.LogWarning(ex, "Failed to invalidate player caches for {UserId}", userId);
         }
     }
 

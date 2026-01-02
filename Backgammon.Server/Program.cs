@@ -2,6 +2,7 @@ using System.Linq;
 using System.Security.Claims;
 using System.Text;
 using Backgammon.Core;
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
@@ -15,6 +16,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure cache settings
+builder.Services.Configure<CacheSettings>(
+    builder.Configuration.GetSection(CacheSettings.SectionName));
+builder.Services.AddSingleton(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CacheSettings>>().Value);
 
 // Add Aspire service defaults (telemetry, health checks, service discovery)
 builder.AddServiceDefaults();
@@ -76,8 +83,9 @@ builder.Services.AddSingleton<IUserRepository>(sp =>
 {
     var dynamoDbUserRepo = sp.GetRequiredService<Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
     var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
+    var cacheSettings = sp.GetRequiredService<CacheSettings>();
     var logger = sp.GetRequiredService<ILogger<CachedUserService>>();
-    return new CachedUserService(dynamoDbUserRepo, cache, logger);
+    return new CachedUserService(dynamoDbUserRepo, cache, cacheSettings, logger);
 });
 builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
 builder.Services.AddSingleton<IMatchRepository, Backgammon.Server.Services.DynamoDb.DynamoDbMatchRepository>();
@@ -334,12 +342,13 @@ app.MapGet("/api/stats/db", async (IGameRepository gameRepository) =>
 app.MapGet("/api/player/{playerId}/games", async (
     string playerId,
     Microsoft.Extensions.Caching.Hybrid.HybridCache cache,
+    CacheSettings cacheSettings,
     IGameRepository gameRepository,
     ILogger<Program> logger,
     int limit = 20,
     int skip = 0) =>
 {
-    var cacheKey = $"player-games:{playerId}:completed:limit={limit}:skip={skip}";
+    var cacheKey = $"player:games:{playerId}:completed:limit={limit}:skip={skip}";
 
     try
     {
@@ -354,13 +363,15 @@ app.MapGet("/api/player/{playerId}/games", async (
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Failed to fetch games for player {PlayerId}", playerId);
-                    throw; // Re-throw to prevent caching the error
+                    // Re-throw to prevent caching the error
+                    // HybridCache does NOT cache exceptions - they propagate without creating a cache entry
+                    throw;
                 }
             },
             new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
             {
-                Expiration = TimeSpan.FromMinutes(10),
-                LocalCacheExpiration = TimeSpan.FromMinutes(2) // Shorter local cache to reduce memory for pagination
+                Expiration = cacheSettings.PlayerGames.Expiration,
+                LocalCacheExpiration = cacheSettings.PlayerGames.LocalCacheExpiration
             },
             tags: [$"player:{playerId}"]
         );
@@ -405,14 +416,16 @@ app.MapGet("/api/player/{playerId}/active-match", async (string playerId, IMatch
 app.MapGet("/api/player/{playerId}/stats", async (
     string playerId,
     Microsoft.Extensions.Caching.Hybrid.HybridCache cache,
+    CacheSettings cacheSettings,
     IGameRepository gameRepository) =>
 {
     var stats = await cache.GetOrCreateAsync(
-        $"player-stats:{playerId}",
+        $"player:stats:{playerId}",
         async ct => await gameRepository.GetPlayerStatsAsync(playerId),
         new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
         {
-            Expiration = TimeSpan.FromMinutes(15) // Stats change infrequently
+            Expiration = cacheSettings.PlayerStats.Expiration,
+            LocalCacheExpiration = cacheSettings.PlayerStats.LocalCacheExpiration
         },
         tags: [$"player:{playerId}"]
     );

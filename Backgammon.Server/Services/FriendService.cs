@@ -1,3 +1,4 @@
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
 using Microsoft.AspNetCore.SignalR;
@@ -16,6 +17,7 @@ public class FriendService : IFriendService
     private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly HybridCache _cache;
+    private readonly CacheSettings _cacheSettings;
     private readonly ILogger<FriendService> _logger;
 
     public FriendService(
@@ -24,6 +26,7 @@ public class FriendService : IFriendService
         IGameSessionManager sessionManager,
         IHubContext<GameHub> hubContext,
         HybridCache cache,
+        CacheSettings cacheSettings,
         ILogger<FriendService> logger)
     {
         _friendshipRepository = friendshipRepository;
@@ -31,6 +34,7 @@ public class FriendService : IFriendService
         _sessionManager = sessionManager;
         _hubContext = hubContext;
         _cache = cache;
+        _cacheSettings = cacheSettings;
         _logger = logger;
     }
 
@@ -237,8 +241,8 @@ public class FriendService : IFriendService
                 async cancel => await _friendshipRepository.GetFriendsAsync(userId),
                 new HybridCacheEntryOptions
                 {
-                    Expiration = TimeSpan.FromMinutes(5),
-                    LocalCacheExpiration = TimeSpan.FromMinutes(1)
+                    Expiration = _cacheSettings.Friends.Expiration,
+                    LocalCacheExpiration = _cacheSettings.Friends.LocalCacheExpiration
                 },
                 tags: [$"friends:{userId}"]
             );

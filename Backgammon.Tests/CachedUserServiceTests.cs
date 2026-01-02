@@ -1,3 +1,4 @@
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -21,9 +22,14 @@ public class CachedUserServiceTests
         _userRepositoryMock = new Mock<IUserRepository>();
         _cacheMock = new Mock<HybridCache>();
         _loggerMock = new Mock<ILogger<CachedUserService>>();
+
+        // Use default cache settings for tests
+        var cacheSettings = new CacheSettings();
+
         _service = new CachedUserService(
             _userRepositoryMock.Object,
             _cacheMock.Object,
+            cacheSettings,
             _loggerMock.Object);
     }
 
