@@ -548,7 +548,6 @@ function setupEventHandlers() {
     connection.on("WaitingForOpponent", (gameId) => {
         log(`⏳ Waiting for opponent... Game ID: ${gameId}`, 'info');
         currentGameId = gameId;
-        localStorage.setItem('currentGameId', gameId);
         setGameUrl(gameId);
         showGamePage(); // Show game page so player can see board while waiting
     });
@@ -616,9 +615,6 @@ function setupEventHandlers() {
         } else {
             log('Game Over!', 'info');
         }
-
-        // Clear saved game ID
-        localStorage.removeItem('currentGameId');
 
         // Check if this is a match game
         const match = typeof window.matchController !== 'undefined'
@@ -894,7 +890,6 @@ async function joinSpecificGame(gameId) {
 
     try {
         currentGameId = gameId;
-        localStorage.setItem('currentGameId', gameId);
         setGameUrl(gameId);
         await connection.invoke("JoinGame", myPlayerId, gameId);
         log(`🎮 Joining game ${gameId}...`, 'info');
@@ -930,7 +925,6 @@ async function createGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId'); // Clear any old game
         await connection.invoke("JoinGame", myPlayerId, null);
         log('🎮 Creating new game...', 'info');
         showGamePage();
@@ -955,7 +949,6 @@ async function createAnalysisGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId');
         await connection.invoke("CreateAnalysisGame");
         log('📊 Creating analysis game...', 'info');
         showGamePage();
@@ -980,7 +973,6 @@ async function createAiGame() {
         }
 
         currentGameId = null;
-        localStorage.removeItem('currentGameId'); // Clear any old game
         debug('Invoking CreateAiGame on server', { myPlayerId }, 'info');
         await connection.invoke("CreateAiGame", myPlayerId);
         log('🤖 Creating AI game...', 'info');
@@ -1016,7 +1008,6 @@ async function leaveGameAndReturn() {
         log('👋 Left game', 'info');
         currentGameId = null;
         myColor = null;
-        localStorage.removeItem('currentGameId'); // Clear saved game
         resetGameUI();
         resetBoardFlipPreference();
         showLandingPage();
@@ -1411,10 +1402,6 @@ function updateGameState(state, isSpectator = false) {
 
     // Update current game ID (no need to display it, it's in the URL)
     currentGameId = state.gameId;
-    // Save to localStorage for reconnection
-    if (state.gameId) {
-        localStorage.setItem('currentGameId', state.gameId);
-    }
 
     // Store player color
     if (state.yourColor !== null && state.yourColor !== undefined) {
