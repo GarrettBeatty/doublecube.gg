@@ -5,10 +5,15 @@ var builder = DistributedApplication.CreateBuilder(args);
 // DynamoDB Local for development with persistence
 var dynamoDb = builder.AddAWSDynamoDBLocal("dynamodb-local");
 
+// Redis for SignalR backplane (enables real-time updates across multiple server instances)
+var redis = builder.AddRedis("redis");
+
 // SignalR backend server - Aspire assigns port automatically
 var apiService = builder.AddProject<Projects.Backgammon_Server>("backgammon-api")
     .WithReference(dynamoDb)
-    .WaitFor(dynamoDb);
+    .WithReference(redis)
+    .WaitFor(dynamoDb)
+    .WaitFor(redis);
 
 // Blazor WebAssembly frontend - gets API URL via service discovery
 builder.AddProject<Projects.Backgammon_WebClient>("backgammon-webclient")
