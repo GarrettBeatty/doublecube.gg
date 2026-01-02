@@ -7,12 +7,12 @@ namespace Backgammon.AI;
 /// </summary>
 public class GreedyAI : IBackgammonAI
 {
-    public string Name { get; }
-
     public GreedyAI(string name = "GreedyAI")
     {
         Name = name;
     }
+
+    public string Name { get; }
 
     public List<Move> ChooseMoves(GameEngine engine)
     {
@@ -41,6 +41,32 @@ public class GreedyAI : IBackgammonAI
         }
 
         return chosenMoves;
+    }
+
+    public bool ShouldAcceptDouble(GameEngine engine)
+    {
+        // Simple heuristic: accept if we've borne off at least some checkers
+        // or opponent hasn't borne off many
+        var opponent = engine.GetOpponent();
+
+        if (engine.CurrentPlayer.CheckersBornOff >= 5)
+        {
+            return true;
+        }
+
+        if (opponent.CheckersBornOff < 10)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    public bool ShouldOfferDouble(GameEngine engine)
+    {
+        // Offer double if we're ahead in bearing off
+        var opponent = engine.GetOpponent();
+        return engine.CurrentPlayer.CheckersBornOff > opponent.CheckersBornOff + 3;
     }
 
     private Move SelectBestMove(List<Move> validMoves, GameEngine engine)
@@ -87,31 +113,5 @@ public class GreedyAI : IBackgammonAI
             // Red moves from low to high
             return validMoves.OrderBy(m => m.From).First();
         }
-    }
-
-    public bool ShouldAcceptDouble(GameEngine engine)
-    {
-        // Simple heuristic: accept if we've borne off at least some checkers
-        // or opponent hasn't borne off many
-        var opponent = engine.GetOpponent();
-
-        if (engine.CurrentPlayer.CheckersBornOff >= 5)
-        {
-            return true;
-        }
-
-        if (opponent.CheckersBornOff < 10)
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    public bool ShouldOfferDouble(GameEngine engine)
-    {
-        // Offer double if we're ahead in bearing off
-        var opponent = engine.GetOpponent();
-        return engine.CurrentPlayer.CheckersBornOff > opponent.CheckersBornOff + 3;
     }
 }

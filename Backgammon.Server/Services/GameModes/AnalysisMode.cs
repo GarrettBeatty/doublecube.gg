@@ -12,14 +12,14 @@ public class AnalysisMode : IGameMode
         _controllingPlayerId = controllingPlayerId;
     }
 
+    public bool ShouldTrackStats => false;
+
     public bool IsPlayerTurn(string connectionId, GameSession session)
     {
         // Player controls both sides in analysis mode
         return session.WhitePlayerId == _controllingPlayerId ||
                session.RedPlayerId == _controllingPlayerId;
     }
-
-    public bool ShouldTrackStats => false;
 
     public GameModeFeatures GetFeatures() => new()
     {

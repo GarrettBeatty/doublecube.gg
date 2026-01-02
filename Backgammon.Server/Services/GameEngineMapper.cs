@@ -157,6 +157,14 @@ public static class GameEngineMapper
     }
 
     /// <summary>
+    /// Check if a player ID represents an AI opponent
+    /// </summary>
+    public static bool IsAiPlayer(string? playerId)
+    {
+        return playerId?.StartsWith("ai_") == true;
+    }
+
+    /// <summary>
     /// Serialize board state to list of point DTOs
     /// </summary>
     private static List<PointStateDto> SerializeBoardState(Board board)
@@ -261,13 +269,5 @@ public static class GameEngineMapper
         }
 
         return Guid.TryParse(playerId, out _);
-    }
-
-    /// <summary>
-    /// Check if a player ID represents an AI opponent
-    /// </summary>
-    public static bool IsAiPlayer(string? playerId)
-    {
-        return playerId?.StartsWith("ai_") == true;
     }
 }

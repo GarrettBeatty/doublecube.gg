@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Caching.Hybrid;
-using Microsoft.Extensions.Logging;
 using Backgammon.Server.Configuration;
 using Backgammon.Server.Models;
+using Microsoft.Extensions.Caching.Hybrid;
+using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
 
@@ -40,8 +40,7 @@ public class CachedUserService : IUserRepository
                 Expiration = _cacheSettings.UserProfile.Expiration,
                 LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
             },
-            tags: [$"user:{userId}"]
-        );
+            tags: [$"user:{userId}"]);
     }
 
     public async Task<User?> GetByUsernameAsync(string username)
@@ -56,8 +55,7 @@ public class CachedUserService : IUserRepository
             {
                 Expiration = _cacheSettings.UserProfile.Expiration,
                 LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
-            }
-        );
+            });
     }
 
     public async Task<User?> GetByEmailAsync(string email)
@@ -72,8 +70,7 @@ public class CachedUserService : IUserRepository
             {
                 Expiration = _cacheSettings.UserProfile.Expiration,
                 LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
-            }
-        );
+            });
     }
 
     public async Task CreateUserAsync(User user)
@@ -240,6 +237,17 @@ public class CachedUserService : IUserRepository
     }
 
     /// <summary>
+    /// Hash a cache key to avoid logging sensitive data.
+    /// Returns a short hash that preserves diagnostic usefulness while protecting privacy.
+    /// </summary>
+    private static string HashCacheKey(string cacheKey)
+    {
+        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(cacheKey));
+        // Return first 8 bytes as hex (16 characters) - enough to correlate operations
+        return Convert.ToHexString(hashBytes[..8]);
+    }
+
+    /// <summary>
     /// Invalidate all caches for a user
     /// </summary>
     private async Task InvalidateUserCacheAsync(string userId)
@@ -289,16 +297,5 @@ public class CachedUserService : IUserRepository
         }
 
         return result;
-    }
-
-    /// <summary>
-    /// Hash a cache key to avoid logging sensitive data.
-    /// Returns a short hash that preserves diagnostic usefulness while protecting privacy.
-    /// </summary>
-    private static string HashCacheKey(string cacheKey)
-    {
-        var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(cacheKey));
-        // Return first 8 bytes as hex (16 characters) - enough to correlate operations
-        return Convert.ToHexString(hashBytes[..8]);
     }
 }

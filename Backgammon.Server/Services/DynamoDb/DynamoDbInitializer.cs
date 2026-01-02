@@ -15,12 +15,6 @@ public class DynamoDbInitializer : IHostedService
     private readonly bool _isLocalEnvironment;
     private readonly TaskCompletionSource<bool> _initializationTcs = new();
 
-    /// <summary>
-    /// Task that completes when DynamoDB initialization is finished.
-    /// Throws if initialization fails.
-    /// </summary>
-    public Task InitializationComplete => _initializationTcs.Task;
-
     public DynamoDbInitializer(
         IAmazonDynamoDB dynamoDbClient,
         IConfiguration configuration,
@@ -33,6 +27,12 @@ public class DynamoDbInitializer : IHostedService
         // Detect local environment by checking if Aspire set the local endpoint
         _isLocalEnvironment = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL_DYNAMODB"));
     }
+
+    /// <summary>
+    /// Task that completes when DynamoDB initialization is finished.
+    /// Throws if initialization fails.
+    /// </summary>
+    public Task InitializationComplete => _initializationTcs.Task;
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -56,7 +56,8 @@ public class DynamoDbInitializer : IHostedService
             {
                 _logger.LogWarning(
                     "Table '{TableName}' does not exist in production environment. " +
-                    "Table should be created via CDK. Skipping table creation.", _tableName);
+                    "Table should be created via CDK. Skipping table creation.",
+                    _tableName);
                 _initializationTcs.SetResult(true);
                 return;
             }
@@ -196,8 +197,11 @@ public class DynamoDbInitializer : IHostedService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error checking table status (attempt {Attempt}/{MaxAttempts})",
-                    attemptCount + 1, maxAttempts);
+                _logger.LogWarning(
+                    ex,
+                    "Error checking table status (attempt {Attempt}/{MaxAttempts})",
+                    attemptCount + 1,
+                    maxAttempts);
                 attemptCount++;
                 await Task.Delay(2000, cancellationToken);
             }
