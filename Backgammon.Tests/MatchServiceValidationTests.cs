@@ -257,8 +257,8 @@ public class MatchServiceValidationTests
 
         // Assert
         Assert.NotNull(match);
-        Assert.Equal("Player player123", match.Player1Name);
-        Assert.Equal("Player player987", match.Player2Name);
+        Assert.Equal("Player player12", match.Player1Name);
+        Assert.Equal("Player player98", match.Player2Name);
     }
 
     [Fact]
