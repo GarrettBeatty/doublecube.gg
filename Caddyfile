@@ -1,11 +1,12 @@
 backgammon.beatty.codes, doublecube.gg {
+    # Force HTTP/1.1 for WebSocket compatibility (disables HTTP/2)
+    protocols h1
+
     # Client configuration endpoint (served by WebClient for service discovery)
     handle /api/config {
         reverse_proxy webclient:3000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
         }
     }
 
@@ -19,8 +20,6 @@ backgammon.beatty.codes, doublecube.gg {
         reverse_proxy server:5000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
 
             # WebSocket upgrade headers (critical for SignalR)
             header_up Upgrade {http.request.header.Upgrade}
@@ -29,8 +28,10 @@ backgammon.beatty.codes, doublecube.gg {
             # Force HTTP/1.1 for WebSocket support
             transport http {
                 versions 1.1
-                read_timeout 5m
-                write_timeout 5m
+                read_timeout 10m
+                write_timeout 10m
+                dial_timeout 30s
+                response_header_timeout 30s
             }
 
             # Disable buffering for SSE/WebSocket keepalive
