@@ -10,20 +10,35 @@ backgammon.beatty.codes, doublecube.gg {
         }
     }
 
-    # Server API endpoints
+    # Server API endpoints - load balanced with sticky sessions
     handle /api/* {
-        reverse_proxy server:5000
+        reverse_proxy server-1:5000 server-2:5000 {
+            lb_policy cookie
+            lb_try_duration 5s
+            health_uri /health
+            health_interval 10s
+            health_timeout 5s
+        }
     }
 
-    # SignalR WebSocket endpoint
+    # SignalR WebSocket endpoint - CRITICAL: sticky sessions required
     handle /gamehub* {
-        reverse_proxy server:5000 {
+        reverse_proxy server-1:5000 server-2:5000 {
             header_up Host {host}
             header_up X-Real-IP {remote_host}
 
             # WebSocket upgrade headers (critical for SignalR)
             header_up Upgrade {http.request.header.Upgrade}
             header_up Connection {http.request.header.Connection}
+
+            # Cookie-based sticky sessions for SignalR
+            lb_policy cookie lb_sticky
+            lb_try_duration 5s
+
+            # Active health checks
+            health_uri /health
+            health_interval 10s
+            health_timeout 5s
 
             # Force HTTP/1.1 for WebSocket support
             transport http {
@@ -39,17 +54,23 @@ backgammon.beatty.codes, doublecube.gg {
         }
     }
 
-    # Health check endpoints
+    # Health check endpoints - load balanced
     handle /health {
-        reverse_proxy server:5000
+        reverse_proxy server-1:5000 server-2:5000 {
+            lb_policy round_robin
+        }
     }
 
     handle /alive {
-        reverse_proxy server:5000
+        reverse_proxy server-1:5000 server-2:5000 {
+            lb_policy round_robin
+        }
     }
 
     handle /stats {
-        reverse_proxy server:5000
+        reverse_proxy server-1:5000 server-2:5000 {
+            lb_policy round_robin
+        }
     }
 
     # WebClient - Serve static content (catch-all, must be last)

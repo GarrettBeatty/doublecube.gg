@@ -102,11 +102,53 @@ jobs:
           # Pull new images
           docker-compose -f docker-compose.prod.yml pull
 
-          # Restart services with zero downtime
-          docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+          # Rolling update strategy for zero downtime
+          echo "Starting rolling update..."
 
-          # Wait for services to start
-          sleep 10
+          # Update server-1 first
+          echo "Updating server-1..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps server-1
+
+          # Wait for server-1 to be healthy
+          echo "Waiting for server-1 to become healthy..."
+          for i in {1..30}; do
+            if docker exec backgammon-server-1 curl -f http://localhost:5000/health > /dev/null 2>&1; then
+              echo "server-1 is healthy"
+              break
+            fi
+            echo "Attempt $i/30: server-1 not ready yet..."
+            sleep 2
+          done
+
+          # Give it extra time to stabilize
+          sleep 5
+
+          # Update server-2
+          echo "Updating server-2..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps server-2
+
+          # Wait for server-2 to be healthy
+          echo "Waiting for server-2 to become healthy..."
+          for i in {1..30}; do
+            if docker exec backgammon-server-2 curl -f http://localhost:5000/health > /dev/null 2>&1; then
+              echo "server-2 is healthy"
+              break
+            fi
+            echo "Attempt $i/30: server-2 not ready yet..."
+            sleep 2
+          done
+
+          # Update webclient and other services
+          echo "Updating webclient..."
+          docker-compose -f docker-compose.prod.yml up -d --no-deps webclient
+
+          # Update Caddy (reload config)
+          echo "Reloading Caddy configuration..."
+          docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
+
+          # Final health check
+          echo "Final health check..."
+          sleep 5
 
           # Cleanup old images
           docker image prune -af --filter "until=24h"
