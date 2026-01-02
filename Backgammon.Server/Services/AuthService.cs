@@ -14,12 +14,12 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class AuthService : IAuthService
 {
+    private static readonly Regex UsernameRegex = new(@"^[a-zA-Z0-9_]{3,20}$", RegexOptions.Compiled);
+
     private readonly IUserRepository _userRepository;
     private readonly IGameRepository _gameRepository;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthService> _logger;
-
-    private static readonly Regex UsernameRegex = new(@"^[a-zA-Z0-9_]{3,20}$", RegexOptions.Compiled);
 
     public AuthService(
         IUserRepository userRepository,

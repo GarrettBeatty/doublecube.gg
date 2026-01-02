@@ -11,29 +11,23 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class GameSession
 {
-    // Track spectator connections
     private readonly HashSet<string> _spectatorConnections = new();
-
-    /// <summary>
-    /// Read-only access to spectator connection IDs for broadcasting updates.
-    /// </summary>
-    public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
 
     public string Id { get; }
 
     public GameEngine Engine { get; }
 
-    public string? WhitePlayerId { get; private set; } // Persistent player ID
+    public string? WhitePlayerId { get; private set; }
 
-    public string? RedPlayerId { get; private set; } // Persistent player ID
+    public string? RedPlayerId { get; private set; }
 
-    public string? WhitePlayerName { get; set; } // Display name for White player
+    public string? WhitePlayerName { get; set; }
 
-    public string? RedPlayerName { get; set; } // Display name for Red player
+    public string? RedPlayerName { get; set; }
 
-    public string? WhiteConnectionId { get; private set; } // Current connection
+    public string? WhiteConnectionId { get; private set; }
 
-    public string? RedConnectionId { get; private set; } // Current connection
+    public string? RedConnectionId { get; private set; }
 
     public DateTime CreatedAt { get; }
 
@@ -45,14 +39,15 @@ public class GameSession
 
     public IGameMode GameMode { get; private set; }
 
-    public bool IsAnalysisMode => GameMode is AnalysisMode;  // Helper property for backwards compatibility
+    public bool IsAnalysisMode => GameMode is AnalysisMode;
 
     public bool IsBotGame { get; set; } = false;
 
-    // Match-related properties
     public string? MatchId { get; set; }
 
     public bool IsMatchGame { get; set; } = false;
+
+    public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
 
     public GameSession(string id)
     {
@@ -171,21 +166,6 @@ public class GameSession
     public bool IsSpectator(string connectionId)
     {
         return _spectatorConnections.Contains(connectionId);
-    }
-
-    /// <summary>
-    /// Generate a friendly display name from a player ID
-    /// </summary>
-    private string GenerateFriendlyName(string playerId)
-    {
-        // Extract last 4 characters of the player ID for a short, readable name
-        if (playerId.Length >= 4)
-        {
-            var suffix = playerId.Substring(playerId.Length - 4);
-            return $"Player {suffix}";
-        }
-
-        return playerId;
     }
 
     /// <summary>
@@ -336,11 +316,26 @@ public class GameSession
         return state;
     }
 
+    public void UpdateActivity()
+    {
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    private string GenerateFriendlyName(string playerId)
+    {
+        if (playerId.Length >= 4)
+        {
+            var suffix = playerId.Substring(playerId.Length - 4);
+            return $"Player {suffix}";
+        }
+
+        return playerId;
+    }
+
     private PointState[] GetBoardState()
     {
         var points = new List<PointState>();
 
-        // Points 1-24 on the board
         for (int i = 1; i <= 24; i++)
         {
             var point = Engine.Board.GetPoint(i);
@@ -357,7 +352,6 @@ public class GameSession
 
     private bool WillHit(Move move)
     {
-        // Bear-off moves (To = 0 or 25) cannot hit
         if (move.IsBearOff)
         {
             return false;
@@ -372,15 +366,10 @@ public class GameSession
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
     }
 
-    /// <summary>
-    /// Calculate pip count for a specific color.
-    /// Pip count is the total distance all checkers need to travel to bear off.
-    /// </summary>
     private int CalculatePipCount(CheckerColor color)
     {
         int pips = 0;
 
-        // Count pips from checkers on board points
         for (int pointNum = 1; pointNum <= 24; pointNum++)
         {
             var point = Engine.Board.GetPoint(pointNum);
@@ -388,18 +377,15 @@ public class GameSession
             {
                 if (color == CheckerColor.White)
                 {
-                    // White moves 24→1, so distance is just the point number
                     pips += point.Count * pointNum;
                 }
                 else
                 {
-                    // Red moves 1→24, so distance is (25 - point number)
                     pips += point.Count * (25 - pointNum);
                 }
             }
         }
 
-        // Add pips for checkers on bar (25 pips each)
         if (color == CheckerColor.White)
         {
             pips += Engine.WhitePlayer.CheckersOnBar * 25;
@@ -410,10 +396,5 @@ public class GameSession
         }
 
         return pips;
-    }
-
-    public void UpdateActivity()
-    {
-        LastActivityAt = DateTime.UtcNow;
     }
 }

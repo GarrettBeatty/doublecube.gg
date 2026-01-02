@@ -1,4 +1,4 @@
-﻿using Backgammon.Core;
+using Backgammon.Core;
 using Spectre.Console;
 
 namespace Backgammon.ConsoleApp;
