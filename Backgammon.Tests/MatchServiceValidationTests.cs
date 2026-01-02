@@ -3,6 +3,7 @@ using Backgammon.Server.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using MatchModel = Backgammon.Server.Models.Match;
 
 namespace Backgammon.Tests;
 
@@ -164,7 +165,7 @@ public class MatchServiceValidationTests
             .ReturnsAsync((User?)null);
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -187,7 +188,7 @@ public class MatchServiceValidationTests
             .ReturnsAsync((User?)null);
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -224,7 +225,7 @@ public class MatchServiceValidationTests
             .ReturnsAsync((User?)null);
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -248,7 +249,7 @@ public class MatchServiceValidationTests
             .ReturnsAsync((User?)null);
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -256,8 +257,8 @@ public class MatchServiceValidationTests
 
         // Assert
         Assert.NotNull(match);
-        Assert.Equal("Player player123", match.Player1Name);
-        Assert.Equal("Player player987", match.Player2Name);
+        Assert.Equal("Player player12", match.Player1Name);
+        Assert.Equal("Player player98", match.Player2Name);
     }
 
     [Fact]
@@ -275,7 +276,7 @@ public class MatchServiceValidationTests
             .ReturnsAsync(user1);
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
             .ReturnsAsync(user2);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -297,7 +298,7 @@ public class MatchServiceValidationTests
 
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -312,7 +313,7 @@ public class MatchServiceValidationTests
         Assert.Equal("InProgress", match.Status);
 
         // Verify repository was called
-        _matchRepositoryMock.Verify(x => x.SaveMatchAsync(It.IsAny<Match>()), Times.Once);
+        _matchRepositoryMock.Verify(x => x.SaveMatchAsync(It.IsAny<MatchModel>()), Times.Once);
     }
 
     [Fact]
@@ -358,7 +359,7 @@ public class MatchServiceValidationTests
 
         _userRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
             .ReturnsAsync((User?)null);
-        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<Match>()))
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<MatchModel>()))
             .Returns(Task.CompletedTask);
 
         // Act
