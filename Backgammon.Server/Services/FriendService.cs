@@ -1,12 +1,14 @@
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
 
 /// <summary>
-/// Friend management service with SignalR notifications.
+/// Friend management service with SignalR notifications and HybridCache.
 /// </summary>
 public class FriendService : IFriendService
 {
@@ -14,6 +16,8 @@ public class FriendService : IFriendService
     private readonly IUserRepository _userRepository;
     private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub> _hubContext;
+    private readonly HybridCache _cache;
+    private readonly CacheSettings _cacheSettings;
     private readonly ILogger<FriendService> _logger;
 
     public FriendService(
@@ -21,12 +25,16 @@ public class FriendService : IFriendService
         IUserRepository userRepository,
         IGameSessionManager sessionManager,
         IHubContext<GameHub> hubContext,
+        HybridCache cache,
+        CacheSettings cacheSettings,
         ILogger<FriendService> logger)
     {
         _friendshipRepository = friendshipRepository;
         _userRepository = userRepository;
         _sessionManager = sessionManager;
         _hubContext = hubContext;
+        _cache = cache;
+        _cacheSettings = cacheSettings;
         _logger = logger;
     }
 
@@ -81,6 +89,10 @@ public class FriendService : IFriendService
                 fromUser.Username, fromUser.DisplayName,
                 toUser.Username, toUser.DisplayName);
 
+            // Invalidate friend list caches for both users (pending requests changed)
+            await _cache.RemoveByTagAsync($"friends:{fromUserId}");
+            await _cache.RemoveByTagAsync($"friends:{toUserId}");
+
             // Send real-time notification to recipient if online
             // Note: This requires tracking user connections by userId
             // For now, we'll skip the real-time notification
@@ -120,6 +132,10 @@ public class FriendService : IFriendService
 
             await _friendshipRepository.AcceptFriendRequestAsync(userId, friendUserId);
 
+            // Invalidate friend list caches for both users
+            await _cache.RemoveByTagAsync($"friends:{userId}");
+            await _cache.RemoveByTagAsync($"friends:{friendUserId}");
+
             _logger.LogInformation("Friend request accepted between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);
         }
@@ -148,6 +164,10 @@ public class FriendService : IFriendService
 
             await _friendshipRepository.DeclineFriendRequestAsync(userId, friendUserId);
 
+            // Invalidate friend list caches for both users
+            await _cache.RemoveByTagAsync($"friends:{userId}");
+            await _cache.RemoveByTagAsync($"friends:{friendUserId}");
+
             _logger.LogInformation("Friend request declined between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);
         }
@@ -170,6 +190,10 @@ public class FriendService : IFriendService
             }
 
             await _friendshipRepository.RemoveFriendAsync(userId, friendUserId);
+
+            // Invalidate friend list caches for both users
+            await _cache.RemoveByTagAsync($"friends:{userId}");
+            await _cache.RemoveByTagAsync($"friends:{friendUserId}");
 
             _logger.LogInformation("Friendship removed between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);
@@ -212,12 +236,23 @@ public class FriendService : IFriendService
     {
         try
         {
-            var friendships = await _friendshipRepository.GetFriendsAsync(userId);
+            var friendships = await _cache.GetOrCreateAsync(
+                $"friends:{userId}",
+                async cancel => await _friendshipRepository.GetFriendsAsync(userId),
+                new HybridCacheEntryOptions
+                {
+                    Expiration = _cacheSettings.Friends.Expiration,
+                    LocalCacheExpiration = _cacheSettings.Friends.LocalCacheExpiration
+                },
+                tags: [$"friends:{userId}"]
+            );
+
             var result = new List<FriendDto>();
 
             foreach (var friendship in friendships)
             {
                 // Check if friend is online by looking for active game sessions
+                // Note: Online status is not cached as it changes frequently
                 var isOnline = _sessionManager.IsPlayerOnline(friendship.FriendUserId);
 
                 result.Add(new FriendDto

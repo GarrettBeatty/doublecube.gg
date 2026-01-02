@@ -668,6 +668,7 @@ public class GameHub : Hub
                         if (session.GameMode.ShouldTrackStats)
                         {
                             var game = GameEngineMapper.ToGame(session);
+                            // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                             await UpdateUserStatsAfterGame(game);
                         }
                         else
@@ -987,6 +988,7 @@ public class GameHub : Hub
                                 if (session.GameMode.ShouldTrackStats)
                                 {
                                     var game = GameEngineMapper.ToGame(session);
+                                    // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                                     await UpdateUserStatsAfterGame(game);
                                 }
 
@@ -1125,6 +1127,7 @@ public class GameHub : Hub
                     if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
+                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                         await UpdateUserStatsAfterGame(game);
                     }
                     else
@@ -1537,6 +1540,7 @@ public class GameHub : Hub
                     {
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
                         var game = GameEngineMapper.ToGame(session);
+                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                         await UpdateUserStatsAfterGame(game);
                     }
                     catch (Exception ex)
