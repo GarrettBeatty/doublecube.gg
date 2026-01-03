@@ -136,7 +136,13 @@ public class GameSessionManager : IGameSessionManager
                 throw new InvalidOperationException("You are not a player in this game");
             }
 
-            // Game doesn't exist in DB or not resumable - create new with specified ID
+            // If game exists in DB but is not InProgress, don't allow joining/creating
+            if (game != null)
+            {
+                throw new InvalidOperationException($"This game has already ended (Status: {game.Status})");
+            }
+
+            // Game doesn't exist in DB - create new with specified ID
             lock (_lock)
             {
                 var newGame = CreateGame(gameId);
