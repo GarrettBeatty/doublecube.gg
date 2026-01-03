@@ -1,3 +1,4 @@
+using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -10,12 +11,26 @@ namespace Backgammon.Tests;
 public class GameStateServiceTests
 {
     private readonly Mock<ILogger<GameStateService>> _loggerMock;
+    private readonly Mock<IHubContext<GameHub>> _hubContextMock;
+    private readonly Mock<IHubClients> _clientsMock;
+    private readonly Mock<ISingleClientProxy> _clientProxyMock;
+    private readonly Mock<IClientProxy> _groupProxyMock;
     private readonly GameStateService _service;
 
     public GameStateServiceTests()
     {
         _loggerMock = new Mock<ILogger<GameStateService>>();
-        _service = new GameStateService(_loggerMock.Object);
+        _hubContextMock = new Mock<IHubContext<GameHub>>();
+        _clientsMock = new Mock<IHubClients>();
+        _clientProxyMock = new Mock<ISingleClientProxy>();
+        _groupProxyMock = new Mock<IClientProxy>();
+
+        // Setup hub context to return clients mock
+        _hubContextMock.Setup(h => h.Clients).Returns(_clientsMock.Object);
+        _clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(_clientProxyMock.Object);
+        _clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(_groupProxyMock.Object);
+
+        _service = new GameStateService(_hubContextMock.Object, _loggerMock.Object);
     }
 
     [Fact]
@@ -23,16 +38,12 @@ public class GameStateServiceTests
     {
         // Arrange
         var session = CreateTestGameSession();
-        var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<ISingleClientProxy>();
-
-        clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
         // Act
-        await _service.BroadcastGameUpdateAsync(session, clientsMock.Object);
+        await _service.BroadcastGameUpdateAsync(session);
 
         // Assert
-        clientProxyMock.Verify(
+        _clientProxyMock.Verify(
             c => c.SendCoreAsync(
                 "GameUpdate",
                 It.IsAny<object[]>(),
@@ -45,16 +56,12 @@ public class GameStateServiceTests
     {
         // Arrange
         var session = CreateTestGameSession();
-        var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<ISingleClientProxy>();
-
-        clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
         // Act
-        await _service.BroadcastGameStartAsync(session, clientsMock.Object);
+        await _service.BroadcastGameStartAsync(session);
 
         // Assert
-        clientProxyMock.Verify(
+        _clientProxyMock.Verify(
             c => c.SendCoreAsync(
                 "GameStart",
                 It.IsAny<object[]>(),
@@ -71,16 +78,11 @@ public class GameStateServiceTests
         // Force a game over by forfeiting
         session.Engine.ForfeitGame(session.Engine.WhitePlayer);
 
-        var clientsMock = new Mock<IHubCallerClients>();
-        var groupProxyMock = new Mock<IClientProxy>();
-
-        clientsMock.Setup(c => c.Group(It.IsAny<string>())).Returns(groupProxyMock.Object);
-
         // Act
-        await _service.BroadcastGameOverAsync(session, clientsMock.Object);
+        await _service.BroadcastGameOverAsync(session);
 
         // Assert
-        groupProxyMock.Verify(
+        _groupProxyMock.Verify(
             c => c.SendCoreAsync(
                 "GameOver",
                 It.IsAny<object[]>(),
@@ -94,16 +96,12 @@ public class GameStateServiceTests
         // Arrange
         var session = CreateTestGameSession();
         var connectionId = "test-connection";
-        var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<ISingleClientProxy>();
-
-        clientsMock.Setup(c => c.Client(connectionId)).Returns(clientProxyMock.Object);
 
         // Act
-        await _service.SendGameStateToConnectionAsync(session, connectionId, clientsMock.Object);
+        await _service.SendGameStateToConnectionAsync(session, connectionId);
 
         // Assert
-        clientProxyMock.Verify(
+        _clientProxyMock.Verify(
             c => c.SendCoreAsync(
                 "GameUpdate",
                 It.IsAny<object[]>(),

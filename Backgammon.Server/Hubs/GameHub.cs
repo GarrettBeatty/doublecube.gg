@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Backgammon.Core;
+using Backgammon.Server.Extensions;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -30,10 +31,8 @@ namespace Backgammon.Server.Hubs;
 /// </summary>
 public class GameHub : Hub
 {
-    private static readonly Dictionary<string, string> _playerConnections = new();
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
-    private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMatchService _matchService;
@@ -42,12 +41,13 @@ public class GameHub : Hub
     private readonly IDoubleOfferService _doubleOfferService;
     private readonly IGameStateService _gameStateService;
     private readonly IPlayerProfileService _playerProfileService;
+    private readonly IGameActionOrchestrator _gameActionOrchestrator;
+    private readonly IPlayerStatsService _playerStatsService;
     private readonly ILogger<GameHub> _logger;
 
     public GameHub(
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
-        IUserRepository userRepository,
         IAiMoveService aiMoveService,
         IHubContext<GameHub> hubContext,
         IMatchService matchService,
@@ -56,11 +56,12 @@ public class GameHub : Hub
         IDoubleOfferService doubleOfferService,
         IGameStateService gameStateService,
         IPlayerProfileService playerProfileService,
+        IGameActionOrchestrator gameActionOrchestrator,
+        IPlayerStatsService playerStatsService,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
-        _userRepository = userRepository;
         _aiMoveService = aiMoveService;
         _hubContext = hubContext;
         _matchService = matchService;
@@ -69,6 +70,8 @@ public class GameHub : Hub
         _doubleOfferService = doubleOfferService;
         _gameStateService = gameStateService;
         _playerProfileService = playerProfileService;
+        _gameActionOrchestrator = gameActionOrchestrator;
+        _playerStatsService = playerStatsService;
         _logger = logger;
     }
 
@@ -121,35 +124,46 @@ public class GameHub : Hub
             if (session.IsFull)
             {
                 // Game is ready to start - send personalized state to each player
-                await _gameStateService.BroadcastGameStartAsync(session, Clients);
+                await _gameStateService.BroadcastGameStartAsync(session);
 
                 // Save game state when game starts (progressive save)
-                await SaveGameStateAsync(session);
+                BackgroundTaskHelper.FireAndForget(
+                    async () =>
+                    {
+                        var game = GameEngineMapper.ToGame(session);
+                        await _gameRepository.SaveGameAsync(game);
+                    },
+                    _logger,
+                    $"SaveGameState-{session.Id}");
 
                 // Check if AI should move first
-                var currentPlayerId = GetCurrentPlayerId(session);
+                var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+                    ? session.WhitePlayerId
+                    : session.RedPlayerId;
                 if (currentPlayerId != null && _aiMoveService.IsAiPlayer(currentPlayerId))
                 {
                     _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                    // Trigger AI turn in background with error handling
-                    var playerIdForTask = currentPlayerId; // Capture for lambda
-                    _ = Task.Run(async () =>
-                    {
-                        try
+                    var playerIdForTask = currentPlayerId;
+                    BackgroundTaskHelper.FireAndForget(
+                        async () =>
                         {
-                            await ExecuteAiTurnWithBroadcastAsync(session, playerIdForTask);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
-                        }
-                    });
+                            await _gameActionOrchestrator.EndTurnAsync(session, playerIdForTask);
+                        },
+                        _logger,
+                        $"AiFirstTurn-{session.Id}");
                 }
             }
             else
             {
                 // Waiting for opponent - save to database so it shows in dashboard
-                await SaveGameStateAsync(session);
+                BackgroundTaskHelper.FireAndForget(
+                    async () =>
+                    {
+                        var game = GameEngineMapper.ToGame(session);
+                        await _gameRepository.SaveGameAsync(game);
+                    },
+                    _logger,
+                    $"SaveGameState-{session.Id}");
 
                 var state = session.GetState(connectionId);
                 await Clients.Caller.SendAsync("GameUpdate", state);
@@ -208,7 +222,14 @@ public class GameHub : Hub
             await Clients.Caller.SendAsync("GameStart", state);
 
             // Save game state
-            await SaveGameStateAsync(session);
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
+                {
+                    var game = GameEngineMapper.ToGame(session);
+                    await _gameRepository.SaveGameAsync(game);
+                },
+                _logger,
+                $"SaveGameState-{session.Id}");
 
             _logger.LogInformation(
                 "Analysis game {GameId} created by {UserId}",
@@ -288,11 +309,20 @@ public class GameHub : Hub
                 humanState.YourColor);
             await Clients.Caller.SendAsync("GameStart", humanState);
 
-            // Save initial game state
-            await SaveGameStateAsync(session);
+            // Save initial game state - fire and forget
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
+                {
+                    var game = GameEngineMapper.ToGame(session);
+                    await _gameRepository.SaveGameAsync(game);
+                },
+                _logger,
+                $"SaveGameState-{session.Id}");
 
             // If AI goes first (which would be unusual since White goes first, but handle it)
-            var currentPlayerId = GetCurrentPlayerId(session);
+            var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+                ? session.WhitePlayerId
+                : session.RedPlayerId;
             _logger.LogDebug(
                 "Current player ID: {CurrentPlayerId}, Is AI: {IsAi}",
                 currentPlayerId,
@@ -301,18 +331,14 @@ public class GameHub : Hub
             if (_aiMoveService.IsAiPlayer(currentPlayerId))
             {
                 _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                // Trigger AI turn in background with error handling
-                _ = Task.Run(async () =>
-                {
-                    try
+                BackgroundTaskHelper.FireAndForget(
+                    async () =>
                     {
-                        await ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
-                    }
-                });
+                        // Use dummy connection for AI
+                        await _gameActionOrchestrator.EndTurnAsync(session, aiPlayerId);
+                    },
+                    _logger,
+                    $"AiFirstTurn-{session.Id}");
             }
 
             _logger.LogInformation(
@@ -431,62 +457,18 @@ public class GameHub : Hub
     {
         try
         {
-            _logger.LogDebug(
-                "RollDice called by connection {ConnectionId}",
-                Context.ConnectionId);
-
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                _logger.LogWarning(
-                    "RollDice failed: No session found for connection {ConnectionId}",
-                    Context.ConnectionId);
                 await Clients.Caller.SendAsync("Error", "Not in a game");
                 return;
             }
 
-            _logger.LogDebug(
-                "RollDice: Found session {GameId}, CurrentPlayer={CurrentPlayer}, WhiteConn={WhiteConn}, RedConn={RedConn}",
-                session.Id,
-                session.Engine.CurrentPlayer?.Color,
-                session.WhiteConnectionId,
-                session.RedConnectionId);
-
-            if (!session.IsPlayerTurn(Context.ConnectionId))
+            var result = await _gameActionOrchestrator.RollDiceAsync(session, Context.ConnectionId);
+            if (!result.Success)
             {
-                _logger.LogWarning(
-                    "RollDice failed: Not player's turn. Connection={ConnectionId}, Game={GameId}",
-                    Context.ConnectionId,
-                    session.Id);
-                await Clients.Caller.SendAsync("Error", "Not your turn");
-                return;
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
             }
-
-            if (session.Engine.RemainingMoves.Count > 0)
-            {
-                _logger.LogWarning(
-                    "RollDice failed: Remaining moves exist. Count={Count}, Connection={ConnectionId}",
-                    session.Engine.RemainingMoves.Count,
-                    Context.ConnectionId);
-                await Clients.Caller.SendAsync("Error", "Must complete current moves first");
-                return;
-            }
-
-            session.Engine.RollDice();
-            session.UpdateActivity();
-
-            _logger.LogInformation(
-                "Player {ConnectionId} rolled dice in game {GameId}: [{Die1}, {Die2}]",
-                Context.ConnectionId,
-                session.Id,
-                session.Engine.Dice.Die1,
-                session.Engine.Dice.Die2);
-
-            // Broadcast game state update to all players
-            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
-
-            // Save game state after dice roll (progressive save)
-            await SaveGameStateAsync(session);
         }
         catch (Exception ex)
         {
@@ -502,100 +484,17 @@ public class GameHub : Hub
     {
         try
         {
-            _logger.LogInformation(
-                "MakeMove called: from {From} to {To}",
-                from,
-                to);
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                _logger.LogWarning("No session found for player");
                 await Clients.Caller.SendAsync("Error", "Not in a game");
                 return;
             }
 
-            if (!session.IsPlayerTurn(Context.ConnectionId))
+            var result = await _gameActionOrchestrator.MakeMoveAsync(session, Context.ConnectionId, from, to);
+            if (!result.Success)
             {
-                _logger.LogWarning("Not player's turn");
-                await Clients.Caller.SendAsync("Error", "Not your turn");
-                return;
-            }
-
-            _logger.LogInformation(
-                "Current player: {Player}, Remaining moves: {Moves}",
-                session.Engine.CurrentPlayer.Name,
-                string.Join(",", session.Engine.RemainingMoves));
-
-            // Find the correct die value from valid moves
-            var validMoves = session.Engine.GetValidMoves();
-            var matchingMove = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
-
-            if (matchingMove == null)
-            {
-                _logger.LogWarning("No valid move found from {From} to {To}", from, to);
-                await Clients.Caller.SendAsync("Error", "Invalid move - no matching valid move");
-                return;
-            }
-
-            _logger.LogInformation("Found valid move with die value: {DieValue}", matchingMove.DieValue);
-
-            var isValid = session.Engine.IsValidMove(matchingMove);
-            _logger.LogInformation("Move validity check: {IsValid}", isValid);
-
-            if (!session.Engine.ExecuteMove(matchingMove))
-            {
-                _logger.LogWarning("ExecuteMove returned false - invalid move");
-                await Clients.Caller.SendAsync("Error", "Invalid move");
-                return;
-            }
-
-            _logger.LogInformation("Move executed successfully");
-
-            session.UpdateActivity();
-
-            // Broadcast game state update to all players
-            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
-
-            // Save game state after move (progressive save)
-            await SaveGameStateAsync(session);
-
-            // Check if game is over
-            if (session.Engine.Winner != null)
-            {
-                var stakes = session.Engine.GetGameResult();
-                await _gameStateService.BroadcastGameOverAsync(session, Clients);
-
-                // Handle match game completion if this is a match game
-                await HandleMatchGameCompletion(session);
-
-                // Update game status to Completed and update user stats
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Save final game state with Status="Completed" (already done by SaveGameStateAsync above)
-                        // Update status explicitly to ensure CompletedAt timestamp is set
-                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-
-                        // Update user statistics if players are registered (skip for analysis games)
-                        if (session.GameMode.ShouldTrackStats)
-                        {
-                            var game = GameEngineMapper.ToGame(session);
-                            // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
-                            await UpdateUserStatsAfterGame(game);
-                        }
-                        else
-                        {
-                            _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
-                        }
-
-                        _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
-                    }
-                });
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -619,60 +518,10 @@ public class GameHub : Hub
                 return;
             }
 
-            if (!session.IsPlayerTurn(Context.ConnectionId))
+            var result = await _gameActionOrchestrator.EndTurnAsync(session, Context.ConnectionId);
+            if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", "Not your turn");
-                return;
-            }
-
-            // Validate that turn can be ended
-            // Only allow ending turn if:
-            // 1. No remaining moves, OR
-            // 2. No valid moves are possible
-            if (session.Engine.RemainingMoves.Count > 0)
-            {
-                var validMoves = session.Engine.GetValidMoves();
-                if (validMoves.Count > 0)
-                {
-                    await Clients.Caller.SendAsync("Error", "You still have valid moves available");
-                    return;
-                }
-            }
-
-            session.Engine.EndTurn();
-            session.UpdateActivity();
-
-            // Broadcast game state update to all players
-            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
-
-            // Save game state after turn end (progressive save)
-            await SaveGameStateAsync(session);
-
-            _logger.LogInformation(
-                "Turn ended in game {GameId}. Current player: {Player}",
-                session.Id,
-                session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
-
-            // Check if next player is AI and trigger AI turn
-            var nextPlayerId = GetCurrentPlayerId(session);
-            if (_aiMoveService.IsAiPlayer(nextPlayerId))
-            {
-                _logger.LogInformation(
-                    "Triggering AI turn for player {AiPlayerId} in game {GameId}",
-                    nextPlayerId,
-                    session.Id);
-                // Trigger AI turn in background with error handling
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await ExecuteAiTurnWithBroadcastAsync(session, nextPlayerId!);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "AI turn failed for game {GameId}", session.Id);
-                    }
-                });
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
             }
         }
         catch (Exception ex)
@@ -696,37 +545,11 @@ public class GameHub : Hub
                 return;
             }
 
-            if (!session.IsPlayerTurn(Context.ConnectionId))
+            var result = await _gameActionOrchestrator.UndoLastMoveAsync(session, Context.ConnectionId);
+            if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", "Not your turn");
-                return;
+                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
             }
-
-            if (session.Engine.MoveHistory.Count == 0)
-            {
-                await Clients.Caller.SendAsync("Error", "No moves to undo");
-                return;
-            }
-
-            // Perform undo
-            if (!session.Engine.UndoLastMove())
-            {
-                await Clients.Caller.SendAsync("Error", "Failed to undo move");
-                return;
-            }
-
-            session.UpdateActivity();
-
-            // Broadcast game state update to all players
-            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
-
-            // Save updated game state
-            await SaveGameStateAsync(session);
-
-            _logger.LogInformation(
-                "Player {ConnectionId} undid last move in game {GameId}",
-                Context.ConnectionId,
-                session.Id);
         }
         catch (Exception ex)
         {
@@ -763,7 +586,7 @@ public class GameHub : Hub
 
             if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
             {
-                await _gameStateService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue, Clients);
+                await _gameStateService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
             }
             else
             {
@@ -786,7 +609,14 @@ public class GameHub : Hub
                             await Clients.Caller.SendAsync("DoubleAccepted", state);
                         }
 
-                        await SaveGameStateAsync(session);
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                var game = GameEngineMapper.ToGame(session);
+                                await _gameRepository.SaveGameAsync(game);
+                            },
+                            _logger,
+                            $"SaveGameState-{session.Id}");
                     }
                     else
                     {
@@ -800,25 +630,21 @@ public class GameHub : Hub
                         await Clients.Caller.SendAsync("Info", "Computer declined the double. You win!");
 
                         // Update database and stats (async)
-                        _ = Task.Run(async () =>
-                        {
-                            try
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
                             {
                                 await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
                                 if (session.GameMode.ShouldTrackStats)
                                 {
                                     var game = GameEngineMapper.ToGame(session);
-                                    await UpdateUserStatsAfterGame(game);
+                                    await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
                                 }
 
                                 _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
-                            }
-                        });
+                            },
+                            _logger,
+                            $"UpdateGameCompletion-{session.Id}");
 
                         _sessionManager.RemoveGame(session.Id);
                     }
@@ -850,10 +676,17 @@ public class GameHub : Hub
             await _doubleOfferService.AcceptDoubleAsync(session);
 
             // Broadcast double accepted to both players
-            await _gameStateService.BroadcastDoubleAcceptedAsync(session, Clients);
+            await _gameStateService.BroadcastDoubleAcceptedAsync(session);
 
             // Save game state
-            await SaveGameStateAsync(session);
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
+                {
+                    var game = GameEngineMapper.ToGame(session);
+                    await _gameRepository.SaveGameAsync(game);
+                },
+                _logger,
+                $"SaveGameState-{session.Id}");
         }
         catch (Exception ex)
         {
@@ -884,19 +717,18 @@ public class GameHub : Hub
             }
 
             // Broadcast game over
-            await _gameStateService.BroadcastGameOverAsync(session, Clients);
+            await _gameStateService.BroadcastGameOverAsync(session);
 
             // Update database and stats (async)
-            _ = Task.Run(async () =>
-            {
-                try
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
                     if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
-                        await UpdateUserStatsAfterGame(game);
+                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
                     }
                     else
                     {
@@ -904,12 +736,9 @@ public class GameHub : Hub
                     }
 
                     _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to update completion status for game {GameId}", session.Id);
-                }
-            });
+                },
+                _logger,
+                $"UpdateGameCompletion-{session.Id}");
         }
         catch (Exception ex)
         {
@@ -1013,9 +842,8 @@ public class GameHub : Hub
                 stakes);
 
             // Update database and stats (async)
-            _ = Task.Run(async () =>
-            {
-                try
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
@@ -1023,7 +851,7 @@ public class GameHub : Hub
                     if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
-                        await UpdateUserStatsAfterGame(game);
+                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
                     }
                     else
                     {
@@ -1031,12 +859,9 @@ public class GameHub : Hub
                     }
 
                     _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to update abandoned game {GameId}", session.Id);
-                }
-            });
+                },
+                _logger,
+                $"UpdateGameAbandoned-{session.Id}");
         }
         catch (Exception ex)
         {
@@ -1952,282 +1777,6 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling disconnection");
-        }
-    }
-
-    /// <summary>
-    /// Save current game state to database (progressive save).
-    /// Uses GameEngineMapper to serialize the complete game state.
-    /// Fire-and-forget pattern - does not throw exceptions to avoid blocking game flow.
-    /// </summary>
-    private async Task SaveGameStateAsync(GameSession session)
-    {
-        try
-        {
-            var game = GameEngineMapper.ToGame(session);
-            await _gameRepository.SaveGameAsync(game);
-            _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to save game state for {GameId}", session.Id);
-            // Fire-and-forget - don't throw to avoid disrupting gameplay
-        }
-    }
-
-    /// <summary>
-    /// Check if a player ID looks like a registered user ID (GUID format)
-    /// Anonymous IDs have format "player_timestamp_random"
-    /// </summary>
-    private bool IsRegisteredUserId(string? playerId)
-    {
-        if (string.IsNullOrEmpty(playerId))
-        {
-            return false;
-        }
-
-        // Registered user IDs are GUIDs
-        return Guid.TryParse(playerId, out _);
-    }
-
-    /// <summary>
-    /// Get the player ID of the current player in the session
-    /// </summary>
-    private string? GetCurrentPlayerId(GameSession session)
-    {
-        if (session.Engine.CurrentPlayer == null)
-        {
-            return null;
-        }
-
-        return session.Engine.CurrentPlayer.Color == CheckerColor.White
-            ? session.WhitePlayerId
-            : session.RedPlayerId;
-    }
-
-    /// <summary>
-    /// Get the AI player ID from the session (if any)
-    /// </summary>
-    private string? GetAiPlayerId(GameSession session)
-    {
-        if (_aiMoveService.IsAiPlayer(session.WhitePlayerId))
-        {
-            return session.WhitePlayerId;
-        }
-
-        if (_aiMoveService.IsAiPlayer(session.RedPlayerId))
-        {
-            return session.RedPlayerId;
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Execute AI turn and broadcast updates to clients.
-    /// Runs as a background task to avoid blocking the hub.
-    /// Uses _hubContext instead of Clients because Hub instance may be disposed.
-    /// </summary>
-    private async Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId)
-    {
-        try
-        {
-            // Broadcast callback - sends state to players and spectators
-            // Use _hubContext.Clients instead of this.Clients because Hub may be disposed
-            async Task BroadcastUpdate()
-            {
-                // Send personalized state to each connected player
-                if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-                {
-                    var whiteState = session.GetState(session.WhiteConnectionId);
-                    await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-                }
-
-                if (!string.IsNullOrEmpty(session.RedConnectionId))
-                {
-                    var redState = session.GetState(session.RedConnectionId);
-                    await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-                }
-
-                // Send updates to all spectators
-                var spectatorState = session.GetState(null); // null = spectator view
-                foreach (var spectatorId in session.SpectatorConnections)
-                {
-                    await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
-                }
-            }
-
-            // Execute AI turn with delays and broadcasts
-            await _aiMoveService.ExecuteAiTurnAsync(session, aiPlayerId, BroadcastUpdate);
-
-            // Save game state after AI turn
-            await SaveGameStateAsync(session);
-
-            // Check if game is over
-            if (session.Engine.Winner != null)
-            {
-                var stakes = session.Engine.GetGameResult();
-                var finalState = session.GetState();
-                await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
-                _logger.LogInformation(
-                    "AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id,
-                    session.Engine.Winner.Name,
-                    stakes);
-
-                // Update database status
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-                        var game = GameEngineMapper.ToGame(session);
-                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
-                        await UpdateUserStatsAfterGame(game);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to update completion status for AI game {GameId}", session.Id);
-                    }
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error executing AI turn in game {GameId}", session.Id);
-        }
-    }
-
-    /// <summary>
-    /// Update user statistics after a game is completed
-    /// </summary>
-    private async Task UpdateUserStatsAfterGame(ServerGame game)
-    {
-        try
-        {
-            // Only update stats if game actually had two players
-            if (game.Status == "WaitingForPlayer" ||
-                string.IsNullOrEmpty(game.RedPlayerId) ||
-                string.IsNullOrEmpty(game.WhitePlayerId))
-            {
-                _logger.LogInformation("Skipping stats update for game {GameId} - no opponent joined", game.GameId);
-                return;
-            }
-
-            // Skip stats for AI games
-            if (game.IsAiOpponent)
-            {
-                _logger.LogInformation("Skipping stats update for game {GameId} - AI opponent", game.GameId);
-                return;
-            }
-
-            // Update white player stats if registered
-            if (!string.IsNullOrEmpty(game.WhiteUserId))
-            {
-                var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
-                if (user != null)
-                {
-                    var isWinner = game.Winner == "White";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
-                }
-            }
-
-            // Update red player stats if registered
-            if (!string.IsNullOrEmpty(game.RedUserId))
-            {
-                var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
-                if (user != null)
-                {
-                    var isWinner = game.Winner == "Red";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to update user stats after game {GameId}", game.GameId);
-        }
-    }
-
-    private void UpdateStats(UserStats stats, bool isWinner, int stakes)
-    {
-        stats.TotalGames++;
-
-        if (isWinner)
-        {
-            stats.Wins++;
-            stats.TotalStakes += stakes;
-            stats.WinStreak++;
-
-            if (stats.WinStreak > stats.BestWinStreak)
-            {
-                stats.BestWinStreak = stats.WinStreak;
-            }
-
-            // Track win types
-            switch (stakes)
-            {
-                case 1:
-                    stats.NormalWins++;
-                    break;
-                case 2:
-                    stats.GammonWins++;
-                    break;
-                case 3:
-                    stats.BackgammonWins++;
-                    break;
-            }
-        }
-        else
-        {
-            stats.Losses++;
-            stats.WinStreak = 0; // Reset streak on loss
-        }
-    }
-
-    /// <summary>
-    /// Override the existing MakeMove to handle match game completion
-    /// </summary>
-    private async Task HandleMatchGameCompletion(GameSession session)
-    {
-        if (!session.IsMatchGame || string.IsNullOrEmpty(session.MatchId))
-        {
-            return;
-        }
-
-        try
-        {
-            // Get game result
-            var winnerColor = session.Engine.Winner?.Color;
-            if (winnerColor == null)
-            {
-                return;
-            }
-
-            var winnerId = winnerColor == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
-            var winType = session.Engine.DetermineWinType();
-            var stakes = session.Engine.GetGameResult();
-
-            var result = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
-
-            // Complete the game in the match
-            await _matchService.CompleteGameAsync(session.Id, result);
-
-            // Check if match is complete
-            var match = await _matchService.GetMatchAsync(session.MatchId);
-            if (match == null)
-            {
-                return;
-            }
-
-            // Notify players of match update
-            await _gameStateService.BroadcastMatchUpdateAsync(match, session.Id, Clients);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error handling match game completion");
         }
     }
 

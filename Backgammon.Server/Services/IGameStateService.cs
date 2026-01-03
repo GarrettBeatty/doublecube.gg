@@ -11,35 +11,35 @@ public interface IGameStateService
     /// <summary>
     /// Broadcast game state update to all players and spectators
     /// </summary>
-    Task BroadcastGameUpdateAsync(GameSession session, IHubCallerClients clients);
+    Task BroadcastGameUpdateAsync(GameSession session);
 
     /// <summary>
     /// Broadcast game start to both players
     /// </summary>
-    Task BroadcastGameStartAsync(GameSession session, IHubCallerClients clients);
+    Task BroadcastGameStartAsync(GameSession session);
 
     /// <summary>
     /// Broadcast game over to all players
     /// </summary>
-    Task BroadcastGameOverAsync(GameSession session, IHubCallerClients clients);
+    Task BroadcastGameOverAsync(GameSession session);
 
     /// <summary>
     /// Send game state to a specific connection
     /// </summary>
-    Task SendGameStateToConnectionAsync(GameSession session, string connectionId, IHubCallerClients clients);
+    Task SendGameStateToConnectionAsync(GameSession session, string connectionId);
 
     /// <summary>
     /// Broadcast double offer to opponent
     /// </summary>
-    Task BroadcastDoubleOfferAsync(GameSession session, string offeringConnectionId, int currentValue, int newValue, IHubCallerClients clients);
+    Task BroadcastDoubleOfferAsync(GameSession session, string offeringConnectionId, int currentValue, int newValue);
 
     /// <summary>
     /// Broadcast double accepted to both players
     /// </summary>
-    Task BroadcastDoubleAcceptedAsync(GameSession session, IHubCallerClients clients);
+    Task BroadcastDoubleAcceptedAsync(GameSession session);
 
     /// <summary>
     /// Broadcast match update to players
     /// </summary>
-    Task BroadcastMatchUpdateAsync(Match match, string gameId, IHubCallerClients clients);
+    Task BroadcastMatchUpdateAsync(Match match, string gameId);
 }

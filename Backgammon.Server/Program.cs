@@ -154,6 +154,8 @@ builder.Services.AddSingleton<IMatchLobbyService, MatchLobbyService>();
 builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
 builder.Services.AddSingleton<IGameStateService, GameStateService>();
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
+builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
+builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>();
 
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
