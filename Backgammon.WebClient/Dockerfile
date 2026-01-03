@@ -9,14 +9,11 @@ COPY ["Backgammon.ServiceDefaults/Backgammon.ServiceDefaults.csproj", "Backgammo
 RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
     dotnet restore "Backgammon.WebClient/Backgammon.WebClient.csproj"
 
-# Copy source code and build
+# Copy source code and publish directly (skip separate build step)
 COPY . .
 WORKDIR "/src/Backgammon.WebClient"
-RUN dotnet build "Backgammon.WebClient.csproj" -c Release -o /app/build
-
-# Publish stage
-FROM build AS publish
-RUN dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
+    dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no-restore
 
 # Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
@@ -25,7 +22,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 RUN apk add --no-cache wget
 
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Expose port 3000
 EXPOSE 3000

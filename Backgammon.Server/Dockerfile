@@ -5,19 +5,17 @@ WORKDIR /src
 # Copy csproj files and restore dependencies (layer caching optimization)
 COPY ["Backgammon.Server/Backgammon.Server.csproj", "Backgammon.Server/"]
 COPY ["Backgammon.Core/Backgammon.Core.csproj", "Backgammon.Core/"]
+COPY ["Backgammon.AI/Backgammon.AI.csproj", "Backgammon.AI/"]
 COPY ["Backgammon.ServiceDefaults/Backgammon.ServiceDefaults.csproj", "Backgammon.ServiceDefaults/"]
 # Use BuildKit cache mount to cache NuGet packages across builds
 RUN --mount=type=cache,id=nuget-server,target=/root/.nuget/packages \
     dotnet restore "Backgammon.Server/Backgammon.Server.csproj"
 
-# Copy source code and build
+# Copy source code and publish directly (skip separate build step)
 COPY . .
 WORKDIR "/src/Backgammon.Server"
-RUN dotnet build "Backgammon.Server.csproj" -c Release -o /app/build
-
-# Publish stage
-FROM build AS publish
-RUN dotnet publish "Backgammon.Server.csproj" -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget-server,target=/root/.nuget/packages \
+    dotnet publish "Backgammon.Server.csproj" -c Release -o /app/publish --no-restore
 
 # Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
@@ -26,7 +24,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
 RUN apk add --no-cache wget
 
 WORKDIR /app
-COPY --from=publish /app/publish .
+COPY --from=build /app/publish .
 
 # Expose port 5000
 EXPOSE 5000
