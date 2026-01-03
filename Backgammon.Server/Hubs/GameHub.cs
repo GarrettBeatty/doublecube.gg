@@ -43,6 +43,10 @@ public class GameHub : Hub
     private readonly IPlayerProfileService _playerProfileService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IPlayerStatsService _playerStatsService;
+    private readonly IGameCreationService _gameCreationService;
+    private readonly IMoveQueryService _moveQueryService;
+    private readonly IGameImportExportService _gameImportExportService;
+    private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
 
     public GameHub(
@@ -58,6 +62,10 @@ public class GameHub : Hub
         IPlayerProfileService playerProfileService,
         IGameActionOrchestrator gameActionOrchestrator,
         IPlayerStatsService playerStatsService,
+        IGameCreationService gameCreationService,
+        IMoveQueryService moveQueryService,
+        IGameImportExportService gameImportExportService,
+        IChatService chatService,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
@@ -72,6 +80,10 @@ public class GameHub : Hub
         _playerProfileService = playerProfileService;
         _gameActionOrchestrator = gameActionOrchestrator;
         _playerStatsService = playerStatsService;
+        _gameCreationService = gameCreationService;
+        _moveQueryService = moveQueryService;
+        _gameImportExportService = gameImportExportService;
+        _chatService = chatService;
         _logger = logger;
     }
 
@@ -86,84 +98,10 @@ public class GameHub : Hub
         try
         {
             var connectionId = Context.ConnectionId;
-
-            // Use authenticated user ID if available, otherwise use provided anonymous ID
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            var session = await _sessionManager.JoinOrCreateAsync(
-                effectivePlayerId,
-                connectionId,
-                gameId);
-            await Groups.AddToGroupAsync(connectionId, session.Id);
-            _logger.LogInformation(
-                "Player {PlayerId} (connection {ConnectionId}) joined game {GameId}",
-                effectivePlayerId,
-                connectionId,
-                session.Id);
-
-            // Try to add as player; if full, add as spectator
-            if (!session.AddPlayer(effectivePlayerId, connectionId))
-            {
-                session.AddSpectator(connectionId);
-                var spectatorState = session.GetState(null); // No color for spectators
-                await Clients.Caller.SendAsync("SpectatorJoined", spectatorState);
-                _logger.LogInformation(
-                "Spectator {ConnectionId} joined game {GameId}",
-                connectionId,
-                session.Id);
-                return;
-            }
-
-            // Set display name if authenticated
-            if (!string.IsNullOrEmpty(displayName))
-            {
-                session.SetPlayerName(effectivePlayerId, displayName);
-            }
-
-            if (session.IsFull)
-            {
-                // Game is ready to start - send personalized state to each player
-                await _gameStateService.BroadcastGameStartAsync(session);
-
-                // Save game state when game starts (progressive save)
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _gameRepository.SaveGameAsync(game);
-                    },
-                    _logger,
-                    $"SaveGameState-{session.Id}");
-
-                // Check if AI should move first
-                var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
-                    ? session.WhitePlayerId
-                    : session.RedPlayerId;
-                if (currentPlayerId != null && _aiMoveService.IsAiPlayer(currentPlayerId))
-                {
-                    _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                    var playerIdForTask = currentPlayerId;
-                    BackgroundTaskHelper.FireAndForget(
-                        async () =>
-                        {
-                            await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, playerIdForTask);
-                        },
-                        _logger,
-                        $"AiFirstTurn-{session.Id}");
-                }
-            }
-            else
-            {
-                // Waiting for opponent - game stays in memory only until opponent joins
-                var state = session.GetState(connectionId);
-                await Clients.Caller.SendAsync("GameUpdate", state);
-                await Clients.Caller.SendAsync("WaitingForOpponent", session.Id);
-                _logger.LogInformation(
-                    "Player {PlayerId} waiting in game {GameId} (in-memory only)",
-                    effectivePlayerId,
-                    session.Id);
-            }
+            await _gameCreationService.JoinGameAsync(connectionId, effectivePlayerId, displayName, gameId);
         }
         catch (Exception ex)
         {
@@ -182,50 +120,7 @@ public class GameHub : Hub
             var connectionId = Context.ConnectionId;
             var userId = GetAuthenticatedUserId() ?? connectionId;
 
-            // Create new session
-            var session = await _sessionManager.JoinOrCreateAsync(
-                userId,
-                connectionId,
-                null);
-
-            // Directly set same player for both sides (bypassing AddPlayer logic)
-            // This is necessary because AddPlayer() won't add the same player twice
-            if (session.WhitePlayerId == null)
-            {
-                session.AddPlayer(userId, connectionId); // Adds as White
-            }
-
-            // Manually set Red player to same user (analysis mode special case)
-            session.SetRedPlayer(userId, connectionId);
-
-            // Enable analysis mode
-            session.EnableAnalysisMode(userId);
-
-            // Start game immediately
-            if (!session.Engine.GameStarted)
-            {
-                session.Engine.StartNewGame();
-            }
-
-            await Groups.AddToGroupAsync(connectionId, session.Id);
-
-            var state = session.GetState(connectionId);
-            await Clients.Caller.SendAsync("GameStart", state);
-
-            // Save game state
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    var game = GameEngineMapper.ToGame(session);
-                    await _gameRepository.SaveGameAsync(game);
-                },
-                _logger,
-                $"SaveGameState-{session.Id}");
-
-            _logger.LogInformation(
-                "Analysis game {GameId} created by {UserId}",
-                session.Id,
-                userId);
+            await _gameCreationService.CreateAnalysisGameAsync(connectionId, userId);
         }
         catch (Exception ex)
         {
@@ -244,96 +139,10 @@ public class GameHub : Hub
         try
         {
             var connectionId = Context.ConnectionId;
-            _logger.LogDebug(
-                "CreateAiGame called by connection {ConnectionId}, playerId={PlayerId}",
-                connectionId,
-                playerId);
-
-            // Use authenticated user ID if available
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
-            _logger.LogDebug(
-                "Effective player ID: {EffectivePlayerId}, Display name: {DisplayName}",
-                effectivePlayerId,
-                displayName);
 
-            // Create a new game session
-            var session = _sessionManager.CreateGame();
-            await Groups.AddToGroupAsync(connectionId, session.Id);
-            _logger.LogDebug(
-                "Created game session {GameId}",
-                session.Id);
-
-            // Add human player as White
-            session.AddPlayer(effectivePlayerId, connectionId);
-            _sessionManager.RegisterPlayerConnection(connectionId, session.Id); // Register connection for lookup
-            if (!string.IsNullOrEmpty(displayName))
-            {
-                session.SetPlayerName(effectivePlayerId, displayName);
-            }
-
-            _logger.LogDebug(
-                "Added human player as White: {PlayerId}, registered connection {ConnectionId}",
-                effectivePlayerId,
-                connectionId);
-
-            // Add AI player as Red
-            var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
-            session.AddPlayer(aiPlayerId, string.Empty); // Empty connection ID for AI
-            session.SetPlayerName(aiPlayerId, "Computer");
-            _logger.LogDebug(
-                "Added AI player as Red: {AiPlayerId}",
-                aiPlayerId);
-
-            _logger.LogInformation(
-                "Created AI game {GameId}. Human: {PlayerId}, AI: {AiPlayerId}",
-                session.Id,
-                effectivePlayerId,
-                aiPlayerId);
-
-            // Game is now full - start immediately
-            var humanState = session.GetState(connectionId);
-            _logger.LogDebug(
-                "Sending GameStart to human player. IsYourTurn={IsYourTurn}, CurrentPlayer={CurrentPlayer}, YourColor={YourColor}",
-                humanState.IsYourTurn,
-                humanState.CurrentPlayer,
-                humanState.YourColor);
-            await Clients.Caller.SendAsync("GameStart", humanState);
-
-            // Save initial game state - fire and forget
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    var game = GameEngineMapper.ToGame(session);
-                    await _gameRepository.SaveGameAsync(game);
-                },
-                _logger,
-                $"SaveGameState-{session.Id}");
-
-            // If AI goes first (which would be unusual since White goes first, but handle it)
-            var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
-                ? session.WhitePlayerId
-                : session.RedPlayerId;
-            _logger.LogDebug(
-                "Current player ID: {CurrentPlayerId}, Is AI: {IsAi}",
-                currentPlayerId,
-                _aiMoveService.IsAiPlayer(currentPlayerId));
-
-            if (_aiMoveService.IsAiPlayer(currentPlayerId))
-            {
-                _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
-                    },
-                    _logger,
-                    $"AiFirstTurn-{session.Id}");
-            }
-
-            _logger.LogInformation(
-                "AI game {GameId} started",
-                session.Id);
+            await _gameCreationService.CreateAiGameAsync(connectionId, effectivePlayerId, displayName);
         }
         catch (Exception ex)
         {
@@ -347,33 +156,7 @@ public class GameHub : Hub
     /// </summary>
     public async Task<List<int>> GetValidSources()
     {
-        try
-        {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
-            {
-                return new List<int>();
-            }
-
-            if (!session.IsPlayerTurn(Context.ConnectionId))
-            {
-                return new List<int>();
-            }
-
-            if (session.Engine.RemainingMoves.Count == 0)
-            {
-                return new List<int>();
-            }
-
-            var validMoves = session.Engine.GetValidMoves();
-            var sources = validMoves.Select(m => m.From).Distinct().ToList();
-            return sources;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting valid sources");
-            return new List<int>();
-        }
+        return _moveQueryService.GetValidSources(Context.ConnectionId);
     }
 
     /// <summary>
@@ -381,63 +164,7 @@ public class GameHub : Hub
     /// </summary>
     public async Task<List<MoveDto>> GetValidDestinations(int fromPoint)
     {
-        try
-        {
-            _logger.LogInformation("GetValidDestinations called for point {FromPoint}", fromPoint);
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
-            {
-                _logger.LogWarning("No session found for player");
-                return new List<MoveDto>();
-            }
-
-            if (!session.IsPlayerTurn(Context.ConnectionId))
-            {
-                _logger.LogWarning("Not player's turn");
-                return new List<MoveDto>();
-            }
-
-            if (session.Engine.RemainingMoves.Count == 0)
-            {
-                _logger.LogWarning("No remaining moves");
-                return new List<MoveDto>();
-            }
-
-            var allValidMoves = session.Engine.GetValidMoves();
-            _logger.LogInformation(
-                "Total valid moves: {Count}",
-                allValidMoves.Count);
-            foreach (var m in allValidMoves)
-            {
-                _logger.LogInformation(
-                    "  Valid move: {From} -> {To} (die: {Die})",
-                    m.From,
-                    m.To,
-                    m.DieValue);
-            }
-
-            var validMoves = allValidMoves
-                .Where(m => m.From == fromPoint)
-                .Select(m => new MoveDto
-                {
-                    From = m.From,
-                    To = m.To,
-                    DieValue = m.DieValue,
-                    IsHit = WillHit(session.Engine, m)
-                })
-                .ToList();
-
-            _logger.LogInformation(
-                "Filtered moves from point {FromPoint}: {Count}",
-                fromPoint,
-                validMoves.Count);
-            return validMoves;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting valid destinations");
-            return new List<MoveDto>();
-        }
+        return _moveQueryService.GetValidDestinations(Context.ConnectionId, fromPoint);
     }
 
     /// <summary>
@@ -869,42 +596,7 @@ public class GameHub : Hub
     {
         try
         {
-            // Validate message is not empty
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return;
-            }
-
-            // Get the game session
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
-            {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
-                return;
-            }
-
-            // Determine sender's color and name
-            var senderColor = session.GetPlayerColor(Context.ConnectionId);
-            if (senderColor == null)
-            {
-                return;
-            }
-
-            var senderName = senderColor == CheckerColor.White
-                ? (session.WhitePlayerName ?? "White")
-                : (session.RedPlayerName ?? "Red");
-
-            // Broadcast to all players in the game
-            await Clients.Group(session.Id).SendAsync(
-                "ReceiveChatMessage",
-                senderName,
-                message,
-                Context.ConnectionId);
-
-            _logger.LogInformation(
-                "Chat message from {Sender} in game {GameId}",
-                senderName,
-                session.Id);
+            await _chatService.SendChatMessageAsync(Context.ConnectionId, message);
         }
         catch (Exception ex)
         {
@@ -939,26 +631,7 @@ public class GameHub : Hub
     /// </summary>
     public async Task<string> ExportPosition()
     {
-        var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-
-        if (session == null)
-        {
-            await Clients.Caller.SendAsync("Error", "You are not in a game");
-            return string.Empty;
-        }
-
-        try
-        {
-            return SgfSerializer.ExportPosition(session.Engine);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error exporting position");
-            await Clients.Caller.SendAsync(
-                "Error",
-                $"Failed to export position: {ex.Message}");
-            return string.Empty;
-        }
+        return await _gameImportExportService.ExportPositionAsync(Context.ConnectionId);
     }
 
     /// <summary>
@@ -966,48 +639,7 @@ public class GameHub : Hub
     /// </summary>
     public async Task ImportPosition(string sgf)
     {
-        var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-
-        if (session == null)
-        {
-            await Clients.Caller.SendAsync("Error", "You are not in a game");
-            return;
-        }
-
-        // Check if import is allowed in this game mode
-        var features = session.GameMode.GetFeatures();
-        if (!features.AllowImportExport)
-        {
-            await Clients.Caller.SendAsync("Error", "Cannot import positions in this game mode");
-            return;
-        }
-
-        try
-        {
-            SgfSerializer.ImportPosition(session.Engine, sgf);
-
-            // Send updated game state to all players
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-            }
-
-            _logger.LogInformation("Position imported successfully for game {GameId}", session.Id);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error importing position");
-            await Clients.Caller.SendAsync(
-                "Error",
-                $"Failed to import position: {ex.Message}");
-        }
+        await _gameImportExportService.ImportPositionAsync(Context.ConnectionId, sgf);
     }
 
     /// <summary>
@@ -1696,23 +1328,6 @@ public class GameHub : Hub
     private string GetEffectivePlayerId(string anonymousPlayerId)
     {
         return GetAuthenticatedUserId() ?? anonymousPlayerId;
-    }
-
-    private bool WillHit(GameEngine engine, Move move)
-    {
-        // Bear-off moves (To = 0 or 25) cannot hit
-        if (move.IsBearOff)
-        {
-            return false;
-        }
-
-        var targetPoint = engine.Board.GetPoint(move.To);
-        if (targetPoint.Color == null || targetPoint.Count == 0)
-        {
-            return false;
-        }
-
-        return targetPoint.Color != engine.CurrentPlayer?.Color && targetPoint.Count == 1;
     }
 
     private async Task HandleDisconnection(string connectionId)

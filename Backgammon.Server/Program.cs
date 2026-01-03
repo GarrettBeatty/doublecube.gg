@@ -156,6 +156,10 @@ builder.Services.AddSingleton<IGameStateService, GameStateService>();
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
 builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>();
+builder.Services.AddSingleton<IGameCreationService, GameCreationService>();
+builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
+builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
+builder.Services.AddSingleton<IChatService, ChatService>();
 
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
