@@ -251,7 +251,14 @@ jobs:
             sleep 2
           done
 
-          # Update Caddy (reload config - no restart needed)
+          # Update Caddy (start if not running, reload if already running)
+          echo "Starting/updating Caddy..."
+          docker-compose -f docker-compose.prod.yml up -d caddy
+
+          # Wait for Caddy to be ready
+          sleep 3
+
+          # Reload Caddy config in case it was already running
           echo "Reloading Caddy configuration..."
           docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
 
