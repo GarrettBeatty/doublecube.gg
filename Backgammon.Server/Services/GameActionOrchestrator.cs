@@ -126,31 +126,27 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         if (session.Engine.Winner != null)
         {
             var stakes = session.Engine.GetGameResult();
-            await _gameStateService.BroadcastGameOverAsync(session);
 
             // Handle match game completion if this is a match game
             await HandleMatchGameCompletion(session);
 
-            // Update game status and stats in background
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+            // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
+            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                    if (session.GameMode.ShouldTrackStats)
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
-                    }
+            if (session.GameMode.ShouldTrackStats)
+            {
+                var game = GameEngineMapper.ToGame(session);
+                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
+            }
 
-                    _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                },
-                _logger,
-                $"UpdateGameCompletion-{session.Id}");
+            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+
+            // Broadcast GameOver AFTER database is updated
+            await _gameStateService.BroadcastGameOverAsync(session);
 
             return ActionResult.GameOver();
         }
@@ -296,8 +292,11 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             if (session.Engine.Winner != null)
             {
                 var stakes = session.Engine.GetGameResult();
-                var finalState = session.GetState();
-                await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+                // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
+                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+                var game = GameEngineMapper.ToGame(session);
+                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
 
                 _logger.LogInformation(
                     "AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
@@ -305,15 +304,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     session.Engine.Winner.Name,
                     stakes);
 
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-                        var game = GameEngineMapper.ToGame(session);
-                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                    },
-                    _logger,
-                    $"AiGameCompletion-{session.Id}");
+                // Broadcast GameOver AFTER database is updated
+                var finalState = session.GetState();
+                await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
             }
         }
         catch (Exception ex)

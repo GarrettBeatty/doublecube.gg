@@ -621,30 +621,25 @@ public class GameHub : Hub
                     else
                     {
                         // AI declined - human wins
+                        await Clients.Caller.SendAsync("Info", "Computer declined the double. You win!");
+
+                        // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
+                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+
+                        if (session.GameMode.ShouldTrackStats)
+                        {
+                            var game = GameEngineMapper.ToGame(session);
+                            await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+                        }
+
+                        _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+
+                        // Broadcast GameOver AFTER database is updated
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var finalState = session.GetState(Context.ConnectionId);
                             await Clients.Caller.SendAsync("GameOver", finalState);
                         }
-
-                        await Clients.Caller.SendAsync("Info", "Computer declined the double. You win!");
-
-                        // Update database and stats (async)
-                        BackgroundTaskHelper.FireAndForget(
-                            async () =>
-                            {
-                                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-
-                                if (session.GameMode.ShouldTrackStats)
-                                {
-                                    var game = GameEngineMapper.ToGame(session);
-                                    await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                                }
-
-                                _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                            },
-                            _logger,
-                            $"UpdateGameCompletion-{session.Id}");
 
                         _sessionManager.RemoveGame(session.Id);
                     }
@@ -716,29 +711,23 @@ public class GameHub : Hub
                 return;
             }
 
-            // Broadcast game over
+            // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
+            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+
+            if (session.GameMode.ShouldTrackStats)
+            {
+                var game = GameEngineMapper.ToGame(session);
+                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
+            }
+
+            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+
+            // Broadcast game over AFTER database is updated
             await _gameStateService.BroadcastGameOverAsync(session);
-
-            // Update database and stats (async)
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-
-                    if (session.GameMode.ShouldTrackStats)
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
-                    }
-
-                    _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-                },
-                _logger,
-                $"UpdateGameCompletion-{session.Id}");
         }
         catch (Exception ex)
         {
@@ -830,10 +819,6 @@ public class GameHub : Hub
             // Get stakes from doubling cube
             var stakes = session.Engine.GetGameResult();
 
-            // Broadcast game over
-            var finalState = session.GetState();
-            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
-
             _logger.LogInformation(
                 "Game {GameId} abandoned by {Player}. Winner: {Winner} (Stakes: {Stakes})",
                 session.Id,
@@ -841,27 +826,25 @@ public class GameHub : Hub
                 opponentPlayer.Name,
                 stakes);
 
-            // Update database and stats (async)
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
+            // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
+            await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
-                    // Skip stats update for non-competitive games
-                    if (session.GameMode.ShouldTrackStats)
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
-                    }
+            // Skip stats update for non-competitive games
+            if (session.GameMode.ShouldTrackStats)
+            {
+                var game = GameEngineMapper.ToGame(session);
+                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+            }
 
-                    _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
-                },
-                _logger,
-                $"UpdateGameAbandoned-{session.Id}");
+            _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
+
+            // Broadcast game over AFTER database is updated
+            var finalState = session.GetState();
+            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
         }
         catch (Exception ex)
         {
