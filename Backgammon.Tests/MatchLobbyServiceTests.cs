@@ -1,8 +1,9 @@
-using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using Match = Backgammon.Server.Models.Match;
+using MatchConfig = Backgammon.Server.Models.MatchConfig;
 
 namespace Backgammon.Tests;
 
@@ -111,7 +112,7 @@ public class MatchLobbyServiceTests
         {
             MatchId = matchId,
             Player1Id = "player123",
-            Player2Id = null,
+            Player2Id = string.Empty,
             IsOpenLobby = true
         };
         var updatedMatch = new Match
@@ -173,7 +174,7 @@ public class MatchLobbyServiceTests
         {
             MatchId = matchId,
             Player1Id = playerId,
-            Player2Id = null // No opponent
+            Player2Id = string.Empty // No opponent
         };
 
         _matchServiceMock.Setup(m => m.GetMatchLobbyAsync(matchId))

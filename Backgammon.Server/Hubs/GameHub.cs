@@ -2187,7 +2187,6 @@ public class GameHub : Hub
         }
     }
 
-
     /// <summary>
     /// Override the existing MakeMove to handle match game completion
     /// </summary>

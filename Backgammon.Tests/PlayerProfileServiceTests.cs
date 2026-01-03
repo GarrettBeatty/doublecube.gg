@@ -39,7 +39,7 @@ public class PlayerProfileServiceTests
     public async Task GetPlayerProfileAsync_EmptyUsername_ReturnsError()
     {
         // Act
-        var (profile, error) = await _service.GetPlayerProfileAsync("", null);
+        var (profile, error) = await _service.GetPlayerProfileAsync(string.Empty, null);
 
         // Assert
         Assert.Null(profile);

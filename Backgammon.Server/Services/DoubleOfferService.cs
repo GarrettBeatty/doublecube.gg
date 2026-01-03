@@ -31,13 +31,15 @@ public class DoubleOfferService : IDoubleOfferService
             return (false, 0, 0, "Can only double before rolling dice");
         }
 
+        // Get current cube value before doubling
+        var currentValue = session.Engine.DoublingCube.Value;
+
         // Check if player can offer double
         if (!session.Engine.OfferDouble())
         {
             return (false, 0, 0, "Cannot offer double - opponent owns the cube");
         }
 
-        var currentValue = session.Engine.DoublingCube.Value / 2; // Value before doubling
         var newValue = session.Engine.DoublingCube.Value;
 
         _logger.LogInformation(

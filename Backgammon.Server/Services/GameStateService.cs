@@ -109,7 +109,7 @@ public class GameStateService : IGameStateService
         }
     }
 
-    public async Task BroadcastMatchUpdateAsync(Match match, string gameId, IHubCallerClients clients)
+    public async Task BroadcastMatchUpdateAsync(Models.Match match, string gameId, IHubCallerClients clients)
     {
         await clients.Group(gameId).SendAsync("MatchUpdate", new
         {

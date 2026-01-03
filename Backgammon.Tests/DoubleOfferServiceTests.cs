@@ -39,7 +39,11 @@ public class DoubleOfferServiceTests
         var session = CreateTestGameSession();
         session.Engine.StartNewGame();
         session.Engine.RollDice();
-        var currentPlayerConnection = session.WhiteConnectionId!;
+
+        // Get the connection ID of the current player (who just rolled)
+        var currentPlayerConnection = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+            ? session.WhiteConnectionId!
+            : session.RedConnectionId!;
 
         // Act
         var (success, _, _, error) = await _service.OfferDoubleAsync(session, currentPlayerConnection);
@@ -69,7 +73,9 @@ public class DoubleOfferServiceTests
     public async Task DeclineDoubleAsync_GameNotStarted_ReturnsFalse()
     {
         // Arrange
-        var session = CreateTestGameSession();
+        var session = new GameSession("test-game-id");
+        session.AddPlayer("white-player", "white-connection");
+        // Don't add second player - game won't auto-start
         var connectionId = session.WhiteConnectionId!;
 
         // Act
@@ -95,7 +101,8 @@ public class DoubleOfferServiceTests
         Assert.True(success);
         Assert.NotNull(winner);
         Assert.Equal(CheckerColor.Red, winner.Color);
-        Assert.Equal(1, stakes);
+        // Starting position is a backgammon (loser has checkers in winner's home board)
+        Assert.Equal(3, stakes);
     }
 
     [Fact]
@@ -136,7 +143,7 @@ public class DoubleOfferServiceTests
 
     private GameSession CreateTestGameSession()
     {
-        var session = new GameSession();
+        var session = new GameSession("test-game-id");
         session.AddPlayer("white-player", "white-connection");
         session.AddPlayer("red-player", "red-connection");
         return session;

@@ -36,6 +36,7 @@ public class MatchLobbyService : IMatchLobbyService
         {
             opponentId = config.OpponentId;
         }
+
         // For AI matches, set the AI opponent ID
         else if (config.OpponentType == "AI" && !string.IsNullOrEmpty(config.OpponentId))
         {
@@ -163,7 +164,7 @@ public class MatchLobbyService : IMatchLobbyService
         return (true, game, updatedMatch, null);
     }
 
-    public async Task LeaveMatchLobbyAsync(string matchId, string playerId)
+    public async Task<bool> LeaveMatchLobbyAsync(string matchId, string playerId)
     {
         await _matchService.LeaveMatchLobbyAsync(matchId, playerId);
         _logger.LogInformation("Player {PlayerId} left match lobby {MatchId}", playerId, matchId);

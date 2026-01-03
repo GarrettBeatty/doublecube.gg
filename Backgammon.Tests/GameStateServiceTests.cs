@@ -24,7 +24,7 @@ public class GameStateServiceTests
         // Arrange
         var session = CreateTestGameSession();
         var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<IClientProxy>();
+        var clientProxyMock = new Mock<ISingleClientProxy>();
 
         clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
@@ -46,7 +46,7 @@ public class GameStateServiceTests
         // Arrange
         var session = CreateTestGameSession();
         var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<IClientProxy>();
+        var clientProxyMock = new Mock<ISingleClientProxy>();
 
         clientsMock.Setup(c => c.Client(It.IsAny<string>())).Returns(clientProxyMock.Object);
 
@@ -95,7 +95,7 @@ public class GameStateServiceTests
         var session = CreateTestGameSession();
         var connectionId = "test-connection";
         var clientsMock = new Mock<IHubCallerClients>();
-        var clientProxyMock = new Mock<IClientProxy>();
+        var clientProxyMock = new Mock<ISingleClientProxy>();
 
         clientsMock.Setup(c => c.Client(connectionId)).Returns(clientProxyMock.Object);
 
@@ -113,7 +113,7 @@ public class GameStateServiceTests
 
     private GameSession CreateTestGameSession()
     {
-        var session = new GameSession();
+        var session = new GameSession("test-game-id");
         session.AddPlayer("white-player", "white-connection");
         session.AddPlayer("red-player", "red-connection");
         session.Engine.StartNewGame();
