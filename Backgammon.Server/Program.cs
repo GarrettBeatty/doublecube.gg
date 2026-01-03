@@ -286,46 +286,62 @@ app.MapGet("/", () => "Backgammon SignalR Server Running - Connect via /gamehub"
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow }).RequireCors(selectedCorsPolicy);
 
 // Game statistics endpoint
-app.MapGet("/stats", (IGameSessionManager sessionManager) =>
+app.MapGet("/stats", async (IGameSessionManager sessionManager, IGameRepository gameRepository) =>
 {
-    var games = sessionManager.GetAllGames().ToList();
+    // Get counts from DATABASE (source of truth for persisted games)
+    var totalGames = await gameRepository.GetTotalGameCountAsync(null); // All statuses
+    var activeGamesCount = await gameRepository.GetTotalGameCountAsync("InProgress");
+    var completedGamesCount = await gameRepository.GetTotalGameCountAsync("Completed");
+    var abandonedGamesCount = await gameRepository.GetTotalGameCountAsync("Abandoned");
+
+    // Get waiting games from MEMORY (not yet persisted)
+    var memoryGames = sessionManager.GetAllGames().ToList();
+    var waitingGamesCount = memoryGames.Count(g => !g.IsFull);
+
     return new
     {
-        totalGames = games.Count,
-        activeGames = games.Count(g => g.IsFull && g.Engine.Winner == null),
-        waitingGames = games.Count(g => !g.IsFull),
-        completedGames = games.Count(g => g.Engine.Winner != null)
+        totalGames = totalGames + waitingGamesCount, // DB + waiting
+        activeGames = activeGamesCount,
+        waitingGames = waitingGamesCount,
+        completedGames = completedGamesCount,
+        abandonedGames = abandonedGamesCount
     };
 }).RequireCors(selectedCorsPolicy);
 
 // Game list endpoint - returns list of games available to join
-app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
+app.MapGet("/api/games", async (IGameSessionManager sessionManager, IGameRepository gameRepository) =>
 {
-    var allGames = sessionManager.GetAllGames().ToList();
+    // Get active games from DATABASE (source of truth)
+    var dbActiveGames = await gameRepository.GetActiveGamesAsync();
+    var activeGamesList = dbActiveGames.Select(g => new
+    {
+        gameId = g.GameId,
+        whitePlayer = g.WhitePlayerName ?? "Player 1",
+        redPlayer = g.RedPlayerName ?? "Player 2",
+        whiteUsername = g.WhitePlayerName,
+        redUsername = g.RedPlayerName,
+        status = "playing",
+        createdAt = g.CreatedAt
+    }).ToList();
+
+    // Get waiting games from MEMORY (not yet persisted to DB)
+    var memoryGames = sessionManager.GetAllGames().ToList();
+    var waitingGamesList = memoryGames
+        .Where(g => !g.IsFull && g.Engine.Winner == null)
+        .Select(g => new
+        {
+            gameId = g.Id,
+            playerName = g.WhitePlayerName ?? g.RedPlayerName ?? "Waiting player",
+            playerUsername = g.WhitePlayerName ?? g.RedPlayerName,
+            waitingSince = g.CreatedAt,
+            minutesWaiting = (int)(DateTime.UtcNow - g.CreatedAt).TotalMinutes
+        })
+        .ToList();
 
     return new
     {
-        activeGames = allGames
-            .Where(g => g.IsFull && g.Engine.Winner == null)
-            .Select(g => new
-            {
-                gameId = g.Id,
-                whitePlayer = g.WhitePlayerName ?? "Player 1",
-                redPlayer = g.RedPlayerName ?? "Player 2",
-                status = "playing",
-                createdAt = g.CreatedAt
-            })
-            .ToList(),
-        waitingGames = allGames
-            .Where(g => !g.IsFull && g.Engine.Winner == null)
-            .Select(g => new
-            {
-                gameId = g.Id,
-                playerName = g.WhitePlayerName ?? g.RedPlayerName ?? "Waiting player",
-                waitingSince = g.CreatedAt,
-                minutesWaiting = (int)(DateTime.UtcNow - g.CreatedAt).TotalMinutes
-            })
-            .ToList()
+        activeGames = activeGamesList,
+        waitingGames = waitingGamesList
     };
 }).RequireCors(selectedCorsPolicy);
 
