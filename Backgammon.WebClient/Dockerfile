@@ -12,7 +12,8 @@ RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
 # Copy source code and publish directly (skip separate build step)
 COPY . .
 WORKDIR "/src/Backgammon.WebClient"
-RUN dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
+    dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no-restore
 
 # Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
