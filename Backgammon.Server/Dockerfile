@@ -5,6 +5,7 @@ WORKDIR /src
 # Copy csproj files and restore dependencies (layer caching optimization)
 COPY ["Backgammon.Server/Backgammon.Server.csproj", "Backgammon.Server/"]
 COPY ["Backgammon.Core/Backgammon.Core.csproj", "Backgammon.Core/"]
+COPY ["Backgammon.AI/Backgammon.AI.csproj", "Backgammon.AI/"]
 COPY ["Backgammon.ServiceDefaults/Backgammon.ServiceDefaults.csproj", "Backgammon.ServiceDefaults/"]
 # Use BuildKit cache mount to cache NuGet packages across builds
 RUN --mount=type=cache,id=nuget-server,target=/root/.nuget/packages \
