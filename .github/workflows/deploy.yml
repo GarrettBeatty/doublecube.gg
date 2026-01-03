@@ -102,6 +102,22 @@ jobs:
           # Pull new images
           docker-compose -f docker-compose.prod.yml pull
 
+          # Ensure Redis is running (required for SignalR backplane)
+          echo "Starting Redis if not already running..."
+          docker-compose -f docker-compose.prod.yml up -d redis
+
+          # Wait for Redis to be healthy
+          echo "Waiting for Redis to become healthy..."
+          for i in {1..30}; do
+            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "unknown")
+            if [ "$HEALTH" = "healthy" ]; then
+              echo "✓ Redis is healthy"
+              break
+            fi
+            echo "Attempt $i/30: Redis status = $HEALTH"
+            sleep 2
+          done
+
           # Rolling update strategy for zero downtime
           echo "Starting rolling update..."
 
