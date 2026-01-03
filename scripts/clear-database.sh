@@ -149,12 +149,58 @@ else
     echo -e "  ${GREEN}✓ Deleted $pg_deleted player-game entries${NC}"
 fi
 
+# Delete player-match index entries (USER#* with SK starting with MATCH#)
+echo -e "${YELLOW}Deleting player-match index entries...${NC}"
+player_match_items=$(aws dynamodb scan \
+    --table-name "$TABLE_NAME" \
+    --filter-expression "begins_with(PK, :pk_prefix) AND begins_with(SK, :sk_prefix)" \
+    --expression-attribute-values '{":pk_prefix":{"S":"USER#"},":sk_prefix":{"S":"MATCH#"}}' \
+    --region "$REGION" \
+    $ENDPOINT_ARGS \
+    --output json 2>/dev/null || echo '{"Items":[]}')
+
+pm_count=$(echo "$player_match_items" | jq -r '.Items | length')
+if [ "$pm_count" -eq 0 ]; then
+    echo "  No player-match entries found."
+else
+    echo "  Found $pm_count player-match entries to delete..."
+
+    # Delete in batches of 25
+    pm_deleted=0
+    batch_size=25
+    pm_keys=$(echo "$player_match_items" | jq -c '[.Items[] | {PK: .PK, SK: .SK}]')
+    total_batches=$(( (pm_count + batch_size - 1) / batch_size ))
+
+    for ((i=0; i<pm_count; i+=batch_size)); do
+        # Extract batch of keys
+        batch=$(echo "$pm_keys" | jq -c ".[${i}:${i}+${batch_size}]")
+
+        # Build batch delete request
+        request=$(echo "$batch" | jq -c "{\"$TABLE_NAME\": [.[] | {DeleteRequest: {Key: .}}]}")
+
+        # Execute batch delete
+        aws dynamodb batch-write-item \
+            --request-items "$request" \
+            --region "$REGION" \
+            $ENDPOINT_ARGS \
+            > /dev/null 2>&1
+
+        pm_deleted=$((pm_deleted + $(echo "$batch" | jq -r 'length')))
+        batch_num=$(( (i / batch_size) + 1 ))
+        echo "    Batch $batch_num/$total_batches: Deleted $pm_deleted/$pm_count items..."
+    done
+
+    echo -e "  ${GREEN}✓ Deleted $pm_deleted player-match entries${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}✅ Database cleanup complete!${NC}"
 echo ""
 echo "What was cleared:"
 echo "  • All games (completed, active, abandoned)"
+echo "  • All matches (including lobbies)"
 echo "  • All player-game index entries"
+echo "  • All player-match index entries"
 echo ""
 echo "What was preserved:"
 echo "  • User accounts"
