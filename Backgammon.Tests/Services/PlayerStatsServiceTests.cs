@@ -1,0 +1,328 @@
+using Backgammon.Server.Models;
+using Backgammon.Server.Services;
+using Microsoft.Extensions.Logging;
+using Moq;
+
+namespace Backgammon.Tests.Services;
+
+public class PlayerStatsServiceTests
+{
+    private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<ILogger<PlayerStatsService>> _mockLogger;
+    private readonly PlayerStatsService _service;
+
+    public PlayerStatsServiceTests()
+    {
+        _mockUserRepository = new Mock<IUserRepository>();
+        _mockLogger = new Mock<ILogger<PlayerStatsService>>();
+        _service = new PlayerStatsService(_mockUserRepository.Object, _mockLogger.Object);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_WaitingForPlayer_SkipsUpdate()
+    {
+        // Arrange
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "player-1",
+            RedPlayerId = null // No red player = waiting
+        };
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - should skip because no red player
+        _mockUserRepository.Verify(
+            r => r.GetByUserIdAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_NoRedPlayer_SkipsUpdate()
+    {
+        // Arrange
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "player-1",
+            RedPlayerId = string.Empty
+        };
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        _mockUserRepository.Verify(
+            r => r.GetByUserIdAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_AiOpponent_SkipsUpdate()
+    {
+        // Arrange
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "player-1",
+            RedPlayerId = "ai-123",
+            IsAiOpponent = true
+        };
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        _mockUserRepository.Verify(
+            r => r.GetByUserIdAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_WhiteWins_UpdatesBothPlayersCorrectly()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - White player (winner)
+        Assert.Equal(1, whiteUser.Stats.TotalGames);
+        Assert.Equal(1, whiteUser.Stats.Wins);
+        Assert.Equal(0, whiteUser.Stats.Losses);
+        Assert.Equal(1, whiteUser.Stats.TotalStakes);
+        Assert.Equal(1, whiteUser.Stats.WinStreak);
+        Assert.Equal(1, whiteUser.Stats.NormalWins);
+
+        // Assert - Red player (loser)
+        Assert.Equal(1, redUser.Stats.TotalGames);
+        Assert.Equal(0, redUser.Stats.Wins);
+        Assert.Equal(1, redUser.Stats.Losses);
+        Assert.Equal(0, redUser.Stats.WinStreak);
+
+        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateStatsAsync("red-user", redUser.Stats), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_GammonWin_RecordsCorrectWinType()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = "user-123",
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "user-123",
+            Winner = "White",
+            Stakes = 2, // Gammon
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("user-123")).ReturnsAsync(user);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        Assert.Equal(1, user.Stats.Wins);
+        Assert.Equal(2, user.Stats.TotalStakes);
+        Assert.Equal(1, user.Stats.GammonWins);
+        Assert.Equal(0, user.Stats.NormalWins);
+        Assert.Equal(0, user.Stats.BackgammonWins);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_BackgammonWin_RecordsCorrectWinType()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = "user-123",
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "user-123",
+            Winner = "White",
+            Stakes = 3, // Backgammon
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("user-123")).ReturnsAsync(user);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        Assert.Equal(1, user.Stats.Wins);
+        Assert.Equal(3, user.Stats.TotalStakes);
+        Assert.Equal(1, user.Stats.BackgammonWins);
+        Assert.Equal(0, user.Stats.NormalWins);
+        Assert.Equal(0, user.Stats.GammonWins);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_WinStreak_UpdatesCorrectly()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = "user-123",
+            Stats = new UserStats
+            {
+                WinStreak = 2,
+                BestWinStreak = 2
+            }
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "user-123",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("user-123")).ReturnsAsync(user);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        Assert.Equal(3, user.Stats.WinStreak);
+        Assert.Equal(3, user.Stats.BestWinStreak);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_Loss_ResetsWinStreak()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = "user-123",
+            Stats = new UserStats
+            {
+                WinStreak = 5,
+                BestWinStreak = 5
+            }
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "user-123",
+            Winner = "Red", // User loses
+            Stakes = 1,
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("user-123")).ReturnsAsync(user);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        Assert.Equal(1, user.Stats.Losses);
+        Assert.Equal(0, user.Stats.WinStreak);
+        Assert.Equal(5, user.Stats.BestWinStreak); // Best streak unchanged
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_UserNotFound_DoesNotThrow()
+    {
+        // Arrange
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "non-existent-user",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("non-existent-user")).ReturnsAsync((User?)null);
+
+        // Act & Assert - should not throw
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        _mockUserRepository.Verify(
+            r => r.UpdateStatsAsync(It.IsAny<string>(), It.IsAny<UserStats>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_OnlyWhiteUserRegistered_UpdatesOnlyWhite()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = null, // Red not registered
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert
+        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
+        Assert.Equal(1, whiteUser.Stats.Wins);
+    }
+}

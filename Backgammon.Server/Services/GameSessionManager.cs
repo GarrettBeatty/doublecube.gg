@@ -136,20 +136,15 @@ public class GameSessionManager : IGameSessionManager
                 throw new InvalidOperationException("You are not a player in this game");
             }
 
-            // If game exists in DB but is not InProgress, don't allow joining/creating
+            // If game exists in DB but is not InProgress, don't allow joining
             if (game != null)
             {
                 throw new InvalidOperationException($"This game has already ended (Status: {game.Status})");
             }
 
-            // Game doesn't exist in DB - create new with specified ID
-            lock (_lock)
-            {
-                var newGame = CreateGame(gameId);
-                newGame.AddPlayer(playerId, connectionId);
-                _playerToGame[connectionId] = gameId;
-                return newGame;
-            }
+            // Game doesn't exist - security check to prevent arbitrary game ID creation via URL
+            // Games can only be created via gameId=null (auto-generated ID) or explicit creation methods
+            throw new InvalidOperationException($"Game {gameId} not found");
         }
 
         // When gameId is null, ALWAYS create a new game (no matchmaking)

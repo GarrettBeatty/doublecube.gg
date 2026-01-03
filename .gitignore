@@ -56,6 +56,11 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Test artifacts
+TestResults/
+*.cobertura.xml
+coverage.cobertura.xml
+
 # macOS
 .DS_Store
 .azure
