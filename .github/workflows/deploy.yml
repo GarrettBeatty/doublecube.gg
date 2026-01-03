@@ -148,87 +148,44 @@ jobs:
           # Pull new images
           docker-compose -f docker-compose.prod.yml pull
 
-          # Ensure Redis is running (required for SignalR backplane)
-          echo "Starting Redis if not already running..."
-          docker-compose -f docker-compose.prod.yml up -d redis
+          # Start all services
+          echo "Starting services..."
+          docker-compose -f docker-compose.prod.yml up -d
 
-          # Wait for Redis to be healthy
-          echo "Waiting for Redis to become healthy..."
+          # Wait for all services to be healthy
+          echo "Waiting for services to become healthy..."
+
           for i in {1..30}; do
-            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "unknown")
-            if [ "$HEALTH" = "healthy" ]; then
+            REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "unknown")
+            if [ "$REDIS_HEALTH" = "healthy" ]; then
               echo "✓ Redis is healthy"
               break
             fi
-            echo "Attempt $i/30: Redis status = $HEALTH"
+            echo "Attempt $i/30: Redis status = $REDIS_HEALTH"
             sleep 2
           done
 
-          # Rolling update strategy for zero downtime
-          echo "Starting rolling update..."
-
-          # Update server-1 first
-          echo "Updating server-1..."
-          docker-compose -f docker-compose.prod.yml up -d --no-deps server-1
-
-          # Wait for server-1 to be healthy (using docker health check)
-          echo "Waiting for server-1 to become healthy..."
           for i in {1..60}; do
-            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server-1 2>/dev/null || echo "unknown")
-            if [ "$HEALTH" = "healthy" ]; then
-              echo "✓ server-1 is healthy"
+            SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "unknown")
+            if [ "$SERVER_HEALTH" = "healthy" ]; then
+              echo "✓ Server is healthy"
               break
             fi
-            echo "Attempt $i/60: server-1 status = $HEALTH"
+            echo "Attempt $i/60: Server status = $SERVER_HEALTH"
             sleep 2
           done
 
-          # Give it extra time to stabilize
-          sleep 5
-
-          # Update server-2
-          echo "Updating server-2..."
-          docker-compose -f docker-compose.prod.yml up -d --no-deps server-2
-
-          # Wait for server-2 to be healthy (using docker health check)
-          echo "Waiting for server-2 to become healthy..."
           for i in {1..60}; do
-            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server-2 2>/dev/null || echo "unknown")
-            if [ "$HEALTH" = "healthy" ]; then
-              echo "✓ server-2 is healthy"
+            WEBCLIENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "unknown")
+            if [ "$WEBCLIENT_HEALTH" = "healthy" ]; then
+              echo "✓ WebClient is healthy"
               break
             fi
-            echo "Attempt $i/60: server-2 status = $HEALTH"
+            echo "Attempt $i/60: WebClient status = $WEBCLIENT_HEALTH"
             sleep 2
           done
 
-          # Give it extra time to stabilize
-          sleep 5
-
-          # Update webclient
-          echo "Updating webclient..."
-          docker-compose -f docker-compose.prod.yml up -d --no-deps webclient
-
-          # Wait for webclient to be healthy
-          echo "Waiting for webclient to become healthy..."
-          for i in {1..60}; do
-            HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "unknown")
-            if [ "$HEALTH" = "healthy" ]; then
-              echo "✓ webclient is healthy"
-              break
-            fi
-            echo "Attempt $i/60: webclient status = $HEALTH"
-            sleep 2
-          done
-
-          # Update Caddy (start if not running, reload if already running)
-          echo "Starting/updating Caddy..."
-          docker-compose -f docker-compose.prod.yml up -d caddy
-
-          # Wait for Caddy to be ready
-          sleep 3
-
-          # Reload Caddy config in case it was already running
+          # Reload Caddy config
           echo "Reloading Caddy configuration..."
           docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
 
