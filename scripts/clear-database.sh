@@ -102,6 +102,9 @@ delete_items() {
 # Delete games (GAME#* primary keys)
 delete_items "GAME#" "all games"
 
+# Delete matches (MATCH#* primary keys)
+delete_items "MATCH#" "all matches"
+
 # Delete player-game index entries (USER#* with SK starting with GAME#)
 echo -e "${YELLOW}Deleting player-game index entries...${NC}"
 player_game_items=$(aws dynamodb scan \
