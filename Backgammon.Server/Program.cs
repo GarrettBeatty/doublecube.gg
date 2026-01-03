@@ -326,12 +326,26 @@ app.MapGet("/api/games", (IGameSessionManager sessionManager) =>
 }).RequireCors(selectedCorsPolicy);
 
 // My games endpoint - returns active games for a specific player
-app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameRepository gameRepository) =>
+app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameRepository gameRepository, IGameSessionManager sessionManager) =>
 {
-    // Query database for all InProgress games (source of truth)
-    var dbGames = await gameRepository.GetPlayerGamesAsync(playerId, "InProgress", limit: 50);
+    // 1. Get waiting games from memory (not yet saved to DB)
+    var memoryGames = sessionManager.GetPlayerGames(playerId)
+        .Where(g => !g.IsFull) // Only waiting games
+        .Select(g => new
+        {
+            gameId = g.Id,
+            myColor = g.WhitePlayerId == playerId ? "White" : "Red",
+            opponent = "Waiting for opponent",
+            isFull = false,
+            isMyTurn = false,
+            createdAt = g.CreatedAt,
+            lastActivity = g.LastActivityAt
+        })
+        .ToList();
 
-    return dbGames.Select(g => new
+    // 2. Get in-progress games from database
+    var dbGames = await gameRepository.GetPlayerGamesAsync(playerId, "InProgress", limit: 50);
+    var dbGameList = dbGames.Select(g => new
     {
         gameId = g.GameId,
         myColor = g.WhitePlayerId == playerId ? "White" : "Red",
@@ -342,7 +356,13 @@ app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameR
         isMyTurn = g.CurrentPlayer == (g.WhitePlayerId == playerId ? "White" : "Red"),
         createdAt = g.CreatedAt,
         lastActivity = g.LastUpdatedAt
-    }).ToList();
+    })
+    .ToList();
+
+    // Combine and return sorted by most recent activity
+    return memoryGames.Concat(dbGameList)
+        .OrderByDescending(g => g.lastActivity)
+        .ToList();
 }).RequireCors(selectedCorsPolicy);
 
 // Bot games endpoint - returns active bot games for spectating

@@ -155,21 +155,12 @@ public class GameHub : Hub
             }
             else
             {
-                // Waiting for opponent - save to database so it shows in dashboard
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _gameRepository.SaveGameAsync(game);
-                    },
-                    _logger,
-                    $"SaveGameState-{session.Id}");
-
+                // Waiting for opponent - game stays in memory only until opponent joins
                 var state = session.GetState(connectionId);
                 await Clients.Caller.SendAsync("GameUpdate", state);
                 await Clients.Caller.SendAsync("WaitingForOpponent", session.Id);
                 _logger.LogInformation(
-                    "Player {PlayerId} waiting in game {GameId}",
+                    "Player {PlayerId} waiting in game {GameId} (in-memory only)",
                     effectivePlayerId,
                     session.Id);
             }
@@ -770,23 +761,10 @@ public class GameHub : Hub
                 // Remove player from group
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
 
-                // Remove game completely from session manager
+                // Remove game completely from session manager (no DB update needed - game was never persisted)
                 _sessionManager.RemoveGame(gameId);
 
-                _logger.LogInformation("Game {GameId} abandoned by player while waiting for opponent", gameId);
-
-                // Update database to mark as abandoned but don't update stats
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        await _gameRepository.UpdateGameStatusAsync(gameId, "Abandoned");
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to update abandoned game {GameId}", gameId);
-                    }
-                });
+                _logger.LogInformation("Game {GameId} cancelled by player while waiting for opponent (removed from memory)", gameId);
 
                 return;
             }
