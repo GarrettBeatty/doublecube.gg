@@ -206,7 +206,7 @@ public class DynamoDbGameRepository : IGameRepository
             // Update player-game index items
             if (!string.IsNullOrEmpty(game.WhitePlayerId))
             {
-                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.LastUpdatedAt.Ticks).ToString("D19");
+                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.CreatedAt.Ticks).ToString("D19");
                 transactItems.Add(new TransactWriteItem
                 {
                     Update = new Update
@@ -233,7 +233,7 @@ public class DynamoDbGameRepository : IGameRepository
 
             if (!string.IsNullOrEmpty(game.RedPlayerId))
             {
-                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.LastUpdatedAt.Ticks).ToString("D19");
+                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.CreatedAt.Ticks).ToString("D19");
                 transactItems.Add(new TransactWriteItem
                 {
                     Update = new Update
@@ -529,7 +529,7 @@ public class DynamoDbGameRepository : IGameRepository
             // Delete player-game index items
             if (!string.IsNullOrEmpty(game.WhitePlayerId))
             {
-                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.LastUpdatedAt.Ticks).ToString("D19");
+                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.CreatedAt.Ticks).ToString("D19");
                 transactItems.Add(new TransactWriteItem
                 {
                     Delete = new Delete
@@ -546,7 +546,7 @@ public class DynamoDbGameRepository : IGameRepository
 
             if (!string.IsNullOrEmpty(game.RedPlayerId))
             {
-                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.LastUpdatedAt.Ticks).ToString("D19");
+                var reversedTimestamp = (DateTime.MaxValue.Ticks - game.CreatedAt.Ticks).ToString("D19");
                 transactItems.Add(new TransactWriteItem
                 {
                     Delete = new Delete
