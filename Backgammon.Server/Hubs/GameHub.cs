@@ -34,35 +34,41 @@ public class GameHub : Hub
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IFriendshipRepository _friendshipRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IHubContext<GameHub> _hubContext;
-    private readonly IMemoryCache _cache;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
+    private readonly IMatchLobbyService _matchLobbyService;
+    private readonly IDoubleOfferService _doubleOfferService;
+    private readonly IGameStateService _gameStateService;
+    private readonly IPlayerProfileService _playerProfileService;
     private readonly ILogger<GameHub> _logger;
 
     public GameHub(
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
         IUserRepository userRepository,
-        IFriendshipRepository friendshipRepository,
         IAiMoveService aiMoveService,
         IHubContext<GameHub> hubContext,
-        IMemoryCache cache,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
+        IMatchLobbyService matchLobbyService,
+        IDoubleOfferService doubleOfferService,
+        IGameStateService gameStateService,
+        IPlayerProfileService playerProfileService,
         ILogger<GameHub> logger)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _userRepository = userRepository;
-        _friendshipRepository = friendshipRepository;
         _aiMoveService = aiMoveService;
         _hubContext = hubContext;
-        _cache = cache;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
+        _matchLobbyService = matchLobbyService;
+        _doubleOfferService = doubleOfferService;
+        _gameStateService = gameStateService;
+        _playerProfileService = playerProfileService;
         _logger = logger;
     }
 
@@ -115,24 +121,10 @@ public class GameHub : Hub
             if (session.IsFull)
             {
                 // Game is ready to start - send personalized state to each player
-                if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-                {
-                    var whiteState = session.GetState(session.WhiteConnectionId);
-                    await Clients.Client(session.WhiteConnectionId).SendAsync("GameStart", whiteState);
-                }
-
-                if (!string.IsNullOrEmpty(session.RedConnectionId))
-                {
-                    var redState = session.GetState(session.RedConnectionId);
-                    await Clients.Client(session.RedConnectionId).SendAsync("GameStart", redState);
-                }
+                await _gameStateService.BroadcastGameStartAsync(session, Clients);
 
                 // Save game state when game starts (progressive save)
                 await SaveGameStateAsync(session);
-
-                _logger.LogInformation(
-                "Game {GameId} started with both players",
-                session.Id);
 
                 // Check if AI should move first
                 var currentPlayerId = GetCurrentPlayerId(session);
@@ -490,49 +482,8 @@ public class GameHub : Hub
                 session.Engine.Dice.Die1,
                 session.Engine.Dice.Die2);
 
-            // Send personalized state to each player
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                _logger.LogDebug(
-                    "Sending GameUpdate to White player (conn={Conn}). IsYourTurn={IsYourTurn}, Dice=[{Die1},{Die2}]",
-                    session.WhiteConnectionId,
-                    whiteState.IsYourTurn,
-                    whiteState.Dice?.FirstOrDefault(),
-                    whiteState.Dice?.Skip(1).FirstOrDefault());
-                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "White player has no connection ID in game {GameId}",
-                    session.Id);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                _logger.LogDebug(
-                    "Sending GameUpdate to Red player (conn={Conn}). IsYourTurn={IsYourTurn}, Dice=[{Die1},{Die2}]",
-                    session.RedConnectionId,
-                    redState.IsYourTurn,
-                    redState.Dice?.FirstOrDefault(),
-                    redState.Dice?.Skip(1).FirstOrDefault());
-                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-            }
-            else
-            {
-                _logger.LogDebug(
-                    "Red player has no connection ID (AI player) in game {GameId}",
-                    session.Id);
-            }
-
-            // Send updates to all spectators
-            var spectatorState = session.GetState(null); // null = spectator view
-            foreach (var spectatorId in session.SpectatorConnections)
-            {
-                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
-            }
+            // Broadcast game state update to all players
+            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
 
             // Save game state after dice roll (progressive save)
             await SaveGameStateAsync(session);
@@ -602,25 +553,8 @@ public class GameHub : Hub
 
             session.UpdateActivity();
 
-            // Send personalized state to each player
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-            }
-
-            // Send updates to all spectators
-            var spectatorState = session.GetState(null); // null = spectator view
-            foreach (var spectatorId in session.SpectatorConnections)
-            {
-                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
-            }
+            // Broadcast game state update to all players
+            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
 
             // Save game state after move (progressive save)
             await SaveGameStateAsync(session);
@@ -629,14 +563,7 @@ public class GameHub : Hub
             if (session.Engine.Winner != null)
             {
                 var stakes = session.Engine.GetGameResult();
-                // Use group send for game over since it's the same for both players
-                var finalState = session.GetState();
-                await Clients.Group(session.Id).SendAsync("GameOver", finalState);
-                _logger.LogInformation(
-                    "Game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id,
-                    session.Engine.Winner.Name,
-                    stakes);
+                await _gameStateService.BroadcastGameOverAsync(session, Clients);
 
                 // Handle match game completion if this is a match game
                 await HandleMatchGameCompletion(session);
@@ -715,25 +642,8 @@ public class GameHub : Hub
             session.Engine.EndTurn();
             session.UpdateActivity();
 
-            // Send personalized state to each player
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-            }
-
-            // Send updates to all spectators
-            var spectatorStateEndTurn = session.GetState(null); // null = spectator view
-            foreach (var spectatorId in session.SpectatorConnections)
-            {
-                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorStateEndTurn);
-            }
+            // Broadcast game state update to all players
+            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
 
             // Save game state after turn end (progressive save)
             await SaveGameStateAsync(session);
@@ -807,25 +717,8 @@ public class GameHub : Hub
 
             session.UpdateActivity();
 
-            // Send updated state to both players
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                await Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
-            }
-
-            // Send updates to spectators
-            var spectatorState = session.GetState(null);
-            foreach (var spectatorId in session.SpectatorConnections)
-            {
-                await Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
-            }
+            // Broadcast game state update to all players
+            await _gameStateService.BroadcastGameUpdateAsync(session, Clients);
 
             // Save updated game state
             await SaveGameStateAsync(session);
@@ -856,49 +749,21 @@ public class GameHub : Hub
                 return;
             }
 
-            if (!session.IsPlayerTurn(Context.ConnectionId))
+            var (success, currentValue, newValue, error) = await _doubleOfferService.OfferDoubleAsync(session, Context.ConnectionId);
+            if (!success)
             {
-                await Clients.Caller.SendAsync("Error", "Not your turn");
+                await Clients.Caller.SendAsync("Error", error);
                 return;
             }
-
-            // Can only double before rolling dice
-            if (session.Engine.RemainingMoves.Count > 0 || session.Engine.Dice.Die1 != 0)
-            {
-                await Clients.Caller.SendAsync("Error", "Can only double before rolling dice");
-                return;
-            }
-
-            // Check if player can offer double
-            if (!session.Engine.OfferDouble())
-            {
-                await Clients.Caller.SendAsync("Error", "Cannot offer double - opponent owns the cube");
-                return;
-            }
-
-            var currentValue = session.Engine.DoublingCube.Value;
-            var newValue = currentValue * 2;
 
             // Notify opponent of the double offer
             var opponentConnectionId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
                 ? session.RedConnectionId
                 : session.WhiteConnectionId;
 
-            _logger.LogInformation(
-                "OfferDouble: opponentConnectionId={OpponentConnectionId}, WhiteConn={WhiteConn}, RedConn={RedConn}",
-                opponentConnectionId ?? "null",
-                session.WhiteConnectionId ?? "null",
-                session.RedConnectionId ?? "null");
-
             if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
             {
-                await Clients.Client(opponentConnectionId).SendAsync("DoubleOffered", currentValue, newValue);
-                _logger.LogInformation(
-                    "Player {ConnectionId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
-                    Context.ConnectionId,
-                    session.Id,
-                    currentValue,
-                    newValue);
+                await _gameStateService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue, Clients);
             }
             else
             {
@@ -907,69 +772,25 @@ public class GameHub : Hub
                     ? session.RedPlayerId
                     : session.WhitePlayerId;
 
-                _logger.LogInformation(
-                    "OfferDouble: Checking AI opponent. OpponentPlayerId={OpponentPlayerId}, IsAiPlayer={IsAi}",
-                    opponentPlayerId ?? "null",
-                    opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId));
-
                 if (opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId))
                 {
-                    _logger.LogInformation(
-                        "AI opponent {AiPlayerId} evaluating double offer in game {GameId}. Stakes: {Current}x → {New}x",
-                        opponentPlayerId,
-                        session.Id,
-                        currentValue,
-                        newValue);
+                    var (accepted, winner, stakes) = await _doubleOfferService.HandleAiDoubleResponseAsync(
+                        session, opponentPlayerId, currentValue, newValue);
 
-                    // AI decision logic: Accept if new value <= 4, otherwise decline
-                    // This is a simple conservative strategy
-                    bool aiAccepts = newValue <= 4;
-
-                    // Small delay to make it feel more natural
-                    await Task.Delay(1000);
-
-                    if (aiAccepts)
+                    if (accepted)
                     {
-                        _logger.LogInformation("AI {AiPlayerId} accepted the double", opponentPlayerId);
-                        session.Engine.AcceptDouble();
-                        session.UpdateActivity();
-
-                        // Send updated state to the human player (use DoubleAccepted for consistency)
+                        // AI accepted - send updated state to human player
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var state = session.GetState(Context.ConnectionId);
                             await Clients.Caller.SendAsync("DoubleAccepted", state);
                         }
 
-                        // Save game state
                         await SaveGameStateAsync(session);
-
-                        _logger.LogInformation(
-                            "AI accepted double in game {GameId}. New stakes: {Stakes}x",
-                            session.Id,
-                            session.Engine.DoublingCube.Value);
                     }
                     else
                     {
-                        _logger.LogInformation("AI {AiPlayerId} declined the double", opponentPlayerId);
-
-                        // Determine human player (opponent of AI)
-                        var humanColor = session.GetPlayerColor(Context.ConnectionId);
-                        var humanPlayer = humanColor == CheckerColor.White
-                            ? session.Engine.WhitePlayer
-                            : session.Engine.RedPlayer;
-
-                        // AI declines - human wins at current stakes
-                        session.Engine.ForfeitGame(humanPlayer);
-                        var stakes = session.Engine.GetGameResult();
-
-                        _logger.LogInformation(
-                            "Game {GameId} ended. AI declined double. Winner: {Winner} (Stakes: {Stakes})",
-                            session.Id,
-                            humanPlayer.Name,
-                            stakes);
-
-                        // Send game over event to human player
+                        // AI declined - human wins
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var finalState = session.GetState(Context.ConnectionId);
@@ -985,11 +806,9 @@ public class GameHub : Hub
                             {
                                 await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                                // Skip stats update for non-competitive games
                                 if (session.GameMode.ShouldTrackStats)
                                 {
                                     var game = GameEngineMapper.ToGame(session);
-                                    // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                                     await UpdateUserStatsAfterGame(game);
                                 }
 
@@ -1001,7 +820,6 @@ public class GameHub : Hub
                             }
                         });
 
-                        // Clean up game session
                         _sessionManager.RemoveGame(session.Id);
                     }
                 }
@@ -1029,30 +847,13 @@ public class GameHub : Hub
             }
 
             // Accept the double
-            session.Engine.AcceptDouble();
-            session.UpdateActivity();
+            await _doubleOfferService.AcceptDoubleAsync(session);
 
-            // Send updated state to both players
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
-            {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await Clients.Client(session.WhiteConnectionId).SendAsync("DoubleAccepted", whiteState);
-            }
-
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
-            {
-                var redState = session.GetState(session.RedConnectionId);
-                await Clients.Client(session.RedConnectionId).SendAsync("DoubleAccepted", redState);
-            }
+            // Broadcast double accepted to both players
+            await _gameStateService.BroadcastDoubleAcceptedAsync(session, Clients);
 
             // Save game state
             await SaveGameStateAsync(session);
-
-            _logger.LogInformation(
-                "Player {ConnectionId} accepted double in game {GameId}. New stakes: {Stakes}x",
-                Context.ConnectionId,
-                session.Id,
-                session.Engine.DoublingCube.Value);
         }
         catch (Exception ex)
         {
@@ -1075,51 +876,15 @@ public class GameHub : Hub
                 return;
             }
 
-            // Determine declining player and opponent
-            var decliningColor = session.GetPlayerColor(Context.ConnectionId);
-            if (decliningColor == null)
+            var (success, winner, stakes, error) = await _doubleOfferService.DeclineDoubleAsync(session, Context.ConnectionId);
+            if (!success)
             {
-                await Clients.Caller.SendAsync("Error", "You are not a player in this game");
+                await Clients.Caller.SendAsync("Error", error);
                 return;
             }
-
-            var decliningPlayer = decliningColor == CheckerColor.White
-                ? session.Engine.WhitePlayer
-                : session.Engine.RedPlayer;
-            var opponentPlayer = decliningColor == CheckerColor.White
-                ? session.Engine.RedPlayer
-                : session.Engine.WhitePlayer;
-
-            // Check if game is already over or hasn't started
-            if (session.Engine.GameOver)
-            {
-                _logger.LogWarning("Game {GameId} is already over, cannot decline double", session.Id);
-                await Clients.Caller.SendAsync("Error", "Game is already finished");
-                return;
-            }
-
-            if (!session.Engine.GameStarted)
-            {
-                _logger.LogWarning("Game {GameId} hasn't started yet, cannot decline double", session.Id);
-                await Clients.Caller.SendAsync("Error", "Game hasn't started yet");
-                return;
-            }
-
-            // Forfeit game - opponent wins at current stakes
-            session.Engine.ForfeitGame(opponentPlayer);
-
-            // Get stakes from current cube value (before the proposed double)
-            var stakes = session.Engine.GetGameResult();
 
             // Broadcast game over
-            var finalState = session.GetState();
-            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
-
-            _logger.LogInformation(
-                "Game {GameId} ended - player declined double. Winner: {Winner} (Stakes: {Stakes})",
-                session.Id,
-                opponentPlayer.Name,
-                stakes);
+            await _gameStateService.BroadcastGameOverAsync(session, Clients);
 
             // Update database and stats (async)
             _ = Task.Run(async () =>
@@ -1128,11 +893,9 @@ public class GameHub : Hub
                 {
                     await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
 
-                    // Skip stats update for non-competitive games
                     if (session.GameMode.ShouldTrackStats)
                     {
                         var game = GameEngineMapper.ToGame(session);
-                        // UpdateUserStatsAfterGame calls UpdateStatsAsync which already invalidates player caches
                         await UpdateUserStatsAfterGame(game);
                     }
                     else
@@ -1461,101 +1224,14 @@ public class GameHub : Hub
     {
         try
         {
-            // Validate username
-            if (string.IsNullOrWhiteSpace(username))
-            {
-                await Clients.Caller.SendAsync("Error", "Username is required");
-                return null;
-            }
-
-            // Get the viewing user (might be anonymous)
             var viewingUserId = GetAuthenticatedUserId();
+            var (profile, error) = await _playerProfileService.GetPlayerProfileAsync(username, viewingUserId);
 
-            // Create cache key based on username and viewer
-            var cacheKey = $"profile:{username}:viewer:{viewingUserId ?? "anonymous"}";
-
-            // Try to get from cache first
-            if (_cache.TryGetValue<PlayerProfileDto>(cacheKey, out var cachedProfile))
+            if (error != null)
             {
-                _logger.LogDebug("Returning cached profile for {Username}", username);
-                return cachedProfile;
-            }
-
-            // Get the target user
-            var targetUser = await _userRepository.GetByUsernameAsync(username);
-            if (targetUser == null)
-            {
-                await Clients.Caller.SendAsync("Error", "User not found");
+                await Clients.Caller.SendAsync("Error", error);
                 return null;
             }
-
-            var isOwnProfile = viewingUserId == targetUser.UserId;
-            var isFriend = false;
-
-            // Check if viewer is friends with target
-            if (!string.IsNullOrEmpty(viewingUserId) && !isOwnProfile)
-            {
-                var friendships = await _friendshipRepository.GetFriendsAsync(viewingUserId);
-                isFriend = friendships.Any(f => f.FriendUserId == targetUser.UserId && f.Status == FriendshipStatus.Accepted);
-            }
-
-            // Create profile DTO respecting privacy settings
-            var profile = PlayerProfileDto.FromUser(targetUser, isFriend, isOwnProfile);
-
-            // Get recent games if allowed by privacy settings
-            if (isOwnProfile ||
-                targetUser.GameHistoryPrivacy == ProfilePrivacyLevel.Public ||
-                (targetUser.GameHistoryPrivacy == ProfilePrivacyLevel.FriendsOnly && isFriend))
-            {
-                var recentGames = await _gameRepository.GetPlayerGamesAsync(targetUser.UserId, "Completed", 10);
-                profile.RecentGames = recentGames.Select(g => new GameSummaryDto
-                {
-                    GameId = g.GameId,
-                    OpponentUsername = GetOpponentUsername(g, targetUser.UserId),
-                    Won = DetermineIfPlayerWon(g, targetUser.UserId),
-                    Stakes = g.Stakes,
-                    CompletedAt = g.CompletedAt ?? g.LastUpdatedAt,
-                    WinType = DetermineWinType(g, targetUser.UserId)
-                }).ToList();
-            }
-
-            // Get friends list if allowed by privacy settings
-            if (isOwnProfile ||
-                targetUser.FriendsListPrivacy == ProfilePrivacyLevel.Public ||
-                (targetUser.FriendsListPrivacy == ProfilePrivacyLevel.FriendsOnly && isFriend))
-            {
-                var friendships = await _friendshipRepository.GetFriendsAsync(targetUser.UserId);
-                var friendUsers = new List<FriendDto>();
-
-                foreach (var friendship in friendships.Where(f => f.Status == FriendshipStatus.Accepted))
-                {
-                    var friendUser = await _userRepository.GetByUserIdAsync(friendship.FriendUserId);
-                    if (friendUser != null)
-                    {
-                        var isOnline = _sessionManager.IsPlayerOnline(friendship.FriendUserId);
-                        friendUsers.Add(new FriendDto
-                        {
-                            UserId = friendUser.UserId,
-                            Username = friendUser.Username,
-                            DisplayName = friendUser.DisplayName,
-                            IsOnline = isOnline,
-                            Status = friendship.Status,
-                            InitiatedBy = friendship.InitiatedBy
-                        });
-                    }
-                }
-
-                profile.Friends = friendUsers;
-            }
-
-            _logger.LogInformation(
-                "Profile viewed for {TargetUser} by {ViewingUser}",
-                targetUser.Username,
-                viewingUserId ?? "anonymous");
-
-            // Cache the profile for 2 minutes (shorter for own profile to reflect updates faster)
-            var cacheExpiration = isOwnProfile ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(2);
-            _cache.Set(cacheKey, profile, cacheExpiration);
 
             return profile;
         }
@@ -1801,63 +1477,20 @@ public class GameHub : Hub
         {
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
 
-            // Determine if this is an open lobby
-            bool isOpenLobby = config.OpponentType == "OpenLobby";
-            string? opponentId = null;
-
-            // For friend matches, set the opponent ID
-            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
-            {
-                opponentId = config.OpponentId;
-            }
-
-            // For AI matches, set the AI opponent ID
-            else if (config.OpponentType == "AI" && !string.IsNullOrEmpty(config.OpponentId))
-            {
-                opponentId = config.OpponentId;
-            }
-
             // Create match lobby
-            var match = await _matchService.CreateMatchLobbyAsync(
-                playerId,
-                config.TargetScore,
-                config.OpponentType,
-                isOpenLobby,
-                config.DisplayName,
-                opponentId);
+            var match = await _matchLobbyService.CreateMatchLobbyAsync(playerId, config, config.DisplayName);
 
             // For AI matches, skip lobby and start immediately
             if (config.OpponentType == "AI")
             {
-                var game = await _matchService.StartMatchFirstGameAsync(match.MatchId);
-
-                // Get the game session and add AI player
-                var session = _sessionManager.GetGame(game.GameId);
-                if (session != null)
+                var result = await _matchLobbyService.StartMatchWithAiAsync(match);
+                if (result == null)
                 {
-                    // Add AI player as Red (human player will be White when they join)
-                    var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
-                    session.AddPlayer(aiPlayerId, string.Empty); // Empty connection ID for AI
-                    session.SetPlayerName(aiPlayerId, "Computer");
-
-                    _logger.LogInformation(
-                        "Added AI player {AiPlayerId} to match game {GameId}",
-                        aiPlayerId,
-                        game.GameId);
-                }
-                else
-                {
-                    _logger.LogWarning("Could not find game session {GameId} to add AI player", game.GameId);
-                }
-
-                // Refresh match data
-                var updatedMatch = await _matchService.GetMatchAsync(match.MatchId);
-                if (updatedMatch == null)
-                {
-                    _logger.LogError("Failed to refresh match {MatchId} after creating AI game", match.MatchId);
                     await Clients.Caller.SendAsync("Error", "Failed to refresh match data");
                     return;
                 }
+
+                var (game, updatedMatch) = result.Value;
 
                 await Clients.Caller.SendAsync("MatchGameStarting", new
                 {
@@ -1895,11 +1528,11 @@ public class GameHub : Hub
             });
 
             // For friend matches, notify the friend if they're online
-            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(opponentId))
+            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
             {
-                if (_sessionManager.IsPlayerOnline(opponentId))
+                if (_sessionManager.IsPlayerOnline(config.OpponentId))
                 {
-                    var opponentConnection = GetPlayerConnection(opponentId);
+                    var opponentConnection = GetPlayerConnection(config.OpponentId);
                     if (!string.IsNullOrEmpty(opponentConnection))
                     {
                         await Clients.Client(opponentConnection).SendAsync(
@@ -1914,12 +1547,6 @@ public class GameHub : Hub
                     }
                 }
             }
-
-            _logger.LogInformation(
-                "Match lobby {MatchId} created by {PlayerId} (type: {OpponentType})",
-                match.MatchId,
-                playerId,
-                config.OpponentType);
         }
         catch (Exception ex)
         {
@@ -2560,50 +2187,6 @@ public class GameHub : Hub
         }
     }
 
-    private string GetOpponentUsername(ServerGame game, string userId)
-    {
-        if (game.WhiteUserId == userId)
-        {
-            return game.RedPlayerName ?? "Anonymous";
-        }
-        else
-        {
-            return game.WhitePlayerName ?? "Anonymous";
-        }
-    }
-
-    private bool DetermineIfPlayerWon(ServerGame game, string userId)
-    {
-        if (game.WhiteUserId == userId)
-        {
-            return game.Winner == "White";
-        }
-        else if (game.RedUserId == userId)
-        {
-            return game.Winner == "Red";
-        }
-
-        return false;
-    }
-
-    private string? DetermineWinType(ServerGame game, string userId)
-    {
-        if (!DetermineIfPlayerWon(game, userId))
-        {
-            return null;
-        }
-
-        switch (game.Stakes)
-        {
-            case 2:
-                return "Gammon";
-            case 3:
-                return "Backgammon";
-            default:
-                return "Normal";
-        }
-    }
-
     /// <summary>
     /// Override the existing MakeMove to handle match game completion
     /// </summary>
@@ -2640,21 +2223,7 @@ public class GameHub : Hub
             }
 
             // Notify players of match update
-            await Clients.Group(session.Id).SendAsync("MatchUpdate", new
-            {
-                matchId = match.MatchId,
-                player1Score = match.Player1Score,
-                player2Score = match.Player2Score,
-                targetScore = match.TargetScore,
-                isCrawfordGame = match.IsCrawfordGame,
-                matchComplete = match.Status == "Completed",
-                matchWinner = match.WinnerId
-            });
-
-            if (match.Status == "Completed")
-            {
-                _logger.LogInformation("Match {MatchId} completed. Winner: {WinnerId}", match.MatchId, match.WinnerId);
-            }
+            await _gameStateService.BroadcastMatchUpdateAsync(match, session.Id, Clients);
         }
         catch (Exception ex)
         {

@@ -149,6 +149,12 @@ builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 // Player connection tracking service
 builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
 
+// GameHub extracted services
+builder.Services.AddSingleton<IMatchLobbyService, MatchLobbyService>();
+builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
+builder.Services.AddSingleton<IGameStateService, GameStateService>();
+builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
+
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
 
