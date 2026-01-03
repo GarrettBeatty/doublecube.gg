@@ -1,6 +1,9 @@
+using Backgammon.Server.Configuration;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
+using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
@@ -13,7 +16,8 @@ public class PlayerProfileServiceTests
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IFriendshipRepository> _friendshipRepositoryMock;
     private readonly Mock<IGameSessionManager> _sessionManagerMock;
-    private readonly IMemoryCache _cache;
+    private readonly HybridCache _cache;
+    private readonly CacheSettings _cacheSettings;
     private readonly Mock<ILogger<PlayerProfileService>> _loggerMock;
     private readonly PlayerProfileService _service;
 
@@ -23,7 +27,15 @@ public class PlayerProfileServiceTests
         _gameRepositoryMock = new Mock<IGameRepository>();
         _friendshipRepositoryMock = new Mock<IFriendshipRepository>();
         _sessionManagerMock = new Mock<IGameSessionManager>();
-        _cache = new MemoryCache(new MemoryCacheOptions());
+
+        // Set up HybridCache with in-memory backend for testing
+        var services = new ServiceCollection();
+        services.AddMemoryCache();
+        services.AddHybridCache();
+        var serviceProvider = services.BuildServiceProvider();
+        _cache = serviceProvider.GetRequiredService<HybridCache>();
+
+        _cacheSettings = new CacheSettings();
         _loggerMock = new Mock<ILogger<PlayerProfileService>>();
 
         _service = new PlayerProfileService(
@@ -32,6 +44,7 @@ public class PlayerProfileServiceTests
             _friendshipRepositoryMock.Object,
             _sessionManagerMock.Object,
             _cache,
+            _cacheSettings,
             _loggerMock.Object);
     }
 
@@ -91,7 +104,7 @@ public class PlayerProfileServiceTests
     }
 
     [Fact]
-    public async Task GetPlayerProfileAsync_OwnProfile_IncludesPrivateData()
+    public async Task GetPlayerProfileAsync_AllDataIsPublic()
     {
         // Arrange
         var userId = "user123";
@@ -101,8 +114,8 @@ public class PlayerProfileServiceTests
             Username = "testuser",
             DisplayName = "Test User",
             Stats = new UserStats(),
-            GameHistoryPrivacy = ProfilePrivacyLevel.Private,
-            FriendsListPrivacy = ProfilePrivacyLevel.Private
+            GameHistoryPrivacy = ProfilePrivacyLevel.Private, // Privacy settings no longer enforced
+            FriendsListPrivacy = ProfilePrivacyLevel.Private // Privacy settings no longer enforced
         };
 
         _userRepositoryMock.Setup(r => r.GetByUsernameAsync("testuser"))
@@ -112,14 +125,14 @@ public class PlayerProfileServiceTests
         _gameRepositoryMock.Setup(r => r.GetPlayerGamesAsync(userId, "Completed", 10, 0))
             .ReturnsAsync(new List<Game>());
 
-        // Act
-        var (profile, error) = await _service.GetPlayerProfileAsync("testuser", userId);
+        // Act - Even as anonymous viewer, all data is visible
+        var (profile, error) = await _service.GetPlayerProfileAsync("testuser", null);
 
         // Assert
         Assert.Null(error);
         Assert.NotNull(profile);
-        Assert.NotNull(profile.RecentGames); // Should include games even though privacy is Private
-        Assert.NotNull(profile.Friends); // Should include friends even though privacy is Private
+        Assert.NotNull(profile.RecentGames); // Always included (privacy removed)
+        Assert.NotNull(profile.Friends); // Always included (privacy removed)
     }
 
     [Fact]
@@ -141,13 +154,17 @@ public class PlayerProfileServiceTests
         _gameRepositoryMock.Setup(r => r.GetPlayerGamesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync(new List<Game>());
 
-        // Act - First call
+        // Act - First call as anonymous
         await _service.GetPlayerProfileAsync("testuser", null);
 
-        // Act - Second call (should use cache)
-        await _service.GetPlayerProfileAsync("testuser", null);
+        // Act - Second call as different viewer (should use same cache - no viewer-specific caching)
+        await _service.GetPlayerProfileAsync("testuser", "viewer123");
 
-        // Assert - Repository should only be called once
-        _userRepositoryMock.Verify(r => r.GetByUsernameAsync("testuser"), Times.Once);
+        // Assert - User repository is called twice (needed for cache tag generation)
+        // but expensive operations (games, friendships) should only be called once due to caching
+        _userRepositoryMock.Verify(r => r.GetByUsernameAsync("testuser"), Times.Exactly(2));
+        _gameRepositoryMock.Verify(r => r.GetPlayerGamesAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int>()), Times.Once);
+        // FriendshipRepository called once: only when building the cached profile
+        _friendshipRepositoryMock.Verify(r => r.GetFriendsAsync(It.IsAny<string>()), Times.Once);
     }
 }

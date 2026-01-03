@@ -164,6 +164,17 @@ public class CachedUserService : IUserRepository
         {
             _logger.LogWarning(ex, "Failed to invalidate new email cache");
         }
+
+        // Invalidate player profile cache (privacy settings or display name may have changed)
+        try
+        {
+            await _cache.RemoveByTagAsync($"profile:{user.UserId}");
+            _logger.LogDebug("Invalidated player profile cache for user {UserId}", user.UserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate player profile cache");
+        }
     }
 
     public async Task UpdateLastLoginAsync(string userId)
@@ -201,6 +212,17 @@ public class CachedUserService : IUserRepository
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to invalidate player caches for {UserId}", userId);
+        }
+
+        // Invalidate player profile cache (stats changed)
+        try
+        {
+            await _cache.RemoveByTagAsync($"profile:{userId}");
+            _logger.LogDebug("Invalidated player profile cache for user {UserId} (stats changed)", userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate player profile cache after stats update");
         }
     }
 

@@ -139,6 +139,10 @@ public class FriendService : IFriendService
             await _cache.RemoveByTagAsync($"friends:{userId}");
             await _cache.RemoveByTagAsync($"friends:{friendUserId}");
 
+            // Invalidate player profiles for both users (friendship affects profile privacy views)
+            await _cache.RemoveByTagAsync($"profile:{userId}");
+            await _cache.RemoveByTagAsync($"profile:{friendUserId}");
+
             _logger.LogInformation("Friend request accepted between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);
         }
@@ -197,6 +201,10 @@ public class FriendService : IFriendService
             // Invalidate friend list caches for both users
             await _cache.RemoveByTagAsync($"friends:{userId}");
             await _cache.RemoveByTagAsync($"friends:{friendUserId}");
+
+            // Invalidate player profiles for both users (friendship affects profile privacy views)
+            await _cache.RemoveByTagAsync($"profile:{userId}");
+            await _cache.RemoveByTagAsync($"profile:{friendUserId}");
 
             _logger.LogInformation("Friendship removed between {UserId} and {FriendUserId}", userId, friendUserId);
             return (true, null);

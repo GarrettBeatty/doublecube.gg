@@ -46,4 +46,13 @@ public class CacheSettings
         Expiration = TimeSpan.FromMinutes(5),
         LocalCacheExpiration = TimeSpan.FromMinutes(1)
     };
+
+    /// <summary>
+    /// Player profile cache settings (includes privacy-aware profile views)
+    /// </summary>
+    public CacheDuration PlayerProfile { get; set; } = new()
+    {
+        Expiration = TimeSpan.FromMinutes(3),
+        LocalCacheExpiration = TimeSpan.FromMinutes(1)
+    };
 }
