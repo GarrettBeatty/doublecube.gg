@@ -28,4 +28,9 @@ public interface IGameActionOrchestrator
     /// Undo the last move made during the current turn
     /// </summary>
     Task<ActionResult> UndoLastMoveAsync(GameSession session, string connectionId);
+
+    /// <summary>
+    /// Execute a complete AI turn (roll, move, end turn) with broadcasting
+    /// </summary>
+    Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId);
 }

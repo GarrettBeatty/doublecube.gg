@@ -147,7 +147,7 @@ public class GameHub : Hub
                     BackgroundTaskHelper.FireAndForget(
                         async () =>
                         {
-                            await _gameActionOrchestrator.EndTurnAsync(session, playerIdForTask);
+                            await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, playerIdForTask);
                         },
                         _logger,
                         $"AiFirstTurn-{session.Id}");
@@ -325,8 +325,7 @@ public class GameHub : Hub
                 BackgroundTaskHelper.FireAndForget(
                     async () =>
                     {
-                        // Use dummy connection for AI
-                        await _gameActionOrchestrator.EndTurnAsync(session, aiPlayerId);
+                        await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
                     },
                     _logger,
                     $"AiFirstTurn-{session.Id}");
@@ -719,6 +718,10 @@ public class GameHub : Hub
 
             // Broadcast game over AFTER database is updated
             await _gameStateService.BroadcastGameOverAsync(session);
+
+            // Remove from memory to prevent memory leak
+            _sessionManager.RemoveGame(session.Id);
+            _logger.LogInformation("Removed completed game {GameId} from memory (declined double)", session.Id);
         }
         catch (Exception ex)
         {
@@ -823,6 +826,10 @@ public class GameHub : Hub
             // Broadcast game over AFTER database is updated
             var finalState = session.GetState();
             await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+            // Remove from memory to prevent memory leak
+            _sessionManager.RemoveGame(session.Id);
+            _logger.LogInformation("Removed abandoned game {GameId} from memory", session.Id);
         }
         catch (Exception ex)
         {

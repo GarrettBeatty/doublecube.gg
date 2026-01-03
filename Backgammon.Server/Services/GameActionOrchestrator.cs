@@ -18,6 +18,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     private readonly IAiMoveService _aiMoveService;
     private readonly IPlayerStatsService _playerStatsService;
     private readonly IMatchService _matchService;
+    private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<GameActionOrchestrator> _logger;
 
@@ -27,6 +28,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         IAiMoveService aiMoveService,
         IPlayerStatsService playerStatsService,
         IMatchService matchService,
+        IGameSessionManager sessionManager,
         IHubContext<GameHub> hubContext,
         ILogger<GameActionOrchestrator> logger)
     {
@@ -35,6 +37,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         _aiMoveService = aiMoveService;
         _playerStatsService = playerStatsService;
         _matchService = matchService;
+        _sessionManager = sessionManager;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -148,6 +151,10 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             // Broadcast GameOver AFTER database is updated
             await _gameStateService.BroadcastGameOverAsync(session);
 
+            // Remove from memory to prevent memory leak
+            _sessionManager.RemoveGame(session.Id);
+            _logger.LogInformation("Removed completed game {GameId} from memory", session.Id);
+
             return ActionResult.GameOver();
         }
 
@@ -235,33 +242,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         return ActionResult.Ok();
     }
 
-    private async Task SaveGameStateAsync(GameSession session)
-    {
-        try
-        {
-            var game = GameEngineMapper.ToGame(session);
-            await _gameRepository.SaveGameAsync(game);
-            _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to save game state for {GameId}", session.Id);
-        }
-    }
-
-    private string? GetCurrentPlayerId(GameSession session)
-    {
-        if (session.Engine.CurrentPlayer == null)
-        {
-            return null;
-        }
-
-        return session.Engine.CurrentPlayer.Color == CheckerColor.White
-            ? session.WhitePlayerId
-            : session.RedPlayerId;
-    }
-
-    private async Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId)
+    public async Task ExecuteAiTurnWithBroadcastAsync(GameSession session, string aiPlayerId)
     {
         try
         {
@@ -307,12 +288,42 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 // Broadcast GameOver AFTER database is updated
                 var finalState = session.GetState();
                 await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
+
+                // Remove from memory to prevent memory leak
+                _sessionManager.RemoveGame(session.Id);
+                _logger.LogInformation("Removed completed AI game {GameId} from memory", session.Id);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing AI turn in game {GameId}", session.Id);
         }
+    }
+
+    private async Task SaveGameStateAsync(GameSession session)
+    {
+        try
+        {
+            var game = GameEngineMapper.ToGame(session);
+            await _gameRepository.SaveGameAsync(game);
+            _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save game state for {GameId}", session.Id);
+        }
+    }
+
+    private string? GetCurrentPlayerId(GameSession session)
+    {
+        if (session.Engine.CurrentPlayer == null)
+        {
+            return null;
+        }
+
+        return session.Engine.CurrentPlayer.Color == CheckerColor.White
+            ? session.WhitePlayerId
+            : session.RedPlayerId;
     }
 
     private async Task HandleMatchGameCompletion(GameSession session)
