@@ -717,8 +717,29 @@ var cleanupTask = Task.Run(async () =>
         var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
         var gameRepository = app.Services.GetRequiredService<IGameRepository>();
 
-        // Evict from memory after 6 hours of inactivity (but keep in DB as "InProgress")
+        // Remove completed games from memory after 5 minutes
         var allGames = sessionManager.GetAllGames();
+        var completedGamesCutoff = DateTime.UtcNow - TimeSpan.FromMinutes(5);
+        var completedGames = allGames
+            .Where(g => g.Engine.Winner != null && g.LastActivityAt < completedGamesCutoff)
+            .ToList();
+
+        foreach (var game in completedGames)
+        {
+            try
+            {
+                // Completed game already saved to DB, just remove from memory
+                sessionManager.RemoveGame(game.Id);
+
+                Console.WriteLine($"[Cleanup] Removed completed game {game.Id} from memory (winner: {game.Engine.Winner?.Name})");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Cleanup] Failed to remove completed game {game.Id}: {ex.Message}");
+            }
+        }
+
+        // Evict from memory after 6 hours of inactivity (but keep in DB as "InProgress")
         var evictionCutoff = DateTime.UtcNow - TimeSpan.FromHours(6);
         var inactiveGames = allGames
             .Where(g => g.LastActivityAt < evictionCutoff && g.Engine.Winner == null)
