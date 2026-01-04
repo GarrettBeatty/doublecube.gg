@@ -53,9 +53,10 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
+        // White: points 1,2,3. Red: points 24,23,22,21 (which are 'a','b','c','d' for Red)
         var sgf = @"(;GM[6]
-  AW[f[5]][h[3]][m[5]][y[2]]
-  AB[a[2]][l[5]][q[3]][s[5]]
+  AW[a[5]][b[3]][c[5]][y[2]]
+  AB[a[2]][b[5]][c[3]][d[5]]
   PL[W]
   DI[34]
 )";
@@ -77,9 +78,10 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
+        // White: points 1,2,3,4 (which are 'a','b','c','d'). Red: points 24,23,22 (which are 'a','b','c' for Red)
         var sgf = @"(;GM[6]
-  AW[f[5]][h[3]][m[5]]
-  AB[a[2]][l[5]][q[3]][s[5]][y[1]]
+  AW[a[2]][b[5]][c[3]][d[5]]
+  AB[a[5]][b[3]][c[6]][y[1]]
   PL[B]
   DI[34]
 )";
@@ -98,9 +100,10 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
+        // White on points 1,2. Red on points 24,23 (which are 'a','b' for Red)
         var sgf = @"(;GM[6]
   AW[a[3]][b[2]][z[10]]
-  AB[x[3]][w[2]][z[10]]
+  AB[a[3]][b[2]][z[10]]
   PL[W]
 )";
 
@@ -115,13 +118,44 @@ public class SgfSerializerTests
     [Fact]
     public void ExportThenImport_PreservesPosition()
     {
-        // Arrange
+        // Arrange - Create a custom position from scratch
         var original = new GameEngine();
-        original.StartNewGame();
 
-        // Make some modifications to create a unique position
+        // Set up a valid position (15 checkers each)
+        // White: 5 on point 1, 3 on point 2, 5 on point 3, 1 on bar, 1 borne off = 15 total
+        original.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(2).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(2).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(2).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(3).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(3).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(3).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(3).AddChecker(CheckerColor.White);
+        original.Board.GetPoint(3).AddChecker(CheckerColor.White);
         original.WhitePlayer.CheckersOnBar = 1;
+        original.WhitePlayer.CheckersBornOff = 1;
+
+        // Red: 5 on point 24, 3 on point 23, 5 on point 22, 2 on bar = 15 total
+        original.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(23).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(23).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(23).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(22).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(22).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(22).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(22).AddChecker(CheckerColor.Red);
+        original.Board.GetPoint(22).AddChecker(CheckerColor.Red);
         original.RedPlayer.CheckersOnBar = 2;
+
+        original.SetGameStarted(true);
         original.Dice.SetDice(3, 4);
         original.RemainingMoves.Clear();
         original.RemainingMoves.AddRange(original.Dice.GetMoves());
@@ -181,9 +215,12 @@ public class SgfSerializerTests
     {
         // Arrange - Test case 1 from the plan (White checker on bar)
         var game = new GameEngine();
+        // White has 1 checker on bar, needs to enter at point 22 or 21 (25-3 or 25-4)
+        // Make sure points 21 and 22 are not blocked (max 1 Red checker)
+        // White: points 1,2,3. Red: points 24,23,20,19 (not 21,22!)
         var sgf = @"(;GM[6]
-  AW[f[6]][h[3]][m[5]][y[1]]
-  AB[a[2]][l[5]][q[3]][s[5]]
+  AW[a[6]][b[3]][c[5]][y[1]]
+  AB[a[2]][b[5]][e[3]][f[5]]
   PL[W]
   DI[34]
   CO[c]
@@ -208,9 +245,12 @@ public class SgfSerializerTests
     {
         // Arrange - Test case 2 from the plan (Red checker on bar)
         var game = new GameEngine();
+        // Red has 1 checker on bar, needs to enter at point 3 or 4 (0+3 or 0+4)
+        // Make sure points 3 and 4 are not blocked (max 1 White checker)
+        // White: points 1,2,5,6 (not 3,4!). Red: points 24,23,22 (which are 'a','b','c' for Red)
         var sgf = @"(;GM[6]
-  AW[x[2]][f[5]][h[3]][m[5]]
-  AB[l[5]][q[3]][s[6]][y[1]]
+  AW[a[2]][b[5]][e[3]][f[5]]
+  AB[a[5]][b[3]][c[6]][y[1]]
   PL[B]
   DI[34]
   CO[c]

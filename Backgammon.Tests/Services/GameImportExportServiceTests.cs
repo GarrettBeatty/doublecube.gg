@@ -71,7 +71,11 @@ public class GameImportExportServiceTests
 
         // Assert
         Assert.NotEmpty(result);
-        Assert.StartsWith("(;GM[6]", result); // SGF format starts with this
+
+        // Decode from base64 and verify it's valid SGF
+        var bytes = Convert.FromBase64String(result);
+        var sgf = System.Text.Encoding.UTF8.GetString(bytes);
+        Assert.StartsWith("(;GM[6]", sgf); // SGF format starts with this
     }
 
     [Fact]
