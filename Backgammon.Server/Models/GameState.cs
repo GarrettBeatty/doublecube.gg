@@ -59,4 +59,17 @@ public class GameState
     public string? DoublingCubeOwner { get; set; }
 
     public bool IsAnalysisMode { get; set; }
+
+    // Match information
+    public string? MatchId { get; set; }
+
+    public bool IsMatchGame { get; set; }
+
+    public int? TargetScore { get; set; }
+
+    public int? Player1Score { get; set; }
+
+    public int? Player2Score { get; set; }
+
+    public bool? IsCrawfordGame { get; set; }
 }

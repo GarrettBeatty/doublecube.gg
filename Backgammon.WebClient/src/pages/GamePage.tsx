@@ -6,6 +6,7 @@ import { HubMethods } from '@/types/signalr.types'
 import { BoardSVG } from '@/components/game/BoardSVG'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
+import { MatchInfo } from '@/components/game/MatchInfo'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -18,8 +19,9 @@ export const GamePage: React.FC = () => {
   const navigate = useNavigate()
   const { invoke } = useSignalR()
 
-  const { currentGameState, isSpectator, setCurrentGameId } = useGameStore()
+  const { currentGameState, isSpectator, setCurrentGameId, resetGame } = useGameStore()
   const [isLoading, setIsLoading] = useState(true)
+  const [lastJoinedGameId, setLastJoinedGameId] = useState<string | null>(null)
 
   useEffect(() => {
     const joinGame = async () => {
@@ -28,37 +30,46 @@ export const GamePage: React.FC = () => {
         return
       }
 
-      setCurrentGameId(gameId)
-
-      // If we already have game state for this game, we're already joined
-      if (currentGameState && currentGameState.gameId === gameId) {
-        setIsLoading(false)
+      // Skip if we've already joined this game
+      if (lastJoinedGameId === gameId) {
+        console.log('[GamePage] Already joined game:', gameId)
         return
       }
 
-      // If we don't have game state, we need to rejoin the game
-      // This happens when refreshing the page or navigating directly to a game URL
+      console.log('[GamePage] New game detected, resetting state')
+      resetGame()
+      setCurrentGameId(gameId)
+      setIsLoading(true)
+      setLastJoinedGameId(gameId)
+
+      // Join the game
       try {
         const playerId = authService.getOrCreatePlayerId()
+        console.log('[GamePage] Joining game:', gameId)
         await invoke(HubMethods.JoinGame, playerId, gameId)
         // The GameStart or GameUpdate event will set the game state
         setIsLoading(false)
       } catch (error) {
-        console.error('[GamePage] Failed to rejoin game:', error)
+        console.error('[GamePage] Failed to join game:', error)
         setIsLoading(false)
         // Still show the page, game state might arrive via other events
       }
     }
 
     joinGame()
-  }, [gameId, navigate, setCurrentGameId, currentGameState, invoke])
+  }, [gameId, navigate, setCurrentGameId, invoke, resetGame, lastJoinedGameId])
 
   const handleLeaveGame = async () => {
     try {
+      console.log('[GamePage] Leaving game:', gameId)
       await invoke(HubMethods.LeaveGame)
+      resetGame()
+      setLastJoinedGameId(null)
       navigate('/')
     } catch (error) {
-      console.error('Failed to leave game:', error)
+      console.error('[GamePage] Failed to leave game:', error)
+      resetGame()
+      setLastJoinedGameId(null)
       navigate('/')
     }
   }
@@ -137,6 +148,21 @@ export const GamePage: React.FC = () => {
             )}
 
             <PlayerCard {...whitePlayer} />
+
+            {currentGameState.isMatchGame &&
+              currentGameState.targetScore &&
+              currentGameState.player1Score !== undefined &&
+              currentGameState.player2Score !== undefined && (
+                <MatchInfo
+                  targetScore={currentGameState.targetScore}
+                  player1Score={currentGameState.player1Score}
+                  player2Score={currentGameState.player2Score}
+                  isCrawfordGame={currentGameState.isCrawfordGame ?? false}
+                  player1Name={currentGameState.whitePlayerName}
+                  player2Name={currentGameState.redPlayerName}
+                />
+              )}
+
             <PlayerCard {...redPlayer} />
 
             {/* Doubling Cube */}

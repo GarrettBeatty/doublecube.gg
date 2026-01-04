@@ -72,6 +72,12 @@ export interface GameState {
   winner: CheckerColor | null
   createdAt: string
   updatedAt: string
+  matchId?: string
+  isMatchGame?: boolean
+  targetScore?: number
+  player1Score?: number
+  player2Score?: number
+  isCrawfordGame?: boolean
 }
 
 // Match types

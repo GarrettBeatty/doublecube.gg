@@ -139,6 +139,12 @@ public class MatchService : IMatchService
             var session = _gameSessionManager.CreateGame(gameId);
             session.WhitePlayerName = match.Player1Name;
             session.RedPlayerName = match.Player2Name;
+            session.MatchId = matchId;
+            session.IsMatchGame = true;
+            session.TargetScore = match.TargetScore;
+            session.Player1Score = match.Player1Score;
+            session.Player2Score = match.Player2Score;
+            session.IsCrawfordGame = match.IsCrawfordGame;
 
             // Configure Crawford rule if applicable
             if (match.IsCrawfordGame)
@@ -426,6 +432,10 @@ public class MatchService : IMatchService
             session.RedPlayerName = match.Player2Name;
             session.MatchId = match.MatchId;
             session.IsMatchGame = true;
+            session.TargetScore = match.TargetScore;
+            session.Player1Score = match.Player1Score;
+            session.Player2Score = match.Player2Score;
+            session.IsCrawfordGame = match.IsCrawfordGame;
 
             // Configure Crawford rule if applicable
             if (match.IsCrawfordGame)

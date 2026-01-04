@@ -72,13 +72,24 @@ public class GameSessionManager : IGameSessionManager
         // Check memory first (inside lock)
         lock (_lock)
         {
-            // Check if player is already in a game (reconnection scenario)
+            // Check if player is already in a game
             if (_playerToGame.TryGetValue(connectionId, out var existingGameId))
             {
-                if (_games.TryGetValue(existingGameId, out var playerGame))
+                // If trying to join the SAME game, this is a reconnection
+                if (gameId == existingGameId && _games.TryGetValue(existingGameId, out var playerGame))
                 {
                     playerGame.UpdatePlayerConnection(playerId, connectionId);
                     return playerGame; // Already in this game
+                }
+
+                // If trying to join a DIFFERENT game, remove from old game first
+                if (!string.IsNullOrEmpty(gameId) && gameId != existingGameId)
+                {
+                    if (_games.TryGetValue(existingGameId, out var oldGame))
+                    {
+                        oldGame.RemovePlayer(connectionId);
+                        _playerToGame.Remove(connectionId);
+                    }
                 }
             }
 

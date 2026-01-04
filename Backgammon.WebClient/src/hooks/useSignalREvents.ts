@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
@@ -14,8 +14,14 @@ export const useSignalREvents = () => {
     setIsSpectator,
     setCurrentGameId,
     addChatMessage,
-    currentGameState,
   } = useGameStore()
+  const prevGameStateRef = useRef<GameState | null>(null)
+  const navigateRef = useRef(navigate)
+
+  // Keep navigateRef in sync with navigate
+  useEffect(() => {
+    navigateRef.current = navigate
+  }, [navigate])
 
   useEffect(() => {
     if (!connection) return
@@ -28,7 +34,8 @@ export const useSignalREvents = () => {
       setGameState(gameState)
       setIsSpectator(true)
       setCurrentGameId(gameState.gameId)
-      navigate(`/game/${gameState.gameId}`)
+      prevGameStateRef.current = gameState
+      navigateRef.current(`/game/${gameState.gameId}`)
     })
 
     // GameUpdate - Board state changes
@@ -39,19 +46,31 @@ export const useSignalREvents = () => {
         isYourTurn: gameState.isYourTurn,
       })
 
+      // Check if update is for the current game we're viewing
+      const currentPath = window.location.pathname
+      const isOnGamePage = currentPath.startsWith('/game/')
+      const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
+
+      // If we're on a different game page, ignore this update (it's from an old game)
+      if (currentGameIdFromUrl && currentGameIdFromUrl !== gameState.gameId) {
+        console.log('[SignalR] Ignoring GameUpdate for old game:', gameState.gameId, 'current game:', currentGameIdFromUrl)
+        return
+      }
+
       // Detect and play sounds BEFORE updating state
-      if (currentGameState) {
+      const prevState = prevGameStateRef.current
+      if (prevState) {
         // Turn change detection
-        if (currentGameState.currentPlayer !== gameState.currentPlayer) {
+        if (prevState.currentPlayer !== gameState.currentPlayer) {
           audioService.playSound('turn-change')
         }
 
         // Move detection (simplified - could be enhanced)
         const prevBornOff =
-          currentGameState.whiteBornOff + currentGameState.redBornOff
+          prevState.whiteBornOff + prevState.redBornOff
         const newBornOff = gameState.whiteBornOff + gameState.redBornOff
         const prevBar =
-          currentGameState.whiteCheckersOnBar + currentGameState.redCheckersOnBar
+          prevState.whiteCheckersOnBar + prevState.redCheckersOnBar
         const newBar = gameState.whiteCheckersOnBar + gameState.redCheckersOnBar
 
         if (newBornOff > prevBornOff) {
@@ -65,14 +84,32 @@ export const useSignalREvents = () => {
 
       setGameState(gameState)
       setCurrentGameId(gameState.gameId)
+      prevGameStateRef.current = gameState
     })
 
     // GameStart - Both players connected, game starts
     connection.on(HubEvents.GameStart, (gameState: GameState) => {
       console.log('[SignalR] GameStart', gameState.gameId)
+
+      // Check if we're on a game page and if it's for a different game
+      const currentPath = window.location.pathname
+      const isOnGamePage = currentPath.startsWith('/game/')
+      const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
+
+      // If we're on a different game page, ignore this GameStart (it's from an old game)
+      if (currentGameIdFromUrl && currentGameIdFromUrl !== gameState.gameId) {
+        console.log('[SignalR] Ignoring GameStart for old game:', gameState.gameId, 'current game:', currentGameIdFromUrl)
+        return
+      }
+
       setGameState(gameState)
       setCurrentGameId(gameState.gameId)
-      navigate(`/game/${gameState.gameId}`)
+      prevGameStateRef.current = gameState
+
+      // Only navigate if we're not already on a game page
+      if (!isOnGamePage) {
+        navigateRef.current(`/game/${gameState.gameId}`)
+      }
     })
 
     // GameOver - Game completed
@@ -89,6 +126,7 @@ export const useSignalREvents = () => {
         }
 
         setGameState(gameState)
+        prevGameStateRef.current = gameState
       }
     )
 
@@ -96,7 +134,7 @@ export const useSignalREvents = () => {
     connection.on(HubEvents.WaitingForOpponent, (gameId: string) => {
       console.log('[SignalR] WaitingForOpponent', gameId)
       setCurrentGameId(gameId)
-      navigate(`/game/${gameId}`)
+      navigateRef.current(`/game/${gameId}`)
     })
 
     // OpponentJoined
@@ -170,7 +208,8 @@ export const useSignalREvents = () => {
     connection.on(HubEvents.MatchGameStarting, (data: any) => {
       console.log('[SignalR] MatchGameStarting', { matchId: data.matchId, gameId: data.gameId })
       setCurrentGameId(data.gameId)
-      navigate(`/game/${data.gameId}`)
+      // Force navigation even if on same route
+      navigateRef.current(`/game/${data.gameId}`, { replace: true })
     })
 
     // Cleanup on unmount
@@ -191,7 +230,7 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.MatchLobbyCreated)
       connection.off(HubEvents.MatchGameStarting)
     }
-  }, [connection, currentGameState, setGameState, setIsSpectator, setCurrentGameId, addChatMessage, navigate])
+  }, [connection, setGameState, setIsSpectator, setCurrentGameId, addChatMessage])
 
   return { connection }
 }
