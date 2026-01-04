@@ -11,9 +11,20 @@ namespace Backgammon.Server.Services;
 public interface IMatchService
 {
     /// <summary>
-    /// Create a new match between two players
+    /// Create a new match and immediately create the first game
     /// </summary>
-    Task<Match> CreateMatchAsync(string player1Id, string player2Id, int targetScore);
+    /// <param name="player1Id">First player ID</param>
+    /// <param name="targetScore">Target score for the match (1-25)</param>
+    /// <param name="opponentType">Type of opponent: "AI", "OpenLobby", or "Friend"</param>
+    /// <param name="player1DisplayName">Optional display name for player 1</param>
+    /// <param name="player2Id">Optional player 2 ID (for Friend matches)</param>
+    /// <returns>Tuple of created Match and first ServerGame</returns>
+    Task<(Match Match, ServerGame FirstGame)> CreateMatchAsync(
+        string player1Id,
+        int targetScore,
+        string opponentType,
+        string? player1DisplayName = null,
+        string? player2Id = null);
 
     /// <summary>
     /// Get a match by ID
@@ -61,37 +72,11 @@ public interface IMatchService
     Task<MatchStats> GetPlayerMatchStatsAsync(string playerId);
 
     /// <summary>
-    /// Create a match lobby without starting the first game
+    /// Join an existing match as player 2 (for OpenLobby and Friend matches)
     /// </summary>
-    Task<Match> CreateMatchLobbyAsync(string player1Id, int targetScore, string opponentType, bool isOpenLobby, string? player1DisplayName = null, string? player2Id = null);
-
-    /// <summary>
-    /// Join an open lobby match
-    /// </summary>
-    Task<Match> JoinOpenLobbyAsync(string matchId, string player2Id, string? player2DisplayName = null);
-
-    /// <summary>
-    /// Start the first game in a match lobby
-    /// </summary>
-    Task<ServerGame> StartMatchFirstGameAsync(string matchId);
-
-    /// <summary>
-    /// Start the first game in a match lobby using an existing match object (avoids DB reload)
-    /// </summary>
-    Task<ServerGame> StartMatchFirstGameAsync(Match match);
-
-    /// <summary>
-    /// Leave a match lobby
-    /// </summary>
-    Task LeaveMatchLobbyAsync(string matchId, string playerId);
-
-    /// <summary>
-    /// Get match lobby status
-    /// </summary>
-    Task<Match?> GetMatchLobbyAsync(string matchId);
-
-    /// <summary>
-    /// Create and start a match with AI opponent
-    /// </summary>
-    Task<(ServerGame Game, Match Match)?> StartMatchWithAiAsync(Match match);
+    /// <param name="matchId">Match ID to join</param>
+    /// <param name="player2Id">Player 2 ID</param>
+    /// <param name="player2DisplayName">Optional display name for player 2</param>
+    /// <returns>Updated match</returns>
+    Task<Match> JoinMatchAsync(string matchId, string player2Id, string? player2DisplayName = null);
 }

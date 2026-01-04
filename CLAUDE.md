@@ -5,8 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Run Commands
 
 ```bash
-# Build
+# Build backend
 dotnet build
+
+# Build frontend
+cd Backgammon.WebClient && npm run build
 
 # Run all tests
 dotnet test
@@ -21,8 +24,8 @@ cd Backgammon.AppHost && dotnet run
 cd Backgammon.Console && dotnet run
 
 # Run web multiplayer (manual)
-cd Backgammon.Server && dotnet run      # Server on http://localhost:5000
-cd Backgammon.WebClient && dotnet run # Client on http://localhost:3000
+cd Backgammon.Server && dotnet run            # Server on http://localhost:5000
+cd Backgammon.WebClient && npm run dev        # Client dev server on http://localhost:3000
 
 # Quick start web (script)
 ./start-web.sh
@@ -38,7 +41,7 @@ cd Backgammon.AI && dotnet run
 - **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
 - **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
-- **Backgammon.WebClient** - Static HTML/JS/CSS frontend with SignalR client
+- **Backgammon.WebClient** - React + TypeScript + Vite frontend with real-time SignalR communication. Uses shadcn/ui, TailwindCSS, Zustand for state management.
 - **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI` and `GreedyAI`.
 - **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, services)
 - **Backgammon.Tests** / **Backgammon.IntegrationTests** - xUnit test projects
@@ -70,6 +73,67 @@ All entities (Users, Games, Friendships) stored in one table with composite PK/S
 - Deploy: `cd infra/cdk && cdk deploy`
 - On-demand billing (pay-per-request)
 - Point-in-time recovery enabled
+
+## Frontend Architecture (WebClient)
+
+**Tech Stack:**
+- **React 18** - UI framework with functional components and hooks
+- **TypeScript 5.3** - Type-safe development
+- **Vite 5** - Fast build tool and dev server
+- **shadcn/ui** - Accessible component library built on Radix UI
+- **TailwindCSS** - Utility-first CSS framework
+- **Zustand** - Lightweight state management
+- **SignalR (@microsoft/signalr 8.0)** - Real-time WebSocket communication
+- **React Router** - Client-side routing
+
+**Project Structure:**
+```
+Backgammon.WebClient/
+├── src/                      # Source code (NOT committed build outputs)
+│   ├── components/           # React components
+│   │   ├── game/            # Game-specific components (BoardSVG, PlayerCard, etc.)
+│   │   ├── modals/          # Modal dialogs
+│   │   └── ui/              # shadcn/ui components
+│   ├── contexts/            # React contexts (SignalRContext, etc.)
+│   ├── hooks/               # Custom React hooks (useSignalREvents)
+│   ├── pages/               # Route pages (HomePage, GamePage)
+│   ├── services/            # Service layer (signalr.service, audio.service, etc.)
+│   ├── stores/              # Zustand stores (gameStore)
+│   ├── types/               # TypeScript type definitions
+│   └── main.tsx             # App entry point
+├── wwwroot/                 # Build output directory (gitignored)
+│   ├── assets/              # Generated CSS/JS bundles
+│   └── index.html           # Generated HTML
+├── index.html               # Vite HTML template
+├── vite.config.ts           # Vite configuration
+├── tailwind.config.js       # TailwindCSS configuration
+├── components.json          # shadcn/ui configuration
+└── package.json             # npm dependencies
+```
+
+**Key Patterns:**
+
+1. **Multi-Tab Support** - Players can open the same game in multiple browser tabs. The server tracks multiple connections per player using `HashSet<string>` for connection IDs. All tabs receive real-time updates and can make moves.
+
+2. **SignalR Event Handling** - `useSignalREvents` hook registers event handlers once on mount and uses refs to avoid constant cleanup/re-registration. Events are filtered by game ID to prevent cross-game interference.
+
+3. **State Management** - Zustand store (`gameStore`) manages global game state. Component-local state uses React hooks (useState, useRef).
+
+4. **Real-time Communication Flow:**
+   - Client → `invoke(HubMethods.MakeMove, ...)` → Server
+   - Server → `SendAsync("GameUpdate", state)` → All connected tabs
+   - `useSignalREvents` → Updates Zustand store → React re-renders
+
+5. **Connection Lifecycle:**
+   - Page loads → SignalR connects → Sets `isConnected = true`
+   - GamePage waits for `isConnected` before calling `JoinGame`
+   - On unmount, cleanup effect calls `LeaveGame`
+   - Prevents race conditions where join attempts before connection ready
+
+6. **Build Process:**
+   - Development: `npm run dev` → Vite dev server with HMR
+   - Production: `npm run build` → TypeScript compile + Vite bundle → `wwwroot/`
+   - Output is gitignored, generated fresh on deploy
 
 ## Core Domain Model
 
@@ -108,6 +172,39 @@ if (match.IsCrawfordGame) {
 2. Opponent joins via `JoinMatchLobby()` SignalR method
 3. Creator starts match via `StartMatchFromLobby()`
 4. First game begins, players join game session
+
+### Multi-Tab Connection Management
+
+The server supports **multiple browser tabs** per player in the same game:
+
+**GameSession Architecture:**
+- `_whiteConnections: HashSet<string>` - Tracks all White player's connections
+- `_redConnections: HashSet<string>` - Tracks all Red player's connections
+- `WhiteConnectionId` / `RedConnectionId` - Legacy properties (return first connection for backward compatibility)
+- `GetPlayerColor(connectionId)` - Checks if connection belongs to a player
+- `AddPlayer(playerId, connectionId)` - Adds connection to player's set (multiple connections allowed)
+
+**Broadcast Pattern:**
+All game update methods iterate through all connections:
+```csharp
+foreach (var connectionId in session.WhiteConnections)
+{
+    var state = session.GetState(connectionId);
+    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
+}
+```
+
+**Reconnection Detection:**
+When a player joins an already-in-progress game:
+1. Check if `session.Engine.GameStarted` is true
+2. If yes → Reconnection → Send current state to new connection only
+3. If no → New game → Broadcast GameStart to all connections
+
+This allows players to:
+- Open same game in multiple tabs
+- Make moves from any tab
+- See real-time updates in all tabs
+- Seamlessly reconnect after network issues
 
 ### Board Representation
 - 24 points (positions 1-24) as `Point[]` array

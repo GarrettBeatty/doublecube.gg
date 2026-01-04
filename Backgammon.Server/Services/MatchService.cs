@@ -31,14 +31,19 @@ public class MatchService : IMatchService
         _logger = logger;
     }
 
-    public async Task<Match> CreateMatchAsync(string player1Id, string player2Id, int targetScore)
+    public async Task<(Match Match, ServerGame FirstGame)> CreateMatchAsync(
+        string player1Id,
+        int targetScore,
+        string opponentType,
+        string? player1DisplayName = null,
+        string? player2Id = null)
     {
         try
         {
             // Input validation
-            if (string.IsNullOrWhiteSpace(player1Id) || string.IsNullOrWhiteSpace(player2Id))
+            if (string.IsNullOrWhiteSpace(player1Id))
             {
-                throw new ArgumentException("Player IDs cannot be null or empty");
+                throw new ArgumentException("Player1 ID cannot be null or empty");
             }
 
             if (targetScore <= 0 || targetScore > 25)
@@ -46,44 +51,107 @@ public class MatchService : IMatchService
                 throw new ArgumentException("Target score must be between 1 and 25");
             }
 
-            if (player1Id == player2Id)
+            if (!new[] { "AI", "OpenLobby", "Friend" }.Contains(opponentType))
             {
-                throw new ArgumentException("Cannot create a match against yourself");
+                throw new ArgumentException("OpponentType must be 'AI', 'OpenLobby', or 'Friend'");
             }
 
-            // Get player names
+            // Get player 1 name
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            var player2 = await _userRepository.GetByUserIdAsync(player2Id);
+            string player1Name = player1DisplayName ?? player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
 
+            // Create match
             var match = new Match
             {
                 MatchId = Guid.NewGuid().ToString(),
                 TargetScore = targetScore,
                 Player1Id = player1Id,
-                Player2Id = player2Id,
-                Player1Name = player1?.DisplayName ?? (player1Id.Length >= 8 ? $"Player {player1Id.Substring(0, 8)}" : $"Player {player1Id}"),
-                Player2Name = player2?.DisplayName ?? (player2Id.Length >= 8 ? $"Player {player2Id.Substring(0, 8)}" : $"Player {player2Id}"),
+                Player1Name = player1Name,
+                Player1DisplayName = player1DisplayName,
+                OpponentType = opponentType,
                 Status = "InProgress"
             };
+
+            // Handle opponent based on type
+            if (opponentType == "AI")
+            {
+                // Generate AI player ID
+                var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
+                match.Player2Id = aiPlayerId;
+                match.Player2Name = "Computer";
+            }
+            else if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
+            {
+                // Set friend as player 2
+                var player2 = await _userRepository.GetByUserIdAsync(player2Id);
+                match.Player2Id = player2Id;
+                match.Player2Name = player2?.DisplayName ?? player2Id;
+            }
+
+            // For OpenLobby, Player2Id remains null
 
             await _matchRepository.SaveMatchAsync(match);
 
             _logger.LogInformation(
-                "Created match {MatchId} between {Player1} and {Player2}, target score: {TargetScore}",
+                "Created match {MatchId} for player {Player1Id} (type: {OpponentType}), target score: {TargetScore}",
                 match.MatchId,
-                match.Player1Name,
-                match.Player2Name,
+                player1Id,
+                opponentType,
                 targetScore);
 
-            return match;
+            // Create first game immediately
+            var game = new ServerGame
+            {
+                GameId = Guid.NewGuid().ToString(),
+                WhitePlayerId = match.Player1Id,
+                RedPlayerId = match.Player2Id, // Will be null for OpenLobby
+                WhitePlayerName = match.Player1Name,
+                RedPlayerName = match.Player2Name, // Will be empty for OpenLobby
+                Status = "InProgress",
+                IsMatchGame = true,
+                MatchId = match.MatchId,
+                IsCrawfordGame = false
+            };
+
+            await _gameRepository.SaveGameAsync(game);
+
+            // Update match with game ID
+            match.CurrentGameId = game.GameId;
+            match.GameIds.Add(game.GameId);
+            match.LastUpdatedAt = DateTime.UtcNow;
+            await _matchRepository.UpdateMatchAsync(match);
+
+            // Create game session
+            var session = _gameSessionManager.CreateGame(game.GameId);
+            session.WhitePlayerName = match.Player1Name;
+            session.RedPlayerName = match.Player2Name ?? "Waiting...";
+            session.MatchId = match.MatchId;
+            session.IsMatchGame = true;
+            session.TargetScore = match.TargetScore;
+            session.Player1Score = match.Player1Score;
+            session.Player2Score = match.Player2Score;
+            session.IsCrawfordGame = match.IsCrawfordGame;
+
+            // For AI matches, add AI player to session
+            if (opponentType == "AI")
+            {
+                session.AddPlayer(match.Player2Id!, string.Empty); // Empty connection for AI
+                session.SetPlayerName(match.Player2Id!, "Computer");
+            }
+
+            _logger.LogInformation(
+                "Created first game {GameId} for match {MatchId}",
+                game.GameId,
+                match.MatchId);
+
+            return (match, game);
         }
         catch (Exception ex)
         {
             _logger.LogError(
                 ex,
-                "Failed to create match between {Player1Id} and {Player2Id}",
-                player1Id,
-                player2Id);
+                "Failed to create match for player {Player1Id}",
+                player1Id);
             throw;
         }
     }
@@ -293,54 +361,7 @@ public class MatchService : IMatchService
         return await _matchRepository.GetPlayerMatchStatsAsync(playerId);
     }
 
-    public async Task<Match> CreateMatchLobbyAsync(string player1Id, int targetScore, string opponentType, bool isOpenLobby, string? player1DisplayName = null, string? player2Id = null)
-    {
-        try
-        {
-            // Get player names
-            var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            string player1Name = player1DisplayName ?? player1?.DisplayName ?? $"Player {player1Id.Substring(0, 8)}";
-
-            var match = new Match
-            {
-                MatchId = Guid.NewGuid().ToString(),
-                TargetScore = targetScore,
-                Player1Id = player1Id,
-                Player1Name = player1Name,
-                Player1DisplayName = player1DisplayName,
-                OpponentType = opponentType,
-                IsOpenLobby = isOpenLobby,
-                LobbyStatus = "WaitingForOpponent",
-                Status = "InProgress"
-            };
-
-            // If opponent is specified (Friend or AI), set player 2
-            if (!string.IsNullOrEmpty(player2Id))
-            {
-                var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-                match.Player2Id = player2Id;
-                match.Player2Name = player2?.DisplayName ?? player2Id;
-                match.LobbyStatus = "Ready";
-            }
-
-            await _matchRepository.SaveMatchAsync(match);
-
-            _logger.LogInformation(
-                "Created match lobby {MatchId} for player {Player1Id} (type: {OpponentType})",
-                match.MatchId,
-                player1Id,
-                opponentType);
-
-            return match;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create match lobby");
-            throw;
-        }
-    }
-
-    public async Task<Match> JoinOpenLobbyAsync(string matchId, string player2Id, string? player2DisplayName = null)
+    public async Task<Match> JoinMatchAsync(string matchId, string player2Id, string? player2DisplayName = null)
     {
         try
         {
@@ -350,9 +371,9 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} not found");
             }
 
-            if (!match.IsOpenLobby)
+            if (match.OpponentType != "OpenLobby" && match.OpponentType != "Friend")
             {
-                throw new InvalidOperationException($"Match {matchId} is not an open lobby");
+                throw new InvalidOperationException($"Match {matchId} does not allow joining (OpponentType: {match.OpponentType})");
             }
 
             if (!string.IsNullOrEmpty(match.Player2Id))
@@ -362,190 +383,23 @@ public class MatchService : IMatchService
 
             // Get player 2 name
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-            string player2Name = player2DisplayName ?? player2?.DisplayName ?? $"Player {player2Id.Substring(0, 8)}";
+            string player2Name = player2DisplayName ?? player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
 
             match.Player2Id = player2Id;
             match.Player2Name = player2Name;
             match.Player2DisplayName = player2DisplayName;
-            match.LobbyStatus = "Ready";
             match.LastUpdatedAt = DateTime.UtcNow;
 
             await _matchRepository.UpdateMatchAsync(match);
 
-            _logger.LogInformation("Player {Player2Id} joined match lobby {MatchId}", player2Id, matchId);
+            _logger.LogInformation("Player {Player2Id} joined match {MatchId}", player2Id, matchId);
 
             return match;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to join open lobby {MatchId}", matchId);
+            _logger.LogError(ex, "Failed to join match {MatchId}", matchId);
             throw;
         }
-    }
-
-    public async Task<ServerGame> StartMatchFirstGameAsync(string matchId)
-    {
-        var match = await _matchRepository.GetMatchByIdAsync(matchId);
-        if (match == null)
-        {
-            throw new InvalidOperationException($"Match {matchId} not found");
-        }
-
-        return await StartMatchFirstGameAsync(match);
-    }
-
-    public async Task<ServerGame> StartMatchFirstGameAsync(Match match)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(match.Player2Id))
-            {
-                throw new InvalidOperationException($"Match {match.MatchId} does not have a second player");
-            }
-
-            // Create the first game
-            var game = new ServerGame
-            {
-                GameId = Guid.NewGuid().ToString(),
-                WhitePlayerId = match.Player1Id,
-                RedPlayerId = match.Player2Id,
-                WhitePlayerName = match.Player1Name,
-                RedPlayerName = match.Player2Name,
-                Status = "InProgress",
-                IsMatchGame = true,
-                MatchId = match.MatchId,
-                IsCrawfordGame = false
-            };
-
-            await _gameRepository.SaveGameAsync(game);
-
-            // Update match
-            match.CurrentGameId = game.GameId;
-            match.GameIds.Add(game.GameId);
-            match.LobbyStatus = "InGame";
-            match.LastUpdatedAt = DateTime.UtcNow;
-            await _matchRepository.UpdateMatchAsync(match);
-
-            // Create game session
-            var session = _gameSessionManager.CreateGame(game.GameId);
-            session.WhitePlayerName = match.Player1Name;
-            session.RedPlayerName = match.Player2Name;
-            session.MatchId = match.MatchId;
-            session.IsMatchGame = true;
-            session.TargetScore = match.TargetScore;
-            session.Player1Score = match.Player1Score;
-            session.Player2Score = match.Player2Score;
-            session.IsCrawfordGame = match.IsCrawfordGame;
-
-            // Configure Crawford rule if applicable
-            if (match.IsCrawfordGame)
-            {
-                session.Engine.IsCrawfordGame = true;
-                session.Engine.MatchId = match.MatchId;
-            }
-
-            _logger.LogInformation("Started first game {GameId} for match {MatchId}", game.GameId, match.MatchId);
-
-            return game;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to start first game for match {MatchId}", match.MatchId);
-            throw;
-        }
-    }
-
-    public async Task LeaveMatchLobbyAsync(string matchId, string playerId)
-    {
-        try
-        {
-            var match = await _matchRepository.GetMatchByIdAsync(matchId);
-            if (match == null || match.LobbyStatus == "InGame")
-            {
-                return;
-            }
-
-            // If creator leaves, delete the match
-            if (match.Player1Id == playerId)
-            {
-                await _matchRepository.DeleteMatchAsync(matchId);
-                _logger.LogInformation("Match lobby {MatchId} deleted as creator left", matchId);
-            }
-
-            // If joiner leaves, reset to waiting
-            else if (match.Player2Id == playerId)
-            {
-                match.Player2Id = string.Empty;
-                match.Player2Name = string.Empty;
-                match.Player2DisplayName = null;
-                match.LobbyStatus = "WaitingForOpponent";
-                match.LastUpdatedAt = DateTime.UtcNow;
-                await _matchRepository.UpdateMatchAsync(match);
-                _logger.LogInformation("Player {PlayerId} left match lobby {MatchId}", playerId, matchId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to leave match lobby {MatchId}", matchId);
-            throw;
-        }
-    }
-
-    public async Task<Match?> GetMatchLobbyAsync(string matchId)
-    {
-        return await _matchRepository.GetMatchByIdAsync(matchId);
-    }
-
-    public async Task<(ServerGame Game, Match Match)?> StartMatchWithAiAsync(Match match)
-    {
-        // Generate AI player ID and add to match BEFORE starting the game
-        var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
-        match.Player2Id = aiPlayerId;
-        match.Player2Name = "Computer";
-        match.LobbyStatus = "Ready";
-
-        // Update the match with AI player
-        await UpdateMatchAsync(match);
-
-        _logger.LogInformation(
-            "Added AI player {AiPlayerId} to match {MatchId}",
-            aiPlayerId,
-            match.MatchId);
-
-        // Now start the first game using the updated match object (avoids DB reload race condition)
-        var game = await StartMatchFirstGameAsync(match);
-
-        // Get the game session and add AI player
-        var session = _gameSessionManager.GetGame(game.GameId);
-        if (session != null)
-        {
-            // Add AI player as Red (human player will be White when they join)
-            session.AddPlayer(aiPlayerId, string.Empty); // Empty connection ID for AI
-            session.SetPlayerName(aiPlayerId, "Computer");
-
-            _logger.LogInformation(
-                "Added AI player {AiPlayerId} to game session {GameId}",
-                aiPlayerId,
-                game.GameId);
-        }
-        else
-        {
-            _logger.LogWarning("Could not find game session {GameId} to add AI player", game.GameId);
-        }
-
-        // Refresh match data
-        var updatedMatch = await GetMatchAsync(match.MatchId);
-        if (updatedMatch == null)
-        {
-            _logger.LogError("Failed to refresh match {MatchId} after creating AI game", match.MatchId);
-            return null;
-        }
-
-        _logger.LogInformation(
-            "AI match {MatchId} created and started with game {GameId}",
-            match.MatchId,
-            game.GameId);
-
-        return (game, updatedMatch);
     }
 }

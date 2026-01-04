@@ -4,7 +4,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { HubMethods } from '@/types/signalr.types'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
-import { GameState } from '@/types/game.types'
+import { GameState, GameStatus } from '@/types/game.types'
 import { Dice1, Check, Undo, RefreshCw, Flag } from 'lucide-react'
 
 interface GameControlsProps {
@@ -22,14 +22,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   if (!gameState) return null
 
+  const isGameInProgress = gameState.status === GameStatus.InProgress
   const isYourTurn = gameState.isYourTurn
   // Only consider dice rolled if there are dice with non-zero values
   const hasDiceRolled =
     gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
   const hasMovesLeft = gameState.remainingMoves && gameState.remainingMoves.length > 0
-  const canRoll = isYourTurn && !hasDiceRolled
-  const canEndTurn = isYourTurn && hasDiceRolled && !hasMovesLeft
-  const canDouble = isYourTurn && !hasDiceRolled && gameState.doublingCubeOwner === gameState.yourColor
+  const canRoll = isGameInProgress && isYourTurn && !hasDiceRolled
+  const canEndTurn = isGameInProgress && isYourTurn && hasDiceRolled && !hasMovesLeft
+  const canDouble = isGameInProgress && isYourTurn && !hasDiceRolled && gameState.doublingCubeOwner === gameState.yourColor
 
   const handleRollDice = async () => {
     try {
@@ -116,7 +117,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           variant="outline"
           size="lg"
           onClick={handleUndo}
-          disabled={!isYourTurn || !hasDiceRolled}
+          disabled={!isGameInProgress || !isYourTurn || !hasDiceRolled}
           className="h-16"
         >
           <div className="text-center">

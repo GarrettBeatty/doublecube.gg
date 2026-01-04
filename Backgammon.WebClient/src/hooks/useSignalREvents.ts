@@ -198,10 +198,18 @@ export const useSignalREvents = () => {
       // TODO: Show info toast
     })
 
-    // MatchLobbyCreated - Match lobby created (not used for navigation anymore)
-    connection.on(HubEvents.MatchLobbyCreated, (data: any) => {
-      console.log('[SignalR] MatchLobbyCreated', data.matchId)
-      // Don't navigate - wait for MatchGameStarting event
+    // MatchCreated - Match and first game created, navigate to game page
+    connection.on(HubEvents.MatchCreated, (data: any) => {
+      console.log('[SignalR] MatchCreated', { matchId: data.matchId, gameId: data.gameId, opponentType: data.opponentType })
+      setCurrentGameId(data.gameId)
+      // Navigate to game page immediately - game handles waiting state
+      navigateRef.current(`/game/${data.gameId}`, { replace: true })
+    })
+
+    // OpponentJoinedMatch - Opponent joined the match
+    connection.on(HubEvents.OpponentJoinedMatch, (data: any) => {
+      console.log('[SignalR] OpponentJoinedMatch', { matchId: data.matchId, player2Name: data.player2Name })
+      // Game page will receive WaitingForOpponent → GameStart flow
     })
 
     // MatchGameStarting - Match game starting, navigate to game
@@ -227,7 +235,8 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.ReceiveChatMessage)
       connection.off(HubEvents.Error)
       connection.off(HubEvents.Info)
-      connection.off(HubEvents.MatchLobbyCreated)
+      connection.off(HubEvents.MatchCreated)
+      connection.off(HubEvents.OpponentJoinedMatch)
       connection.off(HubEvents.MatchGameStarting)
     }
   }, [connection, setGameState, setIsSpectator, setCurrentGameId, addChatMessage])

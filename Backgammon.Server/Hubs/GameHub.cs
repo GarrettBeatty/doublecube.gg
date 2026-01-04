@@ -38,11 +38,10 @@ public class GameHub : Hub
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
     private readonly IDoubleOfferService _doubleOfferService;
-    private readonly IGameStateService _gameStateService;
+    private readonly IGameService _gameService;
     private readonly IPlayerProfileService _playerProfileService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IPlayerStatsService _playerStatsService;
-    private readonly IGameCreationService _gameCreationService;
     private readonly IMoveQueryService _moveQueryService;
     private readonly IGameImportExportService _gameImportExportService;
     private readonly IChatService _chatService;
@@ -56,11 +55,10 @@ public class GameHub : Hub
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
         IDoubleOfferService doubleOfferService,
-        IGameStateService gameStateService,
+        IGameService gameService,
         IPlayerProfileService playerProfileService,
         IGameActionOrchestrator gameActionOrchestrator,
         IPlayerStatsService playerStatsService,
-        IGameCreationService gameCreationService,
         IMoveQueryService moveQueryService,
         IGameImportExportService gameImportExportService,
         IChatService chatService,
@@ -73,11 +71,10 @@ public class GameHub : Hub
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
         _doubleOfferService = doubleOfferService;
-        _gameStateService = gameStateService;
+        _gameService = gameService;
         _playerProfileService = playerProfileService;
         _gameActionOrchestrator = gameActionOrchestrator;
         _playerStatsService = playerStatsService;
-        _gameCreationService = gameCreationService;
         _moveQueryService = moveQueryService;
         _gameImportExportService = gameImportExportService;
         _chatService = chatService;
@@ -98,7 +95,13 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            await _gameCreationService.JoinGameAsync(connectionId, effectivePlayerId, displayName, gameId);
+            if (string.IsNullOrEmpty(gameId))
+            {
+                await Clients.Caller.SendAsync("Error", "Game ID is required");
+                return;
+            }
+
+            await _gameService.JoinGameAsync(connectionId, effectivePlayerId, displayName, gameId);
         }
         catch (Exception ex)
         {
@@ -117,7 +120,7 @@ public class GameHub : Hub
             var connectionId = Context.ConnectionId;
             var userId = GetAuthenticatedUserId() ?? connectionId;
 
-            await _gameCreationService.CreateAnalysisGameAsync(connectionId, userId);
+            await _gameService.CreateAnalysisGameAsync(connectionId, userId);
         }
         catch (Exception ex)
         {
@@ -139,7 +142,7 @@ public class GameHub : Hub
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = GetAuthenticatedDisplayName();
 
-            await _gameCreationService.CreateAiGameAsync(connectionId, effectivePlayerId, displayName);
+            await _gameService.CreateAiGameAsync(connectionId, effectivePlayerId, displayName);
         }
         catch (Exception ex)
         {
@@ -300,7 +303,7 @@ public class GameHub : Hub
 
             if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
             {
-                await _gameStateService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
+                await _gameService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
             }
             else
             {
@@ -385,7 +388,7 @@ public class GameHub : Hub
             await _doubleOfferService.AcceptDoubleAsync(session);
 
             // Broadcast double accepted to both players
-            await _gameStateService.BroadcastDoubleAcceptedAsync(session);
+            await _gameService.BroadcastDoubleAcceptedAsync(session);
 
             // Save game state
             BackgroundTaskHelper.FireAndForget(
@@ -441,7 +444,7 @@ public class GameHub : Hub
             _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
 
             // Broadcast game over AFTER database is updated
-            await _gameStateService.BroadcastGameOverAsync(session);
+            await _gameService.BroadcastGameOverAsync(session);
 
             // Remove from memory to prevent memory leak
             _sessionManager.RemoveGame(session.Id);
@@ -665,76 +668,6 @@ public class GameHub : Hub
         }
     }
 
-    /// <summary>
-    /// Create a new match between two players
-    /// </summary>
-    public async Task CreateMatch(string opponentId, int targetScore)
-    {
-        try
-        {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-
-            if (playerId == opponentId)
-            {
-                await Clients.Caller.SendAsync("Error", "Cannot create a match against yourself");
-                return;
-            }
-
-            // Create the match
-            var match = await _matchService.CreateMatchAsync(playerId, opponentId, targetScore);
-
-            // Start the first game
-            var firstGame = await _matchService.StartNextGameAsync(match.MatchId);
-
-            // Create game session
-            var session = _sessionManager.GetSession(firstGame.GameId);
-            if (session != null)
-            {
-                session.MatchId = match.MatchId;
-                session.IsMatchGame = true;
-            }
-
-            // Notify both players
-            await Clients.Caller.SendAsync("MatchCreated", new
-            {
-                matchId = match.MatchId,
-                targetScore = match.TargetScore,
-                opponentName = match.Player2Name,
-                gameId = firstGame.GameId
-            });
-
-            // Check if opponent is online and notify them
-            if (_sessionManager.IsPlayerOnline(opponentId))
-            {
-                var opponentConnection = GetPlayerConnection(opponentId);
-                if (!string.IsNullOrEmpty(opponentConnection))
-                {
-                    await Clients.Client(opponentConnection).SendAsync("MatchInvite", new
-                    {
-                        matchId = match.MatchId,
-                        targetScore = match.TargetScore,
-                        challengerName = match.Player1Name,
-                        gameId = firstGame.GameId
-                    });
-                }
-            }
-
-            _logger.LogInformation(
-                "Created match {MatchId} between {Player1} and {Player2}",
-                match.MatchId,
-                match.Player1Name,
-                match.Player2Name);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating match");
-            await Clients.Caller.SendAsync("Error", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// Continue an existing match
-    /// </summary>
     public async Task ContinueMatch(string matchId)
     {
         try
@@ -893,92 +826,42 @@ public class GameHub : Hub
     /// <summary>
     /// Create a new match with configuration (lobby-based)
     /// </summary>
-    public async Task CreateMatchWithConfig(MatchConfig config)
+    /// <summary>
+    /// Create a new match and immediately create the first game
+    /// </summary>
+    public async Task CreateMatch(MatchConfig config)
     {
         try
         {
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
 
-            // Create match lobby
-            var match = await _matchService.CreateMatchLobbyAsync(playerId, config.TargetScore, config.OpponentType, config.OpponentType == "OpenLobby", config.DisplayName);
+            // Create match and first game immediately
+            var (match, firstGame) = await _matchService.CreateMatchAsync(
+                playerId,
+                config.TargetScore,
+                config.OpponentType,
+                config.DisplayName,
+                config.OpponentId);
 
-            // For AI matches, start immediately
-            if (config.OpponentType == "AI")
-            {
-                var result = await _matchService.StartMatchWithAiAsync(match);
-                if (result == null)
-                {
-                    await Clients.Caller.SendAsync("Error", "Failed to refresh match data");
-                    return;
-                }
-
-                var (game, updatedMatch) = result.Value;
-
-                await Clients.Caller.SendAsync("MatchGameStarting", new
-                {
-                    matchId = updatedMatch.MatchId,
-                    gameId = game.GameId,
-                    player1Id = updatedMatch.Player1Id,
-                    player2Id = updatedMatch.Player2Id,
-                    player1Name = updatedMatch.Player1Name,
-                    player2Name = updatedMatch.Player2Name,
-                    player1Score = updatedMatch.Player1Score,
-                    player2Score = updatedMatch.Player2Score,
-                    targetScore = updatedMatch.TargetScore,
-                    isCrawfordGame = updatedMatch.IsCrawfordGame
-                });
-
-                _logger.LogInformation(
-                    "AI match {MatchId} created and started for player {PlayerId}",
-                    match.MatchId,
-                    playerId);
-                return;
-            }
-
-            // For OpenLobby matches, start the game immediately and wait for opponent to join
-            if (config.OpponentType == "OpenLobby")
-            {
-                // Set a placeholder for player 2
-                match.Player2Id = "waiting";
-                match.Player2Name = "Waiting for opponent...";
-                await _matchService.UpdateMatchAsync(match);
-
-                // Start the first game
-                var game = await _matchService.StartMatchFirstGameAsync(match);
-
-                await Clients.Caller.SendAsync("MatchGameStarting", new
-                {
-                    matchId = match.MatchId,
-                    gameId = game.GameId,
-                    player1Id = match.Player1Id,
-                    player2Id = match.Player2Id,
-                    player1Name = match.Player1Name,
-                    player2Name = match.Player2Name,
-                    player1Score = match.Player1Score,
-                    player2Score = match.Player2Score,
-                    targetScore = match.TargetScore,
-                    isCrawfordGame = match.IsCrawfordGame
-                });
-
-                _logger.LogInformation(
-                    "OpenLobby match {MatchId} created and game started, waiting for opponent",
-                    match.MatchId);
-                return;
-            }
-
-            // Send match lobby created event for Friend matches
-            await Clients.Caller.SendAsync("MatchLobbyCreated", new
+            // Send MatchCreated event with game ID
+            await Clients.Caller.SendAsync("MatchCreated", new
             {
                 matchId = match.MatchId,
+                gameId = firstGame.GameId,
                 targetScore = match.TargetScore,
                 opponentType = match.OpponentType,
-                isOpenLobby = match.IsOpenLobby,
-                player1Name = match.Player1Name,
                 player1Id = match.Player1Id,
-                player2Name = match.Player2Name,
                 player2Id = match.Player2Id,
-                lobbyStatus = match.LobbyStatus
+                player1Name = match.Player1Name,
+                player2Name = match.Player2Name
             });
+
+            _logger.LogInformation(
+                "Match {MatchId} created for player {PlayerId} (type: {OpponentType}), first game: {GameId}",
+                match.MatchId,
+                playerId,
+                config.OpponentType,
+                firstGame.GameId);
 
             // For friend matches, notify the friend if they're online
             if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
@@ -989,10 +872,11 @@ public class GameHub : Hub
                     if (!string.IsNullOrEmpty(opponentConnection))
                     {
                         await Clients.Client(opponentConnection).SendAsync(
-                            "MatchLobbyInvite",
+                            "MatchInvite",
                             new
                             {
                                 matchId = match.MatchId,
+                                gameId = firstGame.GameId,
                                 targetScore = match.TargetScore,
                                 challengerName = match.Player1Name,
                                 challengerId = match.Player1Id
@@ -1003,342 +887,63 @@ public class GameHub : Hub
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating match with config");
+            _logger.LogError(ex, "Error creating match");
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
     }
 
+    // Legacy method for backwards compatibility - redirects to CreateMatch
+    public async Task CreateMatchWithConfig(MatchConfig config)
+    {
+        await CreateMatch(config);
+    }
+
     /// <summary>
-    /// Join a match lobby
+    /// Join an existing match as player 2
     /// </summary>
-    public async Task JoinMatchLobby(string matchId, string? displayName)
+    public async Task JoinMatch(string matchId)
     {
         try
         {
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var displayName = GetAuthenticatedDisplayName();
 
             // Track this player's connection
             _playerConnectionService.AddConnection(playerId, Context.ConnectionId);
 
-            // Get match to check if it exists
-            var existingMatch = await _matchService.GetMatchLobbyAsync(matchId);
-            if (existingMatch == null)
+            // Join the match
+            var match = await _matchService.JoinMatchAsync(matchId, playerId, displayName);
+
+            // Send MatchCreated to joiner (navigates to game page)
+            await Clients.Caller.SendAsync("MatchCreated", new
             {
-                await Clients.Caller.SendAsync("Error", "Match not found");
-                return;
-            }
+                matchId = match.MatchId,
+                gameId = match.CurrentGameId,
+                targetScore = match.TargetScore,
+                opponentType = match.OpponentType,
+                player1Id = match.Player1Id,
+                player2Id = match.Player2Id,
+                player1Name = match.Player1Name,
+                player2Name = match.Player2Name
+            });
 
-            _logger.LogInformation(
-                "Player {PlayerId} attempting to join match {MatchId}. Match state: IsOpenLobby={IsOpenLobby}, OpponentType={OpponentType}, Player1Id={Player1Id}, Player2Id={Player2Id}, LobbyStatus={LobbyStatus}",
-                playerId,
-                matchId,
-                existingMatch.IsOpenLobby,
-                existingMatch.OpponentType,
-                existingMatch.Player1Id,
-                existingMatch.Player2Id ?? "null",
-                existingMatch.LobbyStatus);
-
-            // If player is the creator, just send them the lobby state
-            if (existingMatch.Player1Id == playerId)
+            // Notify creator that opponent joined
+            var creatorConnection = GetPlayerConnection(match.Player1Id);
+            if (!string.IsNullOrEmpty(creatorConnection))
             {
-                await Clients.Caller.SendAsync("MatchLobbyJoined", new
-                {
-                    matchId = existingMatch.MatchId,
-                    targetScore = existingMatch.TargetScore,
-                    opponentType = existingMatch.OpponentType,
-                    isOpenLobby = existingMatch.IsOpenLobby,
-                    player1Name = existingMatch.Player1Name,
-                    player1Id = existingMatch.Player1Id,
-                    player2Name = existingMatch.Player2Name,
-                    player2Id = existingMatch.Player2Id,
-                    lobbyStatus = existingMatch.LobbyStatus
-                });
-                return;
-            }
-
-            // Check if this is an open lobby with an empty slot
-            if (existingMatch.IsOpenLobby && string.IsNullOrEmpty(existingMatch.Player2Id))
-            {
-                // New player joining open lobby
-                var match = await _matchService.JoinOpenLobbyAsync(matchId, playerId, displayName);
-
-                // Notify the joiner
-                await Clients.Caller.SendAsync("MatchLobbyJoined", new
+                await Clients.Client(creatorConnection).SendAsync("OpponentJoinedMatch", new
                 {
                     matchId = match.MatchId,
-                    targetScore = match.TargetScore,
-                    opponentType = match.OpponentType,
-                    isOpenLobby = match.IsOpenLobby,
-                    player1Name = match.Player1Name,
-                    player1Id = match.Player1Id,
-                    player2Name = match.Player2Name,
                     player2Id = match.Player2Id,
-                    lobbyStatus = match.LobbyStatus
+                    player2Name = match.Player2Name
                 });
-
-                // Notify the creator
-                var creatorConnection = GetPlayerConnection(match.Player1Id);
-                _logger.LogInformation(
-                    "Looking up creator connection for Player1Id={Player1Id}, found connectionId={ConnectionId}",
-                    match.Player1Id,
-                    creatorConnection ?? "NULL");
-
-                if (!string.IsNullOrEmpty(creatorConnection))
-                {
-                    _logger.LogInformation(
-                        "Sending MatchLobbyPlayerJoined to creator at connection {ConnectionId}",
-                        creatorConnection);
-                    await Clients.Client(creatorConnection).SendAsync(
-                        "MatchLobbyPlayerJoined",
-                        new
-                        {
-                            matchId = match.MatchId,
-                            player2Name = match.Player2Name,
-                            player2Id = match.Player2Id,
-                            lobbyStatus = match.LobbyStatus
-                        });
-                }
-                else
-                {
-                    _logger.LogWarning("Could not find connection for creator {Player1Id}", match.Player1Id);
-                }
-
-                _logger.LogInformation("Player {PlayerId} joined match lobby {MatchId}", playerId, matchId);
-
-                // Auto-start the match now that both players are ready
-                _logger.LogInformation(
-                    "Auto-starting match {MatchId} with both players ready. Player1Id={Player1Id}, Player2Id={Player2Id}",
-                    matchId,
-                    match.Player1Id,
-                    match.Player2Id);
-                try
-                {
-                    // Use the match data we just got from JoinOpenLobbyAsync (it's fresh)
-                    if (string.IsNullOrEmpty(match.Player2Id))
-                    {
-                        _logger.LogWarning(
-                            "Cannot auto-start match {MatchId} - Player2Id not set in returned match data. Player1Id={Player1Id}, Player2Id={Player2Id}",
-                            matchId,
-                            match.Player1Id,
-                            match.Player2Id);
-                        return;
-                    }
-
-                    // Start the first game (pass the match object to avoid DB reload)
-                    var firstGame = await _matchService.StartMatchFirstGameAsync(match);
-
-                    // Get updated match state
-                    var updatedMatch = await _matchService.GetMatchAsync(matchId);
-                    if (updatedMatch == null)
-                    {
-                        _logger.LogError("Failed to get match {MatchId} after starting first game", matchId);
-                        await Clients.Caller.SendAsync("Error", "Failed to load match data");
-                        return;
-                    }
-
-                    // Notify both players
-                    var player1Connection = GetPlayerConnection(match.Player1Id);
-                    var player2Connection = GetPlayerConnection(match.Player2Id);
-
-                    var matchGameData = new
-                    {
-                        matchId = updatedMatch.MatchId,
-                        gameId = firstGame.GameId,
-                        player1Id = updatedMatch.Player1Id,
-                        player2Id = updatedMatch.Player2Id,
-                        player1Name = updatedMatch.Player1Name,
-                        player2Name = updatedMatch.Player2Name,
-                        player1Score = updatedMatch.Player1Score,
-                        player2Score = updatedMatch.Player2Score,
-                        targetScore = updatedMatch.TargetScore,
-                        isCrawfordGame = updatedMatch.IsCrawfordGame
-                    };
-
-                    if (!string.IsNullOrEmpty(player1Connection))
-                    {
-                        await Clients.Client(player1Connection).SendAsync("MatchGameStarting", matchGameData);
-                    }
-
-                    if (!string.IsNullOrEmpty(player2Connection))
-                    {
-                        await Clients.Client(player2Connection).SendAsync("MatchGameStarting", matchGameData);
-                    }
-
-                    _logger.LogInformation(
-                        "Match {MatchId} first game {GameId} auto-started",
-                        matchId,
-                        firstGame.GameId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error auto-starting match {MatchId}", matchId);
-                    // Don't throw - just log the error and let players manually start if needed
-                }
             }
-            else if (existingMatch.Player2Id == playerId)
-            {
-                // Player is already in this match (rejoining), send current state
-                await Clients.Caller.SendAsync("MatchLobbyJoined", new
-                {
-                    matchId = existingMatch.MatchId,
-                    targetScore = existingMatch.TargetScore,
-                    opponentType = existingMatch.OpponentType,
-                    isOpenLobby = existingMatch.IsOpenLobby,
-                    player1Name = existingMatch.Player1Name,
-                    player1Id = existingMatch.Player1Id,
-                    player2Name = existingMatch.Player2Name,
-                    player2Id = existingMatch.Player2Id,
-                    lobbyStatus = existingMatch.LobbyStatus
-                });
-                _logger.LogInformation("Player {PlayerId} rejoined match lobby {MatchId}", playerId, matchId);
-            }
-            else
-            {
-                // Provide detailed error message for debugging
-                string reason = existingMatch.IsOpenLobby
-                    ? "Match lobby is full"
-                    : "Match is not an open lobby (it's invite-only)";
 
-                _logger.LogWarning(
-                    "Player {PlayerId} cannot join match {MatchId}. Reason: {Reason}. IsOpenLobby={IsOpenLobby}, Player2Id={Player2Id}",
-                    playerId,
-                    matchId,
-                    reason,
-                    existingMatch.IsOpenLobby,
-                    existingMatch.Player2Id);
-
-                await Clients.Caller.SendAsync("Error", $"Cannot join this match: {reason}");
-            }
+            _logger.LogInformation("Player {PlayerId} joined match {MatchId}", playerId, matchId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error joining match lobby {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// Start the first game in a match
-    /// </summary>
-    public async Task StartMatchGame(string matchId)
-    {
-        try
-        {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-
-            var match = await _matchService.GetMatchLobbyAsync(matchId);
-            if (match == null)
-            {
-                await Clients.Caller.SendAsync("Error", "Match not found");
-                return;
-            }
-
-            // Only the creator can start the match
-            if (match.Player1Id != playerId)
-            {
-                await Clients.Caller.SendAsync("Error", "Only the match creator can start the game");
-                return;
-            }
-
-            // Ensure both players are present
-            if (string.IsNullOrEmpty(match.Player2Id))
-            {
-                await Clients.Caller.SendAsync("Error", "Waiting for opponent to join");
-                return;
-            }
-
-            // Start the first game
-            var game = await _matchService.StartMatchFirstGameAsync(matchId);
-
-            // Refresh match data to get updated state
-            var updatedMatch = await _matchService.GetMatchAsync(matchId);
-            if (updatedMatch == null)
-            {
-                _logger.LogError("Failed to get match {MatchId} after starting first game", matchId);
-                await Clients.Caller.SendAsync("Error", "Failed to load match data");
-                return;
-            }
-
-            // Notify both players
-            var player1Connection = GetPlayerConnection(match.Player1Id);
-            var player2Connection = GetPlayerConnection(match.Player2Id);
-
-            var matchData = new
-            {
-                matchId = updatedMatch.MatchId,
-                gameId = game.GameId,
-                player1Id = updatedMatch.Player1Id,
-                player2Id = updatedMatch.Player2Id,
-                player1Name = updatedMatch.Player1Name,
-                player2Name = updatedMatch.Player2Name,
-                player1Score = updatedMatch.Player1Score,
-                player2Score = updatedMatch.Player2Score,
-                targetScore = updatedMatch.TargetScore,
-                isCrawfordGame = updatedMatch.IsCrawfordGame
-            };
-
-            if (!string.IsNullOrEmpty(player1Connection))
-            {
-                await Clients.Client(player1Connection).SendAsync("MatchGameStarting", matchData);
-            }
-
-            if (!string.IsNullOrEmpty(player2Connection))
-            {
-                await Clients.Client(player2Connection).SendAsync("MatchGameStarting", matchData);
-            }
-
-            _logger.LogInformation(
-                "Match {MatchId} first game {GameId} started by {PlayerId}",
-                matchId,
-                game.GameId,
-                playerId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error starting match game {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// Leave a match lobby
-    /// </summary>
-    public async Task LeaveMatchLobby(string matchId)
-    {
-        try
-        {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-
-            var match = await _matchService.GetMatchLobbyAsync(matchId);
-            if (match == null)
-            {
-                return;
-            }
-
-            await _matchService.LeaveMatchLobbyAsync(matchId, playerId);
-
-            // Notify the caller
-            await Clients.Caller.SendAsync("MatchLobbyLeft", new { matchId });
-
-            // If player 2 left, notify player 1
-            if (match.Player2Id == playerId && !string.IsNullOrEmpty(match.Player1Id))
-            {
-                var player1Connection = GetPlayerConnection(match.Player1Id);
-                if (!string.IsNullOrEmpty(player1Connection))
-                {
-                    await Clients.Client(player1Connection).SendAsync("MatchLobbyPlayerLeft", new
-                    {
-                        matchId,
-                        playerId
-                    });
-                }
-            }
-
-            _logger.LogInformation("Player {PlayerId} left match lobby {MatchId}", playerId, matchId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error leaving match lobby {MatchId}", matchId);
+            _logger.LogError(ex, "Error joining match {MatchId}", matchId);
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
     }

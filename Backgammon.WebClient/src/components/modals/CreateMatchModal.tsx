@@ -46,10 +46,10 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
         TargetScore: targetScore,
         DisplayName: authService.getDisplayName() || 'Player',
       }
-      console.log('[CreateMatchModal] Invoking CreateMatchWithConfig', config)
+      console.log('[CreateMatchModal] Invoking CreateMatch', config)
       // Always use the match system - single games are just matches with targetScore=1
-      await invoke(HubMethods.CreateMatchWithConfig, config)
-      console.log('[CreateMatchModal] CreateMatchWithConfig completed')
+      await invoke(HubMethods.CreateMatch, config)
+      console.log('[CreateMatchModal] CreateMatch completed')
       onClose()
     } catch (error) {
       console.error('[CreateMatchModal] Failed to create match:', error)

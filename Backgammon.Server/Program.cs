@@ -151,11 +151,10 @@ builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>
 
 // GameHub extracted services
 builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
-builder.Services.AddSingleton<IGameStateService, GameStateService>();
+builder.Services.AddSingleton<IGameService, GameService>();  // Consolidated GameCreationService + GameStateService
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
 builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>();
-builder.Services.AddSingleton<IGameCreationService, GameCreationService>();
 builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
 builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
 builder.Services.AddSingleton<IChatService, ChatService>();

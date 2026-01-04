@@ -12,7 +12,6 @@ namespace Backgammon.Tests.Services;
 public class GameActionOrchestratorTests
 {
     private readonly Mock<IGameRepository> _mockGameRepository;
-    private readonly Mock<IGameStateService> _mockGameStateService;
     private readonly Mock<IAiMoveService> _mockAiMoveService;
     private readonly Mock<IPlayerStatsService> _mockPlayerStatsService;
     private readonly Mock<IMatchService> _mockMatchService;
@@ -24,7 +23,6 @@ public class GameActionOrchestratorTests
     public GameActionOrchestratorTests()
     {
         _mockGameRepository = new Mock<IGameRepository>();
-        _mockGameStateService = new Mock<IGameStateService>();
         _mockAiMoveService = new Mock<IAiMoveService>();
         _mockPlayerStatsService = new Mock<IPlayerStatsService>();
         _mockMatchService = new Mock<IMatchService>();
@@ -34,7 +32,6 @@ public class GameActionOrchestratorTests
 
         _orchestrator = new GameActionOrchestrator(
             _mockGameRepository.Object,
-            _mockGameStateService.Object,
             _mockAiMoveService.Object,
             _mockPlayerStatsService.Object,
             _mockMatchService.Object,
@@ -111,7 +108,6 @@ public class GameActionOrchestratorTests
         Assert.True(result.Success);
         Assert.True(session.Engine.Dice.Die1 > 0);
         Assert.True(session.Engine.Dice.Die2 > 0);
-        _mockGameStateService.Verify(s => s.BroadcastGameUpdateAsync(session), Times.Once);
         _mockGameRepository.Verify(r => r.SaveGameAsync(It.IsAny<Backgammon.Server.Models.Game>()), Times.Once);
     }
 
@@ -185,7 +181,6 @@ public class GameActionOrchestratorTests
 
         // Assert
         Assert.True(result.Success);
-        _mockGameStateService.Verify(s => s.BroadcastGameUpdateAsync(session), Times.Once);
         _mockGameRepository.Verify(r => r.SaveGameAsync(It.IsAny<Backgammon.Server.Models.Game>()), Times.Once);
     }
 
@@ -286,7 +281,6 @@ public class GameActionOrchestratorTests
 
         // Assert
         Assert.True(result.Success);
-        _mockGameStateService.Verify(s => s.BroadcastGameUpdateAsync(session), Times.Once);
         _mockGameRepository.Verify(r => r.SaveGameAsync(It.IsAny<Backgammon.Server.Models.Game>()), Times.Once);
     }
 
@@ -395,7 +389,6 @@ public class GameActionOrchestratorTests
         if (session.Engine.MoveHistory.Count > 0)
         {
             Assert.True(result.Success);
-            _mockGameStateService.Verify(s => s.BroadcastGameUpdateAsync(session), Times.Once);
             _mockGameRepository.Verify(r => r.SaveGameAsync(It.IsAny<Backgammon.Server.Models.Game>()), Times.Once);
         }
     }

@@ -10,7 +10,6 @@ import { MatchInfo } from '@/components/game/MatchInfo'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { authService } from '@/services/auth.service'
 import { Eye, BarChart3 } from 'lucide-react'
 
@@ -111,20 +110,6 @@ export const GamePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, isConnected, navigate, setCurrentGameId, invoke, resetGame])
 
-  const handleLeaveGame = async () => {
-    try {
-      console.log('[GamePage] Leaving game:', gameId)
-      await invoke(HubMethods.LeaveGame)
-      resetGame()
-      setLastJoinedGameId(null)
-      navigate('/')
-    } catch (error) {
-      console.error('[GamePage] Failed to leave game:', error)
-      resetGame()
-      setLastJoinedGameId(null)
-      navigate('/')
-    }
-  }
 
   if (isLoading) {
     return (
@@ -182,16 +167,6 @@ export const GamePage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
           {/* Left Sidebar - Player Info & Controls */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <Button
-                variant="outline"
-                onClick={handleLeaveGame}
-                className="bg-white/10 hover:bg-white/20"
-              >
-                ← Leave Game
-              </Button>
-            </div>
-
             {isSpectator && (
               <Badge variant="secondary" className="w-full justify-center py-2">
                 <Eye className="h-4 w-4 mr-2" />

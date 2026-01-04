@@ -45,7 +45,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id!, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id!, targetScore, "Friend", null, player2Id));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -59,7 +59,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -73,7 +73,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -87,7 +87,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id!, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id!));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -101,7 +101,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Player IDs cannot be null or empty", exception.Message);
     }
 
@@ -115,7 +115,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -129,7 +129,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -143,7 +143,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
         Assert.Contains("Target score must be between 1 and 25", exception.Message);
     }
 
@@ -163,10 +163,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal(targetScore, match.TargetScore);
     }
 
@@ -186,10 +185,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal(targetScore, match.TargetScore);
     }
 
@@ -202,7 +200,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
-            () => _matchService.CreateMatchAsync(playerId, playerId, targetScore));
+            () => _matchService.CreateMatchAsync(playerId, targetScore, "Friend", null, playerId));
         Assert.Contains("Cannot create a match against yourself", exception.Message);
     }
 
@@ -222,10 +220,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal("Player p1", match.Player1Name);
         Assert.Equal("Player p2", match.Player2Name);
     }
@@ -246,10 +243,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal("Player player12", match.Player1Name);
         Assert.Equal("Player player98", match.Player2Name);
     }
@@ -273,10 +269,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal("Alice", match.Player1Name);
         Assert.Equal("Bob", match.Player2Name);
     }
@@ -295,10 +290,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.NotNull(match.MatchId);
         Assert.Equal(player1Id, match.Player1Id);
         Assert.Equal(player2Id, match.Player2Id);
@@ -322,7 +316,7 @@ public class MatchServiceValidationTests
 
         // Act & Assert
         await Assert.ThrowsAsync<Exception>(
-            () => _matchService.CreateMatchAsync(player1Id, player2Id, targetScore));
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id));
 
         // Verify error was logged
         _loggerMock.Verify(
@@ -355,10 +349,9 @@ public class MatchServiceValidationTests
             .Returns(Task.CompletedTask);
 
         // Act
-        var match = await _matchService.CreateMatchAsync(player1Id, player2Id, targetScore);
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.NotNull(match);
         Assert.Equal(targetScore, match.TargetScore);
     }
 }

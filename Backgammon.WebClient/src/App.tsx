@@ -11,7 +11,6 @@ import { RegisterModal } from './components/modals/RegisterModal'
 import { CreateMatchModal } from './components/modals/CreateMatchModal'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
-import { MatchLobbyPage } from './pages/MatchLobbyPage'
 import { MatchResultsPage } from './pages/MatchResultsPage'
 import { Toaster } from './components/ui/toaster'
 import { audioService } from './services/audio.service'
@@ -173,7 +172,6 @@ function AppContent() {
           />
           <Route path="/game/:gameId" element={<GamePage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
-          <Route path="/match-lobby/:matchId" element={<MatchLobbyPage />} />
           <Route path="/match-results/:matchId" element={<MatchResultsPage />} />
         </Routes>
       </Layout>

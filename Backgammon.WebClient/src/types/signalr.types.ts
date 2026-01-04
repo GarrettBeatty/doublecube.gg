@@ -18,11 +18,10 @@ export const HubMethods = {
   LeaveGame: 'LeaveGame',
 
   // Match actions
-  CreateMatchWithConfig: 'CreateMatchWithConfig',
-  CreateMatchLobby: 'CreateMatchLobby',
-  JoinMatchLobby: 'JoinMatchLobby',
-  StartMatchFromLobby: 'StartMatchFromLobby',
-  LeaveMatchLobby: 'LeaveMatchLobby',
+  CreateMatch: 'CreateMatch',
+  JoinMatch: 'JoinMatch',
+  ContinueMatch: 'ContinueMatch',
+  GetMatchStatus: 'GetMatchStatus',
 
   // Chat
   SendChatMessage: 'SendChatMessage',
@@ -48,10 +47,12 @@ export const HubEvents = {
   Info: 'Info',
 
   // Match events
-  MatchLobbyCreated: 'MatchLobbyCreated',
+  MatchCreated: 'MatchCreated',
+  OpponentJoinedMatch: 'OpponentJoinedMatch',
   MatchGameStarting: 'MatchGameStarting',
-  MatchLobbyUpdate: 'MatchLobbyUpdate',
-  MatchStarted: 'MatchStarted',
+  MatchUpdate: 'MatchUpdate',
+  MatchContinued: 'MatchContinued',
+  MatchStatus: 'MatchStatus',
   MatchGameCompleted: 'MatchGameCompleted',
   MatchCompleted: 'MatchCompleted',
 } as const
@@ -72,8 +73,11 @@ export interface SignalREventHandlers {
   onInfo: (infoMessage: string) => void
 
   // Match events
-  onMatchLobbyUpdate: (matchLobby: any) => void
-  onMatchStarted: (matchId: string) => void
+  onMatchCreated: (matchData: MatchCreatedEvent) => void
+  onOpponentJoinedMatch: (matchData: OpponentJoinedMatchEvent) => void
+  onMatchUpdate: (matchData: any) => void
+  onMatchContinued: (matchData: any) => void
+  onMatchStatus: (matchData: any) => void
   onMatchGameCompleted: (matchData: any) => void
   onMatchCompleted: (matchData: any) => void
 }
@@ -85,4 +89,22 @@ export enum ConnectionState {
   Connected = 'Connected',
   Reconnecting = 'Reconnecting',
   Failed = 'Failed',
+}
+
+// Match event data types
+export interface MatchCreatedEvent {
+  matchId: string
+  gameId: string
+  targetScore: number
+  opponentType: 'AI' | 'OpenLobby' | 'Friend'
+  player1Id: string
+  player2Id: string | null
+  player1Name: string
+  player2Name: string | null
+}
+
+export interface OpponentJoinedMatchEvent {
+  matchId: string
+  player2Id: string
+  player2Name: string
 }
