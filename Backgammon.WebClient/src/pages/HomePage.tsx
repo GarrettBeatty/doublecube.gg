@@ -15,7 +15,6 @@ import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
 import { CorrespondenceGames } from '@/components/home/CorrespondenceGames'
 import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
-import { VariantsCard } from '@/components/home/VariantsCard'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { RecentGames } from '@/components/home/RecentGames'
 
@@ -148,7 +147,6 @@ export function HomePage() {
           {/* Right Column - Discovery & Engagement (col-span-3) */}
           <div className="lg:col-span-3 space-y-6">
             <FeaturedTournaments />
-            <VariantsCard />
             <ActivityFeed />
           </div>
 
