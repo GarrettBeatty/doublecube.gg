@@ -285,7 +285,11 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             await HandleMatchGameCompletion(session);
 
             // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
-            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+            // Skip for analysis mode
+            if (session.GameMode.ShouldPersist)
+            {
+                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+            }
 
             if (session.GameMode.ShouldTrackStats)
             {
@@ -294,7 +298,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             }
             else
             {
-                _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
+                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
             }
 
             _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
@@ -439,9 +443,17 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 var stakes = session.Engine.GetGameResult();
 
                 // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
-                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-                var game = GameEngineMapper.ToGame(session);
-                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+                // Skip for analysis mode
+                if (session.GameMode.ShouldPersist)
+                {
+                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+                }
+
+                if (session.GameMode.ShouldTrackStats)
+                {
+                    var game = GameEngineMapper.ToGame(session);
+                    await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+                }
 
                 _logger.LogInformation(
                     "AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
@@ -466,6 +478,13 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
     private async Task SaveGameStateAsync(GameSession session)
     {
+        // Skip saving for analysis mode
+        if (!session.GameMode.ShouldPersist)
+        {
+            _logger.LogDebug("Skipping save for analysis game {GameId}", session.Id);
+            return;
+        }
+
         try
         {
             var game = GameEngineMapper.ToGame(session);

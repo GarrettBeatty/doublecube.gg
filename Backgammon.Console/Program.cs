@@ -196,7 +196,7 @@ internal class Program
             midRow.Add(string.Empty);
         }
 
-        midRow.Add($"[grey]OFF[/]\n[white]W:{game.WhitePlayer.CheckersBornOff}[/] [red]R:{game.RedPlayer.CheckersBornOff}[/]");
+        midRow.Add($"[grey]RED OFF[/]\n[red]{game.RedPlayer.CheckersBornOff}[/]");
         table.AddRow(midRow.ToArray());
 
         // Bottom half (points 12-1) - 5 rows of checkers
@@ -218,6 +218,16 @@ internal class Program
 
             table.AddRow(columns.ToArray());
         }
+
+        // Add White's borne-off checkers row at the bottom
+        var bottomRow = new List<string>();
+        for (int i = 0; i < 12; i++)
+        {
+            bottomRow.Add(string.Empty);
+        }
+
+        bottomRow.Add($"[grey]WHITE OFF[/]\n[white]{game.WhitePlayer.CheckersBornOff}[/]");
+        table.AddRow(bottomRow.ToArray());
 
         // Update footer with point numbers
         table.Columns[0].Footer = new Markup("[yellow]12[/]");

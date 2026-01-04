@@ -14,6 +14,8 @@ public class AnalysisMode : IGameMode
 
     public bool ShouldTrackStats => false;
 
+    public bool ShouldPersist => false;
+
     public bool IsPlayerTurn(string connectionId, GameSession session)
     {
         // Player controls both sides in analysis mode

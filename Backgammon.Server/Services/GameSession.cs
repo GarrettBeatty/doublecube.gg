@@ -348,6 +348,7 @@ public class GameSession
             DieValue = Math.Abs(m.To - m.From),
             IsHit = WillHit(m)
         }).ToList();
+        state.HasValidMoves = validMoves.Count > 0;
 
         if (Engine.Winner != null)
         {

@@ -29,6 +29,7 @@ export const HubMethods = {
   // Analysis mode
   CreateAnalysisGame: 'CreateAnalysisGame',
   ImportPosition: 'ImportPosition',
+  SetDice: 'SetDice',
 } as const
 
 // SignalR event names (server → client)

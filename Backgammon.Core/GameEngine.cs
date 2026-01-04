@@ -292,6 +292,14 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Check if there are any valid moves available for any remaining die
+    /// </summary>
+    public bool HasValidMoves()
+    {
+        return GetValidMoves().Count > 0;
+    }
+
+    /// <summary>
     /// End the current player's turn
     /// </summary>
     public void EndTurn()

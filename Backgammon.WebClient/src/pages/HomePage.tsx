@@ -1,9 +1,10 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Toaster } from '@/components/ui/toaster'
-import { Plus, UserPlus, Bot } from 'lucide-react'
+import { Plus, UserPlus, Bot, BarChart3 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useToast } from '@/hooks/use-toast'
 
@@ -25,6 +26,7 @@ import { FriendsDialog } from '@/components/friends/FriendsDialog'
 export function HomePage() {
   const { isConnected } = useSignalR()
   const { toast } = useToast()
+  const navigate = useNavigate()
 
   // Modal state
   const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
@@ -67,6 +69,10 @@ export function HomePage() {
     // TODO: Pre-select the friend in FriendsDialog or add direct challenge support
     setShowFriendsDialog(true)
   }
+
+  const handleOpenAnalysisBoard = () => {
+    navigate('/analysis')
+  }
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8">
@@ -101,6 +107,15 @@ export function HomePage() {
               >
                 <Bot className="h-5 w-5" />
                 Play Against Computer
+              </Button>
+              <Button
+                className="w-full flex items-center gap-2"
+                variant="outline"
+                size="lg"
+                onClick={handleOpenAnalysisBoard}
+              >
+                <BarChart3 className="h-5 w-5" />
+                Analysis Board
               </Button>
             </div>
 

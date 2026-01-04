@@ -8,11 +8,13 @@ import { HubMethods } from '@/types/signalr.types'
 interface BoardOverlayControlsProps {
   gameState: GameState
   isSpectator?: boolean
+  isAnalysisMode?: boolean
 }
 
 export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   gameState,
   isSpectator = false,
+  isAnalysisMode = false,
 }) => {
   const { invoke } = useSignalR()
 
@@ -22,7 +24,6 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   const isYourTurn = gameState.isYourTurn
   const hasDiceRolled =
     gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
-  const hasMovesLeft = gameState.remainingMoves && gameState.remainingMoves.length > 0
 
   // Opening roll logic
   const isOpeningRoll = gameState.isOpeningRoll || false
@@ -36,9 +37,22 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
     (yourColor === CheckerColor.Red && gameState.whiteOpeningRoll != null)
   )
 
-  const canRoll = isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
-  const canEndTurn = isGameInProgress && !isOpeningRoll && isYourTurn && hasDiceRolled && !hasMovesLeft
-  const canUndo = isGameInProgress && !isOpeningRoll && isYourTurn && hasDiceRolled
+  // In analysis mode, don't show roll button (user sets dice manually)
+  const canRoll = !isAnalysisMode && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
+
+  // End turn button logic:
+  // Analysis mode: Show when all moves used OR no valid moves remain
+  // Regular mode: Show when no valid moves remain AND it's your turn
+  const hasUsedAllMoves = gameState.remainingMoves && gameState.remainingMoves.length === 0
+  const canEndTurn = isGameInProgress && !isOpeningRoll && hasDiceRolled && (
+    isAnalysisMode ? (hasUsedAllMoves || !gameState.hasValidMoves) : (!gameState.hasValidMoves && isYourTurn)
+  )
+  
+  // Undo button: Only show if at least one move has been made
+  const totalMoves = hasDiceRolled ? gameState.dice.length : 0
+  const remainingMovesCount = gameState.remainingMoves?.length ?? 0
+  const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
+  const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade
 
   const handleRollDice = async () => {
     try {

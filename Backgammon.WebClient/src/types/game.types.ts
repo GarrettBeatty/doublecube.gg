@@ -72,6 +72,7 @@ export interface GameState {
   dice: number[]
   remainingMoves: Move[]
   validMoves: Move[]
+  hasValidMoves: boolean
   board: Point[]
   whiteCheckersOnBar: number
   redCheckersOnBar: number

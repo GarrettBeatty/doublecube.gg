@@ -11,6 +11,11 @@ public interface IGameMode
     bool ShouldTrackStats { get; }
 
     /// <summary>
+    /// Whether this mode should persist games to the database
+    /// </summary>
+    bool ShouldPersist { get; }
+
+    /// <summary>
     /// Determines if the given connection has control in the current game state
     /// </summary>
     bool IsPlayerTurn(string connectionId, GameSession session);

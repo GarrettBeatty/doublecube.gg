@@ -130,6 +130,71 @@ public class GameHub : Hub
     }
 
     /// <summary>
+    /// Set dice values manually (analysis mode only)
+    /// </summary>
+    public async Task SetDice(int die1, int die2)
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.SendAsync("Error", "Not in a game");
+                return;
+            }
+
+            // Only allow in analysis mode
+            if (!session.IsAnalysisMode)
+            {
+                await Clients.Caller.SendAsync("Error", "Dice can only be set in analysis mode");
+                return;
+            }
+
+            // Get initial dice count to detect if moves were made
+            var initialDiceCount = session.Engine.Dice.GetMoves().Count;
+            var currentRemainingCount = session.Engine.RemainingMoves.Count;
+
+            // Allow setting dice if:
+            // 1. No remaining moves (turn ended), OR
+            // 2. All moves still available (no moves made yet)
+            var noMovesLeft = currentRemainingCount == 0;
+            var noMovesMadeYet = currentRemainingCount == initialDiceCount;
+
+            if (!noMovesLeft && !noMovesMadeYet)
+            {
+                await Clients.Caller.SendAsync("Error", "End your turn or undo moves before setting new dice");
+                return;
+            }
+
+            // Validate dice values
+            if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6)
+            {
+                await Clients.Caller.SendAsync("Error", "Dice values must be between 1 and 6");
+                return;
+            }
+
+            // Set the dice
+            session.Engine.Dice.SetDice(die1, die2);
+            session.Engine.RemainingMoves.Clear();
+            session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+            _logger.LogInformation(
+                "Set dice to [{Die1}, {Die2}] in analysis game {GameId}",
+                die1,
+                die2,
+                session.Id);
+
+            // Broadcast update
+            await _gameService.BroadcastGameUpdateAsync(session);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting dice");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Create a new game against an AI opponent.
     /// The human player is always White (moves first).
     /// </summary>

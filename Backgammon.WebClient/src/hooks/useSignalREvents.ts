@@ -97,6 +97,7 @@ export const useSignalREvents = () => {
       // Check if we're on a game page and if it's for a different game
       const currentPath = window.location.pathname
       const isOnGamePage = currentPath.startsWith('/game/')
+      const isOnAnalysisPage = currentPath === '/analysis'
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
 
       // If we're on a different game page, ignore this GameStart (it's from an old game)
@@ -109,8 +110,8 @@ export const useSignalREvents = () => {
       setCurrentGameId(gameState.gameId)
       prevGameStateRef.current = gameState
 
-      // Only navigate if we're not already on a game page
-      if (!isOnGamePage) {
+      // Only navigate if we're not already on a game page or analysis page
+      if (!isOnGamePage && !isOnAnalysisPage) {
         navigateRef.current(`/game/${gameState.gameId}`)
       }
     })

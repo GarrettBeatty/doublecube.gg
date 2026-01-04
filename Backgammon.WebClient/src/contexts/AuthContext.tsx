@@ -41,16 +41,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         await authService.initialize()
         await authService.restoreSession()
 
-        // Restore user from localStorage
+        // Restore user from localStorage (only if token still valid after validation)
         const storedUser = authService.getUser()
         const storedToken = authService.getToken()
 
         if (storedUser && storedToken) {
           setUser(storedUser)
           setToken(storedToken)
+        } else {
+          // Token was invalid, ensure state is cleared
+          setUser(null)
+          setToken(null)
         }
       } catch (error) {
         console.error('[AuthContext] Failed to initialize:', error)
+        // Clear auth state on error
+        setUser(null)
+        setToken(null)
       } finally {
         setIsLoading(false)
       }

@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 import { PerformanceGraph } from '@/components/home/PerformanceGraph'
@@ -56,10 +55,10 @@ export const ProfilePage: React.FC = () => {
   const { invoke, isConnected } = useSignalR()
   const { user } = useAuth()
   const { stats: userStats, isLoading: userStatsLoading } = useUserStats()
-  const { toast } = useToast()
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
 
   // Check if viewing own profile
@@ -79,25 +78,17 @@ export const ProfilePage: React.FC = () => {
     if (!isConnected || !username) return
 
     setIsLoading(true)
+    setNotFound(false)
     try {
       const profileData = await invoke('GetPlayerProfile', username)
       if (profileData) {
         setProfile(profileData)
       } else {
-        toast({
-          title: 'Profile not found',
-          description: `User ${username} does not exist`,
-          variant: 'destructive',
-        })
-        navigate('/')
+        setNotFound(true)
       }
     } catch (error) {
       console.error('Failed to load profile:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load profile',
-        variant: 'destructive',
-      })
+      setNotFound(true)
     } finally {
       setIsLoading(false)
     }
@@ -113,6 +104,36 @@ export const ProfilePage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <Button variant="outline" onClick={() => navigate('/')} className="mb-6">
+            ← Back to Home
+          </Button>
+
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                User Not Found
+              </CardTitle>
+              <CardDescription>
+                The profile you're looking for doesn't exist
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground mb-4">
+                User <span className="font-mono font-semibold">@{username}</span> does not exist or may have been deleted.
+              </p>
+              <Button onClick={() => navigate('/')}>Return to Home</Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     )
   }

@@ -7,6 +7,8 @@ public class MultiplayerMode : IGameMode
 {
     public bool ShouldTrackStats => true;
 
+    public bool ShouldPersist => true;
+
     public bool IsPlayerTurn(string connectionId, GameSession session)
     {
         var playerColor = session.GetPlayerColor(connectionId);

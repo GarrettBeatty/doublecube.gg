@@ -911,20 +911,20 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       }
     }
 
-    // White borne-off checkers (from top)
-    if (gameState.whiteBornOff > 0) {
-      renderBornOffCheckers(
-        gameState.whiteBornOff,
-        CheckerColor.White,
-        CONFIG.padding + CONFIG.checkerSpacing
-      )
-    }
-
-    // Red borne-off checkers (from bottom)
+    // Red borne-off checkers (from top - points 19-24)
     if (gameState.redBornOff > 0) {
       renderBornOffCheckers(
         gameState.redBornOff,
         CheckerColor.Red,
+        CONFIG.padding + CONFIG.checkerSpacing
+      )
+    }
+
+    // White borne-off checkers (from bottom - points 1-6)
+    if (gameState.whiteBornOff > 0) {
+      renderBornOffCheckers(
+        gameState.whiteBornOff,
+        CheckerColor.White,
         CONFIG.viewBox.height - CONFIG.padding - CONFIG.checkerSpacing
       )
     }

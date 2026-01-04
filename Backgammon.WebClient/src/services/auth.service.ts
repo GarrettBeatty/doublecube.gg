@@ -145,6 +145,25 @@ class AuthService {
     const token = this.getToken()
     if (token) {
       apiService.setAuthToken(token)
+
+      // Validate token with server - if user no longer exists, clear session
+      try {
+        const response = await fetch(`${this.baseUrl}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          // Token invalid or user deleted - clear session
+          console.warn('[AuthService] Token validation failed, clearing session')
+          this.logout()
+        }
+      } catch (error) {
+        console.error('[AuthService] Failed to validate token:', error)
+        // Clear session on network error to be safe
+        this.logout()
+      }
     }
   }
 }

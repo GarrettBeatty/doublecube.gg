@@ -34,6 +34,8 @@ public class GameState
 
     public List<MoveDto> ValidMoves { get; set; } = new();
 
+    public bool HasValidMoves { get; set; }
+
     public PointState[] Board { get; set; } = Array.Empty<PointState>();
 
     public int WhiteCheckersOnBar { get; set; }

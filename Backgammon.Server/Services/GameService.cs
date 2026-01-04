@@ -100,15 +100,18 @@ public class GameService : IGameService
 
             // Timer will be started after opening roll completes (see GameActionOrchestrator.RollDiceAsync)
 
-            // Save game state when game starts (progressive save)
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    var game = GameEngineMapper.ToGame(session);
-                    await _gameRepository.SaveGameAsync(game);
-                },
-                _logger,
-                $"SaveGameState-{session.Id}");
+            // Save game state when game starts (progressive save) - skip for analysis mode
+            if (session.GameMode.ShouldPersist)
+            {
+                BackgroundTaskHelper.FireAndForget(
+                    async () =>
+                    {
+                        var game = GameEngineMapper.ToGame(session);
+                        await _gameRepository.SaveGameAsync(game);
+                    },
+                    _logger,
+                    $"SaveGameState-{session.Id}");
+            }
 
             // Check if AI should move first (only for non-opening-roll games, i.e., reconnections)
             // For opening roll, AI will roll after human rolls (triggered in RollDiceAsync)
@@ -187,10 +190,19 @@ public class GameService : IGameService
         // Enable analysis mode
         session.EnableAnalysisMode(userId);
 
-        // Start game immediately
+        // Register connection so game actions can find this game
+        _sessionManager.RegisterPlayerConnection(connectionId, session.Id);
+
+        // Start game immediately and skip opening roll for analysis mode
         if (!session.Engine.GameStarted)
         {
             session.Engine.StartNewGame();
+
+            // Skip opening roll phase in analysis mode - user will set dice manually
+            // Force the game out of opening roll state
+            session.Engine.GetType()
+                .GetProperty("IsOpeningRoll")!
+                .SetValue(session.Engine, false);
         }
 
         await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
@@ -198,15 +210,7 @@ public class GameService : IGameService
         var state = session.GetState(connectionId);
         await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", state);
 
-        // Save game state
-        BackgroundTaskHelper.FireAndForget(
-            async () =>
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _gameRepository.SaveGameAsync(game);
-            },
-            _logger,
-            $"SaveGameState-{session.Id}");
+        // Analysis games are not persisted to database
 
         _logger.LogInformation(
             "Analysis game {GameId} created by {UserId}",
