@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backgammon Online</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/styles.css?v=5">
+</head>
+<body>
+    <!-- Shared Header (visible on all pages) -->
+    <header id="appHeader" class="bg-gradient-to-br from-primary to-secondary text-white px-6 py-4 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <!-- Left: Logo -->
+            <div class="flex items-center gap-4 cursor-pointer">
+                <h1 class="text-2xl font-bold">Backgammon Online</h1>
+            </div>
+
+            <!-- Right: Connection + Auth -->
+            <div class="flex items-center gap-4">
+                <!-- Debug Toggle Button -->
+                <button id="debugToggleBtn" class="btn btn-ghost btn-sm text-white" title="Toggle Debug Panel">
+                    🐛
+                </button>
+
+                <!-- Connection Indicator -->
+                <div id="connectionIndicator">
+                    <span class="loading loading-ring loading-sm text-error"></span>
+                </div>
+
+                <!-- Auth Section (unauthenticated) -->
+                <div id="authSection" class="flex gap-2">
+                    <button id="loginBtn" class="btn btn-outline btn-sm text-white border-white hover:bg-white hover:text-primary">Login</button>
+                    <button id="signupBtn" class="btn btn-accent btn-sm">Sign Up</button>
+                </div>
+
+                <!-- User Section (authenticated) -->
+                <div id="userSection" style="display: none;" class="flex items-center gap-2">
+                    <span id="usernameDisplay" class="font-semibold"></span>
+                    <button id="profileBtn" class="btn btn-ghost btn-sm text-white">Profile</button>
+                    <button id="logoutBtn" class="btn btn-error btn-sm">Logout</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Landing Page -->
+    <div id="landingPage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <!-- Main Content Card -->
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body">
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                        <button id="createGameBtn" class="btn btn-primary btn-lg h-auto py-6 flex-col gap-2">
+                            <span class="text-3xl">+</span>
+                            <span class="text-lg">Play vs Human</span>
+                            <span class="text-sm opacity-70">Multiplayer</span>
+                        </button>
+                        <button id="createAiGameBtn" class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2">
+                            <span class="text-3xl">&#129302;</span>
+                            <span class="text-lg">Play vs Computer</span>
+                            <span class="text-sm opacity-70">Single player</span>
+                        </button>
+                        <button id="createMatchBtn" class="btn btn-accent btn-lg h-auto py-6 flex-col gap-2">
+                            <span class="text-3xl">🏆</span>
+                            <span class="text-lg">Create Match</span>
+                            <span class="text-sm opacity-70">Play to target score</span>
+                        </button>
+                        <button id="createAnalysisBtn" class="btn btn-secondary btn-lg h-auto py-6 flex-col gap-2">
+                            <span class="text-3xl">📊</span>
+                            <span class="text-lg">Analysis Mode</span>
+                            <span class="text-xs opacity-70">Practice & test positions</span>
+                        </button>
+                    </div>
+
+                    <!-- Live Bot Games Section -->
+                    <div class="mb-8" id="botGamesSection">
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+                            🤖 Live Bot Games
+                            <span class="badge badge-sm badge-info">AI vs AI</span>
+                        </h2>
+                        <div id="botGamesList" class="space-y-2">
+                            <p class="text-base-content/60 text-center py-8 italic">Loading bot games...</p>
+                        </div>
+                    </div>
+
+                    <!-- My Games Section -->
+                    <div class="mb-8">
+                        <h2 class="text-xl font-bold mb-4">My Games</h2>
+                        <div id="myGamesList" class="space-y-2">
+                            <p class="text-base-content/60 text-center py-8 italic">Loading your games...</p>
+                        </div>
+                    </div>
+
+                    <!-- Friends Section (visible when logged in) -->
+                    <div id="friendsSection" style="display: none;" class="mb-8">
+                        <h2 class="text-xl font-bold mb-4">Friends</h2>
+                        <div class="join w-full mb-4">
+                            <input type="text" id="friendSearch" placeholder="Search users to add..." class="input input-bordered join-item flex-1">
+                            <button id="userSearchBtn" class="btn btn-primary join-item">Search</button>
+                        </div>
+                        <div id="userSearchResults" class="space-y-2"></div>
+                        <div id="friendRequests" class="space-y-2"></div>
+                        <div id="friendsList">
+                            <p class="text-base-content/60 text-center py-4 italic">No friends yet. Search for users to add!</p>
+                        </div>
+                    </div>
+
+                    <!-- Active Games Section -->
+                    <div>
+                        <h2 class="text-xl font-bold mb-4">Active Games</h2>
+                        <div id="gamesList" class="space-y-2">
+                            <p class="text-base-content/60 text-center py-8 italic">Connecting to server...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Page -->
+    <div id="gamePage" class="page" style="display: none;">
+        <div class="game-layout-with-chat">
+            <!-- Left: Player Sidebar -->
+            <div class="player-sidebar">
+                <!-- Red Player Card (Top) -->
+                <div class="player-card" id="redPlayerCard">
+                    <div class="player-avatar red">
+                        <span class="player-color-indicator">🔴</span>
+                    </div>
+                    <div class="player-info">
+                        <span id="redPlayerName" class="player-name">Red Player</span>
+                        <span id="redPlayerId" class="player-id">-</span>
+                        <span id="redPipCount" class="pip-count">Pips: -</span>
+                    </div>
+                </div>
+
+                <!-- Match Score -->
+                <div class="match-score">
+                    <div id="match-status-container"></div>
+                    <div class="score-label">Match Length: <span id="matchLength">1</span></div>
+                    <div class="score-label">Stake: <span id="matchStake">0</span></div>
+                </div>
+
+                <!-- White Player Card (Bottom) -->
+                <div class="player-card" id="whitePlayerCard">
+                    <div class="player-avatar white">
+                        <span class="player-color-indicator">⚪</span>
+                    </div>
+                    <div class="player-info">
+                        <span id="whitePlayerName" class="player-name">White Player</span>
+                        <span id="whitePlayerId" class="player-id">-</span>
+                        <span id="whitePipCount" class="pip-count">Pips: -</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Board Area -->
+            <div class="board-section">
+                <div class="game-container" style="min-height: calc(100vh - 72px); justify-content:center;align-items:center;">
+                    <main class="board-area" style="min-width:0;min-height:0;padding:10px;">
+                        <div class="board-wrapper-game" style="gap:8px;">
+                            <!-- Analysis Mode Badge -->
+                            <div id="analysisBadge" style="display: none; text-align: center; margin-bottom: 8px;">
+                                <span class="badge badge-info badge-lg">📊 Analysis Mode</span>
+                            </div>
+
+                            <!-- Board -->
+                            <svg id="boardSvg" class="board-svg" viewBox="0 0 1000 500" preserveAspectRatio="xMidYMid meet"></svg>
+                            <div id="boardPlaceholder" class="board-placeholder">
+                                <div class="loading loading-spinner loading-lg text-primary"></div>
+                                <p class="mt-4">Waiting for game to start...</p>
+                            </div>
+
+                            <!-- Hidden buttons (triggered by SVG controls) -->
+                            <button id="rollBtn" style="display: none;" disabled></button>
+                            <button id="doubleBtn" style="display: none;" disabled></button>
+                            <button id="undoBtn" style="display: none;" disabled></button>
+                            <button id="endTurnBtn" style="display: none;" disabled></button>
+
+                            <!-- Secondary Game Controls -->
+                            <div class="game-controls-secondary" style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
+                                <button id="flipBoardBtn" class="btn btn-ghost btn-sm gap-2" title="Flip board orientation">
+                                    🔄 Flip Board
+                                </button>
+                                <button id="abandonBtn" class="btn btn-error btn-sm gap-2">
+                                    ⚠️ Abandon
+                                </button>
+                                <button id="exportBtn" class="btn btn-ghost btn-sm gap-2">
+                                    📋 Export
+                                </button>
+                                <button id="importBtn" class="btn btn-ghost btn-sm gap-2" style="display: none;">
+                                    📥 Import
+                                </button>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Profile Page -->
+    <div id="profilePage" class="page min-h-screen bg-gradient-to-br from-primary to-secondary" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div class="card bg-base-100 shadow-2xl">
+                <div class="card-body">
+                    <!-- Profile Header -->
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="flex items-center gap-4">
+                            <div class="avatar placeholder">
+                                <div class="bg-neutral text-neutral-content rounded-full w-24">
+                                    <span class="text-3xl" id="profileAvatar">?</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h1 class="text-3xl font-bold" id="profileDisplayName">Loading...</h1>
+                                <p class="text-base-content/60">@<span id="profileUsername">...</span></p>
+                                <p class="text-sm text-base-content/50">Member since <span id="profileJoinDate">...</span></p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2" id="profileActions">
+                            <!-- Actions will be added dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Privacy Notice -->
+                    <div id="profilePrivacyNotice" class="alert alert-warning mb-6" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        <span>This profile is private. Only limited information is visible.</span>
+                    </div>
+
+                    <!-- Stats Section -->
+                    <div id="profileStats" class="stats shadow mb-6">
+                        <div class="stat">
+                            <div class="stat-figure text-primary">
+                                🎮
+                            </div>
+                            <div class="stat-title">Total Games</div>
+                            <div class="stat-value" id="statTotalGames">-</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-success">
+                                🏆
+                            </div>
+                            <div class="stat-title">Wins</div>
+                            <div class="stat-value text-success" id="statWins">-</div>
+                            <div class="stat-desc">Win rate: <span id="statWinRate">-</span>%</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-error">
+                                ❌
+                            </div>
+                            <div class="stat-title">Losses</div>
+                            <div class="stat-value text-error" id="statLosses">-</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-figure text-warning">
+                                🔥
+                            </div>
+                            <div class="stat-title">Best Streak</div>
+                            <div class="stat-value" id="statBestStreak">-</div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs tabs-boxed mb-6">
+                        <a class="tab tab-active" id="tabGames">Recent Games</a>
+                        <a class="tab" id="tabFriends">Friends</a>
+                        <a class="tab" id="tabStats">Detailed Stats</a>
+                        <a class="tab" id="tabSettings" style="display: none;">Settings</a>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <div id="profileTabContent">
+                        <!-- Recent Games Tab -->
+                        <div id="tabContentGames" class="space-y-2">
+                            <div class="text-center py-8">
+                                <span class="loading loading-spinner loading-lg"></span>
+                            </div>
+                        </div>
+
+                        <!-- Friends Tab -->
+                        <div id="tabContentFriends" class="space-y-2" style="display: none;">
+                            <div class="text-center py-8">
+                                <span class="loading loading-spinner loading-lg"></span>
+                            </div>
+                        </div>
+
+                        <!-- Detailed Stats Tab -->
+                        <div id="tabContentStats" class="space-y-4" style="display: none;">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Normal Wins</div>
+                                    <div class="stat-value text-lg" id="statNormalWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Gammons</div>
+                                    <div class="stat-value text-lg" id="statGammonWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Backgammons</div>
+                                    <div class="stat-value text-lg" id="statBackgammonWins">-</div>
+                                </div>
+                                <div class="stat bg-base-200 rounded-lg">
+                                    <div class="stat-title">Total Stakes Won</div>
+                                    <div class="stat-value text-lg" id="statTotalStakes">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Settings Tab (only for own profile) -->
+                        <div id="tabContentSettings" class="space-y-4" style="display: none;">
+                            <h3 class="text-lg font-bold">Privacy Settings</h3>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Profile Visibility</span>
+                                </label>
+                                <select id="settingProfilePrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public - Anyone can view</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private - Hidden from everyone</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Game History Visibility</span>
+                                </label>
+                                <select id="settingGameHistoryPrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private</option>
+                                </select>
+                            </div>
+                            <div class="form-control">
+                                <label class="label">
+                                    <span class="label-text">Friends List Visibility</span>
+                                </label>
+                                <select id="settingFriendsListPrivacy" class="select select-bordered w-full">
+                                    <option value="0">Public</option>
+                                    <option value="1">Friends Only</option>
+                                    <option value="2">Private</option>
+                                </select>
+                            </div>
+                            <button id="saveProfileSettingsBtn" class="btn btn-primary mt-4">Save Privacy Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Match Lobby Page -->
+    <div id="match-lobby-container" class="page" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div id="match-lobby-content"></div>
+        </div>
+    </div>
+
+    <!-- Match Results Page -->
+    <div id="match-results-container" class="page" style="display: none;">
+        <div class="max-w-5xl mx-auto px-4 py-8">
+            <div id="match-results-content"></div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <dialog id="loginModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Login</h3>
+            <div class="form-control w-full">
+                <input type="text" id="loginUsername" placeholder="Username" class="input input-bordered w-full" autocomplete="username">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="loginPassword" placeholder="Password" class="input input-bordered w-full" autocomplete="current-password">
+            </div>
+            <p id="loginError" class="text-error text-sm mt-2 min-h-5"></p>
+            <div class="modal-action flex-col gap-2 mt-4">
+                <button id="performLoginBtn" class="btn btn-primary w-full">Login</button>
+                <button id="cancelLoginBtn" class="btn btn-ghost w-full">Cancel</button>
+            </div>
+            <p class="text-center text-sm mt-4 text-base-content/70">
+                Don't have an account?
+                <a href="#" id="switchToRegisterLink" class="link link-primary">Sign up</a>
+            </p>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Register Modal -->
+    <dialog id="registerModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create Account</h3>
+            <div class="form-control w-full">
+                <input type="text" id="regUsername" placeholder="Username (3-20 chars)" class="input input-bordered w-full" autocomplete="username">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="text" id="regDisplayName" placeholder="Display Name (optional)" class="input input-bordered w-full">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="regPassword" placeholder="Password (8+ chars)" class="input input-bordered w-full" autocomplete="new-password">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="password" id="regPasswordConfirm" placeholder="Confirm Password" class="input input-bordered w-full" autocomplete="new-password">
+            </div>
+            <div class="form-control w-full mt-3">
+                <input type="email" id="regEmail" placeholder="Email (optional)" class="input input-bordered w-full">
+            </div>
+            <div class="alert alert-info mt-4 text-sm">
+                <span>Your anonymous game history will be linked to this account.</span>
+            </div>
+            <p id="registerError" class="text-error text-sm mt-2 min-h-5"></p>
+            <div class="modal-action flex-col gap-2 mt-4">
+                <button id="performRegisterBtn" class="btn btn-primary w-full">Create Account</button>
+                <button id="cancelLoginBtn" class="btn btn-ghost w-full">Cancel</button>
+            </div>
+            <p class="text-center text-sm mt-4 text-base-content/70">
+                Already have an account?
+                <a href="#" id="switchToLoginLink" class="link link-primary">Login</a>
+            </p>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Profile Modal -->
+    <dialog id="profileModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box max-w-lg">
+            <h3 class="font-bold text-lg mb-6">Your Profile</h3>
+
+            <!-- Account Info -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Account Info</h4>
+                <p class="mb-2"><span class="text-base-content/70">Username:</span> <span id="profileUsername" class="font-semibold"></span></p>
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Display Name</span>
+                    </label>
+                    <input type="text" id="profileDisplayName" class="input input-bordered w-full">
+                </div>
+                <button id="updateProfileBtn" class="btn btn-primary btn-sm mt-3">Update</button>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Audio Settings -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Audio Settings</h4>
+
+                <div class="form-control">
+                    <label class="label cursor-pointer">
+                        <span class="label-text">Enable Sound Effects</span>
+                        <input type="checkbox" id="audioEnabled" class="toggle toggle-primary" checked>
+                    </label>
+                </div>
+
+                <div class="form-control w-full mt-3">
+                    <label class="label">
+                        <span class="label-text">Volume</span>
+                        <span class="label-text-alt" id="volumeDisplay">70%</span>
+                    </label>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="70"
+                           class="range range-primary range-sm" step="10">
+                    <div class="w-full flex justify-between text-xs px-2 mt-1">
+                        <span>0%</span>
+                        <span>50%</span>
+                        <span>100%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- Statistics -->
+            <div class="mb-6">
+                <h4 class="font-semibold mb-3">Statistics</h4>
+                <div class="stats stats-vertical sm:stats-horizontal shadow w-full bg-base-200">
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Games</div>
+                        <div class="stat-value text-primary" id="statTotalGames">0</div>
+                    </div>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Wins</div>
+                        <div class="stat-value text-success" id="statWins">0</div>
+                    </div>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Win Rate</div>
+                        <div class="stat-value" id="statWinRate">0%</div>
+                    </div>
+                    <div class="stat place-items-center">
+                        <div class="stat-title">Best Streak</div>
+                        <div class="stat-value text-warning" id="statBestStreak">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-action">
+                <button id="closeProfileModalBtn" class="btn btn-ghost">Close</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Abandon Game Confirmation Modal -->
+    <dialog id="abandonConfirmModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4 text-error">Abandon Game?</h3>
+            <p id="abandonMessage" class="mb-4">Your opponent will win if you abandon this game.</p>
+            <p id="abandonStakesMessage" class="mb-6 text-sm text-base-content/70">
+                This will count as a loss with stakes: <span id="abandonStakes" class="font-bold">1x</span>
+            </p>
+            <div class="modal-action gap-2">
+                <button id="confirmAbandonBtn" class="btn btn-error">Abandon Game</button>
+                <button class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Double Offer Modal -->
+    <dialog id="doubleOfferModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Double Offer</h3>
+            <p class="mb-2">Your opponent offers to double the stakes!</p>
+            <p class="mb-6">
+                Current stakes: <span id="doubleCurrentStakes" class="font-bold">1x</span><br/>
+                New stakes if accepted: <span id="doubleNewStakes" class="font-bold text-warning">2x</span>
+            </p>
+            <p class="text-sm text-base-content/70 mb-6">
+                Declining will concede the game at current stakes.
+            </p>
+            <div class="modal-action gap-2">
+                <button id="acceptDoubleBtn" class="btn btn-success">Accept</button>
+                <button id="declineDoubleBtn" class="btn btn-error">Decline (Lose)</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- Double Confirm Modal -->
+    <dialog id="doubleConfirmModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Confirm Double</h3>
+            <p class="mb-2">You are offering to double the stakes.</p>
+            <p class="mb-6">
+                Current stakes: <span id="doubleConfirmCurrentStakes" class="font-bold">1x</span><br/>
+                New stakes if accepted: <span id="doubleConfirmNewStakes" class="font-bold text-warning">2x</span>
+            </p>
+            <p class="text-sm text-base-content/70 mb-6">
+                If your opponent declines, they lose at the current stakes.
+            </p>
+            <div class="modal-action gap-2">
+                <button id="confirmOfferDoubleBtn" class="btn btn-success">Confirm Double</button>
+                <button class="btn btn-ghost">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Create Match Dialog -->
+    <dialog id="createMatchDialog" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Create Match</h3>
+            <p class="mb-4">Create a competitive match played to a target score.</p>
+            
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Select Opponent</span>
+                </label>
+                <select id="matchOpponentSelect" class="select select-bordered w-full">
+                    <option value="" disabled selected>Choose an opponent...</option>
+                </select>
+            </div>
+            
+            <div class="form-control mb-4">
+                <label class="label">
+                    <span class="label-text">Target Score</span>
+                </label>
+                <select id="matchTargetScore" class="select select-bordered w-full">
+                    <option value="3">3 points (short)</option>
+                    <option value="5">5 points</option>
+                    <option value="7" selected>7 points (standard)</option>
+                    <option value="11">11 points</option>
+                    <option value="15">15 points</option>
+                    <option value="21">21 points (long)</option>
+                </select>
+            </div>
+            
+            <div class="alert alert-info mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div>
+                    <div class="text-sm">Crawford rule will apply when a player reaches match point minus 1.</div>
+                </div>
+            </div>
+            
+            <div class="modal-action gap-2">
+                <button id="createMatchConfirmBtn" class="btn btn-primary">Create Match</button>
+                <button class="btn btn-ghost" onclick="hideCreateMatchDialog()">Cancel</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Match List Container (for active matches) -->
+    <div id="match-list-container"></div>
+
+    <!-- Position Import/Export Modal -->
+    <dialog id="positionModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box max-w-4xl">
+            <h3 class="font-bold text-lg mb-4" id="positionModalTitle">Position Import/Export (SGF Format)</h3>
+            <div class="alert alert-info mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span>SGF (Smart Game Format) is the standard format used by GNU Backgammon and other tools.</span>
+            </div>
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text">SGF Position String</span>
+                </label>
+                <textarea
+                    id="positionText"
+                    class="textarea textarea-bordered w-full font-mono text-sm"
+                    rows="12"
+                    placeholder="(;GM[6]
+  AW[f[6]h[3]m[5]y[1]]  ; White checkers
+  AB[a[2]l[5]q[3]s[5]]  ; Red checkers
+  PL[W]                  ; White to move
+  DI[34]                 ; Dice: 3, 4
+  CO[c]                  ; Cube centered
+  CV[1]                  ; Cube value: 1
+)"></textarea>
+            </div>
+            <div class="modal-action gap-2 flex-wrap">
+                <button id="copyPositionBtn" class="btn btn-primary">
+                    📋 Copy to Clipboard
+                </button>
+                <button id="importPositionBtn" class="btn btn-success">
+                    📥 Import Position
+                </button>
+                <button id="closeProfileModalBtn" class="btn btn-ghost">Close</button>
+            </div>
+            <div class="alert alert-warning mt-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                <span>Import is only allowed in solo practice games, not multiplayer.</span>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+            <button>close</button>
+        </form>
+    </dialog>
+
+    <!-- Quick Join Modal (hidden) -->
+    <input type="text" id="serverUrl" value="http://localhost:5000/gamehub" style="display: none;">
+
+    <!-- Debug Panel (floating) -->
+    <div id="debugPanel" style="display: none; position: fixed; bottom: 20px; right: 20px; width: 500px; max-height: 600px; background: rgba(0, 0, 0, 0.95); border: 2px solid #4ade80; border-radius: 8px; z-index: 9999; font-family: monospace; font-size: 11px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #1a1a1a; border-bottom: 1px solid #4ade80; border-radius: 6px 6px 0 0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="color: #4ade80; font-weight: bold;">🐛 DEBUG PANEL</span>
+                <label style="display: flex; align-items: center; gap: 4px; color: #94a3b8; font-size: 10px;">
+                    <input type="checkbox" id="debugAutoScroll" checked style="width: 14px; height: 14px;">
+                    Auto-scroll
+                </label>
+            </div>
+            <div style="display: flex; gap: 4px;">
+                <button id="clearDebugBtn" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Clear</button>
+                <button id="closeDebugBtn" style="background: #6366f1; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 10px;">Close</button>
+            </div>
+        </div>
+        <div id="debugLog" style="padding: 10px; overflow-y: auto; max-height: 550px; color: #e2e8f0;">
+            <div style="color: #94a3b8; font-size: 10px; padding: 5px; text-align: center;">Debug logging enabled. Events will appear here...</div>
+        </div>
+    </div>
+
+    <!-- SignalR JavaScript Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.0/dist/browser/signalr.min.js"></script>
+    <script src="/auth.js"></script>
+    <script src="/friends.js"></script>
+    <script src="/board-svg.js"></script>
+    <script src="/audio.js"></script>
+    <script src="/match-state.js"></script>
+    <script src="/match-lobby.js"></script>
+    <script src="/match-results.js"></script>
+    <script src="/match.js"></script>
+    <script src="/game.js"></script>
+    <script src="/profile.js"></script>
+    <script src="/event-handlers.js"></script>
+</body>
+</html>

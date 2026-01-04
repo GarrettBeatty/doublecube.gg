@@ -8,6 +8,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <SpaRoot>.</SpaRoot>
+    <DefaultItemExcludes>$(DefaultItemExcludes);node_modules\**;src\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <!-- Build Vite app before .NET publish in Release mode -->
+  <Target Name="BuildViteApp" BeforeTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+  </Target>
+
+  <!-- Clean Vite output on Clean -->
+  <Target Name="CleanViteApp" BeforeTargets="Clean">
+    <RemoveDir Directories="$(SpaRoot)\wwwroot" />
+  </Target>
 
 </Project>

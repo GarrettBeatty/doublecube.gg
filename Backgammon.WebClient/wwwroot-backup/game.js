@@ -646,15 +646,8 @@ function setupEventHandlers() {
                 }
             }, 1500);
         } else {
-            // Single game - use existing behavior
-            setTimeout(() => {
-                if (confirm(`Game Over! ${winner} wins! Return to lobby?`)) {
-                    // Clear game state
-                    currentGameId = null;
-                    myColor = null;
-                    leaveGameAndReturn();
-                }
-            }, 1500);
+            // Single game - let user navigate away on their own
+            // No automatic redirect or popup
         }
     });
 
