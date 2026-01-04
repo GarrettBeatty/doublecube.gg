@@ -731,9 +731,7 @@ async function refreshGamesList() {
         if (data.waitingGames.length === 0 && data.activeGames.length === 0) {
             gamesListEl.innerHTML = '<p class="text-base-content/60 text-center py-8 italic">No games available. Create one to get started!</p>';
         } else {
-            let html = '<div class="text-center py-3 px-4 bg-base-200 rounded-lg mb-4 font-medium">' +
-                `${data.activeGames.length} active game(s) • ${data.waitingGames.length} waiting for players` +
-                '</div>';
+            let html = '';
 
             // Show waiting games (available to join)
             if (data.waitingGames.length > 0) {
