@@ -123,7 +123,8 @@ interface BoardSVGProps {
   gameState: GameState | null
 }
 
-export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
+// Internal component (not exported)
+const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
@@ -876,3 +877,50 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
     />
   )
 }
+
+// Custom comparison function to prevent re-renders when only timer values change
+const arePropsEqual = (prevProps: BoardSVGProps, nextProps: BoardSVGProps): boolean => {
+  const prev = prevProps.gameState
+  const next = nextProps.gameState
+
+  // If both are null, they're equal
+  if (prev === null && next === null) return true
+
+  // If one is null and the other isn't, they're different
+  if (prev === null || next === null) return false
+
+  // Compare all fields EXCEPT timer-related ones
+  // Timer fields that should be IGNORED (don't cause re-render):
+  // - whiteReserveSeconds, redReserveSeconds (change every second)
+  // - whiteDelayRemaining, redDelayRemaining (change every second)
+  // - whiteIsInDelay, redIsInDelay (can change during turn)
+
+  return (
+    prev.gameId === next.gameId &&
+    prev.currentPlayer === next.currentPlayer &&
+    prev.isYourTurn === next.isYourTurn &&
+    JSON.stringify(prev.dice) === JSON.stringify(next.dice) &&
+    JSON.stringify(prev.remainingMoves) === JSON.stringify(next.remainingMoves) &&
+    JSON.stringify(prev.validMoves) === JSON.stringify(next.validMoves) &&
+    JSON.stringify(prev.board) === JSON.stringify(next.board) &&
+    prev.whiteCheckersOnBar === next.whiteCheckersOnBar &&
+    prev.redCheckersOnBar === next.redCheckersOnBar &&
+    prev.whiteBornOff === next.whiteBornOff &&
+    prev.redBornOff === next.redBornOff &&
+    prev.doublingCubeValue === next.doublingCubeValue &&
+    prev.doublingCubeOwner === next.doublingCubeOwner &&
+    prev.winner === next.winner &&
+    prev.isOpeningRoll === next.isOpeningRoll &&
+    prev.whiteOpeningRoll === next.whiteOpeningRoll &&
+    prev.redOpeningRoll === next.redOpeningRoll &&
+    prev.isOpeningRollTie === next.isOpeningRollTie
+    // Deliberately NOT comparing timer fields:
+    // - timeControlType, delaySeconds (config, shouldn't change mid-game)
+    // - whiteReserveSeconds, redReserveSeconds (changes every second!)
+    // - whiteIsInDelay, redIsInDelay (changes during turn)
+    // - whiteDelayRemaining, redDelayRemaining (changes every second!)
+  )
+}
+
+// Export memoized version to prevent re-renders during drag
+export const BoardSVG = React.memo(BoardSVGComponent, arePropsEqual)
