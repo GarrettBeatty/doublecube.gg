@@ -12,6 +12,8 @@ namespace Backgammon.Server.Services;
 public class GameSession
 {
     private readonly HashSet<string> _spectatorConnections = new();
+    private readonly HashSet<string> _whiteConnections = new();
+    private readonly HashSet<string> _redConnections = new();
 
     public GameSession(string id)
     {
@@ -36,9 +38,15 @@ public class GameSession
 
     public string? RedPlayerName { get; set; }
 
-    public string? WhiteConnectionId { get; private set; }
+    // Legacy properties for backwards compatibility - return first connection
+    public string? WhiteConnectionId => _whiteConnections.FirstOrDefault();
 
-    public string? RedConnectionId { get; private set; }
+    public string? RedConnectionId => _redConnections.FirstOrDefault();
+
+    // New properties to access all connections
+    public IReadOnlySet<string> WhiteConnections => _whiteConnections;
+
+    public IReadOnlySet<string> RedConnections => _redConnections;
 
     public DateTime CreatedAt { get; }
 
@@ -75,10 +83,10 @@ public class GameSession
     {
         LastActivityAt = DateTime.UtcNow;
 
-        // Check if player is already in this game (reconnection)
+        // Check if player is already in this game (reconnection/multi-tab)
         if (WhitePlayerId == playerId)
         {
-            WhiteConnectionId = connectionId;
+            _whiteConnections.Add(connectionId);
             // Set name if not already set (for existing games before this feature)
             if (string.IsNullOrEmpty(WhitePlayerName))
             {
@@ -90,7 +98,7 @@ public class GameSession
 
         if (RedPlayerId == playerId)
         {
-            RedConnectionId = connectionId;
+            _redConnections.Add(connectionId);
             // Set name if not already set (for existing games before this feature)
             if (string.IsNullOrEmpty(RedPlayerName))
             {
@@ -104,7 +112,7 @@ public class GameSession
         if (WhitePlayerId == null)
         {
             WhitePlayerId = playerId;
-            WhiteConnectionId = connectionId;
+            _whiteConnections.Add(connectionId);
             WhitePlayerName = GenerateFriendlyName(playerId);
             return true;
         }
@@ -112,7 +120,7 @@ public class GameSession
         if (RedPlayerId == null)
         {
             RedPlayerId = playerId;
-            RedConnectionId = connectionId;
+            _redConnections.Add(connectionId);
             RedPlayerName = GenerateFriendlyName(playerId);
             // Start game when both players joined (only if not already started)
             if (!Engine.GameStarted)
@@ -132,7 +140,7 @@ public class GameSession
     public void SetRedPlayer(string playerId, string connectionId)
     {
         RedPlayerId = playerId;
-        RedConnectionId = connectionId;
+        _redConnections.Add(connectionId);
         if (string.IsNullOrEmpty(RedPlayerName))
         {
             RedPlayerName = GenerateFriendlyName(playerId);
@@ -193,19 +201,20 @@ public class GameSession
 
     /// <summary>
     /// Update player's connection ID (for reconnection scenarios)
+    /// Now adds the new connection rather than replacing
     /// </summary>
     public bool UpdatePlayerConnection(string playerId, string newConnectionId)
     {
         if (WhitePlayerId == playerId)
         {
-            WhiteConnectionId = newConnectionId;
+            _whiteConnections.Add(newConnectionId);
             LastActivityAt = DateTime.UtcNow;
             return true;
         }
 
         if (RedPlayerId == playerId)
         {
-            RedConnectionId = newConnectionId;
+            _redConnections.Add(newConnectionId);
             LastActivityAt = DateTime.UtcNow;
             return true;
         }
@@ -214,20 +223,13 @@ public class GameSession
     }
 
     /// <summary>
-    /// Remove a player from the game session
+    /// Remove a player connection from the game session
+    /// Only removes this specific connection, not the player entirely
     /// </summary>
     public void RemovePlayer(string connectionId)
     {
-        if (WhiteConnectionId == connectionId)
-        {
-            WhiteConnectionId = null;
-        }
-
-        if (RedConnectionId == connectionId)
-        {
-            RedConnectionId = null;
-        }
-
+        _whiteConnections.Remove(connectionId);
+        _redConnections.Remove(connectionId);
         LastActivityAt = DateTime.UtcNow;
     }
 
@@ -236,12 +238,12 @@ public class GameSession
     /// </summary>
     public CheckerColor? GetPlayerColor(string connectionId)
     {
-        if (connectionId == WhiteConnectionId)
+        if (_whiteConnections.Contains(connectionId))
         {
             return CheckerColor.White;
         }
 
-        if (connectionId == RedConnectionId)
+        if (_redConnections.Contains(connectionId))
         {
             return CheckerColor.Red;
         }

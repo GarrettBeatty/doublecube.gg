@@ -51,6 +51,9 @@ public class GameCreationService : IGameCreationService
             connectionId,
             session.Id);
 
+        // Check if game is already in progress (for reconnection detection)
+        var wasAlreadyStarted = session.Engine.GameStarted;
+
         // Try to add as player; if full, add as spectator
         if (!session.AddPlayer(playerId, connectionId))
         {
@@ -72,7 +75,20 @@ public class GameCreationService : IGameCreationService
 
         if (session.IsFull)
         {
-            // Game is ready to start - send personalized state to each player
+            // If game was already started, this is a reconnection - just send current state
+            if (wasAlreadyStarted)
+            {
+                _logger.LogInformation(
+                    "Player {PlayerId} reconnecting to in-progress game {GameId}",
+                    playerId,
+                    session.Id);
+
+                var state = session.GetState(connectionId);
+                await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", state);
+                return;
+            }
+
+            // Game just became full - broadcast start to both players
             await _gameStateService.BroadcastGameStartAsync(session);
 
             // Save game state when game starts (progressive save)

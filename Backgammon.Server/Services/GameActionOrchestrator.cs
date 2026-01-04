@@ -248,16 +248,16 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         {
             async Task BroadcastUpdate()
             {
-                if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+                foreach (var connectionId in session.WhiteConnections)
                 {
-                    var whiteState = session.GetState(session.WhiteConnectionId);
-                    await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+                    var whiteState = session.GetState(connectionId);
+                    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", whiteState);
                 }
 
-                if (!string.IsNullOrEmpty(session.RedConnectionId))
+                foreach (var connectionId in session.RedConnections)
                 {
-                    var redState = session.GetState(session.RedConnectionId);
-                    await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+                    var redState = session.GetState(connectionId);
+                    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", redState);
                 }
 
                 var spectatorState = session.GetState(null);

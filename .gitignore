@@ -97,3 +97,7 @@ aws-credentials.json
 # Local configuration overrides
 appsettings.Local.json
 local-config.json
+
+# Vite build outputs (WebClient)
+Backgammon.WebClient/wwwroot/assets/
+Backgammon.WebClient/wwwroot/index.html

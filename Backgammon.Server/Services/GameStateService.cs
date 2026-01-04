@@ -24,17 +24,17 @@ public class GameStateService : IGameStateService
 
     public async Task BroadcastGameUpdateAsync(GameSession session)
     {
-        // Send personalized state to each player
-        if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+        // Send personalized state to each player connection
+        foreach (var connectionId in session.WhiteConnections)
         {
-            var whiteState = session.GetState(session.WhiteConnectionId);
-            await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+            var whiteState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", whiteState);
         }
 
-        if (!string.IsNullOrEmpty(session.RedConnectionId))
+        foreach (var connectionId in session.RedConnections)
         {
-            var redState = session.GetState(session.RedConnectionId);
-            await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+            var redState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", redState);
         }
 
         // Send updates to all spectators
@@ -47,17 +47,17 @@ public class GameStateService : IGameStateService
 
     public async Task BroadcastGameStartAsync(GameSession session)
     {
-        // Game is ready to start - send personalized state to each player
-        if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+        // Game is ready to start - send personalized state to each player connection
+        foreach (var connectionId in session.WhiteConnections)
         {
-            var whiteState = session.GetState(session.WhiteConnectionId);
-            await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameStart", whiteState);
+            var whiteState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", whiteState);
         }
 
-        if (!string.IsNullOrEmpty(session.RedConnectionId))
+        foreach (var connectionId in session.RedConnections)
         {
-            var redState = session.GetState(session.RedConnectionId);
-            await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameStart", redState);
+            var redState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", redState);
         }
 
         _logger.LogInformation("Game {GameId} started with both players", session.Id);
@@ -86,12 +86,12 @@ public class GameStateService : IGameStateService
         int currentValue,
         int newValue)
     {
-        // Determine opponent connection
-        var opponentConnectionId = session.GetPlayerColor(offeringConnectionId) == CheckerColor.White
-            ? session.RedConnectionId
-            : session.WhiteConnectionId;
+        // Determine opponent connections
+        var opponentConnections = session.GetPlayerColor(offeringConnectionId) == CheckerColor.White
+            ? session.RedConnections
+            : session.WhiteConnections;
 
-        if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
+        foreach (var opponentConnectionId in opponentConnections)
         {
             await _hubContext.Clients.Client(opponentConnectionId).SendAsync("DoubleOffered", currentValue, newValue);
         }
@@ -99,17 +99,17 @@ public class GameStateService : IGameStateService
 
     public async Task BroadcastDoubleAcceptedAsync(GameSession session)
     {
-        // Send updated state to both players
-        if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+        // Send updated state to all player connections
+        foreach (var connectionId in session.WhiteConnections)
         {
-            var whiteState = session.GetState(session.WhiteConnectionId);
-            await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("DoubleAccepted", whiteState);
+            var whiteState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("DoubleAccepted", whiteState);
         }
 
-        if (!string.IsNullOrEmpty(session.RedConnectionId))
+        foreach (var connectionId in session.RedConnections)
         {
-            var redState = session.GetState(session.RedConnectionId);
-            await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("DoubleAccepted", redState);
+            var redState = session.GetState(connectionId);
+            await _hubContext.Clients.Client(connectionId).SendAsync("DoubleAccepted", redState);
         }
     }
 

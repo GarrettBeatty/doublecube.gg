@@ -196,15 +196,15 @@ public class GameSessionManager : IGameSessionManager
         {
             if (_games.TryGetValue(gameId, out var game))
             {
-                // Remove player-to-game mappings
-                if (game.WhiteConnectionId != null)
+                // Remove all player-to-game mappings
+                foreach (var connectionId in game.WhiteConnections)
                 {
-                    _playerToGame.Remove(game.WhiteConnectionId);
+                    _playerToGame.Remove(connectionId);
                 }
 
-                if (game.RedConnectionId != null)
+                foreach (var connectionId in game.RedConnections)
                 {
-                    _playerToGame.Remove(game.RedConnectionId);
+                    _playerToGame.Remove(connectionId);
                 }
 
                 // Remove game from dictionary
@@ -262,10 +262,10 @@ public class GameSessionManager : IGameSessionManager
     {
         lock (_lock)
         {
-            // Check if player has an active game with a connection
+            // Check if player has an active game with at least one connection
             return _games.Values.Any(g =>
-                (g.WhitePlayerId == playerId && g.WhiteConnectionId != null) ||
-                (g.RedPlayerId == playerId && g.RedConnectionId != null));
+                (g.WhitePlayerId == playerId && g.WhiteConnections.Count > 0) ||
+                (g.RedPlayerId == playerId && g.RedConnections.Count > 0));
         }
     }
 

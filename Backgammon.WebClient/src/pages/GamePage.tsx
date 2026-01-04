@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
@@ -17,11 +17,31 @@ import { Eye, BarChart3 } from 'lucide-react'
 export const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
-  const { invoke } = useSignalR()
+  const { invoke, isConnected } = useSignalR()
 
   const { currentGameState, isSpectator, setCurrentGameId, resetGame } = useGameStore()
   const [isLoading, setIsLoading] = useState(true)
   const [lastJoinedGameId, setLastJoinedGameId] = useState<string | null>(null)
+  const lastJoinedGameIdRef = useRef<string | null>(null)
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    lastJoinedGameIdRef.current = lastJoinedGameId
+  }, [lastJoinedGameId])
+
+  // Cleanup when component unmounts (navigating away from game page entirely)
+  useEffect(() => {
+    return () => {
+      if (lastJoinedGameIdRef.current) {
+        console.log('[GamePage] Component unmounting, leaving game:', lastJoinedGameIdRef.current)
+        invoke(HubMethods.LeaveGame).catch((err) => {
+          console.error('[GamePage] Failed to leave game on unmount:', err)
+        })
+      }
+    }
+    // Empty deps = only runs on mount/unmount, but uses ref for current value
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const joinGame = async () => {
@@ -30,10 +50,27 @@ export const GamePage: React.FC = () => {
         return
       }
 
+      // Wait for SignalR connection before attempting to join
+      if (!isConnected) {
+        console.log('[GamePage] Waiting for SignalR connection...')
+        return
+      }
+
       // Skip if we've already joined this game
       if (lastJoinedGameId === gameId) {
         console.log('[GamePage] Already joined game:', gameId)
         return
+      }
+
+      // If we were in a different game, leave it first
+      if (lastJoinedGameId && lastJoinedGameId !== gameId) {
+        console.log('[GamePage] Leaving previous game:', lastJoinedGameId)
+        try {
+          await invoke(HubMethods.LeaveGame)
+        } catch (error) {
+          console.error('[GamePage] Failed to leave previous game:', error)
+          // Continue anyway - we want to join the new game
+        }
       }
 
       console.log('[GamePage] New game detected, resetting state')
@@ -57,7 +94,22 @@ export const GamePage: React.FC = () => {
     }
 
     joinGame()
-  }, [gameId, navigate, setCurrentGameId, invoke, resetGame, lastJoinedGameId])
+
+    // Cleanup when gameId changes or component unmounts
+    return () => {
+      // Only leave if we're switching to a different game or unmounting completely
+      // Don't leave if lastJoinedGameId is just being set for the first time
+      if (lastJoinedGameId && lastJoinedGameId !== gameId) {
+        console.log('[GamePage] Cleaning up previous game:', lastJoinedGameId)
+        invoke(HubMethods.LeaveGame).catch((err) => {
+          console.error('[GamePage] Failed to leave game on cleanup:', err)
+        })
+      }
+    }
+    // Note: lastJoinedGameId is intentionally NOT in dependencies
+    // We only want to re-run when gameId or connection state changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, isConnected, navigate, setCurrentGameId, invoke, resetGame])
 
   const handleLeaveGame = async () => {
     try {
