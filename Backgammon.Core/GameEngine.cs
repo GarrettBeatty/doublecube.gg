@@ -46,6 +46,15 @@ public class GameEngine
 
     public string? MatchId { get; set; }
 
+    // Opening roll properties
+    public bool IsOpeningRoll { get; private set; }
+
+    public int? WhiteOpeningRoll { get; private set; }
+
+    public int? RedOpeningRoll { get; private set; }
+
+    public bool IsOpeningRollTie { get; private set; }
+
     /// <summary>
     /// Start a new game
     /// </summary>
@@ -61,8 +70,11 @@ public class GameEngine
         GameOver = false;
         Winner = null;
 
-        // Determine who goes first
-        DetermineFirstPlayer();
+        // Start with opening roll phase
+        IsOpeningRoll = true;
+        WhiteOpeningRoll = null;
+        RedOpeningRoll = null;
+        IsOpeningRollTie = false;
     }
 
     /// <summary>
@@ -498,6 +510,71 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Roll a single die for the opening roll (each player clicks to roll)
+    /// </summary>
+    /// <param name="color">Which player is rolling</param>
+    /// <returns>The die value rolled, or -1 if both players must re-roll (tie)</returns>
+    public int RollOpening(CheckerColor color)
+    {
+        if (!IsOpeningRoll)
+        {
+            throw new InvalidOperationException("Not in opening roll phase");
+        }
+
+        // If there was a tie, clear the previous rolls when a new roll is made
+        if (IsOpeningRollTie)
+        {
+            WhiteOpeningRoll = null;
+            RedOpeningRoll = null;
+            IsOpeningRollTie = false;
+        }
+
+        int roll = Dice.RollSingle();
+
+        if (color == CheckerColor.White)
+        {
+            WhiteOpeningRoll = roll;
+        }
+        else
+        {
+            RedOpeningRoll = roll;
+        }
+
+        // Check if both players have rolled
+        if (WhiteOpeningRoll.HasValue && RedOpeningRoll.HasValue)
+        {
+            // Check for tie
+            if (WhiteOpeningRoll.Value == RedOpeningRoll.Value)
+            {
+                // Tie - keep the dice visible and set tie flag
+                IsOpeningRollTie = true;
+                return -1; // Signal a tie
+            }
+
+            // Different numbers rolled - clear tie flag and determine winner
+            IsOpeningRollTie = false;
+
+            // Determine winner and set up first turn
+            // Always set dice in same order (White, Red) - don't sort by value
+            Dice.SetDice(WhiteOpeningRoll.Value, RedOpeningRoll.Value);
+
+            if (WhiteOpeningRoll.Value > RedOpeningRoll.Value)
+            {
+                CurrentPlayer = WhitePlayer;
+            }
+            else
+            {
+                CurrentPlayer = RedPlayer;
+            }
+
+            RemainingMoves = new List<int>(Dice.GetMoves());
+            IsOpeningRoll = false;
+        }
+
+        return roll;
+    }
+
+    /// <summary>
     /// Determine which player goes first by rolling dice
     /// </summary>
     private void DetermineFirstPlayer()
@@ -512,9 +589,8 @@ public class GameEngine
 
         CurrentPlayer = whiteRoll > redRoll ? WhitePlayer : RedPlayer;
 
-        // Use the opening rolls as the first move
-        Dice.SetDice(Math.Max(whiteRoll, redRoll), Math.Min(whiteRoll, redRoll));
-        RemainingMoves = Dice.GetMoves();
+        // First player must manually roll dice to start their turn
+        // (Opening rolls only used to determine turn order)
     }
 
     /// <summary>

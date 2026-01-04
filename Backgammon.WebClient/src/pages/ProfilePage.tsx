@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { Skeleton } from '@/components/ui/skeleton'
 import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
+import { PerformanceGraph } from '@/components/home/PerformanceGraph'
 
 interface PlayerProfile {
   userId: string
@@ -215,6 +216,13 @@ export const ProfilePage: React.FC = () => {
               )}
             </CardContent>
           </Card>
+        )}
+
+        {/* Rating Progress (Own Profile Only) */}
+        {isOwnProfile && (
+          <div className="mb-6">
+            <PerformanceGraph />
+          </div>
         )}
 
         {/* Statistics Cards */}

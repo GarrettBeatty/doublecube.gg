@@ -279,7 +279,7 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
 
   // Update point highlights
   const updateHighlights = useCallback(() => {
-    if (!pointsGroupRef.current) return
+    if (!pointsGroupRef.current || !svgRef.current) return
 
     // Reset all point fills
     const points = pointsGroupRef.current.querySelectorAll('polygon.point')
@@ -292,22 +292,42 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
       point.setAttribute('fill', baseColor)
     })
 
+    // Reset bar fill
+    const barRect = svgRef.current.querySelector('#bar rect')
+    if (barRect) {
+      barRect.setAttribute('fill', COLORS.bar)
+    }
+
     // Apply highlights
     // Highlight all valid source points in yellow
     highlightedPoints.sources.forEach((pointNum) => {
-      const point = pointsGroupRef.current!.querySelector(`.point-${pointNum}`)
-      if (point) {
-        point.setAttribute('fill', COLORS.highlightSource)
+      if (pointNum === 0) {
+        // Highlight the bar
+        if (barRect) {
+          barRect.setAttribute('fill', COLORS.highlightSource)
+        }
+      } else {
+        const point = pointsGroupRef.current!.querySelector(`.point-${pointNum}`)
+        if (point) {
+          point.setAttribute('fill', COLORS.highlightSource)
+        }
       }
     })
 
     // Highlight selected point in green (overrides source highlight if both)
     if (highlightedPoints.source !== null) {
-      const sourcePoint = pointsGroupRef.current.querySelector(
-        `.point-${highlightedPoints.source}`
-      )
-      if (sourcePoint) {
-        sourcePoint.setAttribute('fill', COLORS.highlightSelected)
+      if (highlightedPoints.source === 0) {
+        // Highlight the bar as selected
+        if (barRect) {
+          barRect.setAttribute('fill', COLORS.highlightSelected)
+        }
+      } else {
+        const sourcePoint = pointsGroupRef.current.querySelector(
+          `.point-${highlightedPoints.source}`
+        )
+        if (sourcePoint) {
+          sourcePoint.setAttribute('fill', COLORS.highlightSelected)
+        }
       }
     }
 

@@ -44,22 +44,50 @@ public class AiMoveService : IAiMoveService
         var engine = session.Engine;
         var ai = CreateAI(aiPlayerId);
 
+        // Guard: Don't execute full AI turn during opening roll phase
+        if (engine.IsOpeningRoll)
+        {
+            _logger.LogWarning(
+                "ExecuteAiTurnAsync called during opening roll phase for game {GameId}. This should not happen - opening roll should use RollDiceAsync instead.",
+                session.Id);
+            return;
+        }
+
         _logger.LogInformation("AI {AiPlayerId} starting turn in game {GameId}", aiPlayerId, session.Id);
 
         try
         {
-            // Delay before rolling dice (AI "thinking")
-            await Task.Delay(DelayBeforeRoll);
+            // Check if dice are already set (from opening roll)
+            bool diceAlreadySet = engine.RemainingMoves.Count > 0;
 
-            // Roll dice
-            engine.RollDice();
-            _logger.LogInformation("AI rolled {Die1} and {Die2}", engine.Dice.Die1, engine.Dice.Die2);
+            if (!diceAlreadySet)
+            {
+                // Delay before rolling dice (AI "thinking")
+                await Task.Delay(DelayBeforeRoll);
 
-            // Broadcast dice roll to clients
-            await broadcastUpdate();
+                // Roll dice
+                engine.RollDice();
+                _logger.LogInformation("AI rolled {Die1} and {Die2}", engine.Dice.Die1, engine.Dice.Die2);
 
-            // Delay after roll to show dice
-            await Task.Delay(DelayAfterRoll);
+                // Broadcast dice roll to clients
+                await broadcastUpdate();
+
+                // Delay after roll to show dice
+                await Task.Delay(DelayAfterRoll);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "AI using opening roll dice: {Die1} and {Die2}",
+                    engine.Dice.Die1,
+                    engine.Dice.Die2);
+
+                // Broadcast initial state with opening dice
+                await broadcastUpdate();
+
+                // Small delay before making moves
+                await Task.Delay(DelayAfterRoll);
+            }
 
             // Execute AI moves
             var validMoves = engine.GetValidMoves();

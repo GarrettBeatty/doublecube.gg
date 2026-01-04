@@ -5,7 +5,7 @@ import { HubMethods } from '@/types/signalr.types'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
 import { GameState, GameStatus } from '@/types/game.types'
-import { Dice1, Check, Undo, RefreshCw, Flag } from 'lucide-react'
+import { Dice1, RefreshCw, Flag } from 'lucide-react'
 
 interface GameControlsProps {
   gameState: GameState | null
@@ -24,37 +24,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   const isGameInProgress = gameState.status === GameStatus.InProgress
   const isYourTurn = gameState.isYourTurn
-  // Only consider dice rolled if there are dice with non-zero values
   const hasDiceRolled =
     gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
-  const hasMovesLeft = gameState.remainingMoves && gameState.remainingMoves.length > 0
-  const canRoll = isGameInProgress && isYourTurn && !hasDiceRolled
-  const canEndTurn = isGameInProgress && isYourTurn && hasDiceRolled && !hasMovesLeft
   const canDouble = isGameInProgress && isYourTurn && !hasDiceRolled && gameState.doublingCubeOwner === gameState.yourColor
-
-  const handleRollDice = async () => {
-    try {
-      await invoke(HubMethods.RollDice)
-    } catch (error) {
-      console.error('Failed to roll dice:', error)
-    }
-  }
-
-  const handleEndTurn = async () => {
-    try {
-      await invoke(HubMethods.EndTurn)
-    } catch (error) {
-      console.error('Failed to end turn:', error)
-    }
-  }
-
-  const handleUndo = async () => {
-    try {
-      await invoke(HubMethods.UndoLastMove)
-    } catch (error) {
-      console.error('Failed to undo:', error)
-    }
-  }
 
   const handleDouble = async () => {
     try {
@@ -84,79 +56,45 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant="default"
-          size="lg"
-          onClick={handleRollDice}
-          disabled={!canRoll}
-          className="h-16"
-        >
-          <div className="text-center">
-            <Dice1 className="h-6 w-6 mx-auto mb-1" />
-            <div className="text-sm">Roll Dice</div>
-          </div>
-        </Button>
-
-        <Button
-          variant="default"
-          size="lg"
-          onClick={handleEndTurn}
-          disabled={!canEndTurn}
-          className="h-16"
-        >
-          <div className="text-center">
-            <Check className="h-6 w-6 mx-auto mb-1" />
-            <div className="text-sm">End Turn</div>
-          </div>
-        </Button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handleUndo}
-          disabled={!isGameInProgress || !isYourTurn || !hasDiceRolled}
-          className="h-16"
-        >
-          <div className="text-center">
-            <Undo className="h-6 w-6 mx-auto mb-1" />
-            <div className="text-sm">Undo</div>
-          </div>
-        </Button>
-
+      {/* Doubling Cube Button */}
+      {canDouble && (
         <Button
           variant="outline"
           size="lg"
           onClick={handleDouble}
-          disabled={!canDouble}
-          className="h-16 bg-yellow-500/10 hover:bg-yellow-500/20"
+          className="w-full h-16 bg-yellow-500/10 hover:bg-yellow-500/20"
         >
           <div className="text-center">
             <Dice1 className="h-6 w-6 mx-auto mb-1" />
             <div className="text-sm">Double</div>
           </div>
         </Button>
-      </div>
+      )}
 
+      {/* Utility Buttons */}
       <div className="grid grid-cols-2 gap-2">
         <Button
           variant="outline"
-          size="sm"
+          size="lg"
           onClick={toggleBoardFlip}
-          className="w-full"
+          className="w-full h-12"
         >
-          <RefreshCw className="h-4 w-4" />
+          <div className="text-center">
+            <RefreshCw className="h-5 w-5 mx-auto mb-1" />
+            <div className="text-xs">Flip Board</div>
+          </div>
         </Button>
 
         <Button
           variant="destructive"
-          size="sm"
+          size="lg"
           onClick={() => setShowAbandonModal(true)}
-          className="w-full"
+          className="w-full h-12"
         >
-          <Flag className="h-4 w-4" />
+          <div className="text-center">
+            <Flag className="h-5 w-5 mx-auto mb-1" />
+            <div className="text-xs">Abandon</div>
+          </div>
         </Button>
       </div>
 

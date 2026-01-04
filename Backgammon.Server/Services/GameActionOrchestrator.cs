@@ -44,6 +44,140 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     {
         _logger.LogDebug("RollDice called by connection {ConnectionId}", connectionId);
 
+        // Handle opening roll
+        if (session.Engine.IsOpeningRoll)
+        {
+            var playerColor = session.GetPlayerColor(connectionId);
+            if (playerColor == null)
+            {
+                return ActionResult.Error("Not a player in this game");
+            }
+
+            // Check if this player already rolled (unless there's a tie - then allow re-roll)
+            if (!session.Engine.IsOpeningRollTie)
+            {
+                if (playerColor == CheckerColor.White && session.Engine.WhiteOpeningRoll.HasValue)
+                {
+                    return ActionResult.Error("You already rolled");
+                }
+
+                if (playerColor == CheckerColor.Red && session.Engine.RedOpeningRoll.HasValue)
+                {
+                    return ActionResult.Error("You already rolled");
+                }
+            }
+
+            int roll = session.Engine.RollOpening(playerColor.Value);
+            session.UpdateActivity();
+
+            if (roll == -1)
+            {
+                // Tie - need to re-roll
+                _logger.LogInformation(
+                    "Opening roll tie in game {GameId}. Both players must re-roll.",
+                    session.Id);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "{Player} rolled {Roll} for opening in game {GameId}",
+                    playerColor == CheckerColor.White ? "White" : "Red",
+                    roll,
+                    session.Id);
+
+                // Check if opening roll is complete
+                if (!session.Engine.IsOpeningRoll)
+                {
+                    _logger.LogInformation(
+                        "Opening roll complete in game {GameId}. {Winner} goes first with dice [{Die1}, {Die2}]",
+                        session.Id,
+                        session.Engine.CurrentPlayer.Name,
+                        session.Engine.Dice.Die1,
+                        session.Engine.Dice.Die2);
+
+                    // Check if the winner is AI and should start playing
+                    var firstPlayerId = GetCurrentPlayerId(session);
+                    if (_aiMoveService.IsAiPlayer(firstPlayerId))
+                    {
+                        _logger.LogInformation(
+                            "AI won opening roll. Triggering AI turn for player {AiPlayerId} in game {GameId}",
+                            firstPlayerId,
+                            session.Id);
+
+                        // Broadcast current state first, then trigger AI
+                        await BroadcastGameUpdateAsync(session);
+                        await SaveGameStateAsync(session);
+
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                await ExecuteAiTurnWithBroadcastAsync(session, firstPlayerId!);
+                            },
+                            _logger,
+                            $"AiOpeningTurn-{session.Id}");
+
+                        return ActionResult.Ok();
+                    }
+                }
+                else if (session.Engine.IsOpeningRoll)
+                {
+                    // Still in opening roll - check if AI needs to roll
+                    var whitePlayerId = session.WhitePlayerId;
+                    var redPlayerId = session.RedPlayerId;
+
+                    // Check if AI hasn't rolled yet
+                    if (_aiMoveService.IsAiPlayer(whitePlayerId) && !session.Engine.WhiteOpeningRoll.HasValue)
+                    {
+                        _logger.LogInformation("AI (White) needs to roll opening die in game {GameId}", session.Id);
+
+                        // Broadcast current state first
+                        await BroadcastGameUpdateAsync(session);
+                        await SaveGameStateAsync(session);
+
+                        // Trigger AI opening roll
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                await Task.Delay(500); // Small delay for visual effect
+                                await RollDiceAsync(session, string.Empty); // Empty connection for AI
+                            },
+                            _logger,
+                            $"AiOpeningRoll-White-{session.Id}");
+
+                        return ActionResult.Ok();
+                    }
+
+                    if (_aiMoveService.IsAiPlayer(redPlayerId) && !session.Engine.RedOpeningRoll.HasValue)
+                    {
+                        _logger.LogInformation("AI (Red) needs to roll opening die in game {GameId}", session.Id);
+
+                        // Broadcast current state first
+                        await BroadcastGameUpdateAsync(session);
+                        await SaveGameStateAsync(session);
+
+                        // Trigger AI opening roll
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                await Task.Delay(500); // Small delay for visual effect
+                                await RollDiceAsync(session, string.Empty); // Empty connection for AI
+                            },
+                            _logger,
+                            $"AiOpeningRoll-Red-{session.Id}");
+
+                        return ActionResult.Ok();
+                    }
+                }
+            }
+
+            // Broadcast and save
+            await BroadcastGameUpdateAsync(session);
+            await SaveGameStateAsync(session);
+
+            return ActionResult.Ok();
+        }
+
+        // Regular dice roll
         if (!session.IsPlayerTurn(connectionId))
         {
             _logger.LogWarning(

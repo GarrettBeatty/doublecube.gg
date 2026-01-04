@@ -78,6 +78,10 @@ export interface GameState {
   player1Score?: number
   player2Score?: number
   isCrawfordGame?: boolean
+  isOpeningRoll?: boolean
+  whiteOpeningRoll?: number | null
+  redOpeningRoll?: number | null
+  isOpeningRollTie?: boolean
 }
 
 // Match types

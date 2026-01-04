@@ -7,6 +7,7 @@ import { BoardSVG } from '@/components/game/BoardSVG'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
+import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -218,7 +219,7 @@ export const GamePage: React.FC = () => {
           {/* Main Board Area */}
           <div>
             <Card>
-              <CardContent className="p-2">
+              <CardContent className="p-2 relative">
                 {currentGameState.isAnalysisMode && (
                   <Badge variant="secondary" className="mb-4">
                     <BarChart3 className="h-4 w-4 mr-2" />
@@ -226,30 +227,14 @@ export const GamePage: React.FC = () => {
                   </Badge>
                 )}
 
-                <BoardSVG gameState={currentGameState} />
-
-                {/* Dice Display - Only show if dice have non-zero values */}
-                {currentGameState.dice &&
-                  currentGameState.dice.length > 0 &&
-                  currentGameState.dice.some((d) => d > 0) && (
-                    <div className="mt-4 text-center">
-                      <div className="inline-flex gap-2 bg-white/10 p-3 rounded-lg">
-                        {currentGameState.dice.map((die, index) => (
-                          <div
-                            key={index}
-                            className="w-12 h-12 bg-white rounded flex items-center justify-center text-2xl font-bold text-gray-800 shadow-lg"
-                          >
-                            {die}
-                          </div>
-                        ))}
-                      </div>
-                      {currentGameState.remainingMoves && (
-                        <div className="text-sm text-white/70 mt-2">
-                          {currentGameState.remainingMoves.length} moves remaining
-                        </div>
-                      )}
-                    </div>
-                  )}
+                {/* Board with overlay controls */}
+                <div className="relative">
+                  <BoardSVG gameState={currentGameState} />
+                  <BoardOverlayControls
+                    gameState={currentGameState}
+                    isSpectator={isSpectator}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>

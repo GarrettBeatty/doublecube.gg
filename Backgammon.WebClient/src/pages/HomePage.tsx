@@ -15,7 +15,6 @@ import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
 import { CorrespondenceGames } from '@/components/home/CorrespondenceGames'
 import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
-import { PerformanceGraph } from '@/components/home/PerformanceGraph'
 import { VariantsCard } from '@/components/home/VariantsCard'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { RecentGames } from '@/components/home/RecentGames'
@@ -132,6 +131,7 @@ export function HomePage() {
                 <div className="space-y-6">
                   <QuickPlayCard />
                   <ActiveGamesList />
+                  <RecentGames />
                 </div>
               </TabsContent>
 
@@ -148,10 +148,8 @@ export function HomePage() {
           {/* Right Column - Discovery & Engagement (col-span-3) */}
           <div className="lg:col-span-3 space-y-6">
             <FeaturedTournaments />
-            <PerformanceGraph />
             <VariantsCard />
             <ActivityFeed />
-            <RecentGames />
           </div>
 
         </div>

@@ -108,21 +108,25 @@ public class GameService : IGameService
                 _logger,
                 $"SaveGameState-{session.Id}");
 
-            // Check if AI should move first
-            var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
-                ? session.WhitePlayerId
-                : session.RedPlayerId;
-            if (currentPlayerId != null && _aiMoveService.IsAiPlayer(currentPlayerId))
+            // Check if AI should move first (only for non-opening-roll games, i.e., reconnections)
+            // For opening roll, AI will roll after human rolls (triggered in RollDiceAsync)
+            if (!session.Engine.IsOpeningRoll)
             {
-                _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-                var playerIdForTask = currentPlayerId;
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, playerIdForTask);
-                    },
-                    _logger,
-                    $"AiFirstTurn-{session.Id}");
+                var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+                    ? session.WhitePlayerId
+                    : session.RedPlayerId;
+                if (currentPlayerId != null && _aiMoveService.IsAiPlayer(currentPlayerId))
+                {
+                    _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
+                    var playerIdForTask = currentPlayerId;
+                    BackgroundTaskHelper.FireAndForget(
+                        async () =>
+                        {
+                            await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, playerIdForTask);
+                        },
+                        _logger,
+                        $"AiFirstTurn-{session.Id}");
+                }
             }
         }
         else
@@ -273,29 +277,9 @@ public class GameService : IGameService
             _logger,
             $"SaveGameState-{session.Id}");
 
-        // If AI goes first (which would be unusual since White goes first, but handle it)
-        var currentPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
-            ? session.WhitePlayerId
-            : session.RedPlayerId;
-        _logger.LogDebug(
-            "Current player ID: {CurrentPlayerId}, Is AI: {IsAi}",
-            currentPlayerId,
-            _aiMoveService.IsAiPlayer(currentPlayerId));
-
-        if (_aiMoveService.IsAiPlayer(currentPlayerId))
-        {
-            _logger.LogInformation("AI goes first - triggering AI turn for game {GameId}", session.Id);
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, aiPlayerId);
-                },
-                _logger,
-                $"AiFirstTurn-{session.Id}");
-        }
-
+        // AI will roll after human rolls (triggered in RollDiceAsync)
         _logger.LogInformation(
-            "AI game {GameId} started",
+            "AI game {GameId} started. Opening roll phase - waiting for first player to roll.",
             session.Id);
     }
 

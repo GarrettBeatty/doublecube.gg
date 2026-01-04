@@ -303,7 +303,11 @@ public class GameSession
             TargetScore = TargetScore,
             Player1Score = Player1Score,
             Player2Score = Player2Score,
-            IsCrawfordGame = IsCrawfordGame
+            IsCrawfordGame = IsCrawfordGame,
+            IsOpeningRoll = Engine.IsOpeningRoll,
+            WhiteOpeningRoll = Engine.WhiteOpeningRoll,
+            RedOpeningRoll = Engine.RedOpeningRoll,
+            IsOpeningRollTie = Engine.IsOpeningRollTie
         };
 
         // Get valid moves for current player

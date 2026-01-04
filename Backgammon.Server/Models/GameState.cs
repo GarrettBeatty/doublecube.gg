@@ -72,4 +72,17 @@ public class GameState
     public int? Player2Score { get; set; }
 
     public bool? IsCrawfordGame { get; set; }
+
+    // Opening roll information
+    public bool IsOpeningRoll { get; set; }
+
+    public int? WhiteOpeningRoll { get; set; }
+
+    public int? RedOpeningRoll { get; set; }
+
+    public bool IsOpeningRollTie { get; set; }
+
+    public string? WhiteUsername { get; set; }
+
+    public string? RedUsername { get; set; }
 }

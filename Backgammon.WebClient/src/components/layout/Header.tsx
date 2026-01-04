@@ -23,7 +23,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onLoginClick,
   onSignupClick,
-  onDebugToggle,
+  onDebugToggle: _onDebugToggle,
 }) => {
   const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()
@@ -78,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={handleLogoClick}
           >
             <Gamepad2 className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold">BackgammonArena</h1>
+            <h1 className="text-2xl font-bold">doublecube.gg</h1>
           </div>
 
           {/* Center: Navigation Menu (placeholders) */}
@@ -101,18 +101,6 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center gap-2">
             {/* Connection Indicator */}
             {getConnectionBadge()}
-
-            {/* Debug Toggle (if provided) */}
-            {onDebugToggle && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onDebugToggle}
-                title="Toggle Debug Panel"
-              >
-                🐛
-              </Button>
-            )}
 
             {/* Settings Icon */}
             <Button variant="ghost" size="icon" title="Settings (coming soon)">
