@@ -346,13 +346,24 @@ public static class DynamoDbHelpers
 
         // Rating changes
         if (game.WhiteRatingBefore.HasValue)
+        {
             item["whiteRatingBefore"] = new AttributeValue { N = game.WhiteRatingBefore.Value.ToString() };
+        }
+
         if (game.RedRatingBefore.HasValue)
+        {
             item["redRatingBefore"] = new AttributeValue { N = game.RedRatingBefore.Value.ToString() };
+        }
+
         if (game.WhiteRatingAfter.HasValue)
+        {
             item["whiteRatingAfter"] = new AttributeValue { N = game.WhiteRatingAfter.Value.ToString() };
+        }
+
         if (game.RedRatingAfter.HasValue)
+        {
             item["redRatingAfter"] = new AttributeValue { N = game.RedRatingAfter.Value.ToString() };
+        }
 
         // Match-related properties
         if (!string.IsNullOrEmpty(game.MatchId))
@@ -411,13 +422,24 @@ public static class DynamoDbHelpers
 
         // Rating changes (nullable ints)
         if (item.TryGetValue("whiteRatingBefore", out var whiteRatingBeforeValue) && !string.IsNullOrEmpty(whiteRatingBeforeValue.N))
+        {
             game.WhiteRatingBefore = int.Parse(whiteRatingBeforeValue.N);
+        }
+
         if (item.TryGetValue("redRatingBefore", out var redRatingBeforeValue) && !string.IsNullOrEmpty(redRatingBeforeValue.N))
+        {
             game.RedRatingBefore = int.Parse(redRatingBeforeValue.N);
+        }
+
         if (item.TryGetValue("whiteRatingAfter", out var whiteRatingAfterValue) && !string.IsNullOrEmpty(whiteRatingAfterValue.N))
+        {
             game.WhiteRatingAfter = int.Parse(whiteRatingAfterValue.N);
+        }
+
         if (item.TryGetValue("redRatingAfter", out var redRatingAfterValue) && !string.IsNullOrEmpty(redRatingAfterValue.N))
+        {
             game.RedRatingAfter = int.Parse(redRatingAfterValue.N);
+        }
 
         // Board state
         if (item.TryGetValue("boardState", out var boardStateValue) && boardStateValue.L != null)

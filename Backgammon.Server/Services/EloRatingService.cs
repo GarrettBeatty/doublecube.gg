@@ -27,10 +27,13 @@ public class EloRatingService : IEloRatingService
         _logger.LogInformation(
             "EloRatingService initialized: StartingRating={StartingRating}, KFactorNew={KFactorNew}, " +
             "KFactorEstablished={KFactorEstablished}, GamesForEstablished={GamesForEstablished}",
-            _startingRating, _kFactorNew, _kFactorEstablished, _gamesForEstablished);
+            _startingRating,
+            _kFactorNew,
+            _kFactorEstablished,
+            _gamesForEstablished);
     }
 
-    public (int whiteNewRating, int redNewRating) CalculateNewRatings(
+    public (int WhiteNewRating, int RedNewRating) CalculateNewRatings(
         int whiteRating,
         int redRating,
         int whiteRatedGames,
@@ -60,9 +63,16 @@ public class EloRatingService : IEloRatingService
             "ELO calculation: White {WhiteOld}→{WhiteNew} ({WhiteChange:+#;-#;0}), " +
             "Red {RedOld}→{RedNew} ({RedChange:+#;-#;0}), " +
             "Expected: W={WhiteExp:F2} R={RedExp:F2}, K-factors: W={WhiteK} R={RedK}",
-            whiteRating, whiteNewRating, whiteChange,
-            redRating, redNewRating, redChange,
-            whiteExpected, redExpected, whiteK, redK);
+            whiteRating,
+            whiteNewRating,
+            whiteChange,
+            redRating,
+            redNewRating,
+            redChange,
+            whiteExpected,
+            redExpected,
+            whiteK,
+            redK);
 
         return (whiteNewRating, redNewRating);
     }

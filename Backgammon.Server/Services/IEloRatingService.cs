@@ -13,8 +13,8 @@ public interface IEloRatingService
     /// <param name="whiteRatedGames">Number of rated games White player has played</param>
     /// <param name="redRatedGames">Number of rated games Red player has played</param>
     /// <param name="whiteWon">True if White won, false if Red won</param>
-    /// <returns>Tuple of (whiteNewRating, redNewRating)</returns>
-    (int whiteNewRating, int redNewRating) CalculateNewRatings(
+    /// <returns>Tuple of (WhiteNewRating, RedNewRating)</returns>
+    (int WhiteNewRating, int RedNewRating) CalculateNewRatings(
         int whiteRating,
         int redRating,
         int whiteRatedGames,
