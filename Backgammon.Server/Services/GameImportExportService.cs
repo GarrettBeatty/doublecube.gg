@@ -37,7 +37,10 @@ public class GameImportExportService : IGameImportExportService
 
         try
         {
-            return SgfSerializer.ExportPosition(session.Engine);
+            // Export SGF and encode as base64 for clean URLs
+            var sgf = SgfSerializer.ExportPosition(session.Engine);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(sgf);
+            return Convert.ToBase64String(bytes);
         }
         catch (Exception ex)
         {
@@ -49,7 +52,7 @@ public class GameImportExportService : IGameImportExportService
         }
     }
 
-    public async Task ImportPositionAsync(string connectionId, string sgf)
+    public async Task ImportPositionAsync(string connectionId, string positionData)
     {
         var session = _sessionManager.GetGameByPlayer(connectionId);
 
@@ -69,19 +72,38 @@ public class GameImportExportService : IGameImportExportService
 
         try
         {
-            SgfSerializer.ImportPosition(session.Engine, sgf);
+            var trimmed = positionData.Trim();
+            string sgf;
 
-            // Send updated game state to all players
-            if (!string.IsNullOrEmpty(session.WhiteConnectionId))
+            // Auto-detect format: raw SGF starts with "(;", otherwise assume base64
+            if (trimmed.StartsWith("(;"))
             {
-                var whiteState = session.GetState(session.WhiteConnectionId);
-                await _hubContext.Clients.Client(session.WhiteConnectionId).SendAsync("GameUpdate", whiteState);
+                // Raw SGF format
+                _logger.LogInformation("Importing raw SGF position for game {GameId}", session.Id);
+                sgf = trimmed;
+            }
+            else
+            {
+                // Assume base64-encoded SGF
+                _logger.LogInformation("Importing base64-encoded SGF position for game {GameId}", session.Id);
+                var bytes = Convert.FromBase64String(trimmed);
+                sgf = System.Text.Encoding.UTF8.GetString(bytes);
             }
 
-            if (!string.IsNullOrEmpty(session.RedConnectionId))
+            // Import the SGF
+            SgfSerializer.ImportPosition(session.Engine, sgf);
+
+            // Send updated game state to all player connections (supports multi-tab)
+            foreach (var whiteConnectionId in session.WhiteConnections)
             {
-                var redState = session.GetState(session.RedConnectionId);
-                await _hubContext.Clients.Client(session.RedConnectionId).SendAsync("GameUpdate", redState);
+                var whiteState = session.GetState(whiteConnectionId);
+                await _hubContext.Clients.Client(whiteConnectionId).SendAsync("GameUpdate", whiteState);
+            }
+
+            foreach (var redConnectionId in session.RedConnections)
+            {
+                var redState = session.GetState(redConnectionId);
+                await _hubContext.Clients.Client(redConnectionId).SendAsync("GameUpdate", redState);
             }
 
             _logger.LogInformation("Position imported successfully for game {GameId}", session.Id);

@@ -14,11 +14,16 @@ export const PositionControls: React.FC = () => {
   const [showExportModal, setShowExportModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [sgfText, setSgfText] = useState('')
+  const [importText, setImportText] = useState('')
   const [copied, setCopied] = useState(false)
 
   const handleExport = async () => {
     try {
-      const sgf = (await invoke(HubMethods.ExportPosition)) as string
+      // Get base64-encoded SGF from server
+      const base64Sgf = (await invoke(HubMethods.ExportPosition)) as string
+
+      // Decode to show raw SGF
+      const sgf = atob(base64Sgf)
       setSgfText(sgf)
       setShowExportModal(true)
     } catch (error) {
@@ -33,9 +38,9 @@ export const PositionControls: React.FC = () => {
 
   const handleImport = async () => {
     try {
-      await invoke(HubMethods.ImportPosition, sgfText.trim())
+      await invoke(HubMethods.ImportPosition, importText.trim())
       setShowImportModal(false)
-      setSgfText('')
+      setImportText('')
       toast({ title: 'Success', description: 'Position imported' })
     } catch (error) {
       console.error('Import failed:', error)
@@ -65,7 +70,7 @@ export const PositionControls: React.FC = () => {
     <>
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Position (SGF)</CardTitle>
+          <CardTitle className="text-sm font-medium">Position</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-2">
           <Button variant="outline" size="sm" onClick={handleExport}>
@@ -89,7 +94,7 @@ export const PositionControls: React.FC = () => {
             <Textarea
               value={sgfText}
               readOnly
-              rows={6}
+              rows={8}
               className="font-mono text-xs"
               onClick={(e: React.MouseEvent<HTMLTextAreaElement>) => e.currentTarget.select()}
             />
@@ -117,14 +122,17 @@ export const PositionControls: React.FC = () => {
             <DialogTitle>Import Position (SGF Format)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Paste SGF format - accepts raw or base64-encoded
+            </p>
             <Textarea
-              value={sgfText}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSgfText(e.target.value)}
+              value={importText}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setImportText(e.target.value)}
               placeholder="Paste SGF here... Example: (;GM[6]AW[...]AB[...]PL[W])"
-              rows={6}
+              rows={8}
               className="font-mono text-xs"
             />
-            <Button onClick={handleImport} disabled={!sgfText.trim()} className="w-full">
+            <Button onClick={handleImport} disabled={!importText.trim()} className="w-full">
               Import Position
             </Button>
           </div>

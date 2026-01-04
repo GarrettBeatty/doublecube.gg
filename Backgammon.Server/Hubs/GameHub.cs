@@ -692,7 +692,7 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Export the current game position in SGF format
+    /// Export the current game position (base64-encoded SGF - used for URLs)
     /// </summary>
     public async Task<string> ExportPosition()
     {
@@ -700,11 +700,11 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Import a position from SGF format
+    /// Import a position (auto-detects raw SGF or base64-encoded SGF)
     /// </summary>
-    public async Task ImportPosition(string sgf)
+    public async Task ImportPosition(string positionData)
     {
-        await _gameImportExportService.ImportPositionAsync(Context.ConnectionId, sgf);
+        await _gameImportExportService.ImportPositionAsync(Context.ConnectionId, positionData);
     }
 
     /// <summary>

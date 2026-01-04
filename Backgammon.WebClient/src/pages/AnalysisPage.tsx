@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,11 +20,14 @@ import { CheckerColor } from '@/types/game.types'
 
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
+  const { sgf } = useParams<{ sgf?: string }>()
   const { invoke, isConnected } = useSignalR()
   const { toast } = useToast()
   const { currentGameState, setCurrentGameId, resetGame, isCustomDiceEnabled } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
   const hasCreatedGame = useRef(false)
+  const lastImportedSgf = useRef<string | null>(null)
+  const lastExportedSgf = useRef<string | null>(null)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -64,6 +67,81 @@ export const AnalysisPage: React.FC = () => {
       setCurrentGameId(currentGameState.gameId)
     }
   }, [currentGameState, setCurrentGameId])
+
+  // Import position from URL if present (only when SGF parameter changes and is different)
+  useEffect(() => {
+    const importFromUrl = async () => {
+      if (!currentGameState || !sgf) {
+        return
+      }
+
+      // Decode the SGF from URL
+      const decodedSgf = decodeURIComponent(sgf)
+
+      // Only import if this is a different SGF than what we last imported
+      if (decodedSgf === lastImportedSgf.current) {
+        console.log('[AnalysisPage] Skipping import - already imported this SGF')
+        return
+      }
+
+      try {
+        console.log('[AnalysisPage] Importing position from URL:', decodedSgf)
+        lastImportedSgf.current = decodedSgf
+        lastExportedSgf.current = decodedSgf // Also track as exported to prevent immediate re-export
+        await invoke(HubMethods.ImportPosition, decodedSgf)
+      } catch (error) {
+        console.error('[AnalysisPage] Failed to import position from URL:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load position from URL',
+          variant: 'destructive',
+        })
+        lastImportedSgf.current = null
+        lastExportedSgf.current = null
+      }
+    }
+
+    importFromUrl()
+  }, [sgf, currentGameState, invoke, toast])
+
+  // Update URL when position changes (but don't trigger if we just imported)
+  useEffect(() => {
+    const updateUrl = async () => {
+      if (!currentGameState) {
+        return
+      }
+
+      try {
+        // Export current position to SGF
+        const exportedSgf = (await invoke(HubMethods.ExportPosition)) as string
+        if (exportedSgf) {
+          // Skip if we already exported this exact SGF (prevents duplicate exports on GameUpdate)
+          if (exportedSgf === lastExportedSgf.current) {
+            return
+          }
+
+          // Only update URL if the exported SGF is different from current URL
+          const currentSgfFromUrl = sgf ? decodeURIComponent(sgf) : null
+
+          if (currentSgfFromUrl !== exportedSgf) {
+            console.log('[AnalysisPage] Updating URL with new position')
+            const encodedSgf = encodeURIComponent(exportedSgf)
+            // Mark this as imported so we don't re-import it
+            lastImportedSgf.current = exportedSgf
+            lastExportedSgf.current = exportedSgf
+            navigate(`/analysis/${encodedSgf}`, { replace: true })
+          } else {
+            // URL already matches, just update our tracking
+            lastExportedSgf.current = exportedSgf
+          }
+        }
+      } catch (error) {
+        console.error('[AnalysisPage] Failed to update URL:', error)
+      }
+    }
+
+    updateUrl()
+  }, [currentGameState, invoke, navigate, sgf])
 
   // Cleanup when leaving the page
   useEffect(() => {

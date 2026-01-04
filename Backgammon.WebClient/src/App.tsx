@@ -61,7 +61,7 @@ function AppContent() {
           <Route path="/game/:gameId" element={<GamePage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/match-results/:matchId" element={<MatchResultsPage />} />
-          <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
         </Routes>
       </Layout>
 
