@@ -182,7 +182,7 @@ if (match.IsCrawfordGame) {
 
 **Match Lobby Flow**:
 1. Player creates match lobby via `CreateMatchLobbyAsync()` (friend/AI/open lobby)
-2. Opponent joins via `JoinMatchLobby()` SignalR method
+2. Opponent joins via `JoinMatch()` SignalR method
 3. Creator starts match via `StartMatchFromLobby()`
 4. First game begins, players join game session
 

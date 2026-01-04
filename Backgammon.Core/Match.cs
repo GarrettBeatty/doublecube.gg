@@ -8,7 +8,7 @@ public class Match
     public Match()
     {
         CreatedAt = DateTime.UtcNow;
-        Status = MatchStatus.InProgress;
+        Status = MatchStatus.WaitingForPlayers;
     }
 
     public Match(string matchId, string player1Id, string player2Id, int targetScore)

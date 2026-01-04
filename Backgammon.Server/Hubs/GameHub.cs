@@ -823,6 +823,35 @@ public class GameHub : Hub
         }
     }
 
+    public async Task<List<object>> GetMatchLobbies()
+    {
+        try
+        {
+            var lobbies = await _matchService.GetOpenLobbiesAsync();
+
+            var lobbyList = lobbies.Select(m => new
+            {
+                matchId = m.MatchId,
+                creatorPlayerId = m.Player1Id,
+                creatorUsername = m.Player1Name,
+                opponentType = m.OpponentType,
+                targetScore = m.TargetScore,
+                status = m.Status,  // Will be "WaitingForPlayers"
+                opponentPlayerId = m.Player2Id,
+                opponentUsername = m.Player2Name,
+                createdAt = m.CreatedAt.ToString("O"),
+                isOpenLobby = m.IsOpenLobby
+            }).ToList<object>();
+
+            return lobbyList;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting match lobbies");
+            throw;
+        }
+    }
+
     /// <summary>
     /// Create a new match with configuration (lobby-based)
     /// </summary>

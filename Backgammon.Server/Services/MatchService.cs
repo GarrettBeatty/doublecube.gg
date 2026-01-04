@@ -58,9 +58,19 @@ public class MatchService : IMatchService
 
             // Get player 1 name
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            string player1Name = player1DisplayName ?? player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
 
-            // Create match
+            // If displayName is just "Player" (guest), append player ID for uniqueness
+            string player1Name;
+            if (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
+            {
+                player1Name = player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
+            }
+            else
+            {
+                player1Name = player1DisplayName;
+            }
+
+            // Create match (Status defaults to WaitingForPlayers from constructor)
             var match = new Match
             {
                 MatchId = Guid.NewGuid().ToString(),
@@ -68,8 +78,7 @@ public class MatchService : IMatchService
                 Player1Id = player1Id,
                 Player1Name = player1Name,
                 Player1DisplayName = player1DisplayName,
-                OpponentType = opponentType,
-                Status = "InProgress"
+                OpponentType = opponentType
             };
 
             // Handle opponent based on type
@@ -79,6 +88,8 @@ public class MatchService : IMatchService
                 var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
                 match.Player2Id = aiPlayerId;
                 match.Player2Name = "Computer";
+                match.Status = "InProgress";  // AI matches start immediately
+                match.IsOpenLobby = false;
             }
             else if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {
@@ -86,9 +97,15 @@ public class MatchService : IMatchService
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
                 match.Player2Id = player2Id;
                 match.Player2Name = player2?.DisplayName ?? player2Id;
+                match.Status = "WaitingForPlayers";  // Must join explicitly
+                match.IsOpenLobby = false;
             }
-
-            // For OpenLobby, Player2Id remains null
+            else
+            {
+                // OpenLobby: Player2Id remains null
+                match.Status = "WaitingForPlayers";  // Waiting for join
+                match.IsOpenLobby = true;
+            }
 
             await _matchRepository.SaveMatchAsync(match);
 
@@ -328,22 +345,41 @@ public class MatchService : IMatchService
         return await _matchRepository.GetActiveMatchesAsync();
     }
 
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    {
+        return await _matchRepository.GetOpenLobbiesAsync(limit);
+    }
+
     public async Task AbandonMatchAsync(string matchId, string abandoningPlayerId)
     {
         try
         {
             var match = await _matchRepository.GetMatchByIdAsync(matchId);
-            if (match == null || match.Status != "InProgress")
+            if (match == null)
             {
                 return;
+            }
+
+            // Allow abandoning both WaitingForPlayers and InProgress matches
+            if (match.Status != "InProgress" && match.Status != "WaitingForPlayers")
+            {
+                return;  // Already completed or abandoned
             }
 
             match.Status = "Abandoned";
             match.CompletedAt = DateTime.UtcNow;
             match.DurationSeconds = (int)(match.CompletedAt.Value - match.CreatedAt).TotalSeconds;
 
-            // The non-abandoning player wins by default
-            match.WinnerId = match.Player1Id == abandoningPlayerId ? match.Player2Id : match.Player1Id;
+            // Handle case where Player2 never joined
+            if (string.IsNullOrEmpty(match.Player2Id))
+            {
+                match.WinnerId = null;  // No winner if match never started
+            }
+            else
+            {
+                // The non-abandoning player wins by default
+                match.WinnerId = match.Player1Id == abandoningPlayerId ? match.Player2Id : match.Player1Id;
+            }
 
             await _matchRepository.UpdateMatchAsync(match);
 
@@ -381,18 +417,38 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} already has a second player");
             }
 
+            // Validate match is in correct state
+            if (match.Status != "WaitingForPlayers")
+            {
+                throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.Status})");
+            }
+
             // Get player 2 name
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-            string player2Name = player2DisplayName ?? player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+
+            // If displayName is just "Player" (guest), append player ID for uniqueness
+            string player2Name;
+            if (string.IsNullOrEmpty(player2DisplayName) || player2DisplayName == "Player")
+            {
+                player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+            }
+            else
+            {
+                player2Name = player2DisplayName;
+            }
 
             match.Player2Id = player2Id;
             match.Player2Name = player2Name;
             match.Player2DisplayName = player2DisplayName;
+            match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
 
             await _matchRepository.UpdateMatchAsync(match);
 
-            _logger.LogInformation("Player {Player2Id} joined match {MatchId}", player2Id, matchId);
+            _logger.LogInformation(
+                "Player {Player2Id} joined match {MatchId}, Status: WaitingForPlayers → InProgress",
+                player2Id,
+                matchId);
 
             return match;
         }

@@ -82,7 +82,7 @@ export function HomePage() {
                 onClick={handleCreateGame}
               >
                 <Plus className="h-5 w-5" />
-                Create a Game
+                Create a Game Lobby
               </Button>
               <Button
                 className="w-full flex items-center gap-2"

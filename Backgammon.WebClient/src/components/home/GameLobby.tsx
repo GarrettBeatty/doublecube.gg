@@ -28,7 +28,7 @@ export function GameLobby() {
 
   const handleJoinLobby = async (matchId: string) => {
     try {
-      await invoke('JoinMatchLobby', matchId);
+      await invoke('JoinMatch', matchId);
       // Navigation happens via MatchGameStarting event in useSignalREvents
     } catch (error) {
       console.error('Failed to join lobby:', error);

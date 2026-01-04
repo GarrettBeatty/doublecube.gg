@@ -43,6 +43,11 @@ public interface IMatchRepository
     Task<MatchStats> GetPlayerMatchStatsAsync(string playerId);
 
     /// <summary>
+    /// Get open lobbies waiting for opponents
+    /// </summary>
+    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50);
+
+    /// <summary>
     /// Delete a match and all associated data
     /// </summary>
     Task DeleteMatchAsync(string matchId);

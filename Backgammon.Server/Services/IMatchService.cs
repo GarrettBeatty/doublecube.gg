@@ -62,6 +62,11 @@ public interface IMatchService
     Task<List<Match>> GetActiveMatchesAsync();
 
     /// <summary>
+    /// Get open lobbies waiting for opponents
+    /// </summary>
+    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50);
+
+    /// <summary>
     /// Abandon a match
     /// </summary>
     Task AbandonMatchAsync(string matchId, string abandoningPlayerId);

@@ -406,6 +406,37 @@ public class DynamoDbMatchRepository : IMatchRepository
         }
     }
 
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    {
+        try
+        {
+            // Query GSI3 for WaitingForPlayers status - FAST!
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI3",
+                KeyConditionExpression = "GSI3PK = :pk",
+                FilterExpression = "isOpenLobby = :isOpen",  // Only public lobbies
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = "MATCH_STATUS#WaitingForPlayers" },
+                    [":isOpen"] = new AttributeValue { BOOL = true }
+                },
+                Limit = limit,
+                ScanIndexForward = false // Most recent first
+            });
+
+            var lobbies = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
+            _logger.LogDebug("Retrieved {Count} open lobbies via GSI3", lobbies.Count);
+            return lobbies;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve open lobbies");
+            return new List<Match>();
+        }
+    }
+
     public async Task DeleteMatchAsync(string matchId)
     {
         try
