@@ -184,7 +184,7 @@ export const GamePage: React.FC = () => {
                 reserveSeconds={currentGameState.whiteReserveSeconds ?? null}
                 isInDelay={currentGameState.whiteIsInDelay ?? null}
                 delayRemaining={currentGameState.whiteDelayRemaining ?? null}
-                isActive={currentGameState.currentPlayer === CheckerColor.White}
+                isActive={!currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.White}
                 color={CheckerColor.White}
               />
             )}
@@ -211,7 +211,7 @@ export const GamePage: React.FC = () => {
                 reserveSeconds={currentGameState.redReserveSeconds ?? null}
                 isInDelay={currentGameState.redIsInDelay ?? null}
                 delayRemaining={currentGameState.redDelayRemaining ?? null}
-                isActive={currentGameState.currentPlayer === CheckerColor.Red}
+                isActive={!currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.Red}
                 color={CheckerColor.Red}
               />
             )}

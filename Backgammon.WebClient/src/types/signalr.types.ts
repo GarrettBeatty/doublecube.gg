@@ -120,6 +120,8 @@ export interface TimeUpdateEvent {
   redReserveSeconds: number
   whiteIsInDelay: boolean
   redIsInDelay: boolean
+  whiteDelayRemaining: number
+  redDelayRemaining: number
 }
 
 export interface TimeoutEvent {

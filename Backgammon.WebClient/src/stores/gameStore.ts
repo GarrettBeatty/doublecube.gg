@@ -32,6 +32,8 @@ interface GameStore {
     redReserveSeconds: number
     whiteIsInDelay: boolean
     redIsInDelay: boolean
+    whiteDelayRemaining: number
+    redDelayRemaining: number
   }) => void
   setMyColor: (color: CheckerColor | null) => void
   setCurrentGameId: (gameId: string | null) => void
@@ -92,6 +94,8 @@ export const useGameStore = create<GameStore>((set) => ({
             redReserveSeconds: timeUpdate.redReserveSeconds,
             whiteIsInDelay: timeUpdate.whiteIsInDelay,
             redIsInDelay: timeUpdate.redIsInDelay,
+            whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
+            redDelayRemaining: timeUpdate.redDelayRemaining,
           }
         : null,
     })),

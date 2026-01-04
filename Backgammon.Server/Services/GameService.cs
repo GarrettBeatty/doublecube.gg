@@ -98,8 +98,7 @@ public class GameService : IGameService
             // Game just became full - broadcast start to both players
             await BroadcastGameStartAsync(session);
 
-            // Start time updates if time control is enabled
-            session.StartTimeUpdates(_hubContext);
+            // Timer will be started after opening roll completes (see GameActionOrchestrator.RollDiceAsync)
 
             // Save game state when game starts (progressive save)
             BackgroundTaskHelper.FireAndForget(

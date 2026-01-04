@@ -119,8 +119,10 @@ public class AiMoveService : IAiMoveService
 
             _logger.LogInformation("AI completed {MoveCount} moves", moveCount);
 
-            // End the AI's turn
-            engine.EndTurn();
+            // End the AI's turn (with timer management)
+            engine.EndTurnTimer();  // End AI's timer, consume reserve if needed
+            engine.EndTurn();       // Switch to next player
+            engine.StartTurnTimer(); // Start next player's timer
             await broadcastUpdate();
 
             _logger.LogInformation("AI turn completed in game {GameId}", session.Id);

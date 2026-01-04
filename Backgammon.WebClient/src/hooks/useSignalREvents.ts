@@ -238,6 +238,8 @@ export const useSignalREvents = () => {
         redReserveSeconds: timeUpdate.redReserveSeconds,
         whiteIsInDelay: timeUpdate.whiteIsInDelay,
         redIsInDelay: timeUpdate.redIsInDelay,
+        whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
+        redDelayRemaining: timeUpdate.redDelayRemaining,
       })
     })
 

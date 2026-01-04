@@ -615,8 +615,20 @@ public class GameEngine
             return;
         }
 
+        Console.WriteLine($"[TIME DEBUG] StartTurnTimer called");
+        Console.WriteLine($"[TIME DEBUG]   CurrentPlayer: {CurrentPlayer?.Color}");
+        Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {IsOpeningRoll}");
+
+        if (CurrentPlayer == null)
+        {
+            Console.WriteLine($"[TIME DEBUG]   ERROR: CurrentPlayer is null, cannot start timer!");
+            return;
+        }
+
         var timeState = CurrentPlayer.Color == CheckerColor.White ? WhiteTimeState : RedTimeState;
         timeState?.StartTurn();
+
+        Console.WriteLine($"[TIME DEBUG]   TurnStartTime set to: {timeState?.TurnStartTime}");
     }
 
     /// <summary>

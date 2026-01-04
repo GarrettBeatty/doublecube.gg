@@ -98,6 +98,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     // Start timer for first player's turn
                     session.Engine.StartTurnTimer();
 
+                    // Start broadcasting time updates (only after opening roll completes)
+                    session.StartTimeUpdates(_hubContext);
+
                     // Check if the winner is AI and should start playing
                     var firstPlayerId = GetCurrentPlayerId(session);
                     if (_aiMoveService.IsAiPlayer(firstPlayerId))
@@ -120,6 +123,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                             $"AiOpeningTurn-{session.Id}");
 
                         return ActionResult.Ok();
+                    }
+                    else
+                    {
+                        // Human won opening roll - broadcast timer state immediately
+                        await BroadcastGameUpdateAsync(session);
+                        await SaveGameStateAsync(session);
                     }
                 }
                 else if (session.Engine.IsOpeningRoll)

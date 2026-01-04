@@ -317,11 +317,26 @@ public class GameSession
             DelaySeconds = TimeControl?.DelaySeconds,
             WhiteReserveSeconds = Engine.WhiteTimeState?.GetRemainingTime(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
             RedReserveSeconds = Engine.RedTimeState?.GetRemainingTime(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
-            WhiteIsInDelay = Engine.WhiteTimeState?.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
-            RedIsInDelay = Engine.RedTimeState?.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
-            WhiteDelayRemaining = Engine.WhiteTimeState?.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
-            RedDelayRemaining = Engine.RedTimeState?.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds
+            // Only show delay for current player (and only after opening roll is complete and turn has started)
+            WhiteIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState != null && Engine.WhiteTimeState.TurnStartTime != null && Engine.WhiteTimeState.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
+            RedIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState != null && Engine.RedTimeState.TurnStartTime != null && Engine.RedTimeState.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
+            WhiteDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState?.TurnStartTime != null ? Engine.WhiteTimeState.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds : 0,
+            RedDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState?.TurnStartTime != null ? Engine.RedTimeState.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds : 0
         };
+
+        // Log time state calculations
+        if (TimeControl != null)
+        {
+            Console.WriteLine($"[TIME DEBUG] GetState for game {Id}");
+            Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {Engine.IsOpeningRoll}");
+            Console.WriteLine($"[TIME DEBUG]   CurrentPlayer: {Engine.CurrentPlayer?.Color}");
+            Console.WriteLine($"[TIME DEBUG]   WhiteTimeState.TurnStartTime: {Engine.WhiteTimeState?.TurnStartTime}");
+            Console.WriteLine($"[TIME DEBUG]   RedTimeState.TurnStartTime: {Engine.RedTimeState?.TurnStartTime}");
+            Console.WriteLine($"[TIME DEBUG]   WhiteIsInDelay: {state.WhiteIsInDelay}");
+            Console.WriteLine($"[TIME DEBUG]   RedIsInDelay: {state.RedIsInDelay}");
+            Console.WriteLine($"[TIME DEBUG]   WhiteDelayRemaining: {state.WhiteDelayRemaining}");
+            Console.WriteLine($"[TIME DEBUG]   RedDelayRemaining: {state.RedDelayRemaining}");
+        }
 
         // Get valid moves for current player
         // Always populate ValidMoves to ensure client has complete state
@@ -363,6 +378,12 @@ public class GameSession
         {
             return;
         }
+
+        Console.WriteLine($"[TIME DEBUG] StartTimeUpdates called for game {Id}");
+        Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {Engine.IsOpeningRoll}");
+        Console.WriteLine($"[TIME DEBUG]   CurrentPlayer: {Engine.CurrentPlayer?.Color}");
+        Console.WriteLine($"[TIME DEBUG]   WhiteTimeState.TurnStartTime: {Engine.WhiteTimeState?.TurnStartTime}");
+        Console.WriteLine($"[TIME DEBUG]   RedTimeState.TurnStartTime: {Engine.RedTimeState?.TurnStartTime}");
 
         lock (_timerLock)
         {
@@ -474,14 +495,35 @@ public class GameSession
             return;
         }
 
+        Console.WriteLine($"[TIME DEBUG] BroadcastTimeUpdate for game {Id}");
+        Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {Engine.IsOpeningRoll}");
+        Console.WriteLine($"[TIME DEBUG]   CurrentPlayer: {Engine.CurrentPlayer?.Color}");
+        Console.WriteLine($"[TIME DEBUG]   WhiteTimeState.TurnStartTime: {Engine.WhiteTimeState.TurnStartTime}");
+        Console.WriteLine($"[TIME DEBUG]   RedTimeState.TurnStartTime: {Engine.RedTimeState.TurnStartTime}");
+
+        var whiteIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState.TurnStartTime != null && Engine.WhiteTimeState.CalculateIsInDelay(TimeControl.DelaySeconds);
+        var redIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState.TurnStartTime != null && Engine.RedTimeState.CalculateIsInDelay(TimeControl.DelaySeconds);
+        var whiteDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState.TurnStartTime != null ? Engine.WhiteTimeState.GetDelayRemaining(TimeControl.DelaySeconds).TotalSeconds : 0;
+        var redDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState.TurnStartTime != null ? Engine.RedTimeState.GetDelayRemaining(TimeControl.DelaySeconds).TotalSeconds : 0;
+
+        Console.WriteLine($"[TIME DEBUG]   whiteIsInDelay: {whiteIsInDelay}");
+        Console.WriteLine($"[TIME DEBUG]   redIsInDelay: {redIsInDelay}");
+        Console.WriteLine($"[TIME DEBUG]   whiteDelayRemaining: {whiteDelayRemaining}");
+        Console.WriteLine($"[TIME DEBUG]   redDelayRemaining: {redDelayRemaining}");
+
         var timeUpdate = new
         {
             gameId = Id,
             whiteReserveSeconds = Engine.WhiteTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
             redReserveSeconds = Engine.RedTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
-            whiteIsInDelay = Engine.WhiteTimeState.IsInDelay,
-            redIsInDelay = Engine.RedTimeState.IsInDelay
+            // Only show delay for current player (and only after opening roll is complete and turn has started)
+            whiteIsInDelay = whiteIsInDelay,
+            redIsInDelay = redIsInDelay,
+            whiteDelayRemaining = whiteDelayRemaining,
+            redDelayRemaining = redDelayRemaining
         };
+
+        Console.WriteLine($"[TIME DEBUG]   Broadcasting whiteReserve: {timeUpdate.whiteReserveSeconds}, redReserve: {timeUpdate.redReserveSeconds}");
 
         await hubContext.Clients.Group(Id).SendAsync("TimeUpdate", timeUpdate);
 
