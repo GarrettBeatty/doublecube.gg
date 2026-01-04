@@ -128,6 +128,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
+  const diceGroupRef = useRef<SVGGElement | null>(null)
 
   const { selectedChecker, validSources, isBoardFlipped } = useGameStore()
   const { invoke } = useSignalR()
@@ -708,6 +709,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     // Dice group
     const diceGroup = createSVGElement('g', { id: 'dice' }) as SVGGElement
     svgRef.current.appendChild(diceGroup)
+    diceGroupRef.current = diceGroup
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -855,8 +857,149 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
         CONFIG.viewBox.height - CONFIG.padding - CONFIG.checkerSpacing
       )
     }
+
+    // Render borne-off checkers in the bear-off area
+    const renderBornOffCheckers = (
+      count: number,
+      color: CheckerColor,
+      startY: number
+    ) => {
+      if (count === 0) return
+
+      const bearoffCenterX = CONFIG.viewBox.width - CONFIG.bearoffWidth / 2
+      const maxVisible = Math.min(count, 5)
+
+      for (let i = 0; i < maxVisible; i++) {
+        const cy = startY + CONFIG.checkerSpacing * i
+        
+        const checkerColor =
+          color === CheckerColor.White ? COLORS.checkerWhite : COLORS.checkerRed
+        const strokeColor =
+          color === CheckerColor.White
+            ? COLORS.checkerWhiteStroke
+            : COLORS.checkerRedStroke
+
+        const circle = createSVGElement('circle', {
+          cx: bearoffCenterX,
+          cy,
+          r: CONFIG.checkerRadius,
+          fill: checkerColor,
+          stroke: strokeColor,
+          'stroke-width': 2,
+          class: 'checker born-off',
+        }) as SVGCircleElement
+
+        checkersGroupRef.current!.appendChild(circle)
+      }
+
+      // Show count if more than 5
+      if (count > 5) {
+        const textColor =
+          color === CheckerColor.White ? COLORS.textDark : COLORS.textLight
+
+        const text = createSVGElement('text', {
+          x: bearoffCenterX,
+          y: startY + CONFIG.checkerSpacing * 4,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle',
+          fill: textColor,
+          'font-size': 16,
+          'font-weight': 'bold',
+        })
+        text.textContent = String(count)
+        checkersGroupRef.current!.appendChild(text)
+      }
+    }
+
+    // White borne-off checkers (from top)
+    if (gameState.whiteBornOff > 0) {
+      renderBornOffCheckers(
+        gameState.whiteBornOff,
+        CheckerColor.White,
+        CONFIG.padding + CONFIG.checkerSpacing
+      )
+    }
+
+    // Red borne-off checkers (from bottom)
+    if (gameState.redBornOff > 0) {
+      renderBornOffCheckers(
+        gameState.redBornOff,
+        CheckerColor.Red,
+        CONFIG.viewBox.height - CONFIG.padding - CONFIG.checkerSpacing
+      )
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, selectedChecker, validSources, startDrag])
+
+  // Render dice
+  const renderDice = useCallback(() => {
+    if (!diceGroupRef.current || !gameState) return
+
+    diceGroupRef.current.innerHTML = ''
+
+    const barCenterX = CONFIG.barX! + CONFIG.barWidth / 2
+    const centerY = CONFIG.viewBox.height / 2
+    const diceSize = 36
+    const diceGap = 6
+
+    // Counter-rotate if board is flipped
+    if (isBoardFlipped) {
+      diceGroupRef.current.setAttribute('transform', `rotate(180 ${barCenterX} ${centerY})`)
+    } else {
+      diceGroupRef.current.removeAttribute('transform')
+    }
+
+    // Only render dice if they're rolled
+    if (gameState.dice && gameState.dice.length > 0 && gameState.dice.some(d => d > 0)) {
+      const totalHeight = gameState.dice.length * diceSize + (gameState.dice.length - 1) * diceGap
+      const startY = centerY - totalHeight / 2
+
+      gameState.dice.forEach((die, index) => {
+        const y = startY + index * (diceSize + diceGap)
+
+        // Dice background
+        const rect = createSVGElement('rect', {
+          x: barCenterX - diceSize / 2,
+          y,
+          width: diceSize,
+          height: diceSize,
+          rx: 4,
+          fill: 'white',
+          stroke: 'none',
+          filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
+        })
+        diceGroupRef.current!.appendChild(rect)
+
+        // Dice value text
+        const text = createSVGElement('text', {
+          x: barCenterX,
+          y: y + diceSize / 2,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle',
+          fill: 'hsl(0 0% 9%)',
+          'font-size': 20,
+          'font-weight': 'bold',
+        })
+        text.textContent = String(die)
+        diceGroupRef.current!.appendChild(text)
+      })
+
+      // "X moves left" text
+      if (gameState.remainingMoves && gameState.remainingMoves.length > 0) {
+        const text = createSVGElement('text', {
+          x: barCenterX,
+          y: startY + totalHeight + 12,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'hanging',
+          fill: 'white',
+          'font-size': 10,
+          'font-weight': 'bold',
+        })
+        text.textContent = `${gameState.remainingMoves.length} move${gameState.remainingMoves.length !== 1 ? 's' : ''} left`
+        diceGroupRef.current!.appendChild(text)
+      }
+    }
+  }, [gameState, isBoardFlipped])
 
   // Initialize board
   useEffect(() => {
@@ -867,6 +1010,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   useEffect(() => {
     renderCheckers()
   }, [renderCheckers])
+
+  // Re-render dice when game state changes
+  useEffect(() => {
+    renderDice()
+  }, [renderDice])
 
   return (
     <svg

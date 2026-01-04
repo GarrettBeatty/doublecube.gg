@@ -70,7 +70,7 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
       {canRoll && (
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '71%' }}
+          style={{ left: '72.65%' }}
         >
           <Button
             variant="default"
@@ -90,18 +90,18 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
       {isOpeningRoll && (youHaveRolled || opponentHasRolled) && (
         <div
           className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-          style={{ left: '47%' }}
+          style={{ left: '46.5%' }}
         >
-          <div className="flex flex-col gap-3 items-center">
+          <div className="flex flex-col gap-2 items-center">
             {/* White's roll (top) */}
             <div className="flex flex-col items-center gap-1">
-              <div className="text-white text-xs font-semibold">{gameState.whitePlayerName}</div>
+              <div className="text-white text-[10px] font-semibold">{gameState.whitePlayerName}</div>
               {gameState.whiteOpeningRoll != null ? (
-                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl font-bold text-gray-800 shadow-xl">
+                <div className="w-9 h-9 bg-white rounded-md flex items-center justify-center text-lg font-bold text-gray-800 shadow-xl">
                   {gameState.whiteOpeningRoll}
                 </div>
               ) : (
-                <div className="w-12 h-12 bg-gray-600 rounded-lg flex items-center justify-center text-sm text-gray-400">
+                <div className="w-9 h-9 bg-gray-600 rounded-md flex items-center justify-center text-xs text-gray-400">
                   ?
                 </div>
               )}
@@ -109,13 +109,13 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
 
             {/* Red's roll (bottom) */}
             <div className="flex flex-col items-center gap-1">
-              <div className="text-white text-xs font-semibold">{gameState.redPlayerName}</div>
+              <div className="text-white text-[10px] font-semibold">{gameState.redPlayerName}</div>
               {gameState.redOpeningRoll != null ? (
-                <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl font-bold text-gray-800 shadow-xl">
+                <div className="w-9 h-9 bg-white rounded-md flex items-center justify-center text-lg font-bold text-gray-800 shadow-xl">
                   {gameState.redOpeningRoll}
                 </div>
               ) : (
-                <div className="w-12 h-12 bg-gray-600 rounded-lg flex items-center justify-center text-sm text-gray-400">
+                <div className="w-9 h-9 bg-gray-600 rounded-md flex items-center justify-center text-xs text-gray-400">
                   ?
                 </div>
               )}
@@ -123,7 +123,7 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
 
             {/* Tie message */}
             {gameState.isOpeningRollTie && (
-              <div className="mt-2 text-yellow-400 text-sm font-bold animate-pulse">
+              <div className="mt-1 text-yellow-400 text-xs font-bold animate-pulse">
                 Tie - Roll Again!
               </div>
             )}
@@ -131,35 +131,14 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
         </div>
       )}
 
-      {/* Regular Dice Display - Center on bar (vertical) */}
-      {!isOpeningRoll && hasDiceRolled && (
-        <div
-          className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 z-10"
-          style={{ left: '47%' }}
-        >
-          <div className="flex flex-col gap-2">
-            {gameState.dice.map((die, index) => (
-              <div
-                key={index}
-                className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl font-bold text-gray-800 shadow-xl"
-              >
-                {die}
-              </div>
-            ))}
-          </div>
-          {gameState.remainingMoves && gameState.remainingMoves.length > 0 && (
-            <div className="text-center text-white text-xs mt-2 font-semibold">
-              {gameState.remainingMoves.length} move{gameState.remainingMoves.length !== 1 ? 's' : ''} left
-            </div>
-          )}
-        </div>
-      )}
+      {/* Regular Dice Display - Now rendered in SVG */}
+      {/* Dice are now rendered directly in BoardSVG for accurate positioning */}
 
       {/* Undo Button - Center of left side of board */}
       {canUndo && (
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '29%' }}
+          style={{ left: '22.16%' }}
         >
           <Button
             variant="outline"
@@ -178,7 +157,7 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
       {canEndTurn && (
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '71%' }}
+          style={{ left: '72.65%' }}
         >
           <Button
             variant="default"
