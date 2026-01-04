@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Tool Preferences
+
+**IMPORTANT: Always use Serena MCP tools when possible for code exploration and manipulation.**
+
+Serena provides semantic, symbol-aware operations that are more efficient and accurate than text-based tools:
+
+- **Code Exploration**: Use `get_symbols_overview`, `find_symbol`, `search_for_pattern` instead of Grep/Read for understanding code
+- **Code Navigation**: Use `find_referencing_symbols` to understand dependencies and usage
+- **Code Editing**: Use `replace_symbol_body`, `insert_after_symbol`, `insert_before_symbol` for precise code changes
+- **Refactoring**: Use `rename_symbol` for safe, project-wide renames
+
+Serena has been initialized with project-specific memories about architecture, conventions, and workflows.
+
 ## Build & Run Commands
 
 ```bash

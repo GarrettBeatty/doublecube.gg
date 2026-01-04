@@ -3,6 +3,8 @@
 
 node_modules/
 
+.serena
+
 # User-specific files
 *.rsuser
 *.suo

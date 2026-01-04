@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
+import { useAuth } from '@/contexts/AuthContext'
+import { useUserStats } from '@/hooks/useUserStats'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { User, Calendar, Trophy, TrendingUp } from 'lucide-react'
+import { Skeleton } from '@/components/ui/skeleton'
+import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
 
 interface PlayerProfile {
   userId: string
@@ -40,11 +43,16 @@ export const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
   const { invoke, isConnected } = useSignalR()
+  const { user } = useAuth()
+  const { stats: userStats, isLoading: userStatsLoading } = useUserStats()
   const { toast } = useToast()
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
+
+  // Check if viewing own profile
+  const isOwnProfile = user && profile && user.username === profile.username
 
   useEffect(() => {
     if (!username) {
@@ -138,6 +146,76 @@ export const ProfilePage: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Personal Stats (Own Profile Only) */}
+        {isOwnProfile && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-yellow-500" />
+                Your Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {userStatsLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : userStats ? (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Rating */}
+                  <div className="p-4 bg-accent rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Rating</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-3xl font-bold">{userStats.rating}</span>
+                    </div>
+                  </div>
+
+                  {/* Current Streak */}
+                  <div className="p-4 bg-accent rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Current Streak</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {userStats.streakType === 'win' ? (
+                        <TrendingUp className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <TrendingDown className="h-5 w-5 text-red-500" />
+                      )}
+                      <span className="text-2xl font-bold">
+                        {userStats.currentStreak} {userStats.streakType}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Activity */}
+                  <div className="p-4 bg-accent rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Recent Activity</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-sm">
+                        Today: <span className="font-semibold">{userStats.gamesToday} games</span>
+                      </p>
+                      <p className="text-sm">
+                        This week: <span className="font-semibold">{userStats.gamesThisWeek} games</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-center text-muted-foreground py-4">Stats unavailable</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Statistics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

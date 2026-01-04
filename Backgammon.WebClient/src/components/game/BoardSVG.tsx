@@ -739,6 +739,100 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
         }
       }
     })
+
+    // Render bar checkers
+    const renderBarCheckers = (
+      count: number,
+      color: CheckerColor,
+      startY: number
+    ) => {
+      if (count === 0) return
+
+      const barCenterX = CONFIG.barX! + CONFIG.barWidth / 2
+      const maxVisible = Math.min(count, 5)
+
+      for (let i = 0; i < maxVisible; i++) {
+        const cy = startY + CONFIG.checkerSpacing * i
+        const isTopChecker = i === maxVisible - 1
+        const isSelected = selectedChecker?.point === 0 && isTopChecker
+        const isDraggable = isTopChecker && validSources.includes(0)
+
+        const checkerColor =
+          color === CheckerColor.White ? COLORS.checkerWhite : COLORS.checkerRed
+        const strokeColor =
+          color === CheckerColor.White
+            ? COLORS.checkerWhiteStroke
+            : COLORS.checkerRedStroke
+
+        const circle = createSVGElement('circle', {
+          cx: barCenterX,
+          cy,
+          r: CONFIG.checkerRadius,
+          fill: checkerColor,
+          stroke: strokeColor,
+          'stroke-width': 2,
+          class: `checker ${isDraggable ? 'draggable' : ''}`,
+          'data-point': 0,
+          'data-color': color,
+        }) as SVGCircleElement
+
+        if (isSelected) {
+          circle.setAttribute('stroke', COLORS.highlightSelected)
+          circle.setAttribute('stroke-width', '4')
+        }
+
+        if (isDraggable) {
+          circle.addEventListener('mousedown', (e: MouseEvent) => {
+            e.preventDefault()
+            startDrag(e as any, circle, e.clientX, e.clientY)
+          })
+
+          circle.addEventListener('touchstart', (e: TouchEvent) => {
+            e.preventDefault()
+            const touch = e.touches[0]
+            startDrag(e as any, circle, touch.clientX, touch.clientY)
+          })
+        }
+
+        checkersGroupRef.current!.appendChild(circle)
+      }
+
+      // Show count if more than 5
+      if (count > 5) {
+        const textColor =
+          color === CheckerColor.White ? COLORS.textDark : COLORS.textLight
+
+        const text = createSVGElement('text', {
+          x: barCenterX,
+          y: startY + CONFIG.checkerSpacing * 4,
+          'text-anchor': 'middle',
+          'dominant-baseline': 'middle',
+          fill: textColor,
+          'font-size': 16,
+          'font-weight': 'bold',
+        })
+        text.textContent = String(count)
+        checkersGroupRef.current!.appendChild(text)
+      }
+    }
+
+    // Render white bar checkers (from top)
+    if (gameState.whiteCheckersOnBar > 0) {
+      renderBarCheckers(
+        gameState.whiteCheckersOnBar,
+        CheckerColor.White,
+        CONFIG.padding + CONFIG.checkerSpacing
+      )
+    }
+
+    // Render red bar checkers (from bottom)
+    if (gameState.redCheckersOnBar > 0) {
+      renderBarCheckers(
+        gameState.redCheckersOnBar,
+        CheckerColor.Red,
+        CONFIG.viewBox.height - CONFIG.padding - CONFIG.checkerSpacing
+      )
+    }
   }, [gameState, selectedChecker, validSources, startDrag])
 
   // Initialize board
