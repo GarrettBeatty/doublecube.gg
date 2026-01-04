@@ -12,6 +12,7 @@ public class MatchService : IMatchService
     private readonly IGameRepository _gameRepository;
     private readonly IGameSessionManager _gameSessionManager;
     private readonly IUserRepository _userRepository;
+    private readonly IAiMoveService _aiMoveService;
     private readonly ILogger<MatchService> _logger;
 
     public MatchService(
@@ -19,12 +20,14 @@ public class MatchService : IMatchService
         IGameRepository gameRepository,
         IGameSessionManager gameSessionManager,
         IUserRepository userRepository,
+        IAiMoveService aiMoveService,
         ILogger<MatchService> logger)
     {
         _matchRepository = matchRepository;
         _gameRepository = gameRepository;
         _gameSessionManager = gameSessionManager;
         _userRepository = userRepository;
+        _aiMoveService = aiMoveService;
         _logger = logger;
     }
 
@@ -88,6 +91,11 @@ public class MatchService : IMatchService
     public async Task<Match?> GetMatchAsync(string matchId)
     {
         return await _matchRepository.GetMatchByIdAsync(matchId);
+    }
+
+    public async Task UpdateMatchAsync(Match match)
+    {
+        await _matchRepository.UpdateMatchAsync(match);
     }
 
     public async Task<ServerGame> StartNextGameAsync(string matchId)
@@ -476,5 +484,58 @@ public class MatchService : IMatchService
     public async Task<Match?> GetMatchLobbyAsync(string matchId)
     {
         return await _matchRepository.GetMatchByIdAsync(matchId);
+    }
+
+    public async Task<(ServerGame Game, Match Match)?> StartMatchWithAiAsync(Match match)
+    {
+        // Generate AI player ID and add to match BEFORE starting the game
+        var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
+        match.Player2Id = aiPlayerId;
+        match.Player2Name = "Computer";
+        match.LobbyStatus = "Ready";
+
+        // Update the match with AI player
+        await UpdateMatchAsync(match);
+
+        _logger.LogInformation(
+            "Added AI player {AiPlayerId} to match {MatchId}",
+            aiPlayerId,
+            match.MatchId);
+
+        // Now start the first game using the updated match object (avoids DB reload race condition)
+        var game = await StartMatchFirstGameAsync(match);
+
+        // Get the game session and add AI player
+        var session = _gameSessionManager.GetGame(game.GameId);
+        if (session != null)
+        {
+            // Add AI player as Red (human player will be White when they join)
+            session.AddPlayer(aiPlayerId, string.Empty); // Empty connection ID for AI
+            session.SetPlayerName(aiPlayerId, "Computer");
+
+            _logger.LogInformation(
+                "Added AI player {AiPlayerId} to game session {GameId}",
+                aiPlayerId,
+                game.GameId);
+        }
+        else
+        {
+            _logger.LogWarning("Could not find game session {GameId} to add AI player", game.GameId);
+        }
+
+        // Refresh match data
+        var updatedMatch = await GetMatchAsync(match.MatchId);
+        if (updatedMatch == null)
+        {
+            _logger.LogError("Failed to refresh match {MatchId} after creating AI game", match.MatchId);
+            return null;
+        }
+
+        _logger.LogInformation(
+            "AI match {MatchId} created and started with game {GameId}",
+            match.MatchId,
+            game.GameId);
+
+        return (game, updatedMatch);
     }
 }

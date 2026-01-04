@@ -24,11 +24,11 @@ const CONFIG: {
 } = {
   viewBox: { width: 1020, height: 500 },
   sidebarWidth: 0,
-  margin: 30,
+  margin: 10,
   barWidth: 70,
   pointWidth: 72,
   pointHeight: 200,
-  padding: 20,
+  padding: 25,
   checkerRadius: 20,
   checkerSpacing: 38,
   bearoffWidth: 50,
@@ -143,10 +143,12 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
 
   // Highlighted points state
   const [highlightedPoints, setHighlightedPoints] = useState<{
+    sources: number[]
     source: number | null
     destinations: number[]
     captures: number[]
   }>({
+    sources: [],
     source: null,
     destinations: [],
     captures: [],
@@ -216,15 +218,9 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
       'data-color': color,
     }) as SVGCircleElement
 
-    // Highlight draggable checkers with yellow glow
-    if (isDraggable && !isSelected) {
-      circle.setAttribute('stroke', COLORS.highlightSource)
-      circle.setAttribute('stroke-width', '3')
-    }
-
-    // Selected checker gets a stronger highlight
+    // Selected checker gets a highlight (the triangle will be highlighted instead)
     if (isSelected) {
-      circle.setAttribute('stroke', 'yellow')
+      circle.setAttribute('stroke', COLORS.highlightSelected)
       circle.setAttribute('stroke-width', '4')
     }
 
@@ -297,12 +293,21 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
     })
 
     // Apply highlights
+    // Highlight all valid source points in yellow
+    highlightedPoints.sources.forEach((pointNum) => {
+      const point = pointsGroupRef.current!.querySelector(`.point-${pointNum}`)
+      if (point) {
+        point.setAttribute('fill', COLORS.highlightSource)
+      }
+    })
+
+    // Highlight selected point in green (overrides source highlight if both)
     if (highlightedPoints.source !== null) {
       const sourcePoint = pointsGroupRef.current.querySelector(
         `.point-${highlightedPoints.source}`
       )
       if (sourcePoint) {
-        sourcePoint.setAttribute('fill', COLORS.highlightSource)
+        sourcePoint.setAttribute('fill', COLORS.highlightSelected)
       }
     }
 
@@ -325,6 +330,14 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
   useEffect(() => {
     updateHighlights()
   }, [updateHighlights])
+
+  // Update highlighted sources whenever validSources changes
+  useEffect(() => {
+    setHighlightedPoints((prev) => ({
+      ...prev,
+      sources: validSources,
+    }))
+  }, [validSources])
 
   // Get point number at client coordinates
   const getPointAtPosition = useCallback(
@@ -480,12 +493,13 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
 
       const sourcePoint = dragState.sourcePoint
 
-      // Clear highlights
-      setHighlightedPoints({
+      // Clear highlights (keep sources)
+      setHighlightedPoints((prev) => ({
+        ...prev,
         source: null,
         destinations: [],
         captures: [],
-      })
+      }))
 
       // Reset drag state
       dragStateRef.current = {
@@ -582,11 +596,12 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
 
       // Set highlights for valid destinations
       const { destinations, captures } = getValidDestinationsForPoint(pointNum)
-      setHighlightedPoints({
+      setHighlightedPoints((prev) => ({
+        ...prev,
         source: pointNum,
         destinations,
         captures,
-      })
+      }))
 
       // Add global listeners
       document.addEventListener(

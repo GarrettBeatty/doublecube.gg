@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { authService } from '@/services/auth.service'
-import { Eye } from 'lucide-react'
+import { Eye, BarChart3 } from 'lucide-react'
 
 export const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>()
@@ -115,10 +115,10 @@ export const GamePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="max-w-[1920px] mx-auto px-2 py-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
           {/* Left Sidebar - Player Info & Controls */}
-          <div className="lg:col-span-1 space-y-4">
+          <div className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <Button
                 variant="outline"
@@ -163,12 +163,13 @@ export const GamePage: React.FC = () => {
           </div>
 
           {/* Main Board Area */}
-          <div className="lg:col-span-3">
-            <Card className="bg-board-bg">
-              <CardContent className="p-4">
+          <div>
+            <Card>
+              <CardContent className="p-2">
                 {currentGameState.isAnalysisMode && (
                   <Badge variant="secondary" className="mb-4">
-                    📊 Analysis Mode
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Analysis Mode
                   </Badge>
                 )}
 

@@ -21,6 +21,11 @@ public interface IMatchService
     Task<Match?> GetMatchAsync(string matchId);
 
     /// <summary>
+    /// Update match data
+    /// </summary>
+    Task UpdateMatchAsync(Match match);
+
+    /// <summary>
     /// Start the next game in a match
     /// </summary>
     Task<ServerGame> StartNextGameAsync(string matchId);
@@ -84,4 +89,9 @@ public interface IMatchService
     /// Get match lobby status
     /// </summary>
     Task<Match?> GetMatchLobbyAsync(string matchId);
+
+    /// <summary>
+    /// Create and start a match with AI opponent
+    /// </summary>
+    Task<(ServerGame Game, Match Match)?> StartMatchWithAiAsync(Match match);
 }

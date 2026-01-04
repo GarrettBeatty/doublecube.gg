@@ -18,6 +18,7 @@ export const HubMethods = {
   LeaveGame: 'LeaveGame',
 
   // Match actions
+  CreateMatchWithConfig: 'CreateMatchWithConfig',
   CreateMatchLobby: 'CreateMatchLobby',
   JoinMatchLobby: 'JoinMatchLobby',
   StartMatchFromLobby: 'StartMatchFromLobby',
@@ -47,6 +48,8 @@ export const HubEvents = {
   Info: 'Info',
 
   // Match events
+  MatchLobbyCreated: 'MatchLobbyCreated',
+  MatchGameStarting: 'MatchGameStarting',
   MatchLobbyUpdate: 'MatchLobbyUpdate',
   MatchStarted: 'MatchStarted',
   MatchGameCompleted: 'MatchGameCompleted',

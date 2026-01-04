@@ -150,7 +150,6 @@ builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
 
 // GameHub extracted services
-builder.Services.AddSingleton<IMatchLobbyService, MatchLobbyService>();
 builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
 builder.Services.AddSingleton<IGameStateService, GameStateService>();
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();

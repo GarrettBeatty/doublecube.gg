@@ -13,6 +13,7 @@ public class MatchServiceValidationTests
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IGameSessionManager> _gameSessionManagerMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
+    private readonly Mock<IAiMoveService> _aiMoveServiceMock;
     private readonly Mock<ILogger<MatchService>> _loggerMock;
     private readonly MatchService _matchService;
 
@@ -22,6 +23,7 @@ public class MatchServiceValidationTests
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameSessionManagerMock = new Mock<IGameSessionManager>();
         _userRepositoryMock = new Mock<IUserRepository>();
+        _aiMoveServiceMock = new Mock<IAiMoveService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
         _matchService = new MatchService(
@@ -29,6 +31,7 @@ public class MatchServiceValidationTests
             _gameRepositoryMock.Object,
             _gameSessionManagerMock.Object,
             _userRepositoryMock.Object,
+            _aiMoveServiceMock.Object,
             _loggerMock.Object);
     }
 

@@ -160,6 +160,19 @@ export const useSignalREvents = () => {
       // TODO: Show info toast
     })
 
+    // MatchLobbyCreated - Match lobby created (not used for navigation anymore)
+    connection.on(HubEvents.MatchLobbyCreated, (data: any) => {
+      console.log('[SignalR] MatchLobbyCreated', data.matchId)
+      // Don't navigate - wait for MatchGameStarting event
+    })
+
+    // MatchGameStarting - Match game starting, navigate to game
+    connection.on(HubEvents.MatchGameStarting, (data: any) => {
+      console.log('[SignalR] MatchGameStarting', { matchId: data.matchId, gameId: data.gameId })
+      setCurrentGameId(data.gameId)
+      navigate(`/game/${data.gameId}`)
+    })
+
     // Cleanup on unmount
     return () => {
       console.log('[useSignalREvents] Cleaning up event handlers')
@@ -175,6 +188,8 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.ReceiveChatMessage)
       connection.off(HubEvents.Error)
       connection.off(HubEvents.Info)
+      connection.off(HubEvents.MatchLobbyCreated)
+      connection.off(HubEvents.MatchGameStarting)
     }
   }, [connection, currentGameState, setGameState, setIsSpectator, setCurrentGameId, addChatMessage, navigate])
 

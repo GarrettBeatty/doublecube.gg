@@ -8,15 +8,15 @@ import { HubMethods } from './types/signalr.types'
 import { Layout } from './components/layout/Layout'
 import { LoginModal } from './components/modals/LoginModal'
 import { RegisterModal } from './components/modals/RegisterModal'
+import { CreateMatchModal } from './components/modals/CreateMatchModal'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { MatchLobbyPage } from './pages/MatchLobbyPage'
 import { MatchResultsPage } from './pages/MatchResultsPage'
 import { Toaster } from './components/ui/toaster'
 import { audioService } from './services/audio.service'
-import { authService } from './services/auth.service'
 import { useToast } from './hooks/use-toast'
-import { Plus, Bot, Trophy, BarChart3 } from 'lucide-react'
+import { Plus, Bot, BarChart3 } from 'lucide-react'
 
 // Component that registers SignalR events
 function SignalREventHandler() {
@@ -28,6 +28,7 @@ function SignalREventHandler() {
 function AppContent() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
   const { invoke, isConnected } = useSignalR()
   const { toast } = useToast()
 
@@ -55,7 +56,9 @@ function AppContent() {
   }
 
   // Game creation handlers
-  const handleCreateGame = async () => {
+  const [matchModalOpponentType, setMatchModalOpponentType] = useState<'AI' | 'OpenLobby'>('AI')
+
+  const handleCreateGame = () => {
     if (!isConnected) {
       toast({
         title: 'Not connected',
@@ -64,22 +67,11 @@ function AppContent() {
       })
       return
     }
-
-    try {
-      const playerId = authService.getOrCreatePlayerId()
-      await invoke(HubMethods.JoinGame, playerId, null)
-      // Navigation will happen automatically when GameStart event is received
-    } catch (error) {
-      console.error('Failed to create game:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to create game. Please try again.',
-        variant: 'destructive',
-      })
-    }
+    setMatchModalOpponentType('OpenLobby')
+    setShowCreateMatchModal(true)
   }
 
-  const handleCreateAiGame = async () => {
+  const handlePlayVsComputer = () => {
     if (!isConnected) {
       toast({
         title: 'Not connected',
@@ -88,28 +80,8 @@ function AppContent() {
       })
       return
     }
-
-    try {
-      const playerId = authService.getOrCreatePlayerId()
-      await invoke(HubMethods.CreateAiGame, playerId)
-      // Navigation will happen automatically when GameStart event is received
-    } catch (error) {
-      console.error('Failed to create AI game:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to create AI game. Please try again.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  const handleCreateMatch = () => {
-    toast({
-      title: 'Coming soon',
-      description: 'Match play feature is under development.',
-    })
-    // TODO: Implement match lobby page navigation
-    // navigate('/match/create')
+    setMatchModalOpponentType('AI')
+    setShowCreateMatchModal(true)
   }
 
   const handleCreateAnalysis = async () => {
@@ -159,21 +131,10 @@ function AppContent() {
                       <p className="text-sm">⏳ Phase 5: Pages & Integration (Next)</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <button
-                        onClick={handleCreateGame}
+                        onClick={handlePlayVsComputer}
                         className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 px-4 rounded-lg transition-colors disabled:opacity-50"
-                        disabled={!isConnected}
-                      >
-                        <div className="mb-2">
-                          <Plus className="h-8 w-8 mx-auto" />
-                        </div>
-                        <div className="text-lg">Play vs Human</div>
-                        <div className="text-sm opacity-70">Multiplayer</div>
-                      </button>
-                      <button
-                        onClick={handleCreateAiGame}
-                        className="bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold py-6 px-4 rounded-lg transition-colors disabled:opacity-50"
                         disabled={!isConnected}
                       >
                         <div className="mb-2">
@@ -183,15 +144,15 @@ function AppContent() {
                         <div className="text-sm opacity-70">Single player</div>
                       </button>
                       <button
-                        onClick={handleCreateMatch}
-                        className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold py-6 px-4 rounded-lg transition-colors disabled:opacity-50"
+                        onClick={handleCreateGame}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-6 px-4 rounded-lg transition-colors disabled:opacity-50"
                         disabled={!isConnected}
                       >
                         <div className="mb-2">
-                          <Trophy className="h-8 w-8 mx-auto" />
+                          <Plus className="h-8 w-8 mx-auto" />
                         </div>
-                        <div className="text-lg">Create Match</div>
-                        <div className="text-sm opacity-70">Play to target score</div>
+                        <div className="text-lg">Play Online</div>
+                        <div className="text-sm opacity-70">Multiplayer</div>
                       </button>
                       <button
                         onClick={handleCreateAnalysis}
@@ -228,6 +189,13 @@ function AppContent() {
         onClose={() => setShowRegisterModal(false)}
         onSwitchToLogin={handleSwitchToLogin}
       />
+
+      <CreateMatchModal
+        isOpen={showCreateMatchModal}
+        onClose={() => setShowCreateMatchModal(false)}
+        defaultOpponentType={matchModalOpponentType}
+      />
+
       <Toaster />
     </>
   )

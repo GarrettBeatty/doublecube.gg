@@ -37,7 +37,6 @@ public class GameHub : Hub
     private readonly IHubContext<GameHub> _hubContext;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
-    private readonly IMatchLobbyService _matchLobbyService;
     private readonly IDoubleOfferService _doubleOfferService;
     private readonly IGameStateService _gameStateService;
     private readonly IPlayerProfileService _playerProfileService;
@@ -56,7 +55,6 @@ public class GameHub : Hub
         IHubContext<GameHub> hubContext,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
-        IMatchLobbyService matchLobbyService,
         IDoubleOfferService doubleOfferService,
         IGameStateService gameStateService,
         IPlayerProfileService playerProfileService,
@@ -74,7 +72,6 @@ public class GameHub : Hub
         _hubContext = hubContext;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
-        _matchLobbyService = matchLobbyService;
         _doubleOfferService = doubleOfferService;
         _gameStateService = gameStateService;
         _playerProfileService = playerProfileService;
@@ -903,12 +900,12 @@ public class GameHub : Hub
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
 
             // Create match lobby
-            var match = await _matchLobbyService.CreateMatchLobbyAsync(playerId, config, config.DisplayName);
+            var match = await _matchService.CreateMatchLobbyAsync(playerId, config.TargetScore, config.OpponentType, config.OpponentType == "OpenLobby", config.DisplayName);
 
-            // For AI matches, skip lobby and start immediately
+            // For AI matches, start immediately
             if (config.OpponentType == "AI")
             {
-                var result = await _matchLobbyService.StartMatchWithAiAsync(match);
+                var result = await _matchService.StartMatchWithAiAsync(match);
                 if (result == null)
                 {
                     await Clients.Caller.SendAsync("Error", "Failed to refresh match data");
@@ -938,7 +935,38 @@ public class GameHub : Hub
                 return;
             }
 
-            // Send match lobby created event
+            // For OpenLobby matches, start the game immediately and wait for opponent to join
+            if (config.OpponentType == "OpenLobby")
+            {
+                // Set a placeholder for player 2
+                match.Player2Id = "waiting";
+                match.Player2Name = "Waiting for opponent...";
+                await _matchService.UpdateMatchAsync(match);
+
+                // Start the first game
+                var game = await _matchService.StartMatchFirstGameAsync(match);
+
+                await Clients.Caller.SendAsync("MatchGameStarting", new
+                {
+                    matchId = match.MatchId,
+                    gameId = game.GameId,
+                    player1Id = match.Player1Id,
+                    player2Id = match.Player2Id,
+                    player1Name = match.Player1Name,
+                    player2Name = match.Player2Name,
+                    player1Score = match.Player1Score,
+                    player2Score = match.Player2Score,
+                    targetScore = match.TargetScore,
+                    isCrawfordGame = match.IsCrawfordGame
+                });
+
+                _logger.LogInformation(
+                    "OpenLobby match {MatchId} created and game started, waiting for opponent",
+                    match.MatchId);
+                return;
+            }
+
+            // Send match lobby created event for Friend matches
             await Clients.Caller.SendAsync("MatchLobbyCreated", new
             {
                 matchId = match.MatchId,
