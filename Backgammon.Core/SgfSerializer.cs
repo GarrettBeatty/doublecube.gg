@@ -264,24 +264,109 @@ public static class SgfSerializer
         var properties = new Dictionary<string, List<string>>();
 
         // Remove outer parentheses and leading (;
-        var content = sgf.Trim().TrimStart('(', ';').TrimEnd(')').Trim();
-
-        // Match property patterns like AW[...] or PL[W]
-        var pattern = @"([A-Z]+)(\[(?:[^\[\]]|\[(?:[^\[\]]|\[[^\[\]]*\])*\])*\])+";
-        var matches = Regex.Matches(content, pattern);
-
-        foreach (System.Text.RegularExpressions.Match match in matches)
+        var content = sgf.Trim();
+        if (content.StartsWith("(;"))
         {
-            var key = match.Groups[1].Value;
-            var valueMatches = Regex.Matches(match.Groups[2].Value, @"\[([^\[\]]*(?:\[[^\[\]]*\])?)\]");
+            content = content.Substring(2);
+        }
+        else if (content.StartsWith("("))
+        {
+            content = content.Substring(1);
+        }
 
-            var values = new List<string>();
-            foreach (System.Text.RegularExpressions.Match valueMatch in valueMatches)
+        if (content.EndsWith(")"))
+        {
+            content = content.Substring(0, content.Length - 1);
+        }
+
+        content = content.Trim();
+
+        int i = 0;
+        while (i < content.Length)
+        {
+            // Skip whitespace
+            while (i < content.Length && char.IsWhiteSpace(content[i]))
             {
-                values.Add(valueMatch.Groups[1].Value);
+                i++;
             }
 
-            properties[key] = values;
+            if (i >= content.Length)
+            {
+                break;
+            }
+
+            // Parse property identifier (uppercase letters)
+            if (!char.IsUpper(content[i]))
+            {
+                i++;
+                continue;
+            }
+
+            var propId = new StringBuilder();
+            while (i < content.Length && char.IsUpper(content[i]))
+            {
+                propId.Append(content[i]);
+                i++;
+            }
+
+            string key = propId.ToString();
+            if (string.IsNullOrEmpty(key))
+            {
+                continue;
+            }
+
+            // Skip whitespace after property identifier
+            while (i < content.Length && char.IsWhiteSpace(content[i]))
+            {
+                i++;
+            }
+
+            // Parse property values (all [...] following the property identifier)
+            var values = new List<string>();
+            while (i < content.Length && content[i] == '[')
+            {
+                i++; // Skip opening bracket
+
+                // Extract value, handling nested brackets
+                var value = new StringBuilder();
+                int depth = 1;
+
+                while (i < content.Length && depth > 0)
+                {
+                    if (content[i] == '[')
+                    {
+                        depth++;
+                        value.Append(content[i]);
+                    }
+                    else if (content[i] == ']')
+                    {
+                        depth--;
+                        if (depth > 0)
+                        {
+                            value.Append(content[i]);
+                        }
+                    }
+                    else
+                    {
+                        value.Append(content[i]);
+                    }
+
+                    i++;
+                }
+
+                values.Add(value.ToString());
+
+                // Skip whitespace after closing bracket
+                while (i < content.Length && char.IsWhiteSpace(content[i]))
+                {
+                    i++;
+                }
+            }
+
+            if (values.Count > 0)
+            {
+                properties[key] = values;
+            }
         }
 
         return properties;

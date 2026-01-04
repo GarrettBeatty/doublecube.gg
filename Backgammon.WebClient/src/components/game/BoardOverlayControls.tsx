@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dice1, Check, Undo } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods } from '@/types/signalr.types'
+import { useGameStore } from '@/stores/gameStore'
 
 interface BoardOverlayControlsProps {
   gameState: GameState
@@ -17,6 +18,7 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   isAnalysisMode = false,
 }) => {
   const { invoke } = useSignalR()
+  const { isCustomDiceEnabled } = useGameStore()
 
   if (isSpectator) return null
 
@@ -37,8 +39,9 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
     (yourColor === CheckerColor.Red && gameState.whiteOpeningRoll != null)
   )
 
-  // In analysis mode, don't show roll button (user sets dice manually)
-  const canRoll = !isAnalysisMode && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
+  // Hide roll button if custom dice is enabled in analysis mode
+  const hideRollForCustomDice = isAnalysisMode && isCustomDiceEnabled
+  const canRoll = !hideRollForCustomDice && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
 
   // End turn button logic:
   // Analysis mode: Show when all moves used OR no valid moves remain
@@ -49,7 +52,9 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   )
   
   // Undo button: Only show if at least one move has been made
-  const totalMoves = hasDiceRolled ? gameState.dice.length : 0
+  // For doubles, you get 4 moves; for regular rolls, you get 2 moves
+  const isDoubles = hasDiceRolled && gameState.dice.length === 2 && gameState.dice[0] === gameState.dice[1]
+  const totalMoves = hasDiceRolled ? (isDoubles ? 4 : gameState.dice.length) : 0
   const remainingMovesCount = gameState.remainingMoves?.length ?? 0
   const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
   const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade
