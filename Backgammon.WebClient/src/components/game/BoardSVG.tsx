@@ -130,7 +130,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   const pointsGroupRef = useRef<SVGGElement | null>(null)
   const diceGroupRef = useRef<SVGGElement | null>(null)
 
-  const { selectedChecker, validSources, isBoardFlipped } = useGameStore()
+  const { selectedChecker, validSources, isBoardFlipped, isFreeMoveEnabled } = useGameStore()
   const { invoke } = useSignalR()
 
   // Drag state - use ref to avoid stale closures in event handlers
@@ -246,6 +246,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   // Get valid destinations for a source point
   const getValidDestinationsForPoint = useCallback(
     (sourcePoint: number) => {
+      // No highlights in analysis mode with free movement enabled
+      if (gameState?.isAnalysisMode && isFreeMoveEnabled) {
+        return { destinations: [], captures: [] }
+      }
+
       if (!gameState?.validMoves) return { destinations: [], captures: [] }
 
       const movesFromPoint = gameState.validMoves.filter(
@@ -276,7 +281,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
 
       return { destinations, captures }
     },
-    [gameState]
+    [gameState, isFreeMoveEnabled]
   )
 
   // Update point highlights
@@ -540,13 +545,18 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
         sourcePoint !== null
       ) {
         try {
-          await invoke(HubMethods.MakeMove, sourcePoint, targetPoint)
+          // Use direct move for analysis mode with free movement enabled
+          if (gameState?.isAnalysisMode && isFreeMoveEnabled) {
+            await invoke(HubMethods.MoveCheckerDirectly, sourcePoint, targetPoint)
+          } else {
+            await invoke(HubMethods.MakeMove, sourcePoint, targetPoint)
+          }
         } catch (error) {
           console.error('Failed to execute move:', error)
         }
       }
     },
-    [getPointAtPosition, invoke, handleDragMove]
+    [getPointAtPosition, invoke, handleDragMove, gameState, isFreeMoveEnabled]
   )
 
   const startDrag = useCallback(

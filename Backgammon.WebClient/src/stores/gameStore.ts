@@ -15,6 +15,10 @@ interface GameStore {
   isSpectator: boolean
   isAnalysisMode: boolean
 
+  // Analysis mode toggles
+  isFreeMoveEnabled: boolean
+  isCustomDiceEnabled: boolean
+
   // Board interaction state
   selectedChecker: SelectedChecker | null
   validDestinations: Destination[]
@@ -38,6 +42,8 @@ interface GameStore {
   setMyColor: (color: CheckerColor | null) => void
   setCurrentGameId: (gameId: string | null) => void
   setIsSpectator: (isSpectator: boolean) => void
+  setFreeMoveEnabled: (enabled: boolean) => void
+  setCustomDiceEnabled: (enabled: boolean) => void
   selectChecker: (checker: SelectedChecker | null) => void
   setValidDestinations: (destinations: Destination[]) => void
   setValidSources: (sources: number[]) => void
@@ -56,6 +62,8 @@ export const useGameStore = create<GameStore>((set) => ({
   currentGameId: null,
   isSpectator: false,
   isAnalysisMode: false,
+  isFreeMoveEnabled: false,
+  isCustomDiceEnabled: false,
   selectedChecker: null,
   validDestinations: [],
   validSources: [],
@@ -64,26 +72,54 @@ export const useGameStore = create<GameStore>((set) => ({
   showChat: false,
 
   // Actions
-  setGameState: (state) => {
-    // Compute valid sources from valid moves - ONLY on player's turn
-    const validSources =
-      state.isYourTurn && state.validMoves
-        ? Array.from(new Set(state.validMoves.map((move) => move.from)))
-        : []
+  setGameState: (state) =>
+    set((prevState) => {
+      let validSources: number[]
 
-    console.log('[GameStore] setGameState:', {
-      isYourTurn: state.isYourTurn,
-      validMovesCount: state.validMoves?.length || 0,
-      validSources,
-      dice: state.dice,
-    })
+      // Check if free move is enabled in analysis mode
+      if (state.isAnalysisMode && prevState.isFreeMoveEnabled) {
+        // Free move mode: ALL points with checkers are draggable sources
+        validSources = []
 
-    set({
-      currentGameState: state,
-      isAnalysisMode: state.isAnalysisMode,
-      validSources,
-    })
-  },
+        // Bar (point 0)
+        if (state.whiteCheckersOnBar > 0 || state.redCheckersOnBar > 0) {
+          validSources.push(0)
+        }
+
+        // Board points (1-24)
+        state.board.forEach((point, index) => {
+          if (point.count > 0) {
+            validSources.push(index + 1)
+          }
+        })
+
+        // Bear-off (point 25) - allow dragging from bear-off
+        if (state.whiteBornOff > 0 || state.redBornOff > 0) {
+          validSources.push(25)
+        }
+      } else {
+        // Regular mode or analysis with rules: only valid sources from game rules
+        validSources =
+          state.isYourTurn && state.validMoves
+            ? Array.from(new Set(state.validMoves.map((move) => move.from)))
+            : []
+      }
+
+      console.log('[GameStore] setGameState:', {
+        isAnalysisMode: state.isAnalysisMode,
+        isFreeMoveEnabled: prevState.isFreeMoveEnabled,
+        isYourTurn: state.isYourTurn,
+        validMovesCount: state.validMoves?.length || 0,
+        validSources,
+        dice: state.dice,
+      })
+
+      return {
+        currentGameState: state,
+        isAnalysisMode: state.isAnalysisMode,
+        validSources,
+      }
+    }),
 
   updateTimeState: (timeUpdate) =>
     set((state) => ({
@@ -105,6 +141,20 @@ export const useGameStore = create<GameStore>((set) => ({
   setCurrentGameId: (gameId) => set({ currentGameId: gameId }),
 
   setIsSpectator: (isSpectator) => set({ isSpectator }),
+
+  setFreeMoveEnabled: (enabled) =>
+    set((state) => {
+      // When toggling, recalculate validSources
+      if (state.currentGameState) {
+        const validSources = enabled
+          ? calculateFreeMoveValidSources(state.currentGameState)
+          : calculateRuleBasedValidSources(state.currentGameState)
+        return { isFreeMoveEnabled: enabled, validSources }
+      }
+      return { isFreeMoveEnabled: enabled }
+    }),
+
+  setCustomDiceEnabled: (enabled) => set({ isCustomDiceEnabled: enabled }),
 
   selectChecker: (checker) => set({ selectedChecker: checker }),
 
@@ -132,6 +182,8 @@ export const useGameStore = create<GameStore>((set) => ({
       currentGameId: null,
       isSpectator: false,
       isAnalysisMode: false,
+      isFreeMoveEnabled: false,
+      isCustomDiceEnabled: false,
       selectedChecker: null,
       validDestinations: [],
       validSources: [],
@@ -140,3 +192,33 @@ export const useGameStore = create<GameStore>((set) => ({
       // Keep board flip preference
     }),
 }))
+
+// Helper functions for calculating valid sources
+function calculateFreeMoveValidSources(state: GameState): number[] {
+  const validSources: number[] = []
+
+  // Bar (point 0)
+  if (state.whiteCheckersOnBar > 0 || state.redCheckersOnBar > 0) {
+    validSources.push(0)
+  }
+
+  // Board points (1-24)
+  state.board.forEach((point, index) => {
+    if (point.count > 0) {
+      validSources.push(index + 1)
+    }
+  })
+
+  // Bear-off (point 25)
+  if (state.whiteBornOff > 0 || state.redBornOff > 0) {
+    validSources.push(25)
+  }
+
+  return validSources
+}
+
+function calculateRuleBasedValidSources(state: GameState): number[] {
+  return state.isYourTurn && state.validMoves
+    ? Array.from(new Set(state.validMoves.map((move) => move.from)))
+    : []
+}

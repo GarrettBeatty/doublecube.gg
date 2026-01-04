@@ -13,13 +13,16 @@ import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { DiceSelector } from '@/components/game/DiceSelector'
+import { PlayerSwitcher } from '@/components/game/PlayerSwitcher'
+import { PositionControls } from '@/components/game/PositionControls'
+import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
 import { CheckerColor } from '@/types/game.types'
 
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
   const { invoke, isConnected } = useSignalR()
   const { toast } = useToast()
-  const { currentGameState, setCurrentGameId, resetGame } = useGameStore()
+  const { currentGameState, setCurrentGameId, resetGame, isCustomDiceEnabled } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
   const hasCreatedGame = useRef(false)
 
@@ -145,8 +148,18 @@ export const AnalysisPage: React.FC = () => {
 
             <PlayerCard {...redPlayer} />
 
-            {/* Dice Selector - Analysis Mode Only */}
-            <DiceSelector />
+            {/* Analysis Mode Toggles */}
+            <AnalysisModeToggles />
+
+            {/* Dice Selector - Only shown when custom dice is enabled */}
+            {isCustomDiceEnabled && <DiceSelector />}
+
+            {/* Player Switcher - Always shown in analysis */}
+            <PlayerSwitcher currentPlayer={currentGameState.currentPlayer} />
+        
+
+            {/* Position Export/Import */}
+            <PositionControls />
 
             {/* Doubling Cube */}
             {currentGameState.doublingCubeValue > 1 && (

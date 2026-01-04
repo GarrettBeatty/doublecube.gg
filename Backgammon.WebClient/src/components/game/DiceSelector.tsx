@@ -6,24 +6,12 @@ import { Dices } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods } from '@/types/signalr.types'
 import { useToast } from '@/hooks/use-toast'
-import { useGameStore } from '@/stores/gameStore'
 
 export const DiceSelector: React.FC = () => {
   const { invoke } = useSignalR()
   const { toast } = useToast()
-  const { currentGameState } = useGameStore()
   const [die1, setDie1] = useState<string>('1')
   const [die2, setDie2] = useState<string>('1')
-
-  // Check if dice are set and if moves have been made
-  const hasDiceSet = currentGameState?.dice && currentGameState.dice.length > 0 && currentGameState.dice.some((d) => d > 0)
-  const remainingMoves = currentGameState?.remainingMoves?.length ?? 0
-  const totalMoves = hasDiceSet ? currentGameState!.dice.length : 0
-  
-  // Disable if:
-  // 1. Dice are set AND
-  // 2. Not all moves are remaining (some moves made OR all moves used but turn not ended yet)
-  const isDisabled = hasDiceSet && remainingMoves !== totalMoves
 
   const handleSetDice = async () => {
     try {
@@ -52,7 +40,7 @@ export const DiceSelector: React.FC = () => {
         <div className="flex gap-2">
           <div className="flex-1">
             <label className="text-xs text-muted-foreground mb-1 block">Die 1</label>
-            <Select value={die1} onValueChange={setDie1} disabled={isDisabled}>
+            <Select value={die1} onValueChange={setDie1}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -67,7 +55,7 @@ export const DiceSelector: React.FC = () => {
           </div>
           <div className="flex-1">
             <label className="text-xs text-muted-foreground mb-1 block">Die 2</label>
-            <Select value={die2} onValueChange={setDie2} disabled={isDisabled}>
+            <Select value={die2} onValueChange={setDie2}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -81,8 +69,8 @@ export const DiceSelector: React.FC = () => {
             </Select>
           </div>
         </div>
-        <Button onClick={handleSetDice} className="w-full" size="sm" disabled={isDisabled}>
-          {isDisabled ? 'Undo or End Turn First' : 'Apply'}
+        <Button onClick={handleSetDice} className="w-full" size="sm">
+          Apply
         </Button>
       </CardContent>
     </Card>
