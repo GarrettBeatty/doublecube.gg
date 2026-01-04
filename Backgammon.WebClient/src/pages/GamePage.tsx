@@ -8,6 +8,7 @@ import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
+import { TimeDisplay } from '@/components/game/TimeDisplay'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -177,6 +178,17 @@ export const GamePage: React.FC = () => {
 
             <PlayerCard {...whitePlayer} />
 
+            {/* White Player Timer */}
+            {currentGameState.timeControlType && currentGameState.timeControlType !== 'None' && (
+              <TimeDisplay
+                reserveSeconds={currentGameState.whiteReserveSeconds ?? null}
+                isInDelay={currentGameState.whiteIsInDelay ?? null}
+                delayRemaining={currentGameState.whiteDelayRemaining ?? null}
+                isActive={currentGameState.currentPlayer === CheckerColor.White}
+                color={CheckerColor.White}
+              />
+            )}
+
             {currentGameState.isMatchGame &&
               currentGameState.targetScore &&
               currentGameState.player1Score !== undefined &&
@@ -192,6 +204,17 @@ export const GamePage: React.FC = () => {
               )}
 
             <PlayerCard {...redPlayer} />
+
+            {/* Red Player Timer */}
+            {currentGameState.timeControlType && currentGameState.timeControlType !== 'None' && (
+              <TimeDisplay
+                reserveSeconds={currentGameState.redReserveSeconds ?? null}
+                isInDelay={currentGameState.redIsInDelay ?? null}
+                delayRemaining={currentGameState.redDelayRemaining ?? null}
+                isActive={currentGameState.currentPlayer === CheckerColor.Red}
+                color={CheckerColor.Red}
+              />
+            )}
 
             {/* Doubling Cube */}
             {currentGameState.doublingCubeValue > 1 && (

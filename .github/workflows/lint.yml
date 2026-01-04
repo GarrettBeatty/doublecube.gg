@@ -7,15 +7,15 @@ on:
   pull_request:
     branches: [ main ]
     paths:
-      - 'Backgammon.WebClient/wwwroot/**/*.js'
-      - 'Backgammon.WebClient/wwwroot/.eslintrc.json'
+      - 'Backgammon.WebClient/src/**/*.ts'
+      - 'Backgammon.WebClient/src/**/*.tsx'
       - 'Backgammon.WebClient/package.json'
       - '.github/workflows/lint.yml'
   push:
     branches: [ main ]
     paths:
-      - 'Backgammon.WebClient/wwwroot/**/*.js'
-      - 'Backgammon.WebClient/wwwroot/.eslintrc.json'
+      - 'Backgammon.WebClient/src/**/*.ts'
+      - 'Backgammon.WebClient/src/**/*.tsx'
       - 'Backgammon.WebClient/package.json'
 
 jobs:
@@ -40,4 +40,4 @@ jobs:
 
       - name: Run ESLint
         working-directory: Backgammon.WebClient
-        run: npx eslint wwwroot/*.js --max-warnings 0
+        run: npm run lint

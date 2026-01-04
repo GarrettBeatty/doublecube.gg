@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { User, LoginRequest, RegisterRequest } from '@/types/game.types'
 import { authService } from '@/services/auth.service'

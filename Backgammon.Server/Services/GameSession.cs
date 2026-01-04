@@ -1,6 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services.GameModes;
+using Microsoft.AspNetCore.SignalR;
 using ServerGameStatus = Backgammon.Server.Models.GameStatus;
 
 namespace Backgammon.Server.Services;
@@ -14,6 +15,8 @@ public class GameSession
     private readonly HashSet<string> _spectatorConnections = new();
     private readonly HashSet<string> _whiteConnections = new();
     private readonly HashSet<string> _redConnections = new();
+    private readonly object _timerLock = new();
+    private System.Threading.Timer? _timeUpdateTimer;
 
     public GameSession(string id)
     {
@@ -75,6 +78,8 @@ public class GameSession
     public bool? IsCrawfordGame { get; set; }
 
     public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
+
+    public TimeControlConfig? TimeControl { get; set; }
 
     /// <summary>
     /// Add a player to the game session
@@ -307,7 +312,15 @@ public class GameSession
             IsOpeningRoll = Engine.IsOpeningRoll,
             WhiteOpeningRoll = Engine.WhiteOpeningRoll,
             RedOpeningRoll = Engine.RedOpeningRoll,
-            IsOpeningRollTie = Engine.IsOpeningRollTie
+            IsOpeningRollTie = Engine.IsOpeningRollTie,
+            TimeControlType = TimeControl?.Type.ToString(),
+            DelaySeconds = TimeControl?.DelaySeconds,
+            WhiteReserveSeconds = Engine.WhiteTimeState?.GetRemainingTime(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
+            RedReserveSeconds = Engine.RedTimeState?.GetRemainingTime(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
+            WhiteIsInDelay = Engine.WhiteTimeState?.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
+            RedIsInDelay = Engine.RedTimeState?.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
+            WhiteDelayRemaining = Engine.WhiteTimeState?.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
+            RedDelayRemaining = Engine.RedTimeState?.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds
         };
 
         // Get valid moves for current player
@@ -339,6 +352,39 @@ public class GameSession
     public void UpdateActivity()
     {
         LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Start broadcasting time updates every second
+    /// </summary>
+    public void StartTimeUpdates(IHubContext<Hubs.GameHub> hubContext)
+    {
+        if (TimeControl == null || TimeControl.Type == TimeControlType.None)
+        {
+            return;
+        }
+
+        lock (_timerLock)
+        {
+            _timeUpdateTimer?.Dispose();
+            _timeUpdateTimer = new System.Threading.Timer(
+                async _ => await BroadcastTimeUpdate(hubContext),
+                null,
+                TimeSpan.FromSeconds(1),
+                TimeSpan.FromSeconds(1));
+        }
+    }
+
+    /// <summary>
+    /// Stop time updates
+    /// </summary>
+    public void StopTimeUpdates()
+    {
+        lock (_timerLock)
+        {
+            _timeUpdateTimer?.Dispose();
+            _timeUpdateTimer = null;
+        }
     }
 
     private string GenerateFriendlyName(string playerId)
@@ -416,5 +462,55 @@ public class GameSession
         }
 
         return pips;
+    }
+
+    /// <summary>
+    /// Broadcast time update to all connections
+    /// </summary>
+    private async Task BroadcastTimeUpdate(IHubContext<Hubs.GameHub> hubContext)
+    {
+        if (Engine.WhiteTimeState == null || Engine.RedTimeState == null || TimeControl == null)
+        {
+            return;
+        }
+
+        var timeUpdate = new
+        {
+            gameId = Id,
+            whiteReserveSeconds = Engine.WhiteTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
+            redReserveSeconds = Engine.RedTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
+            whiteIsInDelay = Engine.WhiteTimeState.IsInDelay,
+            redIsInDelay = Engine.RedTimeState.IsInDelay
+        };
+
+        await hubContext.Clients.Group(Id).SendAsync("TimeUpdate", timeUpdate);
+
+        // Check for timeout
+        if (Engine.HasCurrentPlayerTimedOut())
+        {
+            StopTimeUpdates();
+            await HandleTimeout(hubContext);
+        }
+    }
+
+    /// <summary>
+    /// Handle player timeout
+    /// </summary>
+    private async Task HandleTimeout(IHubContext<Hubs.GameHub> hubContext)
+    {
+        var losingPlayer = Engine.CurrentPlayer;
+        var winningPlayer = Engine.GetOpponent();
+
+        // Mark game as over using ForfeitGame
+        Engine.ForfeitGame(winningPlayer);
+
+        var timeoutEvent = new
+        {
+            gameId = Id,
+            timedOutPlayer = losingPlayer.Color.ToString(),
+            winner = winningPlayer.Color.ToString()
+        };
+
+        await hubContext.Clients.Group(Id).SendAsync("PlayerTimedOut", timeoutEvent);
     }
 }

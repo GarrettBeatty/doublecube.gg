@@ -24,4 +24,9 @@ public class MatchConfig
     /// Display name for anonymous players
     /// </summary>
     public string? DisplayName { get; set; }
+
+    /// <summary>
+    /// Time control type: "None", "ChicagoPoint" (defaults to "None")
+    /// </summary>
+    public string TimeControlType { get; set; } = "None";
 }

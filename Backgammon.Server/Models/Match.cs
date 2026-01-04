@@ -253,4 +253,14 @@ public class Match
             CoreMatch.Games = value.Select(id => new Core.Game(id)).ToList();
         }
     }
+
+    /// <summary>
+    /// Time control configuration (delegates to CoreMatch)
+    /// </summary>
+    [JsonIgnore]
+    public Core.TimeControlConfig TimeControl
+    {
+        get => CoreMatch.TimeControl;
+        set => CoreMatch.TimeControl = value;
+    }
 }

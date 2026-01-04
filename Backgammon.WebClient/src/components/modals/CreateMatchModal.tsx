@@ -28,6 +28,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const { invoke } = useSignalR()
   const [opponentType, setOpponentType] = useState<'AI' | 'OpenLobby'>(defaultOpponentType)
   const [targetScore, setTargetScore] = useState<number>(1)
+  const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
   const [isCreating, setIsCreating] = useState(false)
 
   // Reset to default when modal opens
@@ -35,6 +36,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
     if (isOpen) {
       setOpponentType(defaultOpponentType)
       setTargetScore(1)
+      setTimeControlType('None')
     }
   }, [isOpen, defaultOpponentType])
 
@@ -45,6 +47,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
         OpponentType: opponentType,
         TargetScore: targetScore,
         DisplayName: authService.getDisplayName() || 'Player',
+        TimeControlType: timeControlType,
       }
       console.log('[CreateMatchModal] Invoking CreateMatch', config)
       // Always use the match system - single games are just matches with targetScore=1
@@ -100,6 +103,38 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                 </Label>
               </div>
             </RadioGroup>
+          </div>
+
+          {/* Time Control */}
+          <div className="space-y-3">
+            <Label>Time Control</Label>
+            <RadioGroup value={timeControlType} onValueChange={(value) => setTimeControlType(value as 'None' | 'ChicagoPoint')}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="None" id="time-none" />
+                <Label htmlFor="time-none" className="font-normal cursor-pointer">
+                  <div className="flex flex-col">
+                    <span>Casual (No Timer)</span>
+                    <span className="text-sm text-muted-foreground">Unlimited time to think</span>
+                  </div>
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="ChicagoPoint" id="time-chicago" />
+                <Label htmlFor="time-chicago" className="font-normal cursor-pointer">
+                  <div className="flex flex-col">
+                    <span>Chicago Point</span>
+                    <span className="text-sm text-muted-foreground">
+                      12s delay + {2 * targetScore}min reserve
+                    </span>
+                  </div>
+                </Label>
+              </div>
+            </RadioGroup>
+            {timeControlType === 'ChicagoPoint' && (
+              <p className="text-sm text-muted-foreground">
+                Reserve time adjusts as match progresses: 2min per point remaining
+              </p>
+            )}
           </div>
         </div>
 

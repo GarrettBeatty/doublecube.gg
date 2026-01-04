@@ -36,7 +36,8 @@ public class MatchService : IMatchService
         int targetScore,
         string opponentType,
         string? player1DisplayName = null,
-        string? player2Id = null)
+        string? player2Id = null,
+        TimeControlConfig? timeControl = null)
     {
         try
         {
@@ -78,7 +79,8 @@ public class MatchService : IMatchService
                 Player1Id = player1Id,
                 Player1Name = player1Name,
                 Player1DisplayName = player1DisplayName,
-                OpponentType = opponentType
+                OpponentType = opponentType,
+                TimeControl = timeControl ?? new TimeControlConfig() // Default to None if not specified
             };
 
             // Handle opponent based on type
@@ -148,6 +150,25 @@ public class MatchService : IMatchService
             session.Player1Score = match.Player1Score;
             session.Player2Score = match.Player2Score;
             session.IsCrawfordGame = match.IsCrawfordGame;
+
+            // Configure time controls if enabled
+            if (match.TimeControl != null && match.TimeControl.Type != TimeControlType.None)
+            {
+                session.TimeControl = match.TimeControl;
+
+                // Calculate reserve times based on current match score
+                var whiteReserve = match.TimeControl.CalculateReserveTime(
+                    match.TargetScore, match.Player1Score, match.Player2Score);
+                var redReserve = whiteReserve; // Same for both players
+
+                session.Engine.InitializeTimeControl(match.TimeControl, whiteReserve, redReserve);
+
+                _logger.LogInformation(
+                    "Initialized time control for game {GameId}: {Type}, Reserve={Reserve}min",
+                    game.GameId,
+                    match.TimeControl.Type,
+                    whiteReserve.TotalMinutes);
+            }
 
             // For AI matches, add AI player to session
             if (opponentType == "AI")
@@ -236,6 +257,25 @@ public class MatchService : IMatchService
             {
                 session.Engine.IsCrawfordGame = true;
                 session.Engine.MatchId = matchId;
+            }
+
+            // Configure time controls if enabled
+            if (match.TimeControl != null && match.TimeControl.Type != TimeControlType.None)
+            {
+                session.TimeControl = match.TimeControl;
+
+                // Calculate reserve times based on current match score
+                var whiteReserve = match.TimeControl.CalculateReserveTime(
+                    match.TargetScore, match.Player1Score, match.Player2Score);
+                var redReserve = whiteReserve; // Same for both players
+
+                session.Engine.InitializeTimeControl(match.TimeControl, whiteReserve, redReserve);
+
+                _logger.LogInformation(
+                    "Initialized time control for game {GameId}: {Type}, Reserve={Reserve}min",
+                    gameId,
+                    match.TimeControl.Type,
+                    whiteReserve.TotalMinutes);
             }
 
             _logger.LogInformation(

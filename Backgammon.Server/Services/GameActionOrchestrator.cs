@@ -95,6 +95,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                         session.Engine.Dice.Die1,
                         session.Engine.Dice.Die2);
 
+                    // Start timer for first player's turn
+                    session.Engine.StartTurnTimer();
+
                     // Check if the winner is AI and should start playing
                     var firstPlayerId = GetCurrentPlayerId(session);
                     if (_aiMoveService.IsAiPlayer(firstPlayerId))
@@ -197,6 +200,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         }
 
         session.Engine.RollDice();
+
         session.UpdateActivity();
 
         _logger.LogInformation(
@@ -221,6 +225,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         {
             _logger.LogWarning("Not player's turn");
             return ActionResult.Error("Not your turn");
+        }
+
+        // Check for timeout before allowing move
+        if (session.Engine.HasCurrentPlayerTimedOut())
+        {
+            return ActionResult.Error("You have run out of time");
         }
 
         _logger.LogInformation(
@@ -300,6 +310,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             return ActionResult.Error("Not your turn");
         }
 
+        // Check for timeout
+        if (session.Engine.HasCurrentPlayerTimedOut())
+        {
+            return ActionResult.Error("You have run out of time");
+        }
+
         // Validate that turn can be ended
         if (session.Engine.RemainingMoves.Count > 0)
         {
@@ -310,7 +326,14 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             }
         }
 
+        // End turn timer before switching turns
+        session.Engine.EndTurnTimer();
+
         session.Engine.EndTurn();
+
+        // Start timer for next player's turn
+        session.Engine.StartTurnTimer();
+
         session.UpdateActivity();
 
         // Broadcast and save

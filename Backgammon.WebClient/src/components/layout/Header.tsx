@@ -23,7 +23,6 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   onLoginClick,
   onSignupClick,
-  onDebugToggle: _onDebugToggle,
 }) => {
   const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()

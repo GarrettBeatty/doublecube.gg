@@ -228,13 +228,13 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
     if (isDraggable) {
       circle.addEventListener('mousedown', (e: MouseEvent) => {
         e.preventDefault()
-        startDrag(e as any, circle, e.clientX, e.clientY)
+        startDrag(e, circle, e.clientX, e.clientY)
       })
 
       circle.addEventListener('touchstart', (e: TouchEvent) => {
         e.preventDefault()
         const touch = e.touches[0]
-        startDrag(e as any, circle, touch.clientX, touch.clientY)
+        startDrag(e, circle, touch.clientX, touch.clientY)
       })
     }
 
@@ -549,7 +549,7 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
 
   const startDrag = useCallback(
     (
-      _event: React.MouseEvent | React.TouchEvent,
+      _event: MouseEvent | TouchEvent,
       checkerElement: SVGCircleElement,
       clientX: number,
       clientY: number
@@ -707,6 +707,7 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
     // Dice group
     const diceGroup = createSVGElement('g', { id: 'dice' }) as SVGGElement
     svgRef.current.appendChild(diceGroup)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Render checkers
@@ -804,13 +805,13 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
         if (isDraggable) {
           circle.addEventListener('mousedown', (e: MouseEvent) => {
             e.preventDefault()
-            startDrag(e as any, circle, e.clientX, e.clientY)
+            startDrag(e, circle, e.clientX, e.clientY)
           })
 
           circle.addEventListener('touchstart', (e: TouchEvent) => {
             e.preventDefault()
             const touch = e.touches[0]
-            startDrag(e as any, circle, touch.clientX, touch.clientY)
+            startDrag(e, circle, touch.clientX, touch.clientY)
           })
         }
 
@@ -853,6 +854,7 @@ export const BoardSVG: React.FC<BoardSVGProps> = ({ gameState }) => {
         CONFIG.viewBox.height - CONFIG.padding - CONFIG.checkerSpacing
       )
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, selectedChecker, validSources, startDrag])
 
   // Initialize board

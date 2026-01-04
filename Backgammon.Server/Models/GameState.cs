@@ -85,4 +85,21 @@ public class GameState
     public string? WhiteUsername { get; set; }
 
     public string? RedUsername { get; set; }
+
+    // Time control information
+    public string? TimeControlType { get; set; }
+
+    public int? DelaySeconds { get; set; }
+
+    public double? WhiteReserveSeconds { get; set; }
+
+    public double? RedReserveSeconds { get; set; }
+
+    public bool? WhiteIsInDelay { get; set; }
+
+    public bool? RedIsInDelay { get; set; }
+
+    public double? WhiteDelayRemaining { get; set; }
+
+    public double? RedDelayRemaining { get; set; }
 }

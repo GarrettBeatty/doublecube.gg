@@ -864,13 +864,28 @@ public class GameHub : Hub
         {
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
 
+            // Parse time control type
+            Core.TimeControlConfig? timeControl = null;
+            if (!string.IsNullOrEmpty(config.TimeControlType) && config.TimeControlType != "None")
+            {
+                if (Enum.TryParse<Core.TimeControlType>(config.TimeControlType, out var timeControlType))
+                {
+                    timeControl = new Core.TimeControlConfig
+                    {
+                        Type = timeControlType,
+                        DelaySeconds = timeControlType == Core.TimeControlType.ChicagoPoint ? 12 : 0
+                    };
+                }
+            }
+
             // Create match and first game immediately
             var (match, firstGame) = await _matchService.CreateMatchAsync(
                 playerId,
                 config.TargetScore,
                 config.OpponentType,
                 config.DisplayName,
-                config.OpponentId);
+                config.OpponentId,
+                timeControl);
 
             // Send MatchCreated event with game ID
             await Clients.Caller.SendAsync("MatchCreated", new

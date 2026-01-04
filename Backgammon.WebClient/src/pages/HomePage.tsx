@@ -62,7 +62,7 @@ export function HomePage() {
     setShowCreateMatchModal(true)
   }
 
-  const handleChallengeFromFriendsList = (_friendUserId: string) => {
+  const handleChallengeFromFriendsList = () => {
     // For now, open the FriendsDialog which has challenge functionality
     // TODO: Pre-select the friend in FriendsDialog or add direct challenge support
     setShowFriendsDialog(true)

@@ -36,6 +36,8 @@ public class Match
 
     public bool HasCrawfordGameBeenPlayed { get; set; }
 
+    public TimeControlConfig TimeControl { get; set; } = new();
+
     public List<Game> Games { get; set; } = new();
 
     public Game? CurrentGame { get; set; }

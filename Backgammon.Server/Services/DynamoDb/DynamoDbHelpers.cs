@@ -550,6 +550,13 @@ public static class DynamoDbHelpers
             item["player2DisplayName"] = new AttributeValue { S = match.Player2DisplayName };
         }
 
+        // Time control fields
+        if (match.TimeControl != null)
+        {
+            item["timeControlType"] = new AttributeValue { S = match.TimeControl.Type.ToString() };
+            item["delaySeconds"] = new AttributeValue { N = match.TimeControl.DelaySeconds.ToString() };
+        }
+
         return item;
     }
 
@@ -583,6 +590,18 @@ public static class DynamoDbHelpers
             Player1DisplayName = GetStringOrNull(item, "player1DisplayName"),
             Player2DisplayName = GetStringOrNull(item, "player2DisplayName")
         };
+
+        // Parse time control if present
+        var timeControlTypeStr = GetStringOrNull(item, "timeControlType");
+        if (!string.IsNullOrEmpty(timeControlTypeStr) &&
+            Enum.TryParse<Core.TimeControlType>(timeControlTypeStr, out var timeControlType))
+        {
+            match.TimeControl = new Core.TimeControlConfig
+            {
+                Type = timeControlType,
+                DelaySeconds = GetInt(item, "delaySeconds")
+            };
+        }
 
         return match;
     }

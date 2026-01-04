@@ -55,6 +55,13 @@ public class GameEngine
 
     public bool IsOpeningRollTie { get; private set; }
 
+    // Time control properties
+    public TimeControlConfig? TimeControl { get; set; }
+
+    public PlayerTimeState? WhiteTimeState { get; private set; }
+
+    public PlayerTimeState? RedTimeState { get; private set; }
+
     /// <summary>
     /// Start a new game
     /// </summary>
@@ -572,6 +579,58 @@ public class GameEngine
         }
 
         return roll;
+    }
+
+    /// <summary>
+    /// Initialize time controls for this game
+    /// </summary>
+    public void InitializeTimeControl(TimeControlConfig config, TimeSpan whiteReserve, TimeSpan redReserve)
+    {
+        TimeControl = config;
+        WhiteTimeState = new PlayerTimeState { ReserveTime = whiteReserve };
+        RedTimeState = new PlayerTimeState { ReserveTime = redReserve };
+    }
+
+    /// <summary>
+    /// Check if current player has timed out
+    /// </summary>
+    public bool HasCurrentPlayerTimedOut()
+    {
+        if (TimeControl == null || TimeControl.Type == TimeControlType.None)
+        {
+            return false;
+        }
+
+        var timeState = CurrentPlayer.Color == CheckerColor.White ? WhiteTimeState : RedTimeState;
+        return timeState?.HasTimedOut(TimeControl.DelaySeconds) ?? false;
+    }
+
+    /// <summary>
+    /// Start turn timer for current player
+    /// </summary>
+    public void StartTurnTimer()
+    {
+        if (TimeControl == null || TimeControl.Type == TimeControlType.None)
+        {
+            return;
+        }
+
+        var timeState = CurrentPlayer.Color == CheckerColor.White ? WhiteTimeState : RedTimeState;
+        timeState?.StartTurn();
+    }
+
+    /// <summary>
+    /// End turn timer for current player
+    /// </summary>
+    public void EndTurnTimer()
+    {
+        if (TimeControl == null || TimeControl.Type == TimeControlType.None)
+        {
+            return;
+        }
+
+        var timeState = CurrentPlayer.Color == CheckerColor.White ? WhiteTimeState : RedTimeState;
+        timeState?.EndTurn(TimeControl.DelaySeconds);
     }
 
     /// <summary>

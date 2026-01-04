@@ -18,13 +18,15 @@ public interface IMatchService
     /// <param name="opponentType">Type of opponent: "AI", "OpenLobby", or "Friend"</param>
     /// <param name="player1DisplayName">Optional display name for player 1</param>
     /// <param name="player2Id">Optional player 2 ID (for Friend matches)</param>
+    /// <param name="timeControl">Optional time control configuration</param>
     /// <returns>Tuple of created Match and first ServerGame</returns>
     Task<(Match Match, ServerGame FirstGame)> CreateMatchAsync(
         string player1Id,
         int targetScore,
         string opponentType,
         string? player1DisplayName = null,
-        string? player2Id = null);
+        string? player2Id = null,
+        TimeControlConfig? timeControl = null);
 
     /// <summary>
     /// Get a match by ID

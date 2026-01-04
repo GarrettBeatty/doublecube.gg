@@ -27,6 +27,12 @@ interface GameStore {
 
   // Actions
   setGameState: (state: GameState) => void
+  updateTimeState: (timeUpdate: {
+    whiteReserveSeconds: number
+    redReserveSeconds: number
+    whiteIsInDelay: boolean
+    redIsInDelay: boolean
+  }) => void
   setMyColor: (color: CheckerColor | null) => void
   setCurrentGameId: (gameId: string | null) => void
   setIsSpectator: (isSpectator: boolean) => void
@@ -76,6 +82,19 @@ export const useGameStore = create<GameStore>((set) => ({
       validSources,
     })
   },
+
+  updateTimeState: (timeUpdate) =>
+    set((state) => ({
+      currentGameState: state.currentGameState
+        ? {
+            ...state.currentGameState,
+            whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
+            redReserveSeconds: timeUpdate.redReserveSeconds,
+            whiteIsInDelay: timeUpdate.whiteIsInDelay,
+            redIsInDelay: timeUpdate.redIsInDelay,
+          }
+        : null,
+    })),
 
   setMyColor: (color) => set({ myColor: color }),
 

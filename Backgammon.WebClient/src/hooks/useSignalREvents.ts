@@ -4,13 +4,14 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
 import { audioService } from '@/services/audio.service'
 import { GameState, CheckerColor } from '@/types/game.types'
-import { HubEvents } from '@/types/signalr.types'
+import { HubEvents, MatchData, TimeUpdateEvent, TimeoutEvent } from '@/types/signalr.types'
 
 export const useSignalREvents = () => {
   const navigate = useNavigate()
   const { connection } = useSignalR()
   const {
     setGameState,
+    updateTimeState,
     setIsSpectator,
     setCurrentGameId,
     addChatMessage,
@@ -199,25 +200,52 @@ export const useSignalREvents = () => {
     })
 
     // MatchCreated - Match and first game created, navigate to game page
-    connection.on(HubEvents.MatchCreated, (data: any) => {
+    connection.on(HubEvents.MatchCreated, (data: MatchData) => {
       console.log('[SignalR] MatchCreated', { matchId: data.matchId, gameId: data.gameId, opponentType: data.opponentType })
-      setCurrentGameId(data.gameId)
+      setCurrentGameId(data.gameId as string)
       // Navigate to game page immediately - game handles waiting state
       navigateRef.current(`/game/${data.gameId}`, { replace: true })
     })
 
     // OpponentJoinedMatch - Opponent joined the match
-    connection.on(HubEvents.OpponentJoinedMatch, (data: any) => {
+    connection.on(HubEvents.OpponentJoinedMatch, (data: MatchData) => {
       console.log('[SignalR] OpponentJoinedMatch', { matchId: data.matchId, player2Name: data.player2Name })
       // Game page will receive WaitingForOpponent → GameStart flow
     })
 
     // MatchGameStarting - Match game starting, navigate to game
-    connection.on(HubEvents.MatchGameStarting, (data: any) => {
+    connection.on(HubEvents.MatchGameStarting, (data: MatchData) => {
       console.log('[SignalR] MatchGameStarting', { matchId: data.matchId, gameId: data.gameId })
-      setCurrentGameId(data.gameId)
+      setCurrentGameId(data.gameId as string)
       // Force navigation even if on same route
       navigateRef.current(`/game/${data.gameId}`, { replace: true })
+    })
+
+    // TimeUpdate - Server broadcasts updated time state every second
+    connection.on(HubEvents.TimeUpdate, (timeUpdate: TimeUpdateEvent) => {
+      const currentPath = window.location.pathname
+      const isOnGamePage = currentPath.startsWith('/game/')
+      const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
+
+      // Ignore time updates for games we're not viewing
+      if (currentGameIdFromUrl && currentGameIdFromUrl !== timeUpdate.gameId) {
+        return
+      }
+
+      // Update game state with new time values
+      updateTimeState({
+        whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
+        redReserveSeconds: timeUpdate.redReserveSeconds,
+        whiteIsInDelay: timeUpdate.whiteIsInDelay,
+        redIsInDelay: timeUpdate.redIsInDelay,
+      })
+    })
+
+    // PlayerTimedOut - Player ran out of time and lost
+    connection.on(HubEvents.PlayerTimedOut, (timeoutEvent: TimeoutEvent) => {
+      console.log('[SignalR] PlayerTimedOut', timeoutEvent)
+      // TODO: Show toast notification about timeout
+      audioService.playSound('game-lost')
     })
 
     // Cleanup on unmount
@@ -238,8 +266,10 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.MatchCreated)
       connection.off(HubEvents.OpponentJoinedMatch)
       connection.off(HubEvents.MatchGameStarting)
+      connection.off(HubEvents.TimeUpdate)
+      connection.off(HubEvents.PlayerTimedOut)
     }
-  }, [connection, setGameState, setIsSpectator, setCurrentGameId, addChatMessage])
+  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage])
 
   return { connection }
 }

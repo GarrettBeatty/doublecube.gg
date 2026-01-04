@@ -47,9 +47,22 @@ export const formatRating = (rating?: number | null): string => {
 
 /**
  * Format time control for display
+ * Supports Chicago Point time control format
  */
-export const formatTimeControl = (seconds?: number): string => {
-  if (!seconds) return 'No timer'
-  if (seconds < 60) return `${seconds}s/move`
-  return `${Math.floor(seconds / 60)}m/move`
+export const formatTimeControl = (
+  timeControlType?: string | null,
+  delaySeconds?: number | null,
+  matchLength?: number
+): string => {
+  if (!timeControlType || timeControlType === 'None') {
+    return 'No timer'
+  }
+
+  if (timeControlType === 'ChicagoPoint') {
+    const reserveMinutes = matchLength ? 2 * matchLength : 14
+    return `Chicago (${delaySeconds || 12}s + ${reserveMinutes}min)`
+  }
+
+  // Fallback for unknown time control types
+  return timeControlType
 }

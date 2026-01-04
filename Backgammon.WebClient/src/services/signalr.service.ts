@@ -118,7 +118,7 @@ class SignalRService {
   }
 
   // Helper method for invoking hub methods with error handling
-  async invoke<T = void>(methodName: string, ...args: any[]): Promise<T | null> {
+  async invoke<T = void>(methodName: string, ...args: unknown[]): Promise<T | null> {
     if (!this.connection || !this.isConnected()) {
       console.error('[SignalR] Cannot invoke method - not connected')
       throw new Error('SignalR connection not available')
@@ -136,7 +136,7 @@ class SignalRService {
   }
 
   // Register event handler
-  on(eventName: string, callback: (...args: any[]) => void): void {
+  on(eventName: string, callback: (...args: unknown[]) => void): void {
     if (!this.connection) {
       console.warn('[SignalR] Cannot register event handler - connection not initialized')
       return
@@ -147,7 +147,7 @@ class SignalRService {
   }
 
   // Unregister event handler
-  off(eventName: string, callback?: (...args: any[]) => void): void {
+  off(eventName: string, callback?: (...args: unknown[]) => void): void {
     if (!this.connection) return
 
     if (callback) {

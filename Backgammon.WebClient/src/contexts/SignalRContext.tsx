@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { HubConnection } from '@microsoft/signalr'
 import { signalRService } from '@/services/signalr.service'
@@ -7,7 +8,7 @@ interface SignalRContextType {
   connection: HubConnection | null
   connectionState: ConnectionState
   isConnected: boolean
-  invoke: <T = void>(methodName: string, ...args: any[]) => Promise<T | null>
+  invoke: <T = void>(methodName: string, ...args: unknown[]) => Promise<T | null>
 }
 
 const SignalRContext = createContext<SignalRContextType | undefined>(undefined)
@@ -76,7 +77,7 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
 
   const invoke = async <T = void,>(
     methodName: string,
-    ...args: any[]
+    ...args: unknown[]
   ): Promise<T | null> => {
     try {
       return await signalRService.invoke<T>(methodName, ...args)

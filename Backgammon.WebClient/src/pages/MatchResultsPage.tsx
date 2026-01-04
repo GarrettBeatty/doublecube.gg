@@ -53,6 +53,7 @@ export const MatchResultsPage: React.FC = () => {
     }
 
     loadMatchResults()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [matchId, isConnected])
 
   const loadMatchResults = async () => {

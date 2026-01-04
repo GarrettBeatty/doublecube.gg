@@ -55,6 +55,10 @@ export const HubEvents = {
   MatchStatus: 'MatchStatus',
   MatchGameCompleted: 'MatchGameCompleted',
   MatchCompleted: 'MatchCompleted',
+
+  // Time control events
+  TimeUpdate: 'TimeUpdate',
+  PlayerTimedOut: 'PlayerTimedOut',
 } as const
 
 // Event handler types
@@ -75,11 +79,11 @@ export interface SignalREventHandlers {
   // Match events
   onMatchCreated: (matchData: MatchCreatedEvent) => void
   onOpponentJoinedMatch: (matchData: OpponentJoinedMatchEvent) => void
-  onMatchUpdate: (matchData: any) => void
-  onMatchContinued: (matchData: any) => void
-  onMatchStatus: (matchData: any) => void
-  onMatchGameCompleted: (matchData: any) => void
-  onMatchCompleted: (matchData: any) => void
+  onMatchUpdate: (matchData: MatchData) => void
+  onMatchContinued: (matchData: MatchData) => void
+  onMatchStatus: (matchData: MatchData) => void
+  onMatchGameCompleted: (matchData: MatchData) => void
+  onMatchCompleted: (matchData: MatchData) => void
 }
 
 // Connection state
@@ -107,4 +111,25 @@ export interface OpponentJoinedMatchEvent {
   matchId: string
   player2Id: string
   player2Name: string
+}
+
+// Time control event data types
+export interface TimeUpdateEvent {
+  gameId: string
+  whiteReserveSeconds: number
+  redReserveSeconds: number
+  whiteIsInDelay: boolean
+  redIsInDelay: boolean
+}
+
+export interface TimeoutEvent {
+  gameId: string
+  timedOutPlayer: string
+  winner: string
+}
+
+// Generic match event data
+export interface MatchData {
+  matchId: string
+  [key: string]: unknown
 }

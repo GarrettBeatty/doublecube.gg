@@ -22,6 +22,11 @@ export enum OpponentType {
   OpenLobby = 2,
 }
 
+export enum TimeControlType {
+  None = 0,
+  ChicagoPoint = 1,
+}
+
 // Core domain types
 export interface Point {
   position: number
@@ -43,6 +48,18 @@ export interface Move {
 export interface Dice {
   die1: number
   die2: number
+}
+
+// Time control types
+export interface TimeControlState {
+  timeControlType: TimeControlType | null
+  delaySeconds: number | null
+  whiteReserveSeconds: number | null
+  redReserveSeconds: number | null
+  whiteIsInDelay: boolean | null
+  redIsInDelay: boolean | null
+  whiteDelayRemaining: number | null
+  redDelayRemaining: number | null
 }
 
 // Game state (received from server)
@@ -82,6 +99,15 @@ export interface GameState {
   whiteOpeningRoll?: number | null
   redOpeningRoll?: number | null
   isOpeningRollTie?: boolean
+  // Time control fields
+  timeControlType?: string | null
+  delaySeconds?: number | null
+  whiteReserveSeconds?: number | null
+  redReserveSeconds?: number | null
+  whiteIsInDelay?: boolean | null
+  redIsInDelay?: boolean | null
+  whiteDelayRemaining?: number | null
+  redDelayRemaining?: number | null
 }
 
 // Match types
@@ -187,7 +213,7 @@ export interface DragState {
 }
 
 // API response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: string

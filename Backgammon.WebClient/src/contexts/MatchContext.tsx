@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, ReactNode } from 'react'
 import { Match } from '@/types/game.types'
 import { MatchLobby } from '@/types/match.types'

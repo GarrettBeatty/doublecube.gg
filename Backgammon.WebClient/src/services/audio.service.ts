@@ -124,7 +124,7 @@ class AudioService {
       if (!this.audioContext) {
         try {
           this.audioContext = new (window.AudioContext ||
-            (window as any).webkitAudioContext)()
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
           console.log('[AudioService] Audio context created')
         } catch (err) {
           console.error('[AudioService] Failed to create audio context:', err)

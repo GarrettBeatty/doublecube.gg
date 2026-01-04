@@ -49,6 +49,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
       loadFriends()
       loadFriendRequests()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isConnected])
 
   const loadFriends = async () => {
