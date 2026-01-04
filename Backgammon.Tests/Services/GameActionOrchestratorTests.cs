@@ -30,6 +30,15 @@ public class GameActionOrchestratorTests
         _mockHubContext = new Mock<IHubContext<GameHub>>();
         _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
 
+        // Set up HubContext mock chain for broadcasting
+        var mockClients = new Mock<IHubClients>();
+        var mockSingleClientProxy = new Mock<ISingleClientProxy>();
+        var mockClientProxy = new Mock<IClientProxy>();
+
+        _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
+        mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockSingleClientProxy.Object);
+        mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockClientProxy.Object);
+
         _orchestrator = new GameActionOrchestrator(
             _mockGameRepository.Object,
             _mockAiMoveService.Object,
@@ -48,6 +57,19 @@ public class GameActionOrchestratorTests
         session.AddPlayer("white-player", "white-conn");
         session.AddPlayer("red-player", "red-conn");
         session.Engine.StartNewGame();
+
+        // Complete opening roll to get into regular gameplay
+        // Keep rolling until we get a non-tie result
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            if (!session.Engine.IsOpeningRoll)
+            {
+                break;
+            }
+
+            session.Engine.RollOpening(CheckerColor.Red);
+        }
 
         // Clear remaining moves so we test "Not your turn" not "Must complete moves"
         session.Engine.RemainingMoves.Clear();
@@ -72,10 +94,21 @@ public class GameActionOrchestratorTests
         session.AddPlayer("red-player", "red-conn");
         session.Engine.StartNewGame();
 
-        // Clear auto-rolled moves and manually add some
-        session.Engine.RemainingMoves.Clear();
-        session.Engine.RemainingMoves.Add(3);
-        session.Engine.RemainingMoves.Add(4);
+        // Complete opening roll to get into regular gameplay
+        // Keep rolling until we get a non-tie result
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            if (!session.Engine.IsOpeningRoll)
+            {
+                break;
+            }
+
+            session.Engine.RollOpening(CheckerColor.Red);
+        }
+
+        // Remaining moves should already be set from opening roll
+        Assert.True(session.Engine.RemainingMoves.Count > 0);
 
         // Use whichever player is current
         var connectionId = session.Engine.CurrentPlayer?.Color == CheckerColor.White ? "white-conn" : "red-conn";
@@ -96,6 +129,21 @@ public class GameActionOrchestratorTests
         session.AddPlayer("white-player", "white-conn");
         session.AddPlayer("red-player", "red-conn");
         session.Engine.StartNewGame();
+
+        // Complete opening roll to get into regular gameplay
+        // Keep rolling until we get a non-tie result
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            if (!session.Engine.IsOpeningRoll)
+            {
+                break;
+            }
+
+            session.Engine.RollOpening(CheckerColor.Red);
+        }
+
+        // Clear remaining moves so player can roll again
         session.Engine.RemainingMoves.Clear();
 
         // Use the current player's connection

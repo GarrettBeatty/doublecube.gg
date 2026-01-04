@@ -80,23 +80,18 @@ public class PlayerTimeState
         }
 
         var elapsed = DateTime.UtcNow - TurnStartTime.Value;
+        var delayTime = TimeSpan.FromSeconds(delaySeconds);
 
-        if (IsInDelay)
+        // Check if still in delay period
+        if (elapsed < delayTime)
         {
-            // Still in delay period - check if delay time exceeded
-            if (elapsed.TotalSeconds < delaySeconds)
-            {
-                return false;
-            }
-
-            // Delay exceeded, now check reserve
-            var reserveUsed = elapsed - TimeSpan.FromSeconds(delaySeconds);
-            return ReserveTime - reserveUsed <= TimeSpan.Zero;
+            // Still in delay - haven't timed out yet
+            return false;
         }
 
-        // Already burning reserve time
-        var totalReserveUsed = elapsed - TimeSpan.FromSeconds(delaySeconds);
-        return ReserveTime - totalReserveUsed <= TimeSpan.Zero;
+        // Delay period over - check if reserve time exhausted
+        var reserveUsed = elapsed - delayTime;
+        return ReserveTime - reserveUsed <= TimeSpan.Zero;
     }
 
     /// <summary>

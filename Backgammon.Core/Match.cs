@@ -18,6 +18,7 @@ public class Match
         Player1Id = player1Id;
         Player2Id = player2Id;
         TargetScore = targetScore;
+        Status = MatchStatus.InProgress; // Match with both players is in progress
     }
 
     public string MatchId { get; set; } = string.Empty;

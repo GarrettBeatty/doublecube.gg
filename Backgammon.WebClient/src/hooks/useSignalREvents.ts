@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
 import { audioService } from '@/services/audio.service'
+import { useToast } from '@/hooks/use-toast'
 import { GameState, CheckerColor } from '@/types/game.types'
 import { HubEvents, MatchData, TimeUpdateEvent, TimeoutEvent } from '@/types/signalr.types'
 
@@ -16,6 +17,7 @@ export const useSignalREvents = () => {
     setCurrentGameId,
     addChatMessage,
   } = useGameStore()
+  const { toast } = useToast()
   const prevGameStateRef = useRef<GameState | null>(null)
   const navigateRef = useRef(navigate)
 
@@ -246,7 +248,14 @@ export const useSignalREvents = () => {
     // PlayerTimedOut - Player ran out of time and lost
     connection.on(HubEvents.PlayerTimedOut, (timeoutEvent: TimeoutEvent) => {
       console.log('[SignalR] PlayerTimedOut', timeoutEvent)
-      // TODO: Show toast notification about timeout
+
+      // Show toast notification about timeout
+      toast({
+        title: 'Time Out!',
+        description: `${timeoutEvent.timedOutPlayer} ran out of time. ${timeoutEvent.winner} wins!`,
+        variant: 'destructive',
+      })
+
       audioService.playSound('game-lost')
     })
 
@@ -271,7 +280,7 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.TimeUpdate)
       connection.off(HubEvents.PlayerTimedOut)
     }
-  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage])
+  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, toast])
 
   return { connection }
 }

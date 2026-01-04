@@ -26,6 +26,10 @@ public class MatchServiceValidationTests
         _aiMoveServiceMock = new Mock<IAiMoveService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
+        // Setup GameSessionManager to return a valid session
+        _gameSessionManagerMock.Setup(x => x.CreateGame(It.IsAny<string>()))
+            .Returns((string gameId) => new GameSession(gameId));
+
         _matchService = new MatchService(
             _matchRepositoryMock.Object,
             _gameRepositoryMock.Object,
@@ -201,7 +205,7 @@ public class MatchServiceValidationTests
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ArgumentException>(
             () => _matchService.CreateMatchAsync(playerId, targetScore, "Friend", null, playerId));
-        Assert.Contains("Cannot create a match against yourself", exception.Message);
+        Assert.Contains("Player IDs cannot be identical", exception.Message);
     }
 
     [Fact]

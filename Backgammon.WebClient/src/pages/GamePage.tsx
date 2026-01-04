@@ -149,6 +149,7 @@ export const GamePage: React.FC = () => {
     color: CheckerColor.White,
     isYourTurn: currentGameState.currentPlayer === CheckerColor.White,
     isYou: currentGameState.yourColor === CheckerColor.White,
+    pipCount: currentGameState.whitePipCount,
     checkersOnBar: currentGameState.whiteCheckersOnBar,
     bornOff: currentGameState.whiteBornOff,
   }
@@ -159,6 +160,7 @@ export const GamePage: React.FC = () => {
     color: CheckerColor.Red,
     isYourTurn: currentGameState.currentPlayer === CheckerColor.Red,
     isYou: currentGameState.yourColor === CheckerColor.Red,
+    pipCount: currentGameState.redPipCount,
     checkersOnBar: currentGameState.redCheckersOnBar,
     bornOff: currentGameState.redBornOff,
   }

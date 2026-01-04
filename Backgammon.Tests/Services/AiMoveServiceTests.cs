@@ -1,3 +1,4 @@
+using Backgammon.Core;
 using Backgammon.Server.Services;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -148,9 +149,25 @@ public class AiMoveServiceTests
     {
         // Arrange
         var session = new GameSession("game-123");
+        // Add players - White first, then Red
         session.AddPlayer("ai_greedy_123", string.Empty);
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
+
+        // Complete opening roll so AI can take a normal turn
+        session.Engine.RollOpening(CheckerColor.White);
+        session.Engine.RollOpening(CheckerColor.Red);
+
+        // Clear remaining moves first
+        session.Engine.RemainingMoves.Clear();
+
+        // Ensure it's the AI's turn - if not, swap current player
+        var aiColor = session.WhitePlayerId == "ai_greedy_123" ? CheckerColor.White : CheckerColor.Red;
+        if (session.Engine.CurrentPlayer?.Color != aiColor)
+        {
+            // Swap to make it AI's turn
+            session.Engine.EndTurn();
+        }
 
         var broadcastCallCount = 0;
         Func<Task> broadcastUpdate = () =>
@@ -159,7 +176,7 @@ public class AiMoveServiceTests
             return Task.CompletedTask;
         };
 
-        // Act
+        // Act - use the AI player ID we set up
         await _service.ExecuteAiTurnAsync(session, "ai_greedy_123", broadcastUpdate);
 
         // Assert - verify broadcast was called at least once (for dice roll)
@@ -171,9 +188,25 @@ public class AiMoveServiceTests
     {
         // Arrange
         var session = new GameSession("game-123");
+        // Add players - White first, then Red
         session.AddPlayer("ai_random_456", string.Empty);
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
+
+        // Complete opening roll so AI can take a normal turn
+        session.Engine.RollOpening(CheckerColor.White);
+        session.Engine.RollOpening(CheckerColor.Red);
+
+        // Clear remaining moves first
+        session.Engine.RemainingMoves.Clear();
+
+        // Ensure it's the AI's turn - if not, swap current player
+        var aiColor = session.WhitePlayerId == "ai_random_456" ? CheckerColor.White : CheckerColor.Red;
+        if (session.Engine.CurrentPlayer?.Color != aiColor)
+        {
+            // Swap to make it AI's turn
+            session.Engine.EndTurn();
+        }
 
         var broadcastCallCount = 0;
         Func<Task> broadcastUpdate = () =>
@@ -182,7 +215,7 @@ public class AiMoveServiceTests
             return Task.CompletedTask;
         };
 
-        // Act
+        // Act - use the AI player ID we set up
         await _service.ExecuteAiTurnAsync(session, "ai_random_456", broadcastUpdate);
 
         // Assert

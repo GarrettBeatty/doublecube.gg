@@ -46,7 +46,21 @@ public class DoubleOfferServiceTests
         session.AddPlayer("red-player", "red-conn");
         session.Engine.StartNewGame();
 
-        // Dice are already rolled from StartNewGame
+        // Complete opening roll to get past opening phase
+        // Keep rolling until we get a non-tie result
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            if (!session.Engine.IsOpeningRoll)
+            {
+                break; // White's roll completed the opening
+            }
+
+            session.Engine.RollOpening(CheckerColor.Red);
+            // If we're still in opening roll, it was a tie - loop and re-roll
+        }
+
+        // Dice are now rolled from opening roll
         var connectionId = session.Engine.CurrentPlayer?.Color == CheckerColor.White ? "white-conn" : "red-conn";
 
         // Act

@@ -44,7 +44,7 @@ public class MatchService : IMatchService
             // Input validation
             if (string.IsNullOrWhiteSpace(player1Id))
             {
-                throw new ArgumentException("Player1 ID cannot be null or empty");
+                throw new ArgumentException("Player IDs cannot be null or empty");
             }
 
             if (targetScore <= 0 || targetScore > 25)
@@ -55,6 +55,18 @@ public class MatchService : IMatchService
             if (!new[] { "AI", "OpenLobby", "Friend" }.Contains(opponentType))
             {
                 throw new ArgumentException("OpponentType must be 'AI', 'OpenLobby', or 'Friend'");
+            }
+
+            // Validate player2Id for Friend matches
+            if (opponentType == "Friend" && string.IsNullOrWhiteSpace(player2Id))
+            {
+                throw new ArgumentException("Player IDs cannot be null or empty");
+            }
+
+            // Validate player IDs are not identical for Friend matches
+            if (opponentType == "Friend" && player1Id == player2Id)
+            {
+                throw new ArgumentException("Player IDs cannot be identical");
             }
 
             // Get player 1 name
@@ -98,8 +110,9 @@ public class MatchService : IMatchService
                 // Set friend as player 2
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
                 match.Player2Id = player2Id;
-                match.Player2Name = player2?.DisplayName ?? player2Id;
-                match.Status = "WaitingForPlayers";  // Must join explicitly
+                // Use same formatting logic as player1 for consistency
+                match.Player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+                match.Status = "InProgress";  // Friend match with both players ready
                 match.IsOpenLobby = false;
             }
             else

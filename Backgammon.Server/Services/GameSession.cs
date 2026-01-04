@@ -543,9 +543,18 @@ public class GameSession
         var losingPlayer = Engine.CurrentPlayer;
         var winningPlayer = Engine.GetOpponent();
 
+        if (losingPlayer == null || winningPlayer == null)
+        {
+            Console.WriteLine("[TIME DEBUG] ERROR: Cannot handle timeout - player is null");
+            return;
+        }
+
+        Console.WriteLine($"[TIME DEBUG] TIMEOUT! {losingPlayer.Color} ran out of time. {winningPlayer.Color} wins!");
+
         // Mark game as over using ForfeitGame
         Engine.ForfeitGame(winningPlayer);
 
+        // Broadcast timeout event
         var timeoutEvent = new
         {
             gameId = Id,
@@ -554,5 +563,12 @@ public class GameSession
         };
 
         await hubContext.Clients.Group(Id).SendAsync("PlayerTimedOut", timeoutEvent);
+
+        // Broadcast final game state to all connections so UI updates with winner
+        foreach (var connectionId in _whiteConnections.Concat(_redConnections).Concat(_spectatorConnections))
+        {
+            var state = GetState(connectionId);
+            await hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
+        }
     }
 }

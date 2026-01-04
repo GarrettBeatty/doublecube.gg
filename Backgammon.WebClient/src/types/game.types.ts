@@ -77,6 +77,8 @@ export interface GameState {
   redCheckersOnBar: number
   whiteBornOff: number
   redBornOff: number
+  whitePipCount: number
+  redPipCount: number
   doublingCubeValue: number
   doublingCubeOwner: CheckerColor | null
   isAnalysisMode: boolean
