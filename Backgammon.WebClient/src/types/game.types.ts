@@ -199,9 +199,26 @@ export interface ServerConfig {
 }
 
 export interface AuthResponse {
+  success: boolean
   token: string
-  userId: string
-  username: string
+  error?: string
+  user: {
+    userId: string
+    username: string
+    displayName: string
+    stats?: {
+      totalGames: number
+      wins: number
+      losses: number
+      totalStakes: number
+      normalWins: number
+      gammonWins: number
+      backgammonWins: number
+      winStreak: number
+      bestWinStreak: number
+    }
+    createdAt: string
+  }
 }
 
 export interface LoginRequest {

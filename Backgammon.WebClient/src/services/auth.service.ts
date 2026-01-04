@@ -37,10 +37,10 @@ class AuthService {
       // Store token and user info
       this.setToken(data.token)
       this.setUser({
-        userId: data.userId,
-        username: data.username,
+        userId: data.user.userId,
+        username: data.user.username,
         email: null,
-        createdAt: new Date().toISOString(),
+        createdAt: data.user.createdAt,
       })
 
       // Update API service with token
@@ -71,10 +71,10 @@ class AuthService {
       // Store token and user info
       this.setToken(authData.token)
       this.setUser({
-        userId: authData.userId,
-        username: authData.username,
+        userId: authData.user.userId,
+        username: authData.user.username,
         email: data.email || null,
-        createdAt: new Date().toISOString(),
+        createdAt: authData.user.createdAt,
       })
 
       // Update API service with token

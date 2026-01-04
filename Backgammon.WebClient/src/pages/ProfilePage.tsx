@@ -20,24 +20,34 @@ interface PlayerProfile {
   displayName: string
   createdAt: string
   isPrivate: boolean
-  statistics: {
-    totalGamesPlayed: number
+  stats?: {
+    totalGames: number
     wins: number
     losses: number
-    winRate: number
-    totalMatchesPlayed: number
-    matchWins: number
-    matchLosses: number
-    matchWinRate: number
-    averageGameDuration: number
+    totalStakes: number
+    normalWins: number
+    gammonWins: number
+    backgammonWins: number
+    winStreak: number
+    bestWinStreak: number
   }
-  recentGames: Array<{
+  recentGames?: Array<{
     gameId: string
     opponentName: string
     result: 'won' | 'lost'
     pointsScored: number
     datePlayed: string
   }>
+  friends?: Array<{
+    userId: string
+    username: string
+    displayName: string
+    status: string
+  }>
+  isFriend: boolean
+  profilePrivacy: number
+  gameHistoryPrivacy: number
+  friendsListPrivacy: number
 }
 
 export const ProfilePage: React.FC = () => {
@@ -226,69 +236,76 @@ export const ProfilePage: React.FC = () => {
         )}
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Games Played
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{profile.statistics.totalGamesPlayed}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {profile.statistics.wins}W - {profile.statistics.losses}L
-              </p>
-            </CardContent>
-          </Card>
+        {profile.stats && !profile.isPrivate && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Games Played
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{profile.stats.totalGames}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {profile.stats.wins}W - {profile.stats.losses}L
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Win Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {(profile.statistics.winRate * 100).toFixed(1)}%
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <TrendingUp className="h-3 w-3 inline mr-1" />
-                Single games
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Win Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {profile.stats.totalGames > 0
+                    ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
+                    : '0.0'}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <TrendingUp className="h-3 w-3 inline mr-1" />
+                  {profile.stats.totalGames} games
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Matches Won
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{profile.statistics.matchWins}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {profile.statistics.totalMatchesPlayed} total matches
-              </p>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Win Streak
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{profile.stats.winStreak}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Best: {profile.stats.bestWinStreak}
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Match Win Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {(profile.statistics.matchWinRate * 100).toFixed(1)}%
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                <Trophy className="h-3 w-3 inline mr-1" />
-                Multi-game matches
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Special Wins
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Gammon:</span>
+                    <span className="font-semibold">{profile.stats.gammonWins}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Backgammon:</span>
+                    <span className="font-semibold">{profile.stats.backgammonWins}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -307,23 +324,37 @@ export const ProfilePage: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">Career Statistics</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex justify-between p-3 bg-muted rounded-lg">
-                        <span className="text-sm">Total Games:</span>
-                        <span className="font-semibold">{profile.statistics.totalGamesPlayed}</span>
-                      </div>
-                      <div className="flex justify-between p-3 bg-muted rounded-lg">
-                        <span className="text-sm">Total Matches:</span>
-                        <span className="font-semibold">
-                          {profile.statistics.totalMatchesPlayed}
-                        </span>
+                {profile.stats && !profile.isPrivate ? (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold mb-2">Career Statistics</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex justify-between p-3 bg-muted rounded-lg">
+                          <span className="text-sm">Total Games:</span>
+                          <span className="font-semibold">{profile.stats.totalGames}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-muted rounded-lg">
+                          <span className="text-sm">Win Rate:</span>
+                          <span className="font-semibold">
+                            {profile.stats.totalGames > 0
+                              ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
+                              : '0.0'}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-muted rounded-lg">
+                          <span className="text-sm">Total Stakes:</span>
+                          <span className="font-semibold">{profile.stats.totalStakes}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-muted rounded-lg">
+                          <span className="text-sm">Best Streak:</span>
+                          <span className="font-semibold">{profile.stats.bestWinStreak}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Profile statistics are private</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -353,7 +384,7 @@ export const ProfilePage: React.FC = () => {
                             {new Date(game.datePlayed).toLocaleDateString()}
                           </span>
                         </div>
-                        {index < profile.recentGames.length - 1 && <Separator />}
+                        {profile.recentGames && index < profile.recentGames.length - 1 && <Separator />}
                       </div>
                     ))}
                   </div>
@@ -371,67 +402,87 @@ export const ProfilePage: React.FC = () => {
                 <CardDescription>Complete performance breakdown</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="font-semibold mb-3">Single Game Performance</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Total Games:</span>
-                        <span className="font-medium">{profile.statistics.totalGamesPlayed}</span>
+                {profile.stats && !profile.isPrivate ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="font-semibold mb-3">Game Performance</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Total Games:</span>
+                          <span className="font-medium">{profile.stats.totalGames}</span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Wins:</span>
+                          <span className="font-medium text-green-600">
+                            {profile.stats.wins}
+                          </span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Losses:</span>
+                          <span className="font-medium text-red-600">
+                            {profile.stats.losses}
+                          </span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Win Rate:</span>
+                          <span className="font-medium">
+                            {profile.stats.totalGames > 0
+                              ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
+                              : '0.0'}%
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Wins:</span>
-                        <span className="font-medium text-green-600">
-                          {profile.statistics.wins}
-                        </span>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="font-semibold mb-3">Win Types</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Normal Wins:</span>
+                          <span className="font-medium">{profile.stats.normalWins}</span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Gammon Wins:</span>
+                          <span className="font-medium text-yellow-600">
+                            {profile.stats.gammonWins}
+                          </span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Backgammon Wins:</span>
+                          <span className="font-medium text-orange-600">
+                            {profile.stats.backgammonWins}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Losses:</span>
-                        <span className="font-medium text-red-600">
-                          {profile.statistics.losses}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Win Rate:</span>
-                        <span className="font-medium">
-                          {(profile.statistics.winRate * 100).toFixed(1)}%
-                        </span>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h3 className="font-semibold mb-3">Streaks & Stakes</h3>
+                      <div className="space-y-2">
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Current Win Streak:</span>
+                          <span className="font-medium">{profile.stats.winStreak}</span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Best Win Streak:</span>
+                          <span className="font-medium text-purple-600">
+                            {profile.stats.bestWinStreak}
+                          </span>
+                        </div>
+                        <div className="flex justify-between p-2">
+                          <span className="text-muted-foreground">Total Stakes:</span>
+                          <span className="font-medium">{profile.stats.totalStakes}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-
-                  <Separator />
-
-                  <div>
-                    <h3 className="font-semibold mb-3">Match Performance</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Total Matches:</span>
-                        <span className="font-medium">
-                          {profile.statistics.totalMatchesPlayed}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Match Wins:</span>
-                        <span className="font-medium text-green-600">
-                          {profile.statistics.matchWins}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Match Losses:</span>
-                        <span className="font-medium text-red-600">
-                          {profile.statistics.matchLosses}
-                        </span>
-                      </div>
-                      <div className="flex justify-between p-2">
-                        <span className="text-muted-foreground">Match Win Rate:</span>
-                        <span className="font-medium">
-                          {(profile.statistics.matchWinRate * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Profile statistics are private</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

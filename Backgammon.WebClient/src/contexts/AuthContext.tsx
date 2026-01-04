@@ -64,10 +64,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response) {
         const newUser: User = {
-          userId: response.userId,
-          username: response.username,
+          userId: response.user.userId,
+          username: response.user.username,
           email: null,
-          createdAt: new Date().toISOString(),
+          createdAt: response.user.createdAt,
         }
 
         setUser(newUser)
@@ -85,10 +85,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (response) {
         const newUser: User = {
-          userId: response.userId,
-          username: response.username,
+          userId: response.user.userId,
+          username: response.user.username,
           email: data.email || null,
-          createdAt: new Date().toISOString(),
+          createdAt: response.user.createdAt,
         }
 
         setUser(newUser)
