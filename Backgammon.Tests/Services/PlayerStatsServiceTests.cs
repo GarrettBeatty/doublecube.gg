@@ -8,14 +8,19 @@ namespace Backgammon.Tests.Services;
 public class PlayerStatsServiceTests
 {
     private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<IEloRatingService> _mockEloRatingService;
     private readonly Mock<ILogger<PlayerStatsService>> _mockLogger;
     private readonly PlayerStatsService _service;
 
     public PlayerStatsServiceTests()
     {
         _mockUserRepository = new Mock<IUserRepository>();
+        _mockEloRatingService = new Mock<IEloRatingService>();
         _mockLogger = new Mock<ILogger<PlayerStatsService>>();
-        _service = new PlayerStatsService(_mockUserRepository.Object, _mockLogger.Object);
+        _service = new PlayerStatsService(
+            _mockUserRepository.Object,
+            _mockEloRatingService.Object,
+            _mockLogger.Object);
     }
 
     [Fact]
@@ -126,8 +131,8 @@ public class PlayerStatsServiceTests
         Assert.Equal(1, redUser.Stats.Losses);
         Assert.Equal(0, redUser.Stats.WinStreak);
 
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("red-user", redUser.Stats), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(whiteUser), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(redUser), Times.Once);
     }
 
     [Fact]
@@ -290,7 +295,7 @@ public class PlayerStatsServiceTests
         await _service.UpdateStatsAfterGameCompletionAsync(game);
 
         _mockUserRepository.Verify(
-            r => r.UpdateStatsAsync(It.IsAny<string>(), It.IsAny<UserStats>()),
+            r => r.UpdateUserAsync(It.IsAny<User>()),
             Times.Never);
     }
 
@@ -322,7 +327,7 @@ public class PlayerStatsServiceTests
         await _service.UpdateStatsAfterGameCompletionAsync(game);
 
         // Assert
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(whiteUser), Times.Once);
         Assert.Equal(1, whiteUser.Stats.Wins);
     }
 }

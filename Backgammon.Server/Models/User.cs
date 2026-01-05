@@ -8,6 +8,11 @@ namespace Backgammon.Server.Models;
 public class User
 {
     /// <summary>
+    /// Default starting ELO rating for new users
+    /// </summary>
+    public const int DefaultStartingRating = 1500;
+
+    /// <summary>
     /// Cosmos DB document id - uses userId as the unique identifier
     /// </summary>
     [JsonPropertyName("id")]
@@ -83,13 +88,13 @@ public class User
     /// Current ELO rating (1500 = starting rating)
     /// </summary>
     [JsonPropertyName("rating")]
-    public int Rating { get; set; } = 1500;
+    public int Rating { get; set; } = DefaultStartingRating;
 
     /// <summary>
     /// Highest rating ever achieved
     /// </summary>
     [JsonPropertyName("peakRating")]
-    public int PeakRating { get; set; } = 1500;
+    public int PeakRating { get; set; } = DefaultStartingRating;
 
     /// <summary>
     /// When the rating was last updated

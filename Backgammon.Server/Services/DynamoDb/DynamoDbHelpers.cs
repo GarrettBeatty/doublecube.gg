@@ -36,9 +36,9 @@ public static class DynamoDbHelpers
     // Helper to get int
     public static int GetInt(Dictionary<string, AttributeValue> item, string key, int defaultValue = 0)
     {
-        if (item.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value.N))
+        if (item.TryGetValue(key, out var value) && int.TryParse(value.N, out var result))
         {
-            return int.Parse(value.N);
+            return result;
         }
 
         return defaultValue;
@@ -194,8 +194,8 @@ public static class DynamoDbHelpers
         }
 
         // Rating fields (with defaults for existing users)
-        user.Rating = GetInt(item, "rating", 1500);
-        user.PeakRating = GetInt(item, "peakRating", 1500);
+        user.Rating = GetInt(item, "rating", User.DefaultStartingRating);
+        user.PeakRating = GetInt(item, "peakRating", User.DefaultStartingRating);
         user.RatedGamesCount = GetInt(item, "ratedGamesCount", 0);
         user.RatingLastUpdatedAt = GetNullableDateTime(item, "ratingLastUpdatedAt");
 
@@ -421,24 +421,24 @@ public static class DynamoDbHelpers
         };
 
         // Rating changes (nullable ints)
-        if (item.TryGetValue("whiteRatingBefore", out var whiteRatingBeforeValue) && !string.IsNullOrEmpty(whiteRatingBeforeValue.N))
+        if (item.TryGetValue("whiteRatingBefore", out var whiteRatingBeforeValue) && int.TryParse(whiteRatingBeforeValue.N, out var whiteRatingBefore))
         {
-            game.WhiteRatingBefore = int.Parse(whiteRatingBeforeValue.N);
+            game.WhiteRatingBefore = whiteRatingBefore;
         }
 
-        if (item.TryGetValue("redRatingBefore", out var redRatingBeforeValue) && !string.IsNullOrEmpty(redRatingBeforeValue.N))
+        if (item.TryGetValue("redRatingBefore", out var redRatingBeforeValue) && int.TryParse(redRatingBeforeValue.N, out var redRatingBefore))
         {
-            game.RedRatingBefore = int.Parse(redRatingBeforeValue.N);
+            game.RedRatingBefore = redRatingBefore;
         }
 
-        if (item.TryGetValue("whiteRatingAfter", out var whiteRatingAfterValue) && !string.IsNullOrEmpty(whiteRatingAfterValue.N))
+        if (item.TryGetValue("whiteRatingAfter", out var whiteRatingAfterValue) && int.TryParse(whiteRatingAfterValue.N, out var whiteRatingAfter))
         {
-            game.WhiteRatingAfter = int.Parse(whiteRatingAfterValue.N);
+            game.WhiteRatingAfter = whiteRatingAfter;
         }
 
-        if (item.TryGetValue("redRatingAfter", out var redRatingAfterValue) && !string.IsNullOrEmpty(redRatingAfterValue.N))
+        if (item.TryGetValue("redRatingAfter", out var redRatingAfterValue) && int.TryParse(redRatingAfterValue.N, out var redRatingAfter))
         {
-            game.RedRatingAfter = int.Parse(redRatingAfterValue.N);
+            game.RedRatingAfter = redRatingAfter;
         }
 
         // Board state

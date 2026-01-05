@@ -8,6 +8,7 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class EloRatingService : IEloRatingService
 {
+    private const int MinimumRating = 100;
     private readonly int _startingRating;
     private readonly int _kFactorNew;
     private readonly int _kFactorEstablished;
@@ -19,10 +20,31 @@ public class EloRatingService : IEloRatingService
         _logger = logger;
 
         // Load configuration with defaults
-        _startingRating = configuration.GetValue<int>("EloRating:StartingRating", 1500);
+        _startingRating = configuration.GetValue<int>("EloRating:StartingRating", Models.User.DefaultStartingRating);
         _kFactorNew = configuration.GetValue<int>("EloRating:KFactorNew", 32);
         _kFactorEstablished = configuration.GetValue<int>("EloRating:KFactorEstablished", 24);
         _gamesForEstablished = configuration.GetValue<int>("EloRating:GamesForEstablished", 30);
+
+        // Validate configuration
+        if (_startingRating <= 0)
+        {
+            throw new ArgumentException($"Invalid EloRating:StartingRating configuration: {_startingRating}. Must be greater than 0.", nameof(configuration));
+        }
+
+        if (_kFactorNew <= 0)
+        {
+            throw new ArgumentException($"Invalid EloRating:KFactorNew configuration: {_kFactorNew}. Must be greater than 0.", nameof(configuration));
+        }
+
+        if (_kFactorEstablished <= 0)
+        {
+            throw new ArgumentException($"Invalid EloRating:KFactorEstablished configuration: {_kFactorEstablished}. Must be greater than 0.", nameof(configuration));
+        }
+
+        if (_gamesForEstablished < 0)
+        {
+            throw new ArgumentException($"Invalid EloRating:GamesForEstablished configuration: {_gamesForEstablished}. Must be greater than or equal to 0.", nameof(configuration));
+        }
 
         _logger.LogInformation(
             "EloRatingService initialized: StartingRating={StartingRating}, KFactorNew={KFactorNew}, " +
@@ -56,8 +78,9 @@ public class EloRatingService : IEloRatingService
         var whiteChange = (int)Math.Round(whiteK * (whiteActual - whiteExpected));
         var redChange = (int)Math.Round(redK * (redActual - redExpected));
 
-        var whiteNewRating = whiteRating + whiteChange;
-        var redNewRating = redRating + redChange;
+        // Apply rating floor
+        var whiteNewRating = Math.Max(MinimumRating, whiteRating + whiteChange);
+        var redNewRating = Math.Max(MinimumRating, redRating + redChange);
 
         _logger.LogDebug(
             "ELO calculation: White {WhiteOld}→{WhiteNew} ({WhiteChange:+#;-#;0}), " +

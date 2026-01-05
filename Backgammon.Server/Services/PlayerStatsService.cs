@@ -9,13 +9,16 @@ namespace Backgammon.Server.Services;
 public class PlayerStatsService : IPlayerStatsService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IEloRatingService _eloRatingService;
     private readonly ILogger<PlayerStatsService> _logger;
 
     public PlayerStatsService(
         IUserRepository userRepository,
+        IEloRatingService eloRatingService,
         ILogger<PlayerStatsService> logger)
     {
         _userRepository = userRepository;
+        _eloRatingService = eloRatingService;
         _logger = logger;
     }
 
@@ -42,28 +45,84 @@ public class PlayerStatsService : IPlayerStatsService
                 return;
             }
 
-            // Update white player stats if registered
+            // Fetch both users
+            User? whiteUser = null;
+            User? redUser = null;
+
             if (!string.IsNullOrEmpty(game.WhiteUserId))
             {
-                var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
-                if (user != null)
+                whiteUser = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
+            }
+
+            if (!string.IsNullOrEmpty(game.RedUserId))
+            {
+                redUser = await _userRepository.GetByUserIdAsync(game.RedUserId);
+            }
+
+            // Update ratings if this is a ranked game with two registered users
+            if (game.IsRanked && whiteUser != null && redUser != null)
+            {
+                try
                 {
-                    var isWinner = game.Winner == "White";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    var whiteWon = game.Winner == "White";
+
+                    // Store ratings before calculation
+                    game.WhiteRatingBefore = whiteUser.Rating;
+                    game.RedRatingBefore = redUser.Rating;
+
+                    // Calculate new ratings
+                    var (whiteNewRating, redNewRating) = _eloRatingService.CalculateNewRatings(
+                        whiteUser.Rating,
+                        redUser.Rating,
+                        whiteUser.RatedGamesCount,
+                        redUser.RatedGamesCount,
+                        whiteWon);
+
+                    // Update white player rating
+                    whiteUser.Rating = whiteNewRating;
+                    whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteNewRating);
+                    whiteUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    whiteUser.RatedGamesCount++;
+
+                    // Update red player rating
+                    redUser.Rating = redNewRating;
+                    redUser.PeakRating = Math.Max(redUser.PeakRating, redNewRating);
+                    redUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    redUser.RatedGamesCount++;
+
+                    // Store ratings after calculation
+                    game.WhiteRatingAfter = whiteNewRating;
+                    game.RedRatingAfter = redNewRating;
+
+                    _logger.LogInformation(
+                        "Updated ratings for game {GameId}: White {WhiteBefore}->{WhiteAfter}, Red {RedBefore}->{RedAfter}",
+                        game.GameId,
+                        game.WhiteRatingBefore,
+                        game.WhiteRatingAfter,
+                        game.RedRatingBefore,
+                        game.RedRatingAfter);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to update ratings for game {GameId}", game.GameId);
+                    // Continue with stats updates even if rating update fails
                 }
             }
 
-            // Update red player stats if registered
-            if (!string.IsNullOrEmpty(game.RedUserId))
+            // Update white player stats if registered
+            if (whiteUser != null)
             {
-                var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
-                if (user != null)
-                {
-                    var isWinner = game.Winner == "Red";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
-                }
+                var isWinner = game.Winner == "White";
+                UpdateStats(whiteUser.Stats, isWinner, game.Stakes);
+                await _userRepository.UpdateUserAsync(whiteUser);
+            }
+
+            // Update red player stats if registered
+            if (redUser != null)
+            {
+                var isWinner = game.Winner == "Red";
+                UpdateStats(redUser.Stats, isWinner, game.Stakes);
+                await _userRepository.UpdateUserAsync(redUser);
             }
         }
         catch (Exception ex)
