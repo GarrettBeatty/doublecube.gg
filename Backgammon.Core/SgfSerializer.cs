@@ -15,63 +15,57 @@ public static class SgfSerializer
     public static string ExportPosition(GameEngine engine)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("(;GM[6]");  // Game type 6 = Backgammon
+        sb.Append("(;FF[4]GM[6]CA[UTF-8]");  // SGF file format 4, Game type 6 = Backgammon, UTF-8 encoding
 
         // Export White checkers
         var whitePositions = GetCheckerPositions(engine, CheckerColor.White);
         if (whitePositions.Count > 0)
         {
-            sb.Append("  AW");
+            sb.AppendLine();
+            sb.Append(";AW");
             foreach (var (coord, count) in whitePositions)
             {
-                if (count == 1)
+                // Repeat coordinate for each checker (standard SGF format)
+                for (int i = 0; i < count; i++)
                 {
                     sb.Append($"[{coord}]");
                 }
-                else
-                {
-                    sb.Append($"[{coord}[{count}]]");
-                }
             }
-
-            sb.AppendLine();
         }
 
         // Export Red/Black checkers
         var redPositions = GetCheckerPositions(engine, CheckerColor.Red);
         if (redPositions.Count > 0)
         {
-            sb.Append("  AB");
+            sb.AppendLine();
+            sb.Append(";AB");
             foreach (var (coord, count) in redPositions)
             {
-                if (count == 1)
+                // Repeat coordinate for each checker (standard SGF format)
+                for (int i = 0; i < count; i++)
                 {
                     sb.Append($"[{coord}]");
                 }
-                else
-                {
-                    sb.Append($"[{coord}[{count}]]");
-                }
             }
-
-            sb.AppendLine();
         }
 
         // Current player
-        sb.AppendLine($"  PL[{(engine.CurrentPlayer.Color == CheckerColor.White ? "W" : "B")}]");
+        sb.AppendLine();
+        sb.Append($";PL[{(engine.CurrentPlayer.Color == CheckerColor.White ? "W" : "B")}]");
 
         // Dice (if rolled)
         if (engine.RemainingMoves.Count > 0)
         {
             var dice = engine.Dice;
-            sb.AppendLine($"  DI[{dice.Die1}{dice.Die2}]");
+            sb.AppendLine();
+            sb.Append($";DI[{dice.Die1}{dice.Die2}]");
         }
 
         // Doubling cube
-        sb.AppendLine($"  CO[{GetCubeOwner(engine.DoublingCube)}]");
-        sb.AppendLine($"  CV[{engine.DoublingCube.Value}]");
-
-        sb.Append(")");
+        sb.AppendLine();
+        sb.Append($";CV[{engine.DoublingCube.Value}]");
+        sb.AppendLine();
+        sb.Append($";CP[{GetCubeOwner(engine.DoublingCube)}])");
 
         return sb.ToString();
     }
@@ -391,15 +385,15 @@ public static class SgfSerializer
 
             if (coord == 'y')
             {
-                // Bar
+                // Bar - Add to existing count (standard SGF uses repeated coordinates)
                 var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
-                player.CheckersOnBar = count;
+                player.CheckersOnBar += count;
             }
             else if (coord == 'z')
             {
-                // Borne off
+                // Borne off - Add to existing count (standard SGF uses repeated coordinates)
                 var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
-                player.CheckersBornOff = count;
+                player.CheckersBornOff += count;
             }
             else
             {

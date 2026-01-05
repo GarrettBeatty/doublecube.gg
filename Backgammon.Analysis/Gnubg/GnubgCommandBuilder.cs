@@ -10,10 +10,9 @@ public static class GnubgCommandBuilder
     /// <summary>
     /// Build gnubg commands for position evaluation
     /// </summary>
-    /// <param name="sgf">SGF representation of the position</param>
     /// <param name="settings">Gnubg settings</param>
-    /// <returns>List of gnubg commands</returns>
-    public static List<string> BuildEvaluationCommand(string sgf, GnubgSettings settings)
+    /// <returns>List of gnubg commands (position should be loaded separately)</returns>
+    public static List<string> BuildEvaluationCommand(GnubgSettings settings)
     {
         var commands = new List<string>();
 
@@ -21,16 +20,14 @@ public static class GnubgCommandBuilder
         commands.Add("set automatic game off");
         commands.Add("set automatic roll off");
 
-        // Import the position
-        commands.Add($"import sgf {sgf}");
+        // Configure evaluation settings (position will be loaded by ProcessManager)
+        commands.Add($"set evaluation chequerplay evaluation plies {settings.EvaluationPlies}");
+        commands.Add($"set evaluation cubedecision evaluation plies {settings.EvaluationPlies}");
 
-        // Configure evaluation settings
         if (settings.UseNeuralNet)
         {
-            commands.Add("set evaluation cubeful off"); // Faster for position evaluation
+            commands.Add("set evaluation chequerplay evaluation cubeful off"); // Faster for position evaluation
         }
-
-        commands.Add($"set evaluation plies {settings.EvaluationPlies}");
 
         // Evaluate the position
         commands.Add("eval");
@@ -41,10 +38,9 @@ public static class GnubgCommandBuilder
     /// <summary>
     /// Build gnubg commands for finding best moves (hint)
     /// </summary>
-    /// <param name="sgf">SGF representation of the position</param>
     /// <param name="settings">Gnubg settings</param>
-    /// <returns>List of gnubg commands</returns>
-    public static List<string> BuildHintCommand(string sgf, GnubgSettings settings)
+    /// <returns>List of gnubg commands (position should be loaded separately)</returns>
+    public static List<string> BuildHintCommand(GnubgSettings settings)
     {
         var commands = new List<string>();
 
@@ -52,16 +48,14 @@ public static class GnubgCommandBuilder
         commands.Add("set automatic game off");
         commands.Add("set automatic roll off");
 
-        // Import the position
-        commands.Add($"import sgf {sgf}");
+        // Configure evaluation settings (position will be loaded by ProcessManager)
+        commands.Add($"set evaluation chequerplay evaluation plies {settings.EvaluationPlies}");
+        commands.Add($"set evaluation cubedecision evaluation plies {settings.EvaluationPlies}");
 
-        // Configure evaluation settings
         if (settings.UseNeuralNet)
         {
-            commands.Add("set evaluation cubeful off");
+            commands.Add("set evaluation chequerplay evaluation cubeful off");
         }
-
-        commands.Add($"set evaluation plies {settings.EvaluationPlies}");
 
         // Get move hints
         commands.Add("hint");
@@ -72,10 +66,9 @@ public static class GnubgCommandBuilder
     /// <summary>
     /// Build gnubg commands for cube decision analysis
     /// </summary>
-    /// <param name="sgf">SGF representation of the position</param>
     /// <param name="settings">Gnubg settings</param>
-    /// <returns>List of gnubg commands</returns>
-    public static List<string> BuildCubeCommand(string sgf, GnubgSettings settings)
+    /// <returns>List of gnubg commands (position should be loaded separately)</returns>
+    public static List<string> BuildCubeCommand(GnubgSettings settings)
     {
         var commands = new List<string>();
 
@@ -83,16 +76,15 @@ public static class GnubgCommandBuilder
         commands.Add("set automatic game off");
         commands.Add("set automatic roll off");
 
-        // Import the position
-        commands.Add($"import sgf {sgf}");
+        // Configure evaluation settings with cubeful analysis (position will be loaded by ProcessManager)
+        commands.Add($"set evaluation chequerplay evaluation plies {settings.EvaluationPlies}");
+        commands.Add($"set evaluation cubedecision evaluation plies {settings.EvaluationPlies}");
 
-        // Configure evaluation settings with cubeful analysis
         if (settings.UseNeuralNet)
         {
-            commands.Add("set evaluation cubeful on"); // Important for cube decisions
+            commands.Add("set evaluation chequerplay evaluation cubeful on"); // Important for cube decisions
+            commands.Add("set evaluation cubedecision evaluation cubeful on");
         }
-
-        commands.Add($"set evaluation plies {settings.EvaluationPlies}");
 
         // Evaluate cube decision
         commands.Add("hint cube");

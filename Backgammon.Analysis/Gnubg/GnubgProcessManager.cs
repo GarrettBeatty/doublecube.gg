@@ -153,6 +153,50 @@ public class GnubgProcessManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Execute gnubg commands with an SGF position loaded from a temporary file
+    /// </summary>
+    /// <param name="sgfContent">SGF position content to load</param>
+    /// <param name="commands">List of gnubg commands to execute after loading position</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>Output from gnubg</returns>
+    public async Task<string> ExecuteWithSgfFileAsync(string sgfContent, List<string> commands, CancellationToken ct = default)
+    {
+        var tempFile = Path.Combine(Path.GetTempPath(), $"gnubg_{Guid.NewGuid()}.sgf");
+        try
+        {
+            // Write SGF content to temporary file
+            await File.WriteAllTextAsync(tempFile, sgfContent, ct);
+
+            if (_settings.VerboseLogging && _logger != null)
+            {
+                _logger($"Wrote SGF to temp file: {tempFile}");
+            }
+
+            // Prepend load position command
+            var allCommands = new List<string> { $"load position {tempFile}" };
+            allCommands.AddRange(commands);
+
+            // Execute commands
+            return await ExecuteCommandAsync(allCommands, ct);
+        }
+        finally
+        {
+            // Clean up temp file
+            if (File.Exists(tempFile))
+            {
+                try
+                {
+                    File.Delete(tempFile);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Invoke($"Failed to delete temp file {tempFile}: {ex.Message}");
+                }
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (!_disposed)

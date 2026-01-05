@@ -56,10 +56,10 @@ public class GnubgEvaluator : IPositionEvaluator
             _logger?.Invoke($"Evaluating position with gnubg. SGF: {sgf}");
 
             // Build gnubg commands
-            var commands = GnubgCommandBuilder.BuildEvaluationCommand(sgf, _settings);
+            var commands = GnubgCommandBuilder.BuildEvaluationCommand(_settings);
 
-            // Execute gnubg
-            var output = await _processManager.ExecuteCommandAsync(commands, CancellationToken.None);
+            // Execute gnubg with SGF file
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
 
             // Parse output
             var evaluation = GnubgOutputParser.ParseEvaluation(output);
@@ -87,10 +87,10 @@ public class GnubgEvaluator : IPositionEvaluator
             var initialEvaluation = await EvaluateAsync(engine);
 
             // Build gnubg hint commands
-            var commands = GnubgCommandBuilder.BuildHintCommand(sgf, _settings);
+            var commands = GnubgCommandBuilder.BuildHintCommand(_settings);
 
-            // Execute gnubg
-            var output = await _processManager.ExecuteCommandAsync(commands, CancellationToken.None);
+            // Execute gnubg with SGF file
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
 
             // Parse move analysis
             var moveAnalyses = GnubgOutputParser.ParseMoveAnalysis(output);
@@ -145,10 +145,10 @@ public class GnubgEvaluator : IPositionEvaluator
             _logger?.Invoke($"Evaluating cube decision with gnubg. SGF: {sgf}");
 
             // Build gnubg cube commands
-            var commands = GnubgCommandBuilder.BuildCubeCommand(sgf, _settings);
+            var commands = GnubgCommandBuilder.BuildCubeCommand(_settings);
 
-            // Execute gnubg
-            var output = await _processManager.ExecuteCommandAsync(commands, CancellationToken.None);
+            // Execute gnubg with SGF file
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
 
             // Parse cube decision
             var decision = GnubgOutputParser.ParseCubeDecision(output);

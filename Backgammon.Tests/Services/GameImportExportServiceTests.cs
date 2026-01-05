@@ -75,7 +75,7 @@ public class GameImportExportServiceTests
         // Decode from base64 and verify it's valid SGF
         var bytes = Convert.FromBase64String(result);
         var sgf = System.Text.Encoding.UTF8.GetString(bytes);
-        Assert.StartsWith("(;GM[6]", sgf); // SGF format starts with this
+        Assert.StartsWith("(;FF[4]GM[6]CA[UTF-8]", sgf); // Standard SGF format with headers
     }
 
     [Fact]
