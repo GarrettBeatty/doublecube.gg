@@ -1,10 +1,5 @@
 import React from 'react'
-import { GameState, GameStatus, CheckerColor } from '@/types/game.types'
-import { Button } from '@/components/ui/button'
-import { Dice1, Check, Undo } from 'lucide-react'
-import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
-import { useGameStore } from '@/stores/gameStore'
+import { GameState, CheckerColor } from '@/types/game.types'
 
 interface BoardOverlayControlsProps {
   gameState: GameState
@@ -15,17 +10,8 @@ interface BoardOverlayControlsProps {
 export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   gameState,
   isSpectator = false,
-  isAnalysisMode = false,
 }) => {
-  const { invoke } = useSignalR()
-  const { isCustomDiceEnabled } = useGameStore()
-
   if (isSpectator) return null
-
-  const isGameInProgress = gameState.status === GameStatus.InProgress
-  const isYourTurn = gameState.isYourTurn
-  const hasDiceRolled =
-    gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
 
   // Opening roll logic
   const isOpeningRoll = gameState.isOpeningRoll || false
@@ -39,71 +25,8 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
     (yourColor === CheckerColor.Red && gameState.whiteOpeningRoll != null)
   )
 
-  // Hide roll button if custom dice is enabled in analysis mode
-  const hideRollForCustomDice = isAnalysisMode && isCustomDiceEnabled
-  const canRoll = !hideRollForCustomDice && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
-
-  // End turn button logic:
-  // Analysis mode: Show when all moves used OR no valid moves remain
-  // Regular mode: Show when no valid moves remain AND it's your turn
-  const hasUsedAllMoves = gameState.remainingMoves && gameState.remainingMoves.length === 0
-  const canEndTurn = isGameInProgress && !isOpeningRoll && hasDiceRolled && (
-    isAnalysisMode ? (hasUsedAllMoves || !gameState.hasValidMoves) : (!gameState.hasValidMoves && isYourTurn)
-  )
-  
-  // Undo button: Only show if at least one move has been made
-  // For doubles, you get 4 moves; for regular rolls, you get 2 moves
-  const isDoubles = hasDiceRolled && gameState.dice.length === 2 && gameState.dice[0] === gameState.dice[1]
-  const totalMoves = hasDiceRolled ? (isDoubles ? 4 : gameState.dice.length) : 0
-  const remainingMovesCount = gameState.remainingMoves?.length ?? 0
-  const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
-  const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (isAnalysisMode || isYourTurn)
-
-  const handleRollDice = async () => {
-    try {
-      await invoke(HubMethods.RollDice)
-    } catch (error) {
-      console.error('Failed to roll dice:', error)
-    }
-  }
-
-  const handleEndTurn = async () => {
-    try {
-      await invoke(HubMethods.EndTurn)
-    } catch (error) {
-      console.error('Failed to end turn:', error)
-    }
-  }
-
-  const handleUndo = async () => {
-    try {
-      await invoke(HubMethods.UndoLastMove)
-    } catch (error) {
-      console.error('Failed to undo:', error)
-    }
-  }
-
   return (
     <>
-      {/* Roll Dice Button - Center of right side of board */}
-      {canRoll && (
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '72.65%' }}
-        >
-          <Button
-            variant="default"
-            size="lg"
-            onClick={handleRollDice}
-            className="h-20 w-20 rounded-full shadow-lg"
-          >
-            <div className="text-center">
-              <Dice1 className="h-8 w-8 mx-auto mb-1" />
-              <div className="text-xs font-semibold">Roll</div>
-            </div>
-          </Button>
-        </div>
-      )}
 
       {/* Opening Roll Display - Show both player's rolls */}
       {isOpeningRoll && (youHaveRolled || opponentHasRolled) && (
@@ -150,47 +73,6 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
         </div>
       )}
 
-      {/* Regular Dice Display - Now rendered in SVG */}
-      {/* Dice are now rendered directly in BoardSVG for accurate positioning */}
-
-      {/* Undo Button - Center of left side of board */}
-      {canUndo && (
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '22.16%' }}
-        >
-          <Button
-            variant="outline"
-            size="lg"
-            onClick={handleUndo}
-            className="h-16 w-16 rounded-full shadow-lg bg-background/95 backdrop-blur-sm"
-          >
-            <div className="text-center">
-              <Undo className="h-6 w-6 mx-auto" />
-            </div>
-          </Button>
-        </div>
-      )}
-
-      {/* End Turn Button - Center of right side of board */}
-      {canEndTurn && (
-        <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
-          style={{ left: '72.65%' }}
-        >
-          <Button
-            variant="default"
-            size="lg"
-            onClick={handleEndTurn}
-            className="h-20 w-20 rounded-full shadow-lg bg-green-600 hover:bg-green-700"
-          >
-            <div className="text-center">
-              <Check className="h-8 w-8 mx-auto mb-1" />
-              <div className="text-xs font-semibold">End</div>
-            </div>
-          </Button>
-        </div>
-      )}
     </>
   )
 }

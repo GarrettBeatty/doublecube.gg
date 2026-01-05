@@ -5,7 +5,7 @@ import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, Home } from 'lucide-react'
+import { BarChart3 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useGameStore } from '@/stores/gameStore'
 import { BoardSVG } from '@/components/game/BoardSVG'
@@ -18,7 +18,7 @@ import { PositionControls } from '@/components/game/PositionControls'
 import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
 import { PositionEvaluation as PositionEvaluationComponent } from '@/components/game/PositionEvaluation'
 import { BestMovesPanel } from '@/components/game/BestMovesPanel'
-import { CheckerColor } from '@/types/game.types'
+import { CheckerColor, Move } from '@/types/game.types'
 import {
   PositionEvaluation,
   BestMovesAnalysis,
@@ -176,6 +176,25 @@ export const AnalysisPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Execute a sequence of moves
+  const handleExecuteMoves = async (moves: Move[]) => {
+    if (!currentGameState?.gameId) return
+
+    try {
+      // Execute each move in sequence
+      for (const move of moves) {
+        await invoke(HubMethods.MakeMove, move.from, move.to)
+      }
+    } catch (error) {
+      console.error('[AnalysisPage] Failed to execute moves:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to execute moves',
+        variant: 'destructive',
+      })
+    }
+  }
+
   // Auto-analyze position whenever game state changes
   useEffect(() => {
     const analyzePosition = async () => {
@@ -207,7 +226,13 @@ export const AnalysisPage: React.FC = () => {
         setCurrentEvaluation(evaluation)
 
         // Auto-find best moves if dice are rolled
-        if (currentGameState.dice && currentGameState.dice.length > 0) {
+        // In analysis mode, you control both sides, so we only check for dice
+        // Check if dice have actual values (not [0, 0] which is set after ending turn)
+        if (
+          currentGameState.dice &&
+          currentGameState.dice.length > 0 &&
+          currentGameState.dice.some((die) => die > 0)
+        ) {
           const analysis = (await invoke(
             HubMethods.FindBestMoves,
             currentGameState.gameId
@@ -217,6 +242,7 @@ export const AnalysisPage: React.FC = () => {
             setCurrentEvaluation(analysis.initialEvaluation)
           }
         } else {
+          // Clear best moves when dice are not rolled (e.g., after ending turn)
           setBestMoves(null)
         }
       } catch (error) {
@@ -283,15 +309,11 @@ export const AnalysisPage: React.FC = () => {
     <div className="min-h-screen bg-background">
       <div className="max-w-[1920px] mx-auto px-2 py-4">
         {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4">
           <Badge variant="secondary" className="text-lg py-2 px-4">
             <BarChart3 className="h-5 w-5 mr-2" />
             Analysis Mode - Control Both Sides
           </Badge>
-          <Button variant="outline" onClick={() => navigate('/')}>
-            <Home className="h-4 w-4 mr-2" />
-            Back to Home
-          </Button>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_320px] gap-3">
@@ -309,10 +331,6 @@ export const AnalysisPage: React.FC = () => {
 
             {/* Player Switcher - Always shown in analysis */}
             <PlayerSwitcher currentPlayer={currentGameState.currentPlayer} />
-        
-
-            {/* Position Export/Import */}
-            <PositionControls />
 
             {/* Doubling Cube */}
             {currentGameState.doublingCubeValue > 1 && (
@@ -330,7 +348,7 @@ export const AnalysisPage: React.FC = () => {
           </div>
 
           {/* Main Board Area */}
-          <div>
+          <div className="space-y-3">
             <Card>
               <CardContent className="p-2 relative">
                 {/* Board with overlay controls */}
@@ -344,6 +362,9 @@ export const AnalysisPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Position SGF */}
+            <PositionControls />
           </div>
 
           {/* Right Sidebar - Analysis */}
@@ -360,6 +381,7 @@ export const AnalysisPage: React.FC = () => {
               isAnalyzing={isAnalyzing}
               onHighlightMoves={setHighlightedMoves}
               highlightedMoves={highlightedMoves}
+              onExecuteMoves={handleExecuteMoves}
             />
           </div>
         </div>

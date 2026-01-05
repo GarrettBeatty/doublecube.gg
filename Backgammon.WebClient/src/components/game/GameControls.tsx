@@ -80,7 +80,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       )}
 
       {/* Utility Buttons */}
-      <div className={`grid gap-2 ${showChatButton ? 'grid-cols-3' : 'grid-cols-2'}`}>
+      <div className={`grid gap-2 ${showChatButton ? 'grid-cols-3' : gameState.isAnalysisMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <Button
           variant="outline"
           size="lg"
@@ -110,17 +110,19 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </Button>
         )}
 
-        <Button
-          variant="destructive"
-          size="lg"
-          onClick={() => setShowAbandonModal(true)}
-          className="w-full h-12"
-        >
-          <div className="text-center">
-            <Flag className="h-5 w-5 mx-auto mb-1" />
-            <div className="text-xs">Abandon</div>
-          </div>
-        </Button>
+        {!gameState.isAnalysisMode && (
+          <Button
+            variant="destructive"
+            size="lg"
+            onClick={() => setShowAbandonModal(true)}
+            className="w-full h-12"
+          >
+            <div className="text-center">
+              <Flag className="h-5 w-5 mx-auto mb-1" />
+              <div className="text-xs">Abandon</div>
+            </div>
+          </Button>
+        )}
       </div>
 
       {/* Chat Panel - only show in multiplayer games */}

@@ -10,6 +10,7 @@ interface BestMovesPanelProps {
   isAnalyzing: boolean
   onHighlightMoves: (moves: Move[]) => void
   highlightedMoves: Move[]
+  onExecuteMoves: (moves: Move[]) => void
 }
 
 export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
@@ -17,6 +18,7 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
   isAnalyzing,
   onHighlightMoves,
   highlightedMoves,
+  onExecuteMoves,
 }) => {
   if (isAnalyzing) {
     return (
@@ -93,7 +95,7 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
               key={index}
               onMouseEnter={() => onHighlightMoves(moveSeq.moves)}
               onMouseLeave={() => onHighlightMoves([])}
-              onClick={() => onHighlightMoves(moveSeq.moves)}
+              onClick={() => onExecuteMoves(moveSeq.moves)}
               className={`w-full text-left p-2 rounded-lg transition-all border ${
                 isActive
                   ? 'bg-primary/10 border-primary'

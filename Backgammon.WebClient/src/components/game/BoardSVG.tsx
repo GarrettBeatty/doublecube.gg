@@ -130,6 +130,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
   const diceGroupRef = useRef<SVGGElement | null>(null)
+  const buttonsGroupRef = useRef<SVGGElement | null>(null)
 
   const { selectedChecker, validSources, isBoardFlipped, isFreeMoveEnabled, highlightedMoves } =
     useGameStore()
@@ -748,6 +749,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     const diceGroup = createSVGElement('g', { id: 'dice' }) as SVGGElement
     svgRef.current.appendChild(diceGroup)
     diceGroupRef.current = diceGroup
+
+    // Buttons group
+    const buttonsGroup = createSVGElement('g', { id: 'buttons' }) as SVGGElement
+    svgRef.current.appendChild(buttonsGroup)
+    buttonsGroupRef.current = buttonsGroup
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -1047,6 +1053,157 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     }
   }, [gameState, isBoardFlipped])
 
+  // Render buttons (Roll, Undo, End)
+  const renderButtons = useCallback(() => {
+    if (!buttonsGroupRef.current || !gameState) return
+
+    buttonsGroupRef.current.innerHTML = ''
+
+    const { isCustomDiceEnabled } = useGameStore.getState()
+
+    const isGameInProgress = gameState.status === GameStatus.InProgress
+    const isYourTurn = gameState.isYourTurn
+    const hasDiceRolled =
+      gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
+
+    // Opening roll logic
+    const isOpeningRoll = gameState.isOpeningRoll || false
+    const yourColor = gameState.yourColor
+    const youHaveRolled = isOpeningRoll && (
+      (yourColor === CheckerColor.White && gameState.whiteOpeningRoll != null) ||
+      (yourColor === CheckerColor.Red && gameState.redOpeningRoll != null)
+    )
+
+    // Button visibility logic (from BoardOverlayControls)
+    const hideRollForCustomDice = gameState.isAnalysisMode && isCustomDiceEnabled
+    const canRoll = !hideRollForCustomDice && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
+
+    const hasUsedAllMoves = gameState.remainingMoves && gameState.remainingMoves.length === 0
+    const canEndTurn = isGameInProgress && !isOpeningRoll && hasDiceRolled && (
+      gameState.isAnalysisMode ? (hasUsedAllMoves || !gameState.hasValidMoves) : (!gameState.hasValidMoves && isYourTurn)
+    )
+
+    const isDoubles = hasDiceRolled && gameState.dice.length === 2 && gameState.dice[0] === gameState.dice[1]
+    const totalMoves = hasDiceRolled ? (isDoubles ? 4 : gameState.dice.length) : 0
+    const remainingMovesCount = gameState.remainingMoves?.length ?? 0
+    const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
+    const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (gameState.isAnalysisMode || isYourTurn)
+
+    // Button positions
+    const centerY = CONFIG.viewBox.height / 2
+    const leftSideX = CONFIG.viewBox.width * 0.2216  // 22.16%
+    const rightSideX = CONFIG.viewBox.width * 0.7265  // 72.65%
+
+    // Helper function to create a circular button
+    const createButton = (
+      x: number,
+      y: number,
+      radius: number,
+      label: string,
+      onClick: () => void,
+      color: string = 'hsl(0 0% 98%)',  // Default white/light
+      textColor: string = 'hsl(0 0% 9%)'  // Default dark text
+    ) => {
+      const buttonGroup = createSVGElement('g', { class: 'button-group' }) as SVGGElement
+      buttonGroup.style.cursor = 'pointer'
+
+      // Button circle background
+      const circle = createSVGElement('circle', {
+        cx: x,
+        cy: y,
+        r: radius,
+        fill: color,
+        stroke: 'hsl(0 0% 72%)',
+        'stroke-width': 2,
+        class: 'button-bg',
+        filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))',
+      })
+      buttonGroup.appendChild(circle)
+
+      // Button text
+      const text = createSVGElement('text', {
+        x: x,
+        y: y,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        fill: textColor,
+        'font-size': 16,
+        'font-weight': 'bold',
+        'pointer-events': 'none',
+      })
+      text.textContent = label
+      buttonGroup.appendChild(text)
+
+      // Add hover effect
+      buttonGroup.addEventListener('mouseenter', () => {
+        circle.setAttribute('stroke-width', '3')
+        circle.setAttribute('r', String(radius + 2))
+      })
+      buttonGroup.addEventListener('mouseleave', () => {
+        circle.setAttribute('stroke-width', '2')
+        circle.setAttribute('r', String(radius))
+      })
+
+      // Add click handler
+      buttonGroup.addEventListener('click', async (e) => {
+        e.preventDefault()
+        try {
+          onClick()
+        } catch (error) {
+          console.error('Button click error:', error)
+        }
+      })
+
+      return buttonGroup
+    }
+
+    // Render Roll button
+    if (canRoll) {
+      const rollButton = createButton(
+        rightSideX,
+        centerY,
+        40,  // radius
+        'Roll',
+        async () => {
+          await invoke(HubMethods.RollDice)
+        }
+      )
+      buttonsGroupRef.current.appendChild(rollButton)
+    }
+
+    // Render Undo button
+    if (canUndo) {
+      const undoButton = createButton(
+        leftSideX,
+        centerY,
+        32,  // smaller radius
+        'Undo',
+        async () => {
+          await invoke(HubMethods.UndoLastMove)
+        },
+        'hsl(0 0% 98%)',  // light background
+        'hsl(0 0% 9%)'  // dark text
+      )
+      buttonsGroupRef.current.appendChild(undoButton)
+    }
+
+    // Render End Turn button
+    if (canEndTurn) {
+      const endButton = createButton(
+        rightSideX,
+        centerY,
+        40,  // radius
+        'End',
+        async () => {
+          await invoke(HubMethods.EndTurn)
+        },
+        'hsl(142.1 76.2% 36.3%)',  // green background
+        'hsl(0 0% 98%)'  // light text
+      )
+      buttonsGroupRef.current.appendChild(endButton)
+    }
+  }, [gameState, invoke])
+
   // Initialize board
   useEffect(() => {
     renderBoard()
@@ -1061,6 +1218,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   useEffect(() => {
     renderDice()
   }, [renderDice])
+
+  // Re-render buttons when game state changes
+  useEffect(() => {
+    renderButtons()
+  }, [renderButtons])
 
   return (
     <svg
