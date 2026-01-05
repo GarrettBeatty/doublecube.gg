@@ -18,6 +18,7 @@ import { PositionControls } from '@/components/game/PositionControls'
 import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
 import { PositionEvaluation as PositionEvaluationComponent } from '@/components/game/PositionEvaluation'
 import { BestMovesPanel } from '@/components/game/BestMovesPanel'
+import { EvaluatorSelector } from '@/components/game/EvaluatorSelector'
 import { CheckerColor, Move } from '@/types/game.types'
 import {
   PositionEvaluation,
@@ -44,6 +45,7 @@ export const AnalysisPage: React.FC = () => {
     setHighlightedMoves,
   } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
+  const [evaluatorType, setEvaluatorType] = useState<'Heuristic' | 'Gnubg'>('Gnubg')
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
@@ -234,7 +236,8 @@ export const AnalysisPage: React.FC = () => {
       try {
         const evaluation = (await invoke(
           HubMethods.AnalyzePosition,
-          currentGameState.gameId
+          currentGameState.gameId,
+          evaluatorType
         )) as PositionEvaluation | null
         setCurrentEvaluation(evaluation)
 
@@ -248,7 +251,8 @@ export const AnalysisPage: React.FC = () => {
         ) {
           const analysis = (await invoke(
             HubMethods.FindBestMoves,
-            currentGameState.gameId
+            currentGameState.gameId,
+            evaluatorType
           )) as BestMovesAnalysis | null
           if (analysis) {
             setBestMoves(analysis)
@@ -267,7 +271,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     analyzePosition()
-  }, [currentGameState, invoke, setCurrentEvaluation, setIsAnalyzing, setBestMoves])
+  }, [currentGameState, invoke, setCurrentEvaluation, setIsAnalyzing, setBestMoves, evaluatorType])
 
   if (!isConnected || !currentGameState) {
     return (
@@ -382,6 +386,13 @@ export const AnalysisPage: React.FC = () => {
 
           {/* Right Sidebar - Analysis */}
           <div className="space-y-3">
+            {/* Evaluator Selector */}
+            <EvaluatorSelector
+              value={evaluatorType}
+              onChange={setEvaluatorType}
+              disabled={isAnalyzing}
+            />
+
             {/* Position Evaluation */}
             <PositionEvaluationComponent
               evaluation={currentEvaluation}

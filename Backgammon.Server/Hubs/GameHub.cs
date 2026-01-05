@@ -1228,7 +1228,9 @@ public class GameHub : Hub
     /// <summary>
     /// Analyze the current position and return evaluation
     /// </summary>
-    public async Task<PositionEvaluationDto> AnalyzePosition(string gameId)
+    /// <param name="gameId">The game ID to analyze</param>
+    /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg"). If null, uses default from settings.</param>
+    public async Task<PositionEvaluationDto> AnalyzePosition(string gameId, string? evaluatorType = null)
     {
         var session = _sessionManager.GetSession(gameId);
         if (session == null)
@@ -1236,13 +1238,15 @@ public class GameHub : Hub
             throw new HubException("Game not found");
         }
 
-        return await Task.Run(() => _analysisService.EvaluatePosition(session.Engine));
+        return await Task.Run(() => _analysisService.EvaluatePosition(session.Engine, evaluatorType));
     }
 
     /// <summary>
     /// Find the best moves for the current position
     /// </summary>
-    public async Task<BestMovesAnalysisDto> FindBestMoves(string gameId)
+    /// <param name="gameId">The game ID to analyze</param>
+    /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg"). If null, uses default from settings.</param>
+    public async Task<BestMovesAnalysisDto> FindBestMoves(string gameId, string? evaluatorType = null)
     {
         var session = _sessionManager.GetSession(gameId);
         if (session == null)
@@ -1255,7 +1259,7 @@ public class GameHub : Hub
             throw new HubException("No dice rolled - cannot analyze moves");
         }
 
-        return await Task.Run(() => _analysisService.FindBestMoves(session.Engine));
+        return await Task.Run(() => _analysisService.FindBestMoves(session.Engine, evaluatorType));
     }
 
     private string? GetAuthenticatedUserId()
