@@ -225,16 +225,18 @@ aws ssm put-parameter \
   --overwrite
 ```
 
-### Set Your Domain Name
+### Set Your Domain Names
+
+The application supports multiple domains simultaneously. Both `backgammon.beatty.codes` and `doublecube.gg` are configured in the Caddyfile. Set both domains in a comma-separated list for backend CORS configuration:
 
 ```bash
 aws ssm put-parameter \
   --name /backgammon/dev/domain \
-  --value "backgammon.beatty.codes" \
+  --value "backgammon.beatty.codes,doublecube.gg" \
   --overwrite
 ```
 
-Replace `backgammon.beatty.codes` with your actual domain name.
+This configures the backend to accept SignalR connections and API requests from both domains. You can add additional domains by separating them with commas.
 
 ### Set Let's Encrypt Email
 
@@ -253,8 +255,9 @@ Replace with your email address (used for Let's Encrypt certificate notification
 # Check table name (set automatically by CDK)
 aws ssm get-parameter --name /backgammon/dev/table-name --query Parameter.Value --output text
 
-# Check domain
+# Check domains (should return comma-separated list)
 aws ssm get-parameter --name /backgammon/dev/domain --query Parameter.Value --output text
+# Expected: backgammon.beatty.codes,doublecube.gg
 
 # Check TLS email
 aws ssm get-parameter --name /backgammon/dev/tls-email --query Parameter.Value --output text
@@ -265,33 +268,43 @@ aws ssm get-parameter --name /backgammon/dev/jwt-secret --with-decryption --quer
 
 ## DNS Configuration
 
-To use a custom domain with HTTPS (via Let's Encrypt), configure your DNS to point to the Elastic IP.
+The application is configured to serve on two domains. You must configure DNS for both to use HTTPS (via Let's Encrypt).
 
-### Create DNS A Record
+### Create DNS A Records for Both Domains
 
-In your DNS provider (e.g., Cloudflare, Route 53, Namecheap):
+In your DNS provider(s), create A records for both domains pointing to your Elastic IP:
 
-- **Host/Name**: `backgammon` (for subdomain) or `@` (for apex domain)
+#### Domain 1: backgammon.beatty.codes (Subdomain)
+
+In your DNS provider for `beatty.codes`:
+- **Host/Name**: `backgammon`
 - **Type**: `A`
 - **Value/Target**: Your Elastic IP address (e.g., `54.123.45.67`)
 - **TTL**: `300` (5 minutes) or your preference
 
-### Example for Subdomain
+#### Domain 2: doublecube.gg (Apex Domain)
 
-For `backgammon.beatty.codes`:
-- Create an A record: `backgammon` → `<ELASTIC_IP>`
+In your DNS provider for `doublecube.gg`:
+- **Host/Name**: `@` (apex/root domain)
+- **Type**: `A`
+- **Value/Target**: Your Elastic IP address (same as above)
+- **TTL**: `300` (5 minutes) or your preference
 
-### Verify DNS Propagation
+**Important**: Both domains must point to the same Elastic IP address.
+
+### Verify DNS Propagation for Both Domains
 
 ```bash
-# Wait a few minutes after creating the record, then check:
+# Wait a few minutes after creating the records, then check both:
 dig backgammon.beatty.codes
+dig doublecube.gg
 
 # Or use nslookup
 nslookup backgammon.beatty.codes
+nslookup doublecube.gg
 ```
 
-The output should show your Elastic IP address.
+Both outputs should show your Elastic IP address.
 
 ## Trigger First Deployment
 
@@ -369,16 +382,19 @@ From your local machine:
 # Test via IP address (HTTP)
 curl http://<ELASTIC_IP>/health
 
-# Test via domain (HTTPS) - after DNS propagates
+# Test via both domains (HTTPS) - after DNS propagates
 curl https://backgammon.beatty.codes/health
+curl https://doublecube.gg/health
 ```
 
-Both should return a success response.
+All should return a success response.
 
 ### Access the Application
 
+The application is accessible from multiple URLs:
 - **HTTP**: `http://<ELASTIC_IP>`
-- **HTTPS**: `https://backgammon.beatty.codes` (Caddy automatically generates Let's Encrypt certificate)
+- **HTTPS**: `https://backgammon.beatty.codes` (Caddy automatically generates Let's Encrypt certificates)
+- **HTTPS**: `https://doublecube.gg`
 
 ## Troubleshooting
 
@@ -417,9 +433,10 @@ Both should return a success response.
 **Problem**: Let's Encrypt certificate generation fails
 
 **Solutions**:
-- Verify DNS is pointing to the correct Elastic IP:
+- Verify both DNS records are pointing to the correct Elastic IP:
   ```bash
   dig backgammon.beatty.codes
+  dig doublecube.gg
   ```
 - Ensure `TLS_EMAIL` SSM parameter has a valid email
 - Wait 5-10 minutes after DNS changes (propagation time)
@@ -428,7 +445,8 @@ Both should return a success response.
   docker logs backgammon-caddy-1
   ```
 - Ensure ports 80 and 443 are open in the security group
-- Verify the domain name in SSM parameter matches your DNS configuration
+- Verify both domains in SSM parameter match your DNS configuration and Caddyfile
+- Note: Caddy obtains separate certificates for each domain - both must have valid DNS records
 
 ### Application Not Responding
 
@@ -479,10 +497,16 @@ Both should return a success response.
 
 ### Need to Update Configuration
 
-**Update SSM parameters**:
+**Update SSM parameters** (e.g., to add a new domain):
 ```bash
-aws ssm put-parameter --name /backgammon/dev/domain --value "new-domain.com" --overwrite
+# Add a new domain to the list
+aws ssm put-parameter --name /backgammon/dev/domain --value "backgammon.beatty.codes,doublecube.gg,newdomain.com" --overwrite
 ```
+
+**Important**: If you add a new domain, you must also:
+1. Update the Caddyfile to include the new domain
+2. Create DNS A record pointing to the Elastic IP
+3. Redeploy the application
 
 **Restart services to pick up changes**:
 ```bash
