@@ -11,7 +11,6 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class PositionEvaluatorFactory : IDisposable
 {
-    private bool _disposed;
     private readonly GnubgProcessManager _gnubgProcessManager;
     private readonly GnubgSettings _gnubgSettings;
     private readonly AnalysisSettings _analysisSettings;
@@ -19,6 +18,7 @@ public class PositionEvaluatorFactory : IDisposable
     private readonly HeuristicEvaluator _heuristicEvaluator;
     private readonly object _lock = new();
     private GnubgEvaluator? _gnubgEvaluator;
+    private bool _disposed;
 
     public PositionEvaluatorFactory(
         GnubgProcessManager gnubgProcessManager,
@@ -58,6 +58,28 @@ public class PositionEvaluatorFactory : IDisposable
         return _heuristicEvaluator;
     }
 
+    /// <summary>
+    /// Dispose resources
+    /// </summary>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _gnubgEvaluator = null;
+            _disposed = true;
+        }
+    }
+
     private IPositionEvaluator GetGnubgEvaluator()
     {
         // Lazy initialization with thread safety
@@ -87,20 +109,5 @@ public class PositionEvaluatorFactory : IDisposable
         }
 
         return _gnubgEvaluator;
-    }
-
-    public void Dispose()
-    {
-        if (_disposed)
-            return;
-
-        lock (_lock)
-        {
-            if (_disposed)
-                return;
-
-            _gnubgEvaluator = null;
-            _disposed = true;
-        }
     }
 }
