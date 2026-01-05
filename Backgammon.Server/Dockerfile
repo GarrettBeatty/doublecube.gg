@@ -35,6 +35,9 @@ ENV PATH="${PATH}:/usr/games"
 # Verify gnubg installation
 RUN gnubg --version
 
+# Create gnubg configuration to disable sound (prevents ALSA errors in container)
+RUN echo "set sound enable off" > /root/.gnubgrc
+
 WORKDIR /app
 COPY --from=build /app/publish .
 
