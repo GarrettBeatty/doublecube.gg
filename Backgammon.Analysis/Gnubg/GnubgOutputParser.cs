@@ -67,7 +67,9 @@ public static class GnubgOutputParser
     /// Parse move analysis from gnubg hint output
     /// Example gnubg hint output:
     ///     1. Cubeful 2-ply    8/5 8/4                      Eq.: +0.200
+    ///        0.571 0.000 0.000 - 0.429 0.000 0.000
     ///     2. Cubeful 2-ply    8/4 6/3                      Eq.: +0.177 (-0.023)
+    ///        0.565 0.000 0.000 - 0.435 0.000 0.000
     /// </summary>
     public static List<MoveAnalysis> ParseMoveAnalysis(string gnubgOutput)
     {
@@ -75,27 +77,95 @@ public static class GnubgOutputParser
 
         try
         {
-            // Split into lines and look for numbered move suggestions
             var lines = gnubgOutput.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var line in lines)
             {
-                // Match pattern like "1. Cubeful 2-ply    8/5 8/4                      Eq.: +0.200"
-                // The "Cubeful N-ply" part is optional for compatibility with other output formats
-                var match = Regex.Match(line, @"(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?([0-9/ ]+)\s+Eq\.[:\s]+([-+]?\d+\.\d+)");
-                if (match.Success)
-                {
-                    var rank = int.Parse(match.Groups[1].Value);
-                    var notation = match.Groups[2].Value.Trim();
-                    var equity = double.Parse(match.Groups[3].Value, CultureInfo.InvariantCulture);
+                var trimmed = line.Trim();
 
-                    moveAnalyses.Add(new MoveAnalysis
-                    {
-                        Rank = rank,
-                        Notation = notation,
-                        Equity = equity
-                    });
+                // Look for lines starting with a number followed by a period (move rank)
+                if (!char.IsDigit(trimmed.FirstOrDefault()))
+                {
+                    continue;
                 }
+
+                var dotIndex = trimmed.IndexOf('.');
+                if (dotIndex == -1)
+                {
+                    continue;
+                }
+
+                // Parse rank
+                if (!int.TryParse(trimmed.Substring(0, dotIndex), out var rank))
+                {
+                    continue;
+                }
+
+                // Find equity marker "Eq.:"
+                var equityIndex = trimmed.IndexOf("Eq.:", StringComparison.OrdinalIgnoreCase);
+                if (equityIndex == -1)
+                {
+                    continue;
+                }
+
+                // Extract the section between rank and equity (contains move notation)
+                var moveSection = trimmed.Substring(dotIndex + 1, equityIndex - dotIndex - 1).Trim();
+
+                // Remove evaluation type prefix (Cubeful/Cubeless N-ply)
+                var moveParts = moveSection.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                var notation = string.Empty;
+
+                // Skip evaluation type tokens and collect move notation (format: "N/N N/N")
+                foreach (var part in moveParts)
+                {
+                    if (part.Contains('/'))
+                    {
+                        notation += (notation.Length > 0 ? " " : string.Empty) + part;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(notation))
+                {
+                    continue;
+                }
+
+                // Parse equity value after "Eq.:"
+                var equityStart = equityIndex + 4;
+                var equitySection = trimmed.Substring(equityStart).Trim();
+
+                // Extract first number (may have +/- sign)
+                var equityEnd = 0;
+                for (int i = 0; i < equitySection.Length; i++)
+                {
+                    var c = equitySection[i];
+                    if (!(char.IsDigit(c) || c == '.' || c == '+' || c == '-'))
+                    {
+                        if (i > 0)
+                        {
+                            equityEnd = i;
+                        }
+
+                        break;
+                    }
+                }
+
+                if (equityEnd == 0)
+                {
+                    equityEnd = equitySection.Length;
+                }
+
+                var equityStr = equitySection.Substring(0, equityEnd).Trim();
+                if (!double.TryParse(equityStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var equity))
+                {
+                    continue;
+                }
+
+                moveAnalyses.Add(new MoveAnalysis
+                {
+                    Rank = rank,
+                    Notation = notation,
+                    Equity = equity
+                });
             }
         }
         catch (Exception ex)

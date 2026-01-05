@@ -39,9 +39,28 @@ public class AnalysisService
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg")</param>
     public BestMovesAnalysisDto FindBestMoves(GameEngine engine, string? evaluatorType = null)
     {
-        var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
-        var analysis = evaluator.FindBestMoves(engine);
-        return MapToDto(analysis, evaluator);
+        try
+        {
+            _logger.LogInformation(
+                "Finding best moves using {EvaluatorType}. Remaining moves: {Count}",
+                evaluatorType ?? "default",
+                engine.RemainingMoves.Count);
+
+            var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
+            var analysis = evaluator.FindBestMoves(engine);
+
+            _logger.LogInformation("Found {Count} best move sequences", analysis.TopMoves.Count);
+
+            return MapToDto(analysis, evaluator);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to find best moves using {EvaluatorType}",
+                evaluatorType ?? "default");
+            throw;
+        }
     }
 
     /// <summary>

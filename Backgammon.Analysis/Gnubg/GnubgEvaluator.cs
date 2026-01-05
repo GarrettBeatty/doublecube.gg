@@ -92,8 +92,12 @@ public class GnubgEvaluator : IPositionEvaluator
             // Execute gnubg with SGF file
             var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
 
+            _logger?.Invoke($"Gnubg hint output:\n{output}");
+
             // Parse move analysis
             var moveAnalyses = GnubgOutputParser.ParseMoveAnalysis(output);
+
+            _logger?.Invoke($"Parsed {moveAnalyses.Count} move analyses from gnubg output");
 
             // Convert to BestMovesAnalysis format
             var topMoves = new List<MoveSequenceEvaluation>();
