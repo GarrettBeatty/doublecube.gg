@@ -52,6 +52,7 @@ export const AnalysisPage: React.FC = () => {
   const isAnalyzingRef = useRef(false)
   const lastAnalyzedState = useRef<string | null>(null)
   const isExecutingMoves = useRef(false)
+  const analysisRequestCounter = useRef(0)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -232,6 +233,10 @@ export const AnalysisPage: React.FC = () => {
       if (stateHash === lastAnalyzedState.current) return
       lastAnalyzedState.current = stateHash
 
+      // Increment request counter to invalidate previous requests
+      analysisRequestCounter.current += 1
+      const currentRequestId = analysisRequestCounter.current
+
       isAnalyzingRef.current = true
       setIsAnalyzing(true)
       try {
@@ -240,7 +245,11 @@ export const AnalysisPage: React.FC = () => {
           currentGameState.gameId,
           evaluatorType
         )) as PositionEvaluation | null
-        setCurrentEvaluation(evaluation)
+
+        // Only update if this is still the latest request
+        if (currentRequestId === analysisRequestCounter.current) {
+          setCurrentEvaluation(evaluation)
+        }
 
         // Auto-find best moves if dice are rolled
         // In analysis mode, you control both sides, so we only check for dice
@@ -255,13 +264,18 @@ export const AnalysisPage: React.FC = () => {
             currentGameState.gameId,
             evaluatorType
           )) as BestMovesAnalysis | null
-          if (analysis) {
+
+          // Only update if this is still the latest request
+          if (analysis && currentRequestId === analysisRequestCounter.current) {
             setBestMoves(analysis)
             setCurrentEvaluation(analysis.initialEvaluation)
           }
         } else {
           // Clear best moves when dice are not rolled (e.g., after ending turn)
-          setBestMoves(null)
+          // Only update if this is still the latest request
+          if (currentRequestId === analysisRequestCounter.current) {
+            setBestMoves(null)
+          }
         }
       } catch (error) {
         console.error('[AnalysisPage] Failed to analyze position:', error)
@@ -272,7 +286,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     analyzePosition()
-  }, [currentGameState, invoke, setCurrentEvaluation, setIsAnalyzing, setBestMoves, evaluatorType])
+  }, [currentGameState, invoke, evaluatorType])
 
   if (!isConnected || !currentGameState) {
     return (

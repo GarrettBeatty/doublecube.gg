@@ -9,8 +9,9 @@ namespace Backgammon.Server.Services;
 /// <summary>
 /// Factory for creating position evaluators based on evaluator type
 /// </summary>
-public class PositionEvaluatorFactory
+public class PositionEvaluatorFactory : IDisposable
 {
+    private bool _disposed;
     private readonly GnubgProcessManager _gnubgProcessManager;
     private readonly GnubgSettings _gnubgSettings;
     private readonly AnalysisSettings _analysisSettings;
@@ -86,5 +87,20 @@ public class PositionEvaluatorFactory
         }
 
         return _gnubgEvaluator;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        lock (_lock)
+        {
+            if (_disposed)
+                return;
+
+            _gnubgEvaluator = null;
+            _disposed = true;
+        }
     }
 }
