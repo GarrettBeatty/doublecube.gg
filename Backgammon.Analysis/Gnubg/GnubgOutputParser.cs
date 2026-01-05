@@ -66,8 +66,8 @@ public static class GnubgOutputParser
     /// <summary>
     /// Parse move analysis from gnubg hint output
     /// Example gnubg hint output:
-    /// 1. 24/20 13/9  Equity: +0.145 (0.000)
-    /// 2. 24/20 6/2   Equity: +0.132 (-0.013)
+    ///     1. Cubeful 2-ply    8/5 8/4                      Eq.: +0.200
+    ///     2. Cubeful 2-ply    8/4 6/3                      Eq.: +0.177 (-0.023)
     /// </summary>
     public static List<MoveAnalysis> ParseMoveAnalysis(string gnubgOutput)
     {
@@ -80,8 +80,9 @@ public static class GnubgOutputParser
 
             foreach (var line in lines)
             {
-                // Match pattern like "1. 24/20 13/9  Equity: +0.145"
-                var match = Regex.Match(line, @"(\d+)\.\s+([0-9/ ]+)\s+Equity[:\s]+([-+]?\d+\.\d+)");
+                // Match pattern like "1. Cubeful 2-ply    8/5 8/4                      Eq.: +0.200"
+                // The "Cubeful N-ply" part is optional for compatibility with other output formats
+                var match = Regex.Match(line, @"(\d+)\.\s+(?:Cubeful\s+\d+-ply\s+)?([0-9/ ]+)\s+Eq\.[:\s]+([-+]?\d+\.\d+)");
                 if (match.Success)
                 {
                     var rank = int.Parse(match.Groups[1].Value);
