@@ -225,6 +225,7 @@ export const AnalysisPage: React.FC = () => {
         redBornOff: currentGameState.redBornOff,
         currentPlayer: currentGameState.currentPlayer,
         dice: currentGameState.dice,
+        evaluatorType: evaluatorType,
       })
 
       // Only analyze if state actually changed

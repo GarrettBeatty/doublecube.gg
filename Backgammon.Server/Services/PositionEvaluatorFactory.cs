@@ -16,8 +16,8 @@ public class PositionEvaluatorFactory
     private readonly AnalysisSettings _analysisSettings;
     private readonly ILogger<GnubgEvaluator> _gnubgLogger;
     private readonly HeuristicEvaluator _heuristicEvaluator;
-    private GnubgEvaluator? _gnubgEvaluator;
     private readonly object _lock = new();
+    private GnubgEvaluator? _gnubgEvaluator;
 
     public PositionEvaluatorFactory(
         GnubgProcessManager gnubgProcessManager,
@@ -69,10 +69,12 @@ public class PositionEvaluatorFactory
                     // Check if gnubg is available
                     if (!_gnubgProcessManager.IsAvailableAsync().GetAwaiter().GetResult())
                     {
-                        _gnubgLogger.LogWarning(
-                            "Gnubg not available at {Path}, falling back to HeuristicEvaluator",
+                        _gnubgLogger.LogError(
+                            "Gnubg not available at {Path}. Please ensure GNU Backgammon is installed and the path is configured correctly.",
                             _gnubgSettings.ExecutablePath);
-                        return _heuristicEvaluator;
+                        throw new InvalidOperationException(
+                            $"GNU Backgammon evaluator requested but not available at: {_gnubgSettings.ExecutablePath}. " +
+                            "Please install GNU Backgammon or use the Heuristic evaluator instead.");
                     }
 
                     _gnubgEvaluator = new GnubgEvaluator(

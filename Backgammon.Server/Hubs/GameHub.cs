@@ -1230,7 +1230,7 @@ public class GameHub : Hub
     /// </summary>
     /// <param name="gameId">The game ID to analyze</param>
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg"). If null, uses default from settings.</param>
-    public async Task<PositionEvaluationDto> AnalyzePosition(string gameId, string? evaluatorType = null)
+    public async Task<PositionEvaluationDto> AnalyzePosition(string gameId, string? evaluatorType)
     {
         var session = _sessionManager.GetSession(gameId);
         if (session == null)
@@ -1246,7 +1246,7 @@ public class GameHub : Hub
     /// </summary>
     /// <param name="gameId">The game ID to analyze</param>
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg"). If null, uses default from settings.</param>
-    public async Task<BestMovesAnalysisDto> FindBestMoves(string gameId, string? evaluatorType = null)
+    public async Task<BestMovesAnalysisDto> FindBestMoves(string gameId, string? evaluatorType)
     {
         var session = _sessionManager.GetSession(gameId);
         if (session == null)
