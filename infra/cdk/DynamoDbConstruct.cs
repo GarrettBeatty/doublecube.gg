@@ -6,8 +6,6 @@ namespace Backgammon.Infrastructure;
 
 public class DynamoDbConstruct : Construct
 {
-    public ITable Table { get; private set; }
-
     public DynamoDbConstruct(Construct scope, string id, string environment)
         : base(scope, id)
     {
@@ -109,4 +107,6 @@ public class DynamoDbConstruct : Construct
         Amazon.CDK.Tags.Of(Table).Add("Environment", environment);
         Amazon.CDK.Tags.Of(Table).Add("ManagedBy", "CDK");
     }
+
+    public ITable Table { get; private set; }
 }

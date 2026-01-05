@@ -6,14 +6,6 @@ namespace Infra;
 
 public class SsmParameterConstruct : Construct
 {
-    public IStringParameter JwtSecretParameter { get; }
-
-    public IStringParameter TableNameParameter { get; }
-
-    public IStringParameter DomainParameter { get; }
-
-    public IStringParameter TlsEmailParameter { get; }
-
     public SsmParameterConstruct(Construct scope, string id, string environment, string tableName)
         : base(scope, id)
     {
@@ -83,4 +75,12 @@ public class SsmParameterConstruct : Construct
             ExportName = $"Backgammon-{environment}-TlsEmailParam"
         });
     }
+
+    public IStringParameter JwtSecretParameter { get; }
+
+    public IStringParameter TableNameParameter { get; }
+
+    public IStringParameter DomainParameter { get; }
+
+    public IStringParameter TlsEmailParameter { get; }
 }

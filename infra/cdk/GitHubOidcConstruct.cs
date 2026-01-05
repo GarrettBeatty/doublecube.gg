@@ -6,8 +6,6 @@ namespace Infra;
 
 public class GitHubOidcConstruct : Construct
 {
-    public IRole DeployRole { get; }
-
     public GitHubOidcConstruct(Construct scope, string id, string githubUsername, string githubRepo)
         : base(scope, id)
     {
@@ -75,4 +73,6 @@ public class GitHubOidcConstruct : Construct
             ExportName = "GitHubOidcProviderArn"
         });
     }
+
+    public IRole DeployRole { get; }
 }

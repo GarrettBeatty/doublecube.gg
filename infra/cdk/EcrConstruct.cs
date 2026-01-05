@@ -6,10 +6,6 @@ namespace Infra;
 
 public class EcrConstruct : Construct
 {
-    public IRepository ServerRepository { get; }
-
-    public IRepository WebClientRepository { get; }
-
     public EcrConstruct(Construct scope, string id, string environment)
         : base(scope, id)
     {
@@ -62,4 +58,8 @@ public class EcrConstruct : Construct
             ExportName = $"Backgammon-{environment}-WebClientRepoUri"
         });
     }
+
+    public IRepository ServerRepository { get; }
+
+    public IRepository WebClientRepository { get; }
 }
