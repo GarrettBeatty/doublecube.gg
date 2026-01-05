@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import type { ActiveGame } from '../types/home.types'
+import type { RecentGame } from '../types/home.types'
 
-export const useActiveGames = () => {
+export const useRecentGames = (limit = 10) => {
   const { invoke, isConnected } = useSignalR()
-  const [games, setGames] = useState<ActiveGame[]>([])
+  const [games, setGames] = useState<RecentGame[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchActiveGames = async () => {
+    const fetchRecentGames = async () => {
       if (!isConnected) {
         setIsLoading(false)
         return
@@ -19,21 +19,19 @@ export const useActiveGames = () => {
         setIsLoading(true)
         setError(null)
 
-        // Try to fetch active games from backend
-        const activeGames = await invoke<ActiveGame[]>('GetActiveGames')
-        setGames(activeGames || [])
+        const recentGames = await invoke<RecentGame[]>('GetRecentGames', limit)
+        setGames(recentGames || [])
       } catch (err) {
-        console.warn('GetActiveGames not implemented yet:', err)
-        setError('Active games temporarily unavailable')
-        // Empty array as fallback
+        console.error('Failed to fetch recent games:', err)
+        setError('Failed to load recent games')
         setGames([])
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchActiveGames()
-  }, [isConnected, invoke])
+    fetchRecentGames()
+  }, [isConnected, invoke, limit])
 
   return { games, isLoading, error }
 }

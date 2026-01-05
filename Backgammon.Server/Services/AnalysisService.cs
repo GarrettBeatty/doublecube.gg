@@ -2,6 +2,7 @@ using Backgammon.Analysis;
 using Backgammon.Analysis.Models;
 using Backgammon.Core;
 using Backgammon.Server.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
 
@@ -11,10 +12,12 @@ namespace Backgammon.Server.Services;
 public class AnalysisService
 {
     private readonly IPositionEvaluator _evaluator;
+    private readonly ILogger<AnalysisService> _logger;
 
-    public AnalysisService()
+    public AnalysisService(IPositionEvaluator evaluator, ILogger<AnalysisService> logger)
     {
-        _evaluator = new HeuristicEvaluator();
+        _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
@@ -40,13 +43,22 @@ public class AnalysisService
     /// </summary>
     private PositionEvaluationDto MapToDto(PositionEvaluation evaluation)
     {
+        // Determine evaluator name from type
+        var evaluatorName = _evaluator.GetType().Name switch
+        {
+            "GnubgEvaluator" => "GNU Backgammon",
+            "HeuristicEvaluator" => "Heuristic",
+            _ => "Unknown"
+        };
+
         return new PositionEvaluationDto
         {
             Equity = evaluation.Equity,
             WinProbability = evaluation.WinProbability,
             GammonProbability = evaluation.GammonProbability,
             BackgammonProbability = evaluation.BackgammonProbability,
-            Features = MapToDto(evaluation.Features)
+            Features = MapToDto(evaluation.Features),
+            EvaluatorName = evaluatorName
         };
     }
 

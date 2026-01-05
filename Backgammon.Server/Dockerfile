@@ -1,5 +1,5 @@
-# Build stage (Alpine-based for smaller image size)
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+# Build stage (Debian-based)
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy csproj files and restore dependencies (layer caching optimization)
@@ -18,11 +18,19 @@ WORKDIR "/src/Backgammon.Server"
 RUN --mount=type=cache,id=nuget-server,target=/root/.nuget/packages \
     dotnet publish "Backgammon.Server.csproj" -c Release -o /app/publish --no-restore
 
-# Runtime stage (Alpine-based for minimal size ~110 MB vs ~210 MB)
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
+# Runtime stage (Debian-based with gnubg)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 
-# Install wget for health checks
-RUN apk add --no-cache wget
+# Install gnubg for game analysis
+# Note: Installing without X11/GUI dependencies (--no-install-recommends)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gnubg \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Verify gnubg installation
+RUN gnubg --version || echo "Warning: gnubg not found in PATH"
 
 WORKDIR /app
 COPY --from=build /app/publish .
@@ -32,9 +40,6 @@ EXPOSE 5000
 
 # Set ASP.NET Core to listen on port 5000
 ENV ASPNETCORE_URLS=http://+:5000
-
-# Use invariant globalization (recommended for APIs, saves ~30 MB)
-ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=true
 
 # Run the application
 ENTRYPOINT ["dotnet", "Backgammon.Server.dll"]

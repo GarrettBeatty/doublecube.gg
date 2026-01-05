@@ -1,57 +1,53 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Trophy, X, Eye } from "lucide-react";
-
-interface RecentGame {
-  id: string;
-  opponent: string;
-  opponentRating: number;
-  result: "win" | "loss";
-  matchScore: string;
-  timeControl: string;
-  matchLength: string;
-  ratingChange: number;
-  date: string;
-}
-
-const mockRecentGames: RecentGame[] = [
-  {
-    id: "1",
-    opponent: "BackgammonMaster",
-    opponentRating: 2150,
-    result: "win",
-    matchScore: "7-5",
-    timeControl: "30s/move",
-    matchLength: "7-point",
-    ratingChange: +8,
-    date: "2 hours ago",
-  },
-  {
-    id: "2",
-    opponent: "DiceWarrior",
-    opponentRating: 1790,
-    result: "loss",
-    matchScore: "4-7",
-    timeControl: "60s/move",
-    matchLength: "7-point",
-    ratingChange: -6,
-    date: "5 hours ago",
-  },
-  {
-    id: "3",
-    opponent: "CheckerChamp",
-    opponentRating: 1920,
-    result: "win",
-    matchScore: "5-3",
-    timeControl: "45s/move",
-    matchLength: "5-point",
-    ratingChange: +7,
-    date: "Yesterday",
-  },
-];
+import { useRecentGames } from "@/hooks/useRecentGames";
+import { formatDistanceToNow } from "date-fns";
 
 export function RecentGames() {
+  const { games, isLoading } = useRecentGames(5);
+
+  const formatDate = (dateString: string) => {
+    try {
+      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+    } catch {
+      return 'Recently';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Games</CardTitle>
+          <CardDescription>Review your recent matches</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (games.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Games</CardTitle>
+          <CardDescription>Review your recent matches</CardDescription>
+        </CardHeader>
+        <CardContent className="text-center py-8">
+          <p className="text-muted-foreground">No completed games yet</p>
+          <p className="text-sm text-muted-foreground mt-2">Play a match to see your game history!</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -59,9 +55,9 @@ export function RecentGames() {
         <CardDescription>Review your recent matches</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {mockRecentGames.map((game) => (
+        {games.map((game) => (
           <div
-            key={game.id}
+            key={game.matchId}
             className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -72,28 +68,32 @@ export function RecentGames() {
               )}
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-semibold">{game.opponent}</span>
-                  <span className="text-muted-foreground text-sm">({game.opponentRating})</span>
+                  <span className="font-semibold">{game.opponentName}</span>
+                  {game.opponentRating > 0 && (
+                    <span className="text-muted-foreground text-sm">({game.opponentRating})</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span>{game.matchLength} match</span>
                   <span>•</span>
                   <span>{game.timeControl}</span>
                   <span>•</span>
-                  <span>{game.date}</span>
+                  <span>{formatDate(game.completedAt || game.createdAt)}</span>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right">
                 <p className="font-semibold">{game.matchScore}</p>
-                <Badge
-                  variant={game.result === "win" ? "default" : "destructive"}
-                  className="text-xs"
-                >
-                  {game.ratingChange > 0 ? "+" : ""}
-                  {game.ratingChange}
-                </Badge>
+                {game.ratingChange !== 0 && (
+                  <Badge
+                    variant={game.result === "win" ? "default" : "destructive"}
+                    className="text-xs"
+                  >
+                    {game.ratingChange > 0 ? "+" : ""}
+                    {game.ratingChange}
+                  </Badge>
+                )}
               </div>
               <Button size="sm" variant="outline">
                 <Eye className="h-4 w-4 mr-1" />

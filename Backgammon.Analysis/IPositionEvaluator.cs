@@ -22,4 +22,11 @@ public interface IPositionEvaluator
     /// <param name="engine">Game engine with dice rolled and valid moves available</param>
     /// <returns>Analysis of top moves ranked by equity</returns>
     BestMovesAnalysis FindBestMoves(GameEngine engine);
+
+    /// <summary>
+    /// Analyze the doubling cube decision for the current position
+    /// </summary>
+    /// <param name="engine">Game engine with the position to analyze</param>
+    /// <returns>Cube decision analysis with recommendations</returns>
+    CubeDecision AnalyzeCubeDecision(GameEngine engine);
 }

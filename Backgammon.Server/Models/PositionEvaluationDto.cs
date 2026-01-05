@@ -21,4 +21,7 @@ public class PositionEvaluationDto
 
     [JsonPropertyName("features")]
     public PositionFeaturesDto Features { get; set; } = new();
+
+    [JsonPropertyName("evaluatorName")]
+    public string EvaluatorName { get; set; } = "Heuristic";
 }

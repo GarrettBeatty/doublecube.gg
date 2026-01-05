@@ -46,3 +46,20 @@ export interface LobbyGame {
   matchLength: number
   doublingCube: boolean
 }
+
+export interface RecentGame {
+  matchId: string
+  opponentId: string
+  opponentName: string
+  opponentRating: number
+  result: 'win' | 'loss'
+  myScore: number
+  opponentScore: number
+  matchScore: string
+  targetScore: number
+  matchLength: string
+  timeControl: string
+  ratingChange: number
+  completedAt?: string
+  createdAt: string
+}

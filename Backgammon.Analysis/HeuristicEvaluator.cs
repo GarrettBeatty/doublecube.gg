@@ -67,6 +67,57 @@ public class HeuristicEvaluator : IPositionEvaluator
     }
 
     /// <summary>
+    /// Analyze the doubling cube decision for the current position
+    /// </summary>
+    public CubeDecision AnalyzeCubeDecision(GameEngine engine)
+    {
+        var evaluation = Evaluate(engine);
+        var cubeValue = engine.DoublingCube.Value;
+        var currentPlayer = engine.CurrentPlayer.Color;
+        var cubeOwner = engine.DoublingCube.Owner;
+
+        // Check if player can legally double
+        bool canDouble = engine.DoublingCube.CanDouble(currentPlayer);
+
+        // Calculate equities for different scenarios
+        double noDoubleEquity = evaluation.Equity * cubeValue;
+        double doubleTakeEquity = evaluation.Equity * (cubeValue * 2);
+        double doublePassEquity = cubeValue; // Win current cube value
+
+        // Calculate take point (opponent's perspective)
+        // Opponent should take if their equity after doubling > losing the current stake
+        // Take point ≈ 25% for money games (standard theory)
+        double takePoint = CalculateTakePoint(evaluation, engine);
+
+        // Determine recommendation based on equity thresholds
+        string recommendation = DetermineRecommendation(
+            evaluation,
+            canDouble,
+            cubeOwner,
+            currentPlayer,
+            takePoint);
+
+        // Build detailed explanation
+        string details = BuildCubeDecisionDetails(
+            evaluation,
+            canDouble,
+            cubeOwner,
+            currentPlayer,
+            cubeValue,
+            takePoint);
+
+        return new CubeDecision
+        {
+            NoDoubleEquity = noDoubleEquity,
+            DoubleTakeEquity = doubleTakeEquity,
+            DoublePassEquity = doublePassEquity,
+            Recommendation = recommendation,
+            TakePoint = takePoint,
+            Details = details
+        };
+    }
+
+    /// <summary>
     /// Recursively explore all possible move sequences using backtracking
     /// </summary>
     private void ExploreAllSequences(
@@ -434,6 +485,134 @@ public class HeuristicEvaluator : IPositionEvaluator
     {
         // TODO: Implement proper bearoff efficiency calculation
         return 0.5;
+    }
+
+    /// <summary>
+    /// Calculate the take point - minimum win probability where opponent should accept double
+    /// </summary>
+    private double CalculateTakePoint(PositionEvaluation evaluation, GameEngine engine)
+    {
+        // Standard take point in money games is around 25%
+        // This can be adjusted based on gammon/backgammon threats
+
+        double baseTakePoint = 0.25;
+
+        // Adjust for gammon threats
+        // If there's significant gammon risk, opponent needs better equity to take
+        if (evaluation.GammonProbability > 0.15)
+        {
+            baseTakePoint += evaluation.GammonProbability * 0.1;
+        }
+
+        // Adjust for backgammon threats (rare but impactful)
+        if (evaluation.BackgammonProbability > 0.05)
+        {
+            baseTakePoint += evaluation.BackgammonProbability * 0.2;
+        }
+
+        return Math.Clamp(baseTakePoint, 0.20, 0.35);
+    }
+
+    /// <summary>
+    /// Determine the recommended cube action
+    /// </summary>
+    private string DetermineRecommendation(
+        PositionEvaluation evaluation,
+        bool canDouble,
+        CheckerColor? cubeOwner,
+        CheckerColor currentPlayer,
+        double takePoint)
+    {
+        // If player can't double (opponent owns cube), analyze if they should take/pass
+        if (!canDouble)
+        {
+            // Player is on the receiving end of a potential double
+            double opponentWinProb = 1.0 - evaluation.WinProbability;
+            return opponentWinProb >= takePoint ? "Take" : "Pass";
+        }
+
+        // Player owns cube or it's centered - should they double?
+        double winProb = evaluation.WinProbability;
+        double equity = evaluation.Equity;
+
+        // Too good to double threshold (opponent would pass, but we can win more by playing on)
+        // This typically happens when win prob > 85-90% and gammon chances are high
+        if (winProb > 0.85 && evaluation.GammonProbability > 0.20)
+        {
+            return "TooGood"; // Too good to double - play on for gammon
+        }
+
+        // Minimum double point - equity must be positive and win prob > ~55%
+        if (winProb >= 0.68)
+        {
+            return "Double"; // Clear double
+        }
+
+        // Borderline doubling window (55-68% win probability)
+        if (winProb >= 0.55)
+        {
+            // Consider position volatility, gammon chances, etc.
+            if (evaluation.GammonProbability > 0.10)
+            {
+                return "Double"; // Double with gammon threat
+            }
+
+            return "Double/NoDouble"; // Borderline - could go either way
+        }
+
+        // Not good enough to double yet
+        return "NoDouble";
+    }
+
+    /// <summary>
+    /// Build detailed explanation of cube decision
+    /// </summary>
+    private string BuildCubeDecisionDetails(
+        PositionEvaluation evaluation,
+        bool canDouble,
+        CheckerColor? cubeOwner,
+        CheckerColor currentPlayer,
+        int cubeValue,
+        double takePoint)
+    {
+        var details = new System.Text.StringBuilder();
+
+        details.AppendLine($"Cube Value: {cubeValue}");
+        details.AppendLine($"Cube Owner: {cubeOwner?.ToString() ?? "Centered"}");
+        details.AppendLine($"Can Double: {canDouble}");
+        details.AppendLine();
+        details.AppendLine($"Win Probability: {evaluation.WinProbability:P1}");
+        details.AppendLine($"Gammon Probability: {evaluation.GammonProbability:P1}");
+        details.AppendLine($"Backgammon Probability: {evaluation.BackgammonProbability:P1}");
+        details.AppendLine();
+        details.AppendLine($"Position Equity: {evaluation.Equity:F3}");
+        details.AppendLine($"Take Point: {takePoint:P1}");
+
+        if (!canDouble)
+        {
+            double opponentWinProb = 1.0 - evaluation.WinProbability;
+            details.AppendLine();
+            details.AppendLine($"Opponent Win Probability: {opponentWinProb:P1}");
+            details.AppendLine($"Should Take: {(opponentWinProb >= takePoint ? "Yes" : "No")}");
+        }
+        else
+        {
+            details.AppendLine();
+            if (evaluation.WinProbability >= 0.68)
+            {
+                details.AppendLine("Strong position - clear double");
+            }
+            else if (evaluation.WinProbability >= 0.55)
+            {
+                details.AppendLine("Borderline doubling position");
+            }
+            else
+            {
+                details.AppendLine("Not strong enough to double yet");
+            }
+        }
+
+        return details.ToString();
     }
 
     private double EstimateWinProbability(double equity)

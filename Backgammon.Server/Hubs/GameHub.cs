@@ -996,6 +996,95 @@ public class GameHub : Hub
         }
     }
 
+    public async Task<List<object>> GetRecentGames(int limit = 10)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var matches = await _matchService.GetPlayerMatchesAsync(playerId, "Completed");
+
+            var recentGames = matches.Take(limit).Select(m =>
+            {
+                var isPlayer1 = m.Player1Id == playerId;
+                var opponentId = isPlayer1 ? m.Player2Id : m.Player1Id;
+                var opponentName = isPlayer1 ? m.Player2Name : m.Player1Name;
+                var myScore = isPlayer1 ? m.Player1Score : m.Player2Score;
+                var opponentScore = isPlayer1 ? m.Player2Score : m.Player1Score;
+                var didWin = myScore > opponentScore;
+
+                return new
+                {
+                    matchId = m.MatchId,
+                    opponentId = opponentId,
+                    opponentName = opponentName ?? "Unknown",
+                    opponentRating = 0, // TODO: Fetch from user profile when available
+                    result = didWin ? "win" : "loss",
+                    myScore = myScore,
+                    opponentScore = opponentScore,
+                    matchScore = $"{myScore}-{opponentScore}",
+                    targetScore = m.TargetScore,
+                    matchLength = $"{m.TargetScore}-point",
+                    timeControl = "Standard", // TODO: Add time control to Match model
+                    ratingChange = 0, // TODO: Calculate rating change when rating system is implemented
+                    completedAt = m.CompletedAt,
+                    createdAt = m.CreatedAt
+                };
+            }).ToList<object>();
+
+            return recentGames;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting recent games for player");
+            throw;
+        }
+    }
+
+    public async Task<List<object>> GetActiveGames(int limit = 10)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var matches = await _matchService.GetPlayerMatchesAsync(playerId, "InProgress");
+
+            var activeGames = matches.Take(limit).Select(m =>
+            {
+                var isPlayer1 = m.Player1Id == playerId;
+                var opponentId = isPlayer1 ? m.Player2Id : m.Player1Id;
+                var opponentName = isPlayer1 ? m.Player2Name : m.Player1Name;
+
+                // Try to get current game state if there's an active game session
+                var currentGameId = m.CurrentGameId;
+                var gameSession = currentGameId != null ? _sessionManager.GetSession(currentGameId) : null;
+
+                return new
+                {
+                    matchId = m.MatchId,
+                    gameId = currentGameId,
+                    player1Name = m.Player1Name ?? "Player 1",
+                    player2Name = m.Player2Name ?? "Player 2",
+                    player1Rating = 0, // TODO: Fetch from user profile
+                    player2Rating = 0, // TODO: Fetch from user profile
+                    currentPlayer = gameSession?.Engine?.CurrentPlayer.ToString() ?? "White",
+                    matchScore = $"{m.Player1Score}-{m.Player2Score}",
+                    matchLength = $"{m.TargetScore}-point",
+                    timeControl = "Standard", // TODO: Add time control to Match model
+                    cubeValue = gameSession?.Engine?.DoublingCube?.Value,
+                    cubeOwner = gameSession?.Engine?.DoublingCube?.Owner?.ToString() ?? "Center",
+                    isCrawford = m.IsCrawfordGame,
+                    viewers = 0 // TODO: Add spectator tracking
+                };
+            }).ToList<object>();
+
+            return activeGames;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting active games for player");
+            throw;
+        }
+    }
+
     /// <summary>
     /// Create a new match with configuration (lobby-based)
     /// </summary>

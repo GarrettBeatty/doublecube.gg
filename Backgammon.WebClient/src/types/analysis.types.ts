@@ -29,6 +29,7 @@ export interface PositionEvaluation {
   gammonProbability: number
   backgammonProbability: number
   features: PositionFeatures
+  evaluatorName?: string
 }
 
 /**

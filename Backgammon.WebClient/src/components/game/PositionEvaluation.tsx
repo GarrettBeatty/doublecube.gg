@@ -56,17 +56,24 @@ export const PositionEvaluation: React.FC<PositionEvaluationProps> = ({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <BarChart3 className="h-4 w-4" />
-          Position Evaluation
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Position Evaluation
+          </CardTitle>
+          {evaluation.evaluatorName && (
+            <Badge variant="secondary" className="text-xs">
+              {evaluation.evaluatorName}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 pb-3">
         {/* Equity bar visualization */}
         <div className="space-y-2">
-          <div className="h-8 bg-muted rounded flex overflow-hidden">
+          <div className="h-8 bg-muted rounded flex overflow-hidden border border-border">
             <div
-              className="bg-blue-500 transition-all duration-300"
+              className="bg-white transition-all duration-300"
               style={{ width: `${50 + equityPercent / 2}%` }}
             />
             <div className="bg-red-500 flex-1" />

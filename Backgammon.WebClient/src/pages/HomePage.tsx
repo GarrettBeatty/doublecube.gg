@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast'
 
 // Import all home components
 import { QuickPlayCard } from '@/components/home/QuickPlayCard'
-import { ActiveGamesList } from '@/components/home/ActiveGamesList'
 import { GameLobby } from '@/components/home/GameLobby'
 import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
@@ -144,7 +143,6 @@ export function HomePage() {
               <TabsContent value="quick-pairing" className="mt-6">
                 <div className="space-y-6">
                   <QuickPlayCard />
-                  <ActiveGamesList />
                   <RecentGames />
                 </div>
               </TabsContent>

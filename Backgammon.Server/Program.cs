@@ -158,7 +158,56 @@ builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>()
 builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
 builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
 builder.Services.AddSingleton<IChatService, ChatService>();
+
+// ========== ANALYSIS CONFIGURATION ==========
+// Configure analysis settings
+builder.Services.Configure<Backgammon.Analysis.Configuration.AnalysisSettings>(
+    builder.Configuration.GetSection(Backgammon.Analysis.Configuration.AnalysisSettings.SectionName));
+builder.Services.Configure<Backgammon.Analysis.Configuration.GnubgSettings>(
+    builder.Configuration.GetSection(Backgammon.Analysis.Configuration.GnubgSettings.SectionName));
+
+// Register GnubgProcessManager as singleton
+builder.Services.AddSingleton<Backgammon.Analysis.Gnubg.GnubgProcessManager>(sp =>
+{
+    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Backgammon.Analysis.Configuration.GnubgSettings>>().Value;
+    var logger = sp.GetRequiredService<ILogger<Backgammon.Analysis.Gnubg.GnubgProcessManager>>();
+    return new Backgammon.Analysis.Gnubg.GnubgProcessManager(settings, msg => logger.LogDebug(msg));
+});
+
+// Register appropriate evaluator based on configuration
+builder.Services.AddSingleton<Backgammon.Analysis.IPositionEvaluator>(sp =>
+{
+    var analysisSettings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Backgammon.Analysis.Configuration.AnalysisSettings>>().Value;
+    var logger = sp.GetRequiredService<ILogger<Backgammon.Analysis.Gnubg.GnubgEvaluator>>();
+
+    if (analysisSettings.EvaluatorType.Equals("Gnubg", StringComparison.OrdinalIgnoreCase))
+    {
+        var gnubgSettings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Backgammon.Analysis.Configuration.GnubgSettings>>().Value;
+        var processManager = sp.GetRequiredService<Backgammon.Analysis.Gnubg.GnubgProcessManager>();
+
+        var evaluator = new Backgammon.Analysis.Gnubg.GnubgEvaluator(processManager, gnubgSettings, msg => logger.LogDebug(msg));
+
+        // Check if gnubg is available, fallback to heuristic if not
+        if (!processManager.IsAvailableAsync().GetAwaiter().GetResult())
+        {
+            logger.LogWarning(
+                "Gnubg not available at {Path}, falling back to HeuristicEvaluator",
+                gnubgSettings.ExecutablePath);
+            logger.LogInformation("Using HeuristicEvaluator for position analysis");
+            return new Backgammon.Analysis.HeuristicEvaluator();
+        }
+
+        logger.LogInformation("Using GnubgEvaluator for position analysis");
+        return evaluator;
+    }
+
+    logger.LogInformation("Using HeuristicEvaluator for position analysis");
+    return new Backgammon.Analysis.HeuristicEvaluator();
+});
+
+// Register AnalysisService (now uses DI for evaluator)
 builder.Services.AddSingleton<AnalysisService>();
+// ========== END ANALYSIS CONFIGURATION ==========
 
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
