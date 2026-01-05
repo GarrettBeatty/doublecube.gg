@@ -49,6 +49,7 @@ export const AnalysisPage: React.FC = () => {
   const lastExportedSgf = useRef<string | null>(null)
   const isAnalyzingRef = useRef(false)
   const lastAnalyzedState = useRef<string | null>(null)
+  const isExecutingMoves = useRef(false)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -93,6 +94,12 @@ export const AnalysisPage: React.FC = () => {
   useEffect(() => {
     const importFromUrl = async () => {
       if (!currentGameState || !sgf) {
+        return
+      }
+
+      // Skip import if we're currently executing moves (prevents flashing during move sequences)
+      if (isExecutingMoves.current) {
+        console.log('[AnalysisPage] Skipping import - executing moves')
         return
       }
 
@@ -180,6 +187,9 @@ export const AnalysisPage: React.FC = () => {
   const handleExecuteMoves = async (moves: Move[]) => {
     if (!currentGameState?.gameId) return
 
+    // Set flag to prevent URL imports during move execution
+    isExecutingMoves.current = true
+
     try {
       // Execute each move in sequence
       for (const move of moves) {
@@ -192,6 +202,9 @@ export const AnalysisPage: React.FC = () => {
         description: 'Failed to execute moves',
         variant: 'destructive',
       })
+    } finally {
+      // Clear flag after all moves complete (or error)
+      isExecutingMoves.current = false
     }
   }
 
