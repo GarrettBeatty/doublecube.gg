@@ -41,6 +41,16 @@ public class GameSession
 
     public string? RedPlayerName { get; set; }
 
+    public int? WhiteRating { get; set; }
+
+    public int? RedRating { get; set; }
+
+    public int? WhiteRatingBefore { get; set; }
+
+    public int? RedRatingBefore { get; set; }
+
+    public bool IsRated { get; set; } = true; // Default to rated games
+
     // Legacy properties for backwards compatibility - return first connection
     public string? WhiteConnectionId => _whiteConnections.FirstOrDefault();
 
@@ -285,6 +295,10 @@ public class GameSession
             RedPlayerId = RedPlayerId ?? string.Empty,
             WhitePlayerName = WhitePlayerName ?? WhitePlayerId ?? "Waiting...",
             RedPlayerName = RedPlayerName ?? RedPlayerId ?? "Waiting...",
+            WhiteRating = WhiteRating,
+            RedRating = RedRating,
+            WhiteRatingChange = WhiteRating.HasValue && WhiteRatingBefore.HasValue ? WhiteRating - WhiteRatingBefore : null,
+            RedRatingChange = RedRating.HasValue && RedRatingBefore.HasValue ? RedRating - RedRatingBefore : null,
             CurrentPlayer = Engine.CurrentPlayer?.Color ?? CheckerColor.White,
             YourColor = playerColor,
             IsYourTurn = forConnectionId != null && GameMode.IsPlayerTurn(forConnectionId, this),
@@ -303,6 +317,7 @@ public class GameSession
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
             IsAnalysisMode = features.ShowAnalysisBadge,
+            IsRated = IsRated,
             MatchId = MatchId,
             IsMatchGame = IsMatchGame,
             TargetScore = TargetScore,

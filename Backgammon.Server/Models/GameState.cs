@@ -18,6 +18,14 @@ public class GameState
 
     public string RedPlayerName { get; set; } = string.Empty;
 
+    public int? WhiteRating { get; set; }
+
+    public int? RedRating { get; set; }
+
+    public int? WhiteRatingChange { get; set; }
+
+    public int? RedRatingChange { get; set; }
+
     public CheckerColor CurrentPlayer { get; set; }
 
     public CheckerColor? YourColor { get; set; }
@@ -61,6 +69,8 @@ public class GameState
     public string? DoublingCubeOwner { get; set; }
 
     public bool IsAnalysisMode { get; set; }
+
+    public bool IsRated { get; set; }
 
     // Match information
     public string? MatchId { get; set; }

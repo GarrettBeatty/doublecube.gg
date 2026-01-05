@@ -19,6 +19,7 @@ public interface IMatchService
     /// <param name="player1DisplayName">Optional display name for player 1</param>
     /// <param name="player2Id">Optional player 2 ID (for Friend matches)</param>
     /// <param name="timeControl">Optional time control configuration</param>
+    /// <param name="isRated">Whether the match affects player ratings (defaults to true, AI matches always unrated)</param>
     /// <returns>Tuple of created Match and first ServerGame</returns>
     Task<(Match Match, ServerGame FirstGame)> CreateMatchAsync(
         string player1Id,
@@ -26,7 +27,8 @@ public interface IMatchService
         string opponentType,
         string? player1DisplayName = null,
         string? player2Id = null,
-        TimeControlConfig? timeControl = null);
+        TimeControlConfig? timeControl = null,
+        bool isRated = true);
 
     /// <summary>
     /// Get a match by ID

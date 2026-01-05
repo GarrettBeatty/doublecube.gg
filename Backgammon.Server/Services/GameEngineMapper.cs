@@ -57,6 +57,9 @@ public static class GameEngineMapper
         // Check if this is an AI game
         game.IsAiOpponent = IsAiPlayer(session.WhitePlayerId) || IsAiPlayer(session.RedPlayerId);
 
+        // Set rated/unrated flag
+        game.IsRanked = session.IsRated;
+
         // If game is completed, add completion data
         if (engine.Winner != null)
         {

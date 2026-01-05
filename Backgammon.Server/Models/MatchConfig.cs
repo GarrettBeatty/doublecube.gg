@@ -29,4 +29,10 @@ public class MatchConfig
     /// Time control type: "None", "ChicagoPoint" (defaults to "None")
     /// </summary>
     public string TimeControlType { get; set; } = "None";
+
+    /// <summary>
+    /// Whether the match affects player ratings (defaults to true)
+    /// AI matches are always unrated regardless of this setting
+    /// </summary>
+    public bool IsRated { get; set; } = true;
 }
