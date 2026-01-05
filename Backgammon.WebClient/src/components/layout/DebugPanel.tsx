@@ -56,7 +56,10 @@ export const DebugPanel: React.FC<DebugPanelProps> = ({ isVisible }) => {
               <div>My Color: {myColor !== null ? (myColor === 0 ? 'White' : 'Red') : 'None'}</div>
               <div>Turn: {currentGameState?.isYourTurn ? 'Yours' : 'Opponent'}</div>
               <div>Dice: {currentGameState?.dice?.join(', ') || 'None'}</div>
-              <div>Moves Left: {currentGameState?.remainingMoves?.length || 0}</div>
+              <div>
+                Moves Left: {currentGameState?.remainingMoves?.length || 0}
+                {currentGameState?.hasValidMoves === false && currentGameState?.remainingMoves?.length > 0 && ' (No valid moves)'}
+              </div>
             </div>
           </div>
 

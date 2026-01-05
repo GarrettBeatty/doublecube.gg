@@ -16,18 +16,39 @@ import { DiceSelector } from '@/components/game/DiceSelector'
 import { PlayerSwitcher } from '@/components/game/PlayerSwitcher'
 import { PositionControls } from '@/components/game/PositionControls'
 import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
+import { PositionEvaluation as PositionEvaluationComponent } from '@/components/game/PositionEvaluation'
+import { BestMovesPanel } from '@/components/game/BestMovesPanel'
 import { CheckerColor } from '@/types/game.types'
+import {
+  PositionEvaluation,
+  BestMovesAnalysis,
+} from '@/types/analysis.types'
 
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
   const { sgf } = useParams<{ sgf?: string }>()
   const { invoke, isConnected } = useSignalR()
   const { toast } = useToast()
-  const { currentGameState, setCurrentGameId, resetGame, isCustomDiceEnabled } = useGameStore()
+  const {
+    currentGameState,
+    setCurrentGameId,
+    resetGame,
+    isCustomDiceEnabled,
+    currentEvaluation,
+    bestMoves,
+    isAnalyzing,
+    highlightedMoves,
+    setCurrentEvaluation,
+    setBestMoves,
+    setIsAnalyzing,
+    setHighlightedMoves,
+  } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
+  const isAnalyzingRef = useRef(false)
+  const lastAnalyzedState = useRef<string | null>(null)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -155,6 +176,60 @@ export const AnalysisPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Auto-analyze position whenever game state changes
+  useEffect(() => {
+    const analyzePosition = async () => {
+      if (!currentGameState?.gameId) return
+      if (isAnalyzingRef.current) return
+
+      // Create a hash of the current state to detect actual changes
+      const stateHash = JSON.stringify({
+        board: currentGameState.board,
+        whiteCheckersOnBar: currentGameState.whiteCheckersOnBar,
+        redCheckersOnBar: currentGameState.redCheckersOnBar,
+        whiteBornOff: currentGameState.whiteBornOff,
+        redBornOff: currentGameState.redBornOff,
+        currentPlayer: currentGameState.currentPlayer,
+        dice: currentGameState.dice,
+      })
+
+      // Only analyze if state actually changed
+      if (stateHash === lastAnalyzedState.current) return
+      lastAnalyzedState.current = stateHash
+
+      isAnalyzingRef.current = true
+      setIsAnalyzing(true)
+      try {
+        const evaluation = (await invoke(
+          HubMethods.AnalyzePosition,
+          currentGameState.gameId
+        )) as PositionEvaluation | null
+        setCurrentEvaluation(evaluation)
+
+        // Auto-find best moves if dice are rolled
+        if (currentGameState.dice && currentGameState.dice.length > 0) {
+          const analysis = (await invoke(
+            HubMethods.FindBestMoves,
+            currentGameState.gameId
+          )) as BestMovesAnalysis | null
+          if (analysis) {
+            setBestMoves(analysis)
+            setCurrentEvaluation(analysis.initialEvaluation)
+          }
+        } else {
+          setBestMoves(null)
+        }
+      } catch (error) {
+        console.error('[AnalysisPage] Failed to analyze position:', error)
+      } finally {
+        setIsAnalyzing(false)
+        isAnalyzingRef.current = false
+      }
+    }
+
+    analyzePosition()
+  }, [currentGameState, invoke, setCurrentEvaluation, setIsAnalyzing, setBestMoves])
+
   if (!isConnected || !currentGameState) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -219,9 +294,9 @@ export const AnalysisPage: React.FC = () => {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_320px] gap-3">
           {/* Left Sidebar - Player Info & Controls */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <PlayerCard {...whitePlayer} />
 
             <PlayerCard {...redPlayer} />
@@ -269,6 +344,23 @@ export const AnalysisPage: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Right Sidebar - Analysis */}
+          <div className="space-y-3">
+            {/* Position Evaluation */}
+            <PositionEvaluationComponent
+              evaluation={currentEvaluation}
+              isAnalyzing={isAnalyzing}
+            />
+
+            {/* Best Moves Panel */}
+            <BestMovesPanel
+              analysis={bestMoves}
+              isAnalyzing={isAnalyzing}
+              onHighlightMoves={setHighlightedMoves}
+              highlightedMoves={highlightedMoves}
+            />
           </div>
         </div>
       </div>

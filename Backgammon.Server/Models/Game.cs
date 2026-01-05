@@ -159,6 +159,13 @@ public class Game
     [JsonPropertyName("moveCount")]
     public int MoveCount { get; set; }
 
+    /// <summary>
+    /// Complete turn-by-turn history for game analysis and replay.
+    /// Each turn includes position SGF, dice rolled, moves made, and doubling actions.
+    /// </summary>
+    [JsonPropertyName("turnHistory")]
+    public List<TurnSnapshotDto> TurnHistory { get; set; } = new();
+
     // Timestamps
 
     /// <summary>

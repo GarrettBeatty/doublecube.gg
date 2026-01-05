@@ -9,6 +9,7 @@ import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
+import { GameResultModal } from '@/components/modals/GameResultModal'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -265,6 +266,9 @@ export const GamePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Game Result Modal */}
+      <GameResultModal />
     </div>
   )
 }

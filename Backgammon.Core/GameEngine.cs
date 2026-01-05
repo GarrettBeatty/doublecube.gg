@@ -5,6 +5,16 @@ namespace Backgammon.Core;
 /// </summary>
 public class GameEngine
 {
+    /// <summary>
+    /// Current turn being built (null when not in an active turn)
+    /// </summary>
+    private TurnSnapshot? _currentTurn;
+
+    /// <summary>
+    /// Pending doubling action for the current turn
+    /// </summary>
+    private DoublingAction? _pendingDoublingAction;
+
     public GameEngine(string whiteName = "White", string redName = "Red")
     {
         Board = new Board();
@@ -15,6 +25,7 @@ public class GameEngine
         DoublingCube = new DoublingCube();
         RemainingMoves = new List<int>();
         MoveHistory = new List<Move>();
+        History = new GameHistory();
         GameStarted = false;
         GameOver = false;
     }
@@ -34,6 +45,11 @@ public class GameEngine
     public List<int> RemainingMoves { get; private set; }
 
     public List<Move> MoveHistory { get; private set; }
+
+    /// <summary>
+    /// Complete game history tracking all turns for analysis and replay
+    /// </summary>
+    public GameHistory History { get; private set; }
 
     public bool GameStarted { get; private set; }
 
@@ -77,6 +93,11 @@ public class GameEngine
         GameOver = false;
         Winner = null;
 
+        // Clear game history for new game
+        History.Clear();
+        _currentTurn = null;
+        _pendingDoublingAction = null;
+
         // Start with opening roll phase
         IsOpeningRoll = true;
         WhiteOpeningRoll = null;
@@ -97,6 +118,21 @@ public class GameEngine
         Dice.Roll();
         RemainingMoves = new List<int>(Dice.GetMoves());
         MoveHistory.Clear(); // Clear history for new turn
+
+        // Start new turn snapshot for game history
+        _currentTurn = new TurnSnapshot
+        {
+            TurnNumber = History.Turns.Count + 1,
+            Player = CurrentPlayer.Color,
+            DiceRolled = Dice.GetMoves().ToArray(),
+            PositionSgf = SgfSerializer.ExportPosition(this),
+            CubeValue = DoublingCube.Value,
+            CubeOwner = DoublingCube.Owner?.ToString(),
+            DoublingAction = _pendingDoublingAction
+        };
+
+        // Clear pending doubling action after recording
+        _pendingDoublingAction = null;
     }
 
     /// <summary>
@@ -162,8 +198,21 @@ public class GameEngine
         // Remove the used die from remaining moves
         RemainingMoves.Remove(move.DieValue);
 
-        // Track move in history
+        // Track move in per-turn history
         MoveHistory.Add(move);
+
+        // Track move in current turn snapshot for game history
+        if (_currentTurn != null)
+        {
+            // Create a copy of the move to avoid reference issues
+            var moveCopy = new Move(move.From, move.To, move.DieValue)
+            {
+                IsHit = move.IsHit,
+                OpponentCheckersOnBarBefore = move.OpponentCheckersOnBarBefore,
+                CurrentPlayerBornOffBefore = move.CurrentPlayerBornOffBefore
+            };
+            _currentTurn.Moves.Add(moveCopy);
+        }
 
         // Check for win condition
         if (CurrentPlayer.CheckersBornOff == 15)
@@ -304,6 +353,13 @@ public class GameEngine
     /// </summary>
     public void EndTurn()
     {
+        // Finalize and save current turn snapshot to game history
+        if (_currentTurn != null)
+        {
+            History.Turns.Add(_currentTurn);
+            _currentTurn = null;
+        }
+
         RemainingMoves.Clear();
         MoveHistory.Clear();
         Dice.SetDice(0, 0); // Clear dice for next player
@@ -392,7 +448,14 @@ public class GameEngine
             return false;
         }
 
-        return DoublingCube.CanDouble(CurrentPlayer.Color);
+        bool canDouble = DoublingCube.CanDouble(CurrentPlayer.Color);
+        if (canDouble)
+        {
+            // Record that a double was offered (will be included in next turn snapshot)
+            _pendingDoublingAction = Core.DoublingAction.Offered;
+        }
+
+        return canDouble;
     }
 
     /// <summary>
@@ -401,6 +464,17 @@ public class GameEngine
     public void AcceptDouble()
     {
         DoublingCube.Double(GetOpponent().Color);
+        // Record that the double was accepted
+        _pendingDoublingAction = Core.DoublingAction.Accepted;
+    }
+
+    /// <summary>
+    /// Decline a double (results in forfeit)
+    /// </summary>
+    public void DeclineDouble()
+    {
+        // Record that the double was declined
+        _pendingDoublingAction = Core.DoublingAction.Declined;
     }
 
     /// <summary>

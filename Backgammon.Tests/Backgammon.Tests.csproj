@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Backgammon.Core\Backgammon.Core.csproj" />
     <ProjectReference Include="..\Backgammon.Server\Backgammon.Server.csproj" />
+    <ProjectReference Include="..\Backgammon.Analysis\Backgammon.Analysis.csproj" />
   </ItemGroup>
 
 </Project>

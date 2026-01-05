@@ -5,7 +5,19 @@ import {
   SelectedChecker,
   Destination,
   ChatMessage,
+  Move,
 } from '@/types/game.types'
+import { PositionEvaluation, BestMovesAnalysis } from '@/types/analysis.types'
+
+interface MatchState {
+  matchId: string
+  player1Score: number
+  player2Score: number
+  targetScore: number
+  isCrawfordGame: boolean
+  matchComplete: boolean
+  matchWinner: string | null
+}
 
 interface GameStore {
   // Game state
@@ -14,6 +26,12 @@ interface GameStore {
   currentGameId: string | null
   isSpectator: boolean
   isAnalysisMode: boolean
+
+  // Match state
+  matchState: MatchState | null
+  showGameResultModal: boolean
+  lastGameWinner: CheckerColor | null
+  lastGamePoints: number
 
   // Analysis mode toggles
   isFreeMoveEnabled: boolean
@@ -28,6 +46,12 @@ interface GameStore {
   // UI state
   chatMessages: ChatMessage[]
   showChat: boolean
+
+  // Analysis state
+  currentEvaluation: PositionEvaluation | null
+  bestMoves: BestMovesAnalysis | null
+  isAnalyzing: boolean
+  highlightedMoves: Move[]
 
   // Actions
   setGameState: (state: GameState) => void
@@ -52,6 +76,14 @@ interface GameStore {
   addChatMessage: (message: ChatMessage) => void
   clearChatMessages: () => void
   toggleChat: () => void
+  setCurrentEvaluation: (evaluation: PositionEvaluation | null) => void
+  setBestMoves: (analysis: BestMovesAnalysis | null) => void
+  setIsAnalyzing: (analyzing: boolean) => void
+  setHighlightedMoves: (moves: Move[]) => void
+  clearAnalysis: () => void
+  setMatchState: (matchState: MatchState | null) => void
+  setShowGameResultModal: (show: boolean) => void
+  setLastGameResult: (winner: CheckerColor | null, points: number) => void
   resetGame: () => void
 }
 
@@ -62,6 +94,10 @@ export const useGameStore = create<GameStore>((set) => ({
   currentGameId: null,
   isSpectator: false,
   isAnalysisMode: false,
+  matchState: null,
+  showGameResultModal: false,
+  lastGameWinner: null,
+  lastGamePoints: 0,
   isFreeMoveEnabled: false,
   isCustomDiceEnabled: false,
   selectedChecker: null,
@@ -70,6 +106,10 @@ export const useGameStore = create<GameStore>((set) => ({
   isBoardFlipped: false,
   chatMessages: [],
   showChat: false,
+  currentEvaluation: null,
+  bestMoves: null,
+  isAnalyzing: false,
+  highlightedMoves: [],
 
   // Actions
   setGameState: (state) =>
@@ -175,6 +215,29 @@ export const useGameStore = create<GameStore>((set) => ({
 
   toggleChat: () => set((state) => ({ showChat: !state.showChat })),
 
+  setCurrentEvaluation: (evaluation) => set({ currentEvaluation: evaluation }),
+
+  setBestMoves: (analysis) => set({ bestMoves: analysis }),
+
+  setIsAnalyzing: (analyzing) => set({ isAnalyzing: analyzing }),
+
+  setHighlightedMoves: (moves) => set({ highlightedMoves: moves }),
+
+  clearAnalysis: () =>
+    set({
+      currentEvaluation: null,
+      bestMoves: null,
+      isAnalyzing: false,
+      highlightedMoves: [],
+    }),
+
+  setMatchState: (matchState) => set({ matchState }),
+
+  setShowGameResultModal: (show) => set({ showGameResultModal: show }),
+
+  setLastGameResult: (winner, points) =>
+    set({ lastGameWinner: winner, lastGamePoints: points }),
+
   resetGame: () =>
     set({
       currentGameState: null,
@@ -182,6 +245,10 @@ export const useGameStore = create<GameStore>((set) => ({
       currentGameId: null,
       isSpectator: false,
       isAnalysisMode: false,
+      matchState: null,
+      showGameResultModal: false,
+      lastGameWinner: null,
+      lastGamePoints: 0,
       isFreeMoveEnabled: false,
       isCustomDiceEnabled: false,
       selectedChecker: null,
@@ -189,6 +256,10 @@ export const useGameStore = create<GameStore>((set) => ({
       validSources: [],
       chatMessages: [],
       showChat: false,
+      currentEvaluation: null,
+      bestMoves: null,
+      isAnalyzing: false,
+      highlightedMoves: [],
       // Keep board flip preference
     }),
 }))

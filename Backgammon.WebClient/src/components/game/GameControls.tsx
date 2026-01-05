@@ -4,8 +4,9 @@ import { useGameStore } from '@/stores/gameStore'
 import { HubMethods } from '@/types/signalr.types'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
+import { ChatPanel } from '@/components/game/ChatPanel'
 import { GameState, GameStatus } from '@/types/game.types'
-import { Dice1, RefreshCw, Flag } from 'lucide-react'
+import { Dice1, RefreshCw, Flag, MessageCircle } from 'lucide-react'
 
 interface GameControlsProps {
   gameState: GameState | null
@@ -17,7 +18,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   isSpectator = false,
 }) => {
   const { invoke } = useSignalR()
-  const { toggleBoardFlip } = useGameStore()
+  const { toggleBoardFlip, toggleChat, showChat, chatMessages } = useGameStore()
   const [showAbandonModal, setShowAbandonModal] = useState(false)
 
   if (!gameState) return null
@@ -36,6 +37,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
     }
   }
 
+  const hasUnreadMessages = !showChat && chatMessages.length > 0
+
+  // Check if this is an AI game or analysis mode (no chat needed)
+  const isAiGame = gameState.whitePlayerId?.startsWith('ai_') || gameState.redPlayerId?.startsWith('ai_')
+  const showChatButton = !gameState.isAnalysisMode && !isAiGame
+
   if (isSpectator) {
     return (
       <div className="space-y-2">
@@ -50,6 +57,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         >
           <RefreshCw className="h-4 w-4" />
         </Button>
+        <ChatPanel />
       </div>
     )
   }
@@ -72,7 +80,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       )}
 
       {/* Utility Buttons */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${showChatButton ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <Button
           variant="outline"
           size="lg"
@@ -81,9 +89,26 @@ export const GameControls: React.FC<GameControlsProps> = ({
         >
           <div className="text-center">
             <RefreshCw className="h-5 w-5 mx-auto mb-1" />
-            <div className="text-xs">Flip Board</div>
+            <div className="text-xs">Flip{showChatButton ? '' : ' Board'}</div>
           </div>
         </Button>
+
+        {showChatButton && (
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={toggleChat}
+            className={`w-full h-12 relative ${hasUnreadMessages ? 'bg-primary/10' : ''}`}
+          >
+            <div className="text-center">
+              <MessageCircle className="h-5 w-5 mx-auto mb-1" />
+              <div className="text-xs">Chat</div>
+            </div>
+            {hasUnreadMessages && (
+              <div className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
+            )}
+          </Button>
+        )}
 
         <Button
           variant="destructive"
@@ -97,6 +122,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </div>
         </Button>
       </div>
+
+      {/* Chat Panel - only show in multiplayer games */}
+      {showChatButton && <ChatPanel />}
 
       <AbandonConfirmModal
         isOpen={showAbandonModal}

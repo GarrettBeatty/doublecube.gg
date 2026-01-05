@@ -16,6 +16,9 @@ export const useSignalREvents = () => {
     setIsSpectator,
     setCurrentGameId,
     addChatMessage,
+    setMatchState,
+    setShowGameResultModal,
+    setLastGameResult,
   } = useGameStore()
   const { toast } = useToast()
   const prevGameStateRef = useRef<GameState | null>(null)
@@ -131,6 +134,14 @@ export const useSignalREvents = () => {
 
         setGameState(gameState)
         prevGameStateRef.current = gameState
+
+        // Store game result for modal display
+        setLastGameResult(winner, points)
+
+        // Show result modal if this is a match game
+        if (gameState.isMatchGame) {
+          setShowGameResultModal(true)
+        }
       }
     )
 
@@ -260,6 +271,59 @@ export const useSignalREvents = () => {
       audioService.playSound('game-lost')
     })
 
+    // MatchUpdate - Match score/state updated
+    connection.on(HubEvents.MatchUpdate, (data: {
+      matchId: string
+      player1Score: number
+      player2Score: number
+      targetScore: number
+      isCrawfordGame: boolean
+      matchComplete: boolean
+      matchWinner: string | null
+    }) => {
+      console.log('[SignalR] MatchUpdate', data)
+
+      setMatchState({
+        matchId: data.matchId,
+        player1Score: data.player1Score,
+        player2Score: data.player2Score,
+        targetScore: data.targetScore,
+        isCrawfordGame: data.isCrawfordGame,
+        matchComplete: data.matchComplete,
+        matchWinner: data.matchWinner,
+      })
+    })
+
+    // MatchContinued - Next game in match started
+    connection.on(HubEvents.MatchContinued, (data: {
+      matchId: string
+      gameId: string
+      player1Score: number
+      player2Score: number
+      targetScore: number
+      isCrawfordGame: boolean
+    }) => {
+      console.log('[SignalR] MatchContinued', data)
+
+      // Update match state
+      setMatchState({
+        matchId: data.matchId,
+        player1Score: data.player1Score,
+        player2Score: data.player2Score,
+        targetScore: data.targetScore,
+        isCrawfordGame: data.isCrawfordGame,
+        matchComplete: false,
+        matchWinner: null,
+      })
+
+      // Close the result modal
+      setShowGameResultModal(false)
+
+      // Navigate to new game
+      setCurrentGameId(data.gameId)
+      navigateRef.current(`/game/${data.gameId}`, { replace: true })
+    })
+
     // Cleanup on unmount
     return () => {
       console.log('[useSignalREvents] Cleaning up event handlers')
@@ -280,8 +344,10 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.MatchGameStarting)
       connection.off(HubEvents.TimeUpdate)
       connection.off(HubEvents.PlayerTimedOut)
+      connection.off(HubEvents.MatchUpdate)
+      connection.off(HubEvents.MatchContinued)
     }
-  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, toast])
+  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, setMatchState, setShowGameResultModal, setLastGameResult, toast])
 
   return { connection }
 }

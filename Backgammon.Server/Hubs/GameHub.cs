@@ -46,6 +46,7 @@ public class GameHub : Hub
     private readonly IGameImportExportService _gameImportExportService;
     private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
+    private readonly AnalysisService _analysisService;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -62,7 +63,8 @@ public class GameHub : Hub
         IMoveQueryService moveQueryService,
         IGameImportExportService gameImportExportService,
         IChatService chatService,
-        ILogger<GameHub> logger)
+        ILogger<GameHub> logger,
+        AnalysisService analysisService)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -79,6 +81,7 @@ public class GameHub : Hub
         _gameImportExportService = gameImportExportService;
         _chatService = chatService;
         _logger = logger;
+        _analysisService = analysisService;
     }
 
     /// <summary>
@@ -1131,6 +1134,39 @@ public class GameHub : Hub
             _logger.LogError(ex, "Error joining match {MatchId}", matchId);
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Analyze the current position and return evaluation
+    /// </summary>
+    public async Task<PositionEvaluationDto> AnalyzePosition(string gameId)
+    {
+        var session = _sessionManager.GetSession(gameId);
+        if (session == null)
+        {
+            throw new HubException("Game not found");
+        }
+
+        return await Task.Run(() => _analysisService.EvaluatePosition(session.Engine));
+    }
+
+    /// <summary>
+    /// Find the best moves for the current position
+    /// </summary>
+    public async Task<BestMovesAnalysisDto> FindBestMoves(string gameId)
+    {
+        var session = _sessionManager.GetSession(gameId);
+        if (session == null)
+        {
+            throw new HubException("Game not found");
+        }
+
+        if (session.Engine.RemainingMoves.Count == 0)
+        {
+            throw new HubException("No dice rolled - cannot analyze moves");
+        }
+
+        return await Task.Run(() => _analysisService.FindBestMoves(session.Engine));
     }
 
     private string? GetAuthenticatedUserId()

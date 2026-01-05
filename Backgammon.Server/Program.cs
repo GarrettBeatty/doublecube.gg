@@ -158,6 +158,7 @@ builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>()
 builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
 builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
 builder.Services.AddSingleton<IChatService, ChatService>();
+builder.Services.AddSingleton<AnalysisService>();
 
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));

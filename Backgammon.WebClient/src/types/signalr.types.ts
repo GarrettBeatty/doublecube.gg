@@ -33,6 +33,8 @@ export const HubMethods = {
   SetDice: 'SetDice',
   MoveCheckerDirectly: 'MoveCheckerDirectly',
   SetCurrentPlayer: 'SetCurrentPlayer',
+  AnalyzePosition: 'AnalyzePosition',
+  FindBestMoves: 'FindBestMoves',
 } as const
 
 // SignalR event names (server → client)

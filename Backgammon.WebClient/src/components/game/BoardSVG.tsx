@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react'
-import { GameState, Point, CheckerColor } from '@/types/game.types'
+import { GameState, Point, CheckerColor, GameStatus } from '@/types/game.types'
 import { useGameStore } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods } from '@/types/signalr.types'
@@ -53,6 +53,7 @@ const COLORS = {
   highlightSelected: 'hsla(142.1 76.2% 36.3% / 0.7)',  // Success/green for selected
   highlightDest: 'hsla(221.2 83.2% 53.3% / 0.6)',      // Primary/blue for destinations
   highlightCapture: 'hsla(0 84.2% 60.2% / 0.6)',       // Destructive/red for captures
+  highlightAnalysis: 'hsla(142.1 76.2% 36.3% / 0.5)',  // Green for suggested moves
   textLight: 'hsla(0 0% 98% / 0.5)',       // Light text
   textDark: 'hsla(0 0% 9% / 0.7)',         // Dark text
 }
@@ -130,7 +131,8 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
   const pointsGroupRef = useRef<SVGGElement | null>(null)
   const diceGroupRef = useRef<SVGGElement | null>(null)
 
-  const { selectedChecker, validSources, isBoardFlipped, isFreeMoveEnabled } = useGameStore()
+  const { selectedChecker, validSources, isBoardFlipped, isFreeMoveEnabled, highlightedMoves } =
+    useGameStore()
   const { invoke } = useSignalR()
 
   // Drag state - use ref to avoid stale closures in event handlers
@@ -149,11 +151,13 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     source: number | null
     destinations: number[]
     captures: number[]
+    analysisMoves: Array<{ from: number; to: number }>
   }>({
     sources: [],
     source: null,
     destinations: [],
     captures: [],
+    analysisMoves: [],
   })
 
   // Helper: Create SVG element
@@ -351,6 +355,19 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
         point.setAttribute('fill', COLORS.highlightCapture)
       }
     })
+
+    // Highlight analysis suggested moves (both from and to points)
+    highlightedPoints.analysisMoves.forEach((move) => {
+      const fromPoint = pointsGroupRef.current!.querySelector(`.point-${move.from}`)
+      const toPoint = pointsGroupRef.current!.querySelector(`.point-${move.to}`)
+
+      if (fromPoint && move.from !== 0 && move.from !== 25) {
+        fromPoint.setAttribute('fill', COLORS.highlightAnalysis)
+      }
+      if (toPoint && move.to !== 0 && move.to !== 25) {
+        toPoint.setAttribute('fill', COLORS.highlightAnalysis)
+      }
+    })
   }, [highlightedPoints])
 
   // Apply highlights whenever highlightedPoints changes
@@ -365,6 +382,17 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       sources: validSources,
     }))
   }, [validSources])
+
+  // Update analysis move highlights
+  useEffect(() => {
+    setHighlightedPoints((prev) => ({
+      ...prev,
+      analysisMoves: highlightedMoves.map((move) => ({
+        from: move.from,
+        to: move.to,
+      })),
+    }))
+  }, [highlightedMoves])
 
   // Get point number at client coordinates
   const getPointAtPosition = useCallback(
@@ -995,7 +1023,8 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       })
 
       // "X moves left" text
-      if (gameState.remainingMoves && gameState.remainingMoves.length > 0) {
+      // Only show move status if game is not completed
+      if (gameState.status !== GameStatus.Completed && gameState.remainingMoves && gameState.remainingMoves.length > 0) {
         const text = createSVGElement('text', {
           x: barCenterX,
           y: startY + totalHeight + 12,
@@ -1005,7 +1034,14 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
           'font-size': 10,
           'font-weight': 'bold',
         })
-        text.textContent = `${gameState.remainingMoves.length} move${gameState.remainingMoves.length !== 1 ? 's' : ''} left`
+
+        // Show "No valid moves" if player has dice but can't move
+        if (!gameState.hasValidMoves) {
+          text.textContent = 'No valid moves'
+        } else {
+          text.textContent = `${gameState.remainingMoves.length} move${gameState.remainingMoves.length !== 1 ? 's' : ''} left`
+        }
+
         diceGroupRef.current!.appendChild(text)
       }
     }

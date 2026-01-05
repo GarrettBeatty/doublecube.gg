@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.ServiceDefaults"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.IntegrationTests", "Backgammon.IntegrationTests\Backgammon.IntegrationTests.csproj", "{A1B2C3D4-1234-5678-ABCD-1234567890AB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Analysis", "Backgammon.Analysis\Backgammon.Analysis.csproj", "{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -91,18 +93,6 @@ Global
 		{E132FD8F-1867-42EC-99AA-AEC5A0053C8A}.Release|x64.Build.0 = Release|Any CPU
 		{E132FD8F-1867-42EC-99AA-AEC5A0053C8A}.Release|x86.ActiveCfg = Release|Any CPU
 		{E132FD8F-1867-42EC-99AA-AEC5A0053C8A}.Release|x86.Build.0 = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|x64.Build.0 = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Debug|x86.Build.0 = Debug|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|x64.ActiveCfg = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|x64.Build.0 = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|x86.ActiveCfg = Release|Any CPU
-		{D57F4727-67B6-4842-B285-A65834BC5880}.Release|x86.Build.0 = Release|Any CPU
 		{7A3F18D3-EB12-46F5-821C-404EB7EE7372}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{7A3F18D3-EB12-46F5-821C-404EB7EE7372}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7A3F18D3-EB12-46F5-821C-404EB7EE7372}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -139,6 +129,18 @@ Global
 		{928D9070-0F38-42C3-9F10-C8D28C3A2BD4}.Release|x64.Build.0 = Release|Any CPU
 		{928D9070-0F38-42C3-9F10-C8D28C3A2BD4}.Release|x86.ActiveCfg = Release|Any CPU
 		{928D9070-0F38-42C3-9F10-C8D28C3A2BD4}.Release|x86.Build.0 = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|x64.Build.0 = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Debug|x86.Build.0 = Debug|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|x64.ActiveCfg = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|x64.Build.0 = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|x86.ActiveCfg = Release|Any CPU
+		{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
