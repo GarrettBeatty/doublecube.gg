@@ -188,16 +188,36 @@ export const AnalysisPage: React.FC = () => {
 
   // Execute a sequence of moves
   const handleExecuteMoves = async (moves: Move[]) => {
-    if (!currentGameState?.gameId) return
+    console.log('[AnalysisPage] handleExecuteMoves called', {
+      movesCount: moves.length,
+      moves: moves.map((m) => `${m.from}/${m.to}`).join(' '),
+      hasGameState: !!currentGameState,
+      gameId: currentGameState?.gameId,
+    })
+
+    if (!currentGameState?.gameId) {
+      console.error('[AnalysisPage] Cannot execute moves: no game ID', {
+        currentGameState,
+      })
+      toast({
+        title: 'Error',
+        description: 'Cannot execute moves: game not properly initialized',
+        variant: 'destructive',
+      })
+      return
+    }
 
     // Set flag to prevent URL imports during move execution
     isExecutingMoves.current = true
 
     try {
       // Execute each move in sequence
-      for (const move of moves) {
+      for (let i = 0; i < moves.length; i++) {
+        const move = moves[i]
+        console.log(`[AnalysisPage] Executing move ${i + 1}/${moves.length}: ${move.from}/${move.to}`)
         await invoke(HubMethods.MakeMove, move.from, move.to)
       }
+      console.log('[AnalysisPage] All moves executed successfully')
     } catch (error) {
       console.error('[AnalysisPage] Failed to execute moves:', error)
       toast({
