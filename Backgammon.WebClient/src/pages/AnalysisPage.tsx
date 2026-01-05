@@ -286,6 +286,8 @@ export const AnalysisPage: React.FC = () => {
     }
 
     analyzePosition()
+    // Zustand setters (setCurrentEvaluation, setBestMoves, setIsAnalyzing) are stable and don't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentGameState, invoke, evaluatorType])
 
   if (!isConnected || !currentGameState) {
