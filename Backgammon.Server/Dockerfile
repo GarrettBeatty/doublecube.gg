@@ -29,8 +29,11 @@ RUN apt-get update && \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Add /usr/games to PATH (gnubg installs here on Debian)
+ENV PATH="${PATH}:/usr/games"
+
 # Verify gnubg installation
-RUN gnubg --version || echo "Warning: gnubg not found in PATH"
+RUN gnubg --version
 
 WORKDIR /app
 COPY --from=build /app/publish .
