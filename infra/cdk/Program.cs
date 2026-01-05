@@ -2,7 +2,7 @@ using Amazon.CDK;
 
 namespace Backgammon.Infrastructure;
 
-sealed class Program
+internal sealed class Program
 {
     public static void Main(string[] args)
     {

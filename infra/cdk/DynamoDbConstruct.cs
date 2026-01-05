@@ -8,7 +8,8 @@ public class DynamoDbConstruct : Construct
 {
     public ITable Table { get; private set; }
 
-    public DynamoDbConstruct(Construct scope, string id, string environment) : base(scope, id)
+    public DynamoDbConstruct(Construct scope, string id, string environment)
+        : base(scope, id)
     {
         var tableName = $"backgammon-{environment}";
 

@@ -8,7 +8,8 @@ public class GitHubOidcConstruct : Construct
 {
     public IRole DeployRole { get; }
 
-    public GitHubOidcConstruct(Construct scope, string id, string githubUsername, string githubRepo) : base(scope, id)
+    public GitHubOidcConstruct(Construct scope, string id, string githubUsername, string githubRepo)
+        : base(scope, id)
     {
         // Create GitHub OIDC Provider
         var oidcProvider = new OpenIdConnectProvider(this, "GitHubOidcProvider", new OpenIdConnectProviderProps
@@ -27,19 +28,20 @@ public class GitHubOidcConstruct : Construct
                 oidcProvider.OpenIdConnectProviderArn,
                 new System.Collections.Generic.Dictionary<string, object>
                 {
-                    { "StringEquals", new System.Collections.Generic.Dictionary<string, string>
+                    {
+                        "StringEquals", new System.Collections.Generic.Dictionary<string, string>
                         {
                             { "token.actions.githubusercontent.com:aud", "sts.amazonaws.com" }
                         }
                     },
-                    { "StringLike", new System.Collections.Generic.Dictionary<string, string>
+                    {
+                        "StringLike", new System.Collections.Generic.Dictionary<string, string>
                         {
                             { "token.actions.githubusercontent.com:sub", $"repo:{githubUsername}/{githubRepo}:*" }
                         }
                     }
                 },
-                "sts:AssumeRoleWithWebIdentity"
-            ),
+                "sts:AssumeRoleWithWebIdentity"),
             MaxSessionDuration = Duration.Hours(1)
         });
 

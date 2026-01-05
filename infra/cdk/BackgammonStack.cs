@@ -8,7 +8,8 @@ namespace Backgammon.Infrastructure;
 
 public class BackgammonStack : Stack
 {
-    public BackgammonStack(Construct scope, string id, IStackProps? props = null) : base(scope, id, props)
+    public BackgammonStack(Construct scope, string id, IStackProps? props = null)
+        : base(scope, id, props)
     {
         // Extract environment from stack name (e.g., BackgammonStack-dev -> dev)
         var environment = id.Split('-').Last();
@@ -78,22 +79,22 @@ public class BackgammonStack : Stack
         userData.AddCommands(
             "#!/bin/bash",
             "set -e",
-            "",
+            string.Empty,
             "# Update system",
             "yum update -y",
-            "",
+            string.Empty,
             "# Install Docker",
             "yum install -y docker",
             "systemctl start docker",
             "systemctl enable docker",
-            "",
+            string.Empty,
             "# Install Docker Compose",
             "curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose",
             "chmod +x /usr/local/bin/docker-compose",
-            "",
+            string.Empty,
             "# Add ec2-user to docker group",
             "usermod -a -G docker ec2-user",
-            "",
+            string.Empty,
             "# Install AWS CLI v2 (if not already present)",
             "if ! command -v aws &> /dev/null; then",
             "  curl https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip -o awscliv2.zip",
@@ -101,13 +102,12 @@ public class BackgammonStack : Stack
             "  ./aws/install",
             "  rm -rf aws awscliv2.zip",
             "fi",
-            "",
+            string.Empty,
             "# Create deployment directory",
             "mkdir -p /home/ec2-user/backgammon",
             "chown ec2-user:ec2-user /home/ec2-user/backgammon",
-            "",
-            "echo 'Docker and Docker Compose installation complete'"
-        );
+            string.Empty,
+            "echo 'Docker and Docker Compose installation complete'");
 
         // Create EC2 instance (t4g.nano - ARM64, 512MB RAM, 2 vCPU)
         var instance = new Instance_(this, "BackgammonInstance", new InstanceProps

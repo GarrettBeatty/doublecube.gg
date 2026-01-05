@@ -7,9 +7,11 @@ namespace Infra;
 public class EcrConstruct : Construct
 {
     public IRepository ServerRepository { get; }
+
     public IRepository WebClientRepository { get; }
 
-    public EcrConstruct(Construct scope, string id, string environment) : base(scope, id)
+    public EcrConstruct(Construct scope, string id, string environment)
+        : base(scope, id)
     {
         // Server repository
         ServerRepository = new Repository(this, "ServerRepo", new RepositoryProps
