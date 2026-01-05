@@ -1061,6 +1061,15 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
 
     const { isCustomDiceEnabled } = useGameStore.getState()
 
+    // Counter-rotate if board is flipped
+    const centerX = CONFIG.viewBox.width / 2
+    const centerY = CONFIG.viewBox.height / 2
+    if (isBoardFlipped) {
+      buttonsGroupRef.current.setAttribute('transform', `rotate(180 ${centerX} ${centerY})`)
+    } else {
+      buttonsGroupRef.current.removeAttribute('transform')
+    }
+
     const isGameInProgress = gameState.status === GameStatus.InProgress
     const isYourTurn = gameState.isYourTurn
     const hasDiceRolled =
@@ -1202,7 +1211,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       )
       buttonsGroupRef.current.appendChild(endButton)
     }
-  }, [gameState, invoke])
+  }, [gameState, invoke, isBoardFlipped])
 
   // Initialize board
   useEffect(() => {
