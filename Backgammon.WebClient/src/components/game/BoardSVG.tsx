@@ -1099,7 +1099,6 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (gameState.isAnalysisMode || isYourTurn)
 
     // Button positions
-    const centerY = CONFIG.viewBox.height / 2
     const leftSideX = CONFIG.viewBox.width * 0.2216  // 22.16%
     const rightSideX = CONFIG.viewBox.width * 0.7265  // 72.65%
 
