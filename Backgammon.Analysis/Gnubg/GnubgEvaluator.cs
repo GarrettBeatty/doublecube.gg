@@ -105,7 +105,12 @@ public class GnubgEvaluator : IPositionEvaluator
             foreach (var moveAnalysis in moveAnalyses.Take(5))
             {
                 // Parse move notation into Move objects
-                var moves = GnubgOutputParser.ParseMoveNotation(moveAnalysis.Notation, engine.CurrentPlayer.Color);
+                // Pass available dice so parser can expand abbreviated moves (e.g., "12/5" with dice 1,6)
+                var availableDice = engine.RemainingMoves.ToList();
+                var moves = GnubgOutputParser.ParseMoveNotation(
+                    moveAnalysis.Notation,
+                    engine.CurrentPlayer.Color,
+                    availableDice);
 
                 // Create evaluation for this move sequence
                 var moveEvaluation = new PositionEvaluation

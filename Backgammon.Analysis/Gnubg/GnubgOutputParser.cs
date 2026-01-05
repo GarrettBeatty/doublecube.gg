@@ -247,9 +247,11 @@ public static class GnubgOutputParser
     }
 
     /// <summary>
-    /// Convert gnubg move notation (e.g., "24/20 13/9") to list of Move objects
+    /// Convert gnubg move notation (e.g., "24/20 13/9") to list of Move objects.
+    /// Handles abbreviated notation where a single move like "12/5" with dice 1,6
+    /// means two moves: 12->11->5 or 12->6->5
     /// </summary>
-    public static List<Move> ParseMoveNotation(string notation, CheckerColor color)
+    public static List<Move> ParseMoveNotation(string notation, CheckerColor color, List<int> availableDice)
     {
         var moves = new List<Move>();
 
@@ -258,36 +260,124 @@ public static class GnubgOutputParser
             // Split notation by spaces: "24/20 13/9" -> ["24/20", "13/9"]
             var parts = notation.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
+            // Track which dice we've used
+            var remainingDice = new List<int>(availableDice);
+
             foreach (var part in parts)
             {
-                // Parse individual move: "24/20"
-                var moveParts = part.Split('/');
-                if (moveParts.Length == 2)
+                // Handle bar entry: "bar/20"
+                if (part.Contains("bar", StringComparison.OrdinalIgnoreCase))
                 {
-                    var from = int.Parse(moveParts[0]);
-                    var to = int.Parse(moveParts[1]);
-
-                    // Calculate die value
-                    var dieValue = Math.Abs(from - to);
-
-                    moves.Add(new Move(from, to, dieValue));
-                }
-                else if (part.Contains("bar", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Handle bar entry: "bar/20"
+                    var moveParts = part.Split('/');
                     if (moveParts.Length == 2 && moveParts[0].Contains("bar", StringComparison.OrdinalIgnoreCase))
                     {
                         var to = int.Parse(moveParts[1]);
-                        moves.Add(new Move(0, to, 25 - to)); // From bar (point 0)
+                        var dieValue = 25 - to;
+
+                        // Use the appropriate die
+                        if (remainingDice.Contains(dieValue))
+                        {
+                            moves.Add(new Move(0, to, dieValue));
+                            remainingDice.Remove(dieValue);
+                        }
                     }
+
+                    continue;
                 }
-                else if (part.Contains("off", StringComparison.OrdinalIgnoreCase))
+
+                // Handle bearing off: "6/off"
+                if (part.Contains("off", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Handle bearing off: "6/off"
+                    var moveParts = part.Split('/');
                     if (moveParts.Length == 2)
                     {
                         var from = int.Parse(moveParts[0]);
-                        moves.Add(new Move(from, 25, from)); // To bear off (point 25)
+                        var dieValue = from;
+
+                        // For bearing off, might need exact die or higher
+                        if (remainingDice.Contains(dieValue))
+                        {
+                            moves.Add(new Move(from, 25, dieValue));
+                            remainingDice.Remove(dieValue);
+                        }
+                        else
+                        {
+                            // Use any higher die for bearing off
+                            var higherDie = remainingDice.FirstOrDefault(d => d >= dieValue);
+                            if (higherDie > 0)
+                            {
+                                moves.Add(new Move(from, 25, higherDie));
+                                remainingDice.Remove(higherDie);
+                            }
+                        }
+                    }
+
+                    continue;
+                }
+
+                // Parse regular move: "24/20" or abbreviated "12/5"
+                var regularMoveParts = part.Split('/');
+                if (regularMoveParts.Length == 2)
+                {
+                    var from = int.Parse(regularMoveParts[0]);
+                    var to = int.Parse(regularMoveParts[1]);
+                    var distance = Math.Abs(from - to);
+
+                    // Check if this is a single-die move
+                    if (remainingDice.Contains(distance))
+                    {
+                        moves.Add(new Move(from, to, distance));
+                        remainingDice.Remove(distance);
+                    }
+                    else
+                    {
+                        // This is an abbreviated move - need to expand it
+                        // Try to find two dice that sum to the distance
+                        bool expanded = false;
+
+                        for (int i = 0; i < remainingDice.Count && !expanded; i++)
+                        {
+                            for (int j = i; j < remainingDice.Count && !expanded; j++)
+                            {
+                                if (remainingDice[i] + remainingDice[j] == distance)
+                                {
+                                    // Found two dice that work
+                                    var die1 = remainingDice[i];
+                                    var die2 = remainingDice[j];
+
+                                    // Create intermediate point
+                                    // For white moving down (24->1), intermediate is from - die1
+                                    // For red moving up (1->24), intermediate is from + die1
+                                    int intermediate = from > to ? from - die1 : from + die1;
+
+                                    // Add both moves
+                                    moves.Add(new Move(from, intermediate, die1));
+                                    moves.Add(new Move(intermediate, to, die2));
+
+                                    // Remove used dice (remove by index to handle doubles correctly)
+                                    if (i == j)
+                                    {
+                                        // Same die used twice (doubles)
+                                        remainingDice.RemoveAt(i);
+                                        remainingDice.RemoveAt(i); // Remove again at same index
+                                    }
+                                    else
+                                    {
+                                        // Different dice - remove larger index first
+                                        remainingDice.RemoveAt(Math.Max(i, j));
+                                        remainingDice.RemoveAt(Math.Min(i, j));
+                                    }
+
+                                    expanded = true;
+                                }
+                            }
+                        }
+
+                        if (!expanded)
+                        {
+                            // Couldn't expand - this shouldn't happen with valid gnubg output
+                            throw new Exception($"Could not expand move {part} with remaining dice: {string.Join(",", remainingDice)}");
+                        }
                     }
                 }
             }

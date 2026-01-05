@@ -434,6 +434,7 @@ export const AnalysisPage: React.FC = () => {
             <PositionEvaluationComponent
               evaluation={currentEvaluation}
               isAnalyzing={isAnalyzing}
+              currentPlayer={currentGameState.currentPlayer}
             />
 
             {/* Best Moves Panel */}
@@ -443,6 +444,7 @@ export const AnalysisPage: React.FC = () => {
               onHighlightMoves={setHighlightedMoves}
               highlightedMoves={highlightedMoves}
               onExecuteMoves={handleExecuteMoves}
+              currentPlayer={currentGameState.currentPlayer}
             />
           </div>
         </div>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Lightbulb, Target } from 'lucide-react'
 import { BestMovesAnalysis, MoveSequence } from '@/types/analysis.types'
-import { Move } from '@/types/game.types'
+import { Move, CheckerColor } from '@/types/game.types'
 
 interface BestMovesPanelProps {
   analysis: BestMovesAnalysis | null
@@ -11,6 +11,7 @@ interface BestMovesPanelProps {
   onHighlightMoves: (moves: Move[]) => void
   highlightedMoves: Move[]
   onExecuteMoves: (moves: Move[]) => void
+  currentPlayer: CheckerColor
 }
 
 export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
@@ -19,6 +20,7 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
   onHighlightMoves,
   highlightedMoves,
   onExecuteMoves,
+  currentPlayer,
 }) => {
   if (isAnalyzing) {
     return (
@@ -90,6 +92,24 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
           const isActive = isHighlighted(moveSeq)
           const isPositive = moveSeq.equity > 0
 
+          // Determine which player has the advantage based on equity sign and current player
+          const whiteHasAdvantage =
+            (currentPlayer === CheckerColor.White && isPositive) ||
+            (currentPlayer === CheckerColor.Red && !isPositive && moveSeq.equity !== 0)
+          const redHasAdvantage =
+            (currentPlayer === CheckerColor.Red && isPositive) ||
+            (currentPlayer === CheckerColor.White && !isPositive && moveSeq.equity !== 0)
+
+          // Color for equity display - slate for White's advantage, red for Red's advantage
+          const equityColorClass = whiteHasAdvantage
+            ? 'text-slate-700'
+            : redHasAdvantage
+              ? 'text-red-500'
+              : 'text-muted-foreground'
+
+          // Icon color for best move indicator
+          const iconColorClass = whiteHasAdvantage ? 'text-slate-700' : 'text-red-500'
+
           return (
             <button
               key={index}
@@ -104,18 +124,10 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
             >
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  {index === 0 && <Target className="h-3 w-3 text-green-500" />}
+                  {index === 0 && <Target className={`h-3 w-3 ${iconColorClass}`} />}
                   <span className="text-xs text-muted-foreground">#{index + 1}</span>
                 </div>
-                <span
-                  className={`text-sm font-mono font-medium ${
-                    isPositive
-                      ? 'text-green-500'
-                      : moveSeq.equity < 0
-                        ? 'text-red-500'
-                        : 'text-muted-foreground'
-                  }`}
-                >
+                <span className={`text-sm font-mono font-medium ${equityColorClass}`}>
                   {moveSeq.equity > 0 ? '+' : ''}
                   {moveSeq.equity.toFixed(3)}
                 </span>

@@ -3,15 +3,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { BarChart3, TrendingUp, TrendingDown } from 'lucide-react'
 import { PositionEvaluation as PositionEvaluationType } from '@/types/analysis.types'
+import { CheckerColor } from '@/types/game.types'
 
 interface PositionEvaluationProps {
   evaluation: PositionEvaluationType | null
   isAnalyzing: boolean
+  currentPlayer: CheckerColor
 }
 
 export const PositionEvaluation: React.FC<PositionEvaluationProps> = ({
   evaluation,
   isAnalyzing,
+  currentPlayer,
 }) => {
   if (isAnalyzing) {
     return (
@@ -53,6 +56,21 @@ export const PositionEvaluation: React.FC<PositionEvaluationProps> = ({
   const equityPercent = (equity / 3.0) * 100 // Map -3 to +3 -> -100% to +100%
   const isPositive = equity > 0
 
+  // Determine which player has the advantage based on equity sign and current player
+  const whiteHasAdvantage =
+    (currentPlayer === CheckerColor.White && isPositive) ||
+    (currentPlayer === CheckerColor.Red && !isPositive && equity !== 0)
+  const redHasAdvantage =
+    (currentPlayer === CheckerColor.Red && isPositive) ||
+    (currentPlayer === CheckerColor.White && !isPositive && equity !== 0)
+
+  // Color for equity display - slate for White's advantage, red for Red's advantage
+  const equityColorClass = whiteHasAdvantage
+    ? 'text-slate-700'
+    : redHasAdvantage
+      ? 'text-red-500'
+      : 'text-muted-foreground'
+
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -81,9 +99,7 @@ export const PositionEvaluation: React.FC<PositionEvaluationProps> = ({
 
           <div className="text-center">
             <div
-              className={`text-base font-bold font-mono flex items-center justify-center gap-1 ${
-                isPositive ? 'text-green-500' : equity < 0 ? 'text-red-500' : 'text-muted-foreground'
-              }`}
+              className={`text-base font-bold font-mono flex items-center justify-center gap-1 ${equityColorClass}`}
             >
               {isPositive && <TrendingUp className="h-3 w-3" />}
               {equity < 0 && <TrendingDown className="h-3 w-3" />}
