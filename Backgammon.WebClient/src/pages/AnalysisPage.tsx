@@ -18,6 +18,7 @@ import { PositionControls } from '@/components/game/PositionControls'
 import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
 import { PositionEvaluation as PositionEvaluationComponent } from '@/components/game/PositionEvaluation'
 import { BestMovesPanel } from '@/components/game/BestMovesPanel'
+import { EvaluatorSelector } from '@/components/game/EvaluatorSelector'
 import { CheckerColor, Move } from '@/types/game.types'
 import {
   PositionEvaluation,
@@ -44,12 +45,14 @@ export const AnalysisPage: React.FC = () => {
     setHighlightedMoves,
   } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
+  const [evaluatorType, setEvaluatorType] = useState<'Heuristic' | 'Gnubg'>('Gnubg')
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
   const isAnalyzingRef = useRef(false)
   const lastAnalyzedState = useRef<string | null>(null)
   const isExecutingMoves = useRef(false)
+  const analysisRequestCounter = useRef(0)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -223,20 +226,30 @@ export const AnalysisPage: React.FC = () => {
         redBornOff: currentGameState.redBornOff,
         currentPlayer: currentGameState.currentPlayer,
         dice: currentGameState.dice,
+        evaluatorType: evaluatorType,
       })
 
       // Only analyze if state actually changed
       if (stateHash === lastAnalyzedState.current) return
       lastAnalyzedState.current = stateHash
 
+      // Increment request counter to invalidate previous requests
+      analysisRequestCounter.current += 1
+      const currentRequestId = analysisRequestCounter.current
+
       isAnalyzingRef.current = true
       setIsAnalyzing(true)
       try {
         const evaluation = (await invoke(
           HubMethods.AnalyzePosition,
-          currentGameState.gameId
+          currentGameState.gameId,
+          evaluatorType
         )) as PositionEvaluation | null
-        setCurrentEvaluation(evaluation)
+
+        // Only update if this is still the latest request
+        if (currentRequestId === analysisRequestCounter.current) {
+          setCurrentEvaluation(evaluation)
+        }
 
         // Auto-find best moves if dice are rolled
         // In analysis mode, you control both sides, so we only check for dice
@@ -248,15 +261,21 @@ export const AnalysisPage: React.FC = () => {
         ) {
           const analysis = (await invoke(
             HubMethods.FindBestMoves,
-            currentGameState.gameId
+            currentGameState.gameId,
+            evaluatorType
           )) as BestMovesAnalysis | null
-          if (analysis) {
+
+          // Only update if this is still the latest request
+          if (analysis && currentRequestId === analysisRequestCounter.current) {
             setBestMoves(analysis)
             setCurrentEvaluation(analysis.initialEvaluation)
           }
         } else {
           // Clear best moves when dice are not rolled (e.g., after ending turn)
-          setBestMoves(null)
+          // Only update if this is still the latest request
+          if (currentRequestId === analysisRequestCounter.current) {
+            setBestMoves(null)
+          }
         }
       } catch (error) {
         console.error('[AnalysisPage] Failed to analyze position:', error)
@@ -267,7 +286,9 @@ export const AnalysisPage: React.FC = () => {
     }
 
     analyzePosition()
-  }, [currentGameState, invoke, setCurrentEvaluation, setIsAnalyzing, setBestMoves])
+    // Zustand setters (setCurrentEvaluation, setBestMoves, setIsAnalyzing) are stable and don't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGameState, invoke, evaluatorType])
 
   if (!isConnected || !currentGameState) {
     return (
@@ -382,6 +403,13 @@ export const AnalysisPage: React.FC = () => {
 
           {/* Right Sidebar - Analysis */}
           <div className="space-y-3">
+            {/* Evaluator Selector */}
+            <EvaluatorSelector
+              value={evaluatorType}
+              onChange={setEvaluatorType}
+              disabled={isAnalyzing}
+            />
+
             {/* Position Evaluation */}
             <PositionEvaluationComponent
               evaluation={currentEvaluation}

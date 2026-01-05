@@ -155,8 +155,12 @@ public class AiMoveServiceTests
         session.Engine.StartNewGame();
 
         // Complete opening roll so AI can take a normal turn
-        session.Engine.RollOpening(CheckerColor.White);
-        session.Engine.RollOpening(CheckerColor.Red);
+        // Keep rolling until there's no tie
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            session.Engine.RollOpening(CheckerColor.Red);
+        }
 
         // Clear remaining moves first
         session.Engine.RemainingMoves.Clear();
@@ -194,8 +198,12 @@ public class AiMoveServiceTests
         session.Engine.StartNewGame();
 
         // Complete opening roll so AI can take a normal turn
-        session.Engine.RollOpening(CheckerColor.White);
-        session.Engine.RollOpening(CheckerColor.Red);
+        // Keep rolling until there's no tie
+        while (session.Engine.IsOpeningRoll)
+        {
+            session.Engine.RollOpening(CheckerColor.White);
+            session.Engine.RollOpening(CheckerColor.Red);
+        }
 
         // Clear remaining moves first
         session.Engine.RemainingMoves.Clear();

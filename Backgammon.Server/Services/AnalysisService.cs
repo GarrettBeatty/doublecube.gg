@@ -11,40 +11,46 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class AnalysisService
 {
-    private readonly IPositionEvaluator _evaluator;
+    private readonly PositionEvaluatorFactory _evaluatorFactory;
     private readonly ILogger<AnalysisService> _logger;
 
-    public AnalysisService(IPositionEvaluator evaluator, ILogger<AnalysisService> logger)
+    public AnalysisService(PositionEvaluatorFactory evaluatorFactory, ILogger<AnalysisService> logger)
     {
-        _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
+        _evaluatorFactory = evaluatorFactory ?? throw new ArgumentNullException(nameof(evaluatorFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <summary>
     /// Evaluate the current position
     /// </summary>
-    public PositionEvaluationDto EvaluatePosition(GameEngine engine)
+    /// <param name="engine">Game engine to evaluate</param>
+    /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg")</param>
+    public PositionEvaluationDto EvaluatePosition(GameEngine engine, string? evaluatorType = null)
     {
-        var evaluation = _evaluator.Evaluate(engine);
-        return MapToDto(evaluation);
+        var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
+        var evaluation = evaluator.Evaluate(engine);
+        return MapToDto(evaluation, evaluator);
     }
 
     /// <summary>
     /// Find the best moves for the current position
     /// </summary>
-    public BestMovesAnalysisDto FindBestMoves(GameEngine engine)
+    /// <param name="engine">Game engine to analyze</param>
+    /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg")</param>
+    public BestMovesAnalysisDto FindBestMoves(GameEngine engine, string? evaluatorType = null)
     {
-        var analysis = _evaluator.FindBestMoves(engine);
-        return MapToDto(analysis);
+        var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
+        var analysis = evaluator.FindBestMoves(engine);
+        return MapToDto(analysis, evaluator);
     }
 
     /// <summary>
     /// Map PositionEvaluation to DTO
     /// </summary>
-    private PositionEvaluationDto MapToDto(PositionEvaluation evaluation)
+    private PositionEvaluationDto MapToDto(PositionEvaluation evaluation, IPositionEvaluator evaluator)
     {
         // Determine evaluator name from type
-        var evaluatorName = _evaluator.GetType().Name switch
+        var evaluatorName = evaluator.GetType().Name switch
         {
             "GnubgEvaluator" => "GNU Backgammon",
             "HeuristicEvaluator" => "Heuristic",
@@ -89,11 +95,11 @@ public class AnalysisService
     /// <summary>
     /// Map BestMovesAnalysis to DTO
     /// </summary>
-    private BestMovesAnalysisDto MapToDto(BestMovesAnalysis analysis)
+    private BestMovesAnalysisDto MapToDto(BestMovesAnalysis analysis, IPositionEvaluator evaluator)
     {
         return new BestMovesAnalysisDto
         {
-            InitialEvaluation = MapToDto(analysis.InitialEvaluation),
+            InitialEvaluation = MapToDto(analysis.InitialEvaluation, evaluator),
             TopMoves = analysis.TopMoves.Select(MapToDto).ToList(),
             TotalSequencesExplored = analysis.TotalSequencesExplored
         };
