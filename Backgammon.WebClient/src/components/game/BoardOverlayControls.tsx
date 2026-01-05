@@ -57,7 +57,7 @@ export const BoardOverlayControls: React.FC<BoardOverlayControlsProps> = ({
   const totalMoves = hasDiceRolled ? (isDoubles ? 4 : gameState.dice.length) : 0
   const remainingMovesCount = gameState.remainingMoves?.length ?? 0
   const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
-  const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade
+  const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (isAnalysisMode || isYourTurn)
 
   const handleRollDice = async () => {
     try {
