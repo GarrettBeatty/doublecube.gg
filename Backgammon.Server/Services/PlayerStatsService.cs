@@ -8,8 +8,6 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class PlayerStatsService : IPlayerStatsService
 {
-    private const int MinimumRating = 100;
-
     private readonly IUserRepository _userRepository;
     private readonly IEloRatingService _eloRatingService;
     private readonly ILogger<PlayerStatsService> _logger;
@@ -64,12 +62,13 @@ public class PlayerStatsService : IPlayerStatsService
 
             // Update ratings only for rated games between two registered users
             // Unrated games and games with anonymous players don't affect ELO ratings
+            // Defensive check: AI games should never be rated (enforced in GameEngineMapper)
             // TODO: Race condition risk - If a player completes two games simultaneously, rating updates
             // could be lost (read-modify-write pattern without locking). Consider implementing:
             // - Optimistic locking with DynamoDB conditional writes (version/timestamp field)
             // - Application-level distributed locking (Redis) per user during rating updates
             // - Queue-based processing to serialize rating updates per player
-            if (game.IsRated && whiteUser != null && redUser != null)
+            if (game.IsRated && !game.IsAiOpponent && whiteUser != null && redUser != null)
             {
                 try
                 {
@@ -79,37 +78,47 @@ public class PlayerStatsService : IPlayerStatsService
                     game.WhiteRatingBefore = whiteUser.Rating;
                     game.RedRatingBefore = redUser.Rating;
 
-                    // Calculate new ratings
+                    // Calculate new ratings, incorporating stakes
+                    // Stakes = WinType multiplier (1=Normal, 2=Gammon, 3=Backgammon) * DoublingCube value
                     var (whiteNewRating, redNewRating) = _eloRatingService.CalculateNewRatings(
                         whiteUser.Rating,
                         redUser.Rating,
                         whiteUser.RatedGamesCount,
                         redUser.RatedGamesCount,
-                        whiteWon);
+                        whiteWon,
+                        game.Stakes);
 
-                    // Update white player rating (enforce minimum rating floor for defense in depth)
-                    whiteUser.Rating = Math.Max(MinimumRating, whiteNewRating);
-                    whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteNewRating);
+                    // Apply rating floor and update white player rating
+                    var whiteFlooredRating = Math.Max(User.MinimumRating, whiteNewRating);
+                    whiteUser.Rating = whiteFlooredRating;
+                    whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteFlooredRating);
                     whiteUser.RatingLastUpdatedAt = DateTime.UtcNow;
                     whiteUser.RatedGamesCount++;
 
-                    // Update red player rating (enforce minimum rating floor for defense in depth)
-                    redUser.Rating = Math.Max(MinimumRating, redNewRating);
-                    redUser.PeakRating = Math.Max(redUser.PeakRating, redNewRating);
+                    // Apply rating floor and update red player rating
+                    var redFlooredRating = Math.Max(User.MinimumRating, redNewRating);
+                    redUser.Rating = redFlooredRating;
+                    redUser.PeakRating = Math.Max(redUser.PeakRating, redFlooredRating);
                     redUser.RatingLastUpdatedAt = DateTime.UtcNow;
                     redUser.RatedGamesCount++;
 
-                    // Store ratings after calculation
-                    game.WhiteRatingAfter = whiteNewRating;
-                    game.RedRatingAfter = redNewRating;
+                    // Store ratings after calculation (use floored values for consistency)
+                    game.WhiteRatingAfter = whiteFlooredRating;
+                    game.RedRatingAfter = redFlooredRating;
+
+                    // Calculate deltas for logging
+                    var whiteDelta = whiteFlooredRating - game.WhiteRatingBefore;
+                    var redDelta = redFlooredRating - game.RedRatingBefore;
 
                     _logger.LogInformation(
-                        "Updated ratings for game {GameId}: White {WhiteBefore}->{WhiteAfter}, Red {RedBefore}->{RedAfter}",
+                        "Updated ratings for game {GameId}: White {WhiteBefore}→{WhiteAfter} ({WhiteDelta:+#;-#;0}), Red {RedBefore}→{RedAfter} ({RedDelta:+#;-#;0})",
                         game.GameId,
                         game.WhiteRatingBefore,
                         game.WhiteRatingAfter,
+                        whiteDelta,
                         game.RedRatingBefore,
-                        game.RedRatingAfter);
+                        game.RedRatingAfter,
+                        redDelta);
                 }
                 catch (Exception ex)
                 {

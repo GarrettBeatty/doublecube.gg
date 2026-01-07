@@ -13,6 +13,11 @@ public class User
     public const int DefaultStartingRating = 1500;
 
     /// <summary>
+    /// Minimum allowed ELO rating (floor)
+    /// </summary>
+    public const int MinimumRating = 100;
+
+    /// <summary>
     /// Cosmos DB document id - uses userId as the unique identifier
     /// </summary>
     [JsonPropertyName("id")]

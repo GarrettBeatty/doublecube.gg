@@ -15,6 +15,10 @@ public static class GameEngineMapper
     /// Convert GameSession to Game model for database storage.
     /// Captures complete game state including board, players, dice, and move history.
     /// </summary>
+    /// <summary>
+    /// Convert GameSession to Game model for database storage.
+    /// Captures complete game state including board, players, dice, and move history.
+    /// </summary>
     public static ServerGame ToGame(GameSession session)
     {
         var engine = session.Engine;
@@ -57,8 +61,8 @@ public static class GameEngineMapper
         // Check if this is an AI game
         game.IsAiOpponent = IsAiPlayer(session.WhitePlayerId) || IsAiPlayer(session.RedPlayerId);
 
-        // Set rated/unrated flag
-        game.IsRated = session.IsRated;
+        // Set rated/unrated flag (AI games are always unrated regardless of session setting)
+        game.IsRated = game.IsAiOpponent ? false : session.IsRated;
 
         // If game is completed, add completion data
         if (engine.Winner != null)

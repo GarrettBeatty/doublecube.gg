@@ -415,6 +415,29 @@ No new external dependencies required. Uses existing:
 ### Risk: Retroactive rating calculation
 **Mitigation**: Only rate games going forward, or batch-process historical games
 
+### Risk: Race condition in concurrent rating updates
+**Issue**: If a player completes two games simultaneously, rating updates could be lost due to read-modify-write pattern without locking.
+
+**Example**: Player completes Game 1 and Game 2 concurrently:
+- Both transactions read current rating (1500)
+- Game 1 updates to 1516
+- Game 2 updates to 1484 (based on stale 1500 read)
+- Final rating is 1484, losing the +16 from Game 1
+
+**Potential Mitigations** (to be implemented before production with concurrent users):
+1. **DynamoDB Conditional Writes** (Best for AWS deployment)
+   - Add version number to User model
+   - Use conditional expressions: `SET rating = :newRating WHERE version = :expectedVersion`
+   - Retry on condition failure with fresh read
+2. **Application-level distributed locking**
+   - Use Redis or DynamoDB Lock Client
+   - Serialize rating updates per userId
+3. **Queue-based processing**
+   - Queue rating updates per player
+   - Process serially with single-threaded consumer per player
+
+**Current Status**: TODO comment exists in `PlayerStatsService.cs`. Must be addressed before production deployment.
+
 ## Success Metrics
 
 - Ratings accurately reflect player skill
@@ -422,12 +445,41 @@ No new external dependencies required. Uses existing:
 - Players engage with ranked mode
 - Leaderboard queries perform well (<500ms)
 
+## Implementation Decisions
+
+### 1. Minimum Rating Floor
+**Decision**: ✅ Implemented with minimum rating of 100 (defined in `User.MinimumRating`).
+
+**Rationale**: Prevents ratings from going negative and provides a stable floor for new/struggling players.
+
+### 2. Stakes Incorporation in ELO Calculation
+**Decision**: ✅ Implemented - Stakes (WinType × DoublingCube value) are incorporated as a multiplier in rating changes.
+
+**Formula**: `RatingChange = K × (ActualScore - ExpectedScore) × Stakes`
+
+**Rationale**:
+- Aligns with competitive backgammon rating systems (FIBS)
+- Rewards skill in achieving gammon/backgammon wins appropriately
+- Reflects that winning with higher stakes demonstrates greater skill
+- Stakes values: Normal=1, Gammon=2, Backgammon=3, multiplied by cube value
+
+**Implementation**: See `EloRatingService.CalculateNewRatings()` - stakes parameter added.
+
+### 3. AI Games and Rating
+**Decision**: ✅ AI games are always unrated, regardless of lobby settings.
+
+**Rationale**: Prevents rating inflation/manipulation. AI difficulty is not calibrated to player ratings.
+
+**Enforcement**:
+- Backend: `GameEngineMapper.ToGame()` forces `IsRated = false` when `IsAiOpponent = true`
+- Frontend: `CreateMatchModal.tsx` disables rated toggle for AI opponents
+
 ## Open Questions
 
-1. Should we allow rating to go below a minimum (e.g., 100)?
-2. Should we implement rating decay for inactive players?
+1. ~~Should we allow rating to go below a minimum (e.g., 100)?~~ ✅ **Resolved**: Minimum of 100 implemented
+2. Should we implement rating decay for inactive players? (Phase 4)
 3. How to handle disconnections/abandonments in ranked games?
-4. Should doubles/gammon/backgammon affect rating differently?
+4. ~~Should doubles/gammon/backgammon affect rating differently?~~ ✅ **Resolved**: Stakes incorporated as multiplier
 5. Display rating publicly or only to the player?
 
 ## References

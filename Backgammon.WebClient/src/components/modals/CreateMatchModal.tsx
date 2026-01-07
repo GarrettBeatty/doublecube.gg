@@ -44,6 +44,13 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
     }
   }, [isOpen, defaultOpponentType])
 
+  // Force rated to false when AI opponent is selected
+  React.useEffect(() => {
+    if (opponentType === 'AI') {
+      setIsRated(false)
+    }
+  }, [opponentType])
+
   const handleCreate = async () => {
     setIsCreating(true)
     try {

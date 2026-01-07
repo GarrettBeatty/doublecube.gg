@@ -371,10 +371,11 @@ public class EloRatingServiceTests
     }
 
     [Fact]
-    public void CalculateNewRatings_LoserRatingWouldDropBelow100_EnforcesFloor()
+    public void CalculateNewRatings_LoserRatingWouldDropBelow100_ReturnsRawValue()
     {
         // Player with rating 110 loses to equal-rated opponent
-        // Would drop by ~12 points (110 - 12 = 98), but floor is 100
+        // Will drop by ~12 points (110 - 12 = 98)
+        // Note: Rating floor enforcement happens in PlayerStatsService, not here
         // Act
         var (whiteNew, redNew) = _service.CalculateNewRatings(
             whiteRating: 110,
@@ -383,8 +384,8 @@ public class EloRatingServiceTests
             redRatedGames: 30,
             whiteWon: false);
 
-        // Assert - white rating should hit the floor at 100, not go below
-        Assert.Equal(100, whiteNew);
+        // Assert - returns raw calculated value (floor enforcement is in PlayerStatsService)
+        Assert.Equal(98, whiteNew);
         Assert.True(redNew > 110); // Red should gain ~12 points
     }
 
@@ -406,9 +407,10 @@ public class EloRatingServiceTests
     }
 
     [Fact]
-    public void CalculateNewRatings_BothPlayersAtFloor_StillWorks()
+    public void CalculateNewRatings_BothPlayersAtFloor_ReturnsRawValues()
     {
         // Both players at minimum rating (100)
+        // Note: Rating floor enforcement happens in PlayerStatsService, not here
         // Act
         var (whiteNew, redNew) = _service.CalculateNewRatings(
             whiteRating: 100,
@@ -417,8 +419,8 @@ public class EloRatingServiceTests
             redRatedGames: 30,
             whiteWon: true);
 
-        // Assert
+        // Assert - returns raw calculated values
         Assert.True(whiteNew > 100, "Winner should gain rating from floor");
-        Assert.Equal(100, redNew); // Loser stays at floor
+        Assert.True(redNew < 100, "Loser drops below 100 in raw calculation (floor applied in PlayerStatsService)");
     }
 }

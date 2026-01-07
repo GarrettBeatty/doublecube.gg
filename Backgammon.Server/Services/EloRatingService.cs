@@ -41,9 +41,9 @@ public class EloRatingService : IEloRatingService
             throw new ArgumentException($"Invalid EloRating:KFactorEstablished configuration: {_kFactorEstablished}. Must be between 1 and 100.", nameof(configuration));
         }
 
-        if (_gamesForEstablished < 0)
+        if (_gamesForEstablished <= 0)
         {
-            throw new ArgumentException($"Invalid EloRating:GamesForEstablished configuration: {_gamesForEstablished}. Must be greater than or equal to 0.", nameof(configuration));
+            throw new ArgumentException($"Invalid EloRating:GamesForEstablished configuration: {_gamesForEstablished}. Must be greater than 0.", nameof(configuration));
         }
 
         _logger.LogInformation(
@@ -60,8 +60,15 @@ public class EloRatingService : IEloRatingService
         int redRating,
         int whiteRatedGames,
         int redRatedGames,
-        bool whiteWon)
+        bool whiteWon,
+        int stakes = 1)
     {
+        // Validate stakes parameter
+        if (stakes < 1)
+        {
+            throw new ArgumentException($"Stakes must be at least 1, got {stakes}", nameof(stakes));
+        }
+
         // Calculate expected scores
         var whiteExpected = CalculateExpectedScore(whiteRating, redRating);
         var redExpected = CalculateExpectedScore(redRating, whiteRating);
@@ -74,24 +81,26 @@ public class EloRatingService : IEloRatingService
         var whiteK = GetKFactor(whiteRatedGames);
         var redK = GetKFactor(redRatedGames);
 
-        // Calculate rating changes
-        var whiteChange = (int)Math.Round(whiteK * (whiteActual - whiteExpected));
-        var redChange = (int)Math.Round(redK * (redActual - redExpected));
+        // Calculate rating changes, incorporating stakes multiplier
+        // Higher stakes (Gammon/Backgammon wins or cube value) result in larger rating changes
+        var whiteChange = (int)Math.Round(whiteK * (whiteActual - whiteExpected) * stakes);
+        var redChange = (int)Math.Round(redK * (redActual - redExpected) * stakes);
 
-        // Apply rating floor
-        var whiteNewRating = Math.Max(MinimumRating, whiteRating + whiteChange);
-        var redNewRating = Math.Max(MinimumRating, redRating + redChange);
+        // Calculate new ratings (floor enforcement happens in PlayerStatsService)
+        var whiteNewRating = whiteRating + whiteChange;
+        var redNewRating = redRating + redChange;
 
         _logger.LogDebug(
             "ELO calculation: White {WhiteOld}→{WhiteNew} ({WhiteChange:+#;-#;0}), " +
             "Red {RedOld}→{RedNew} ({RedChange:+#;-#;0}), " +
-            "Expected: W={WhiteExp:F2} R={RedExp:F2}, K-factors: W={WhiteK} R={RedK}",
+            "Stakes={Stakes}, Expected: W={WhiteExp:F2} R={RedExp:F2}, K-factors: W={WhiteK} R={RedK}",
             whiteRating,
             whiteNewRating,
             whiteChange,
             redRating,
             redNewRating,
             redChange,
+            stakes,
             whiteExpected,
             redExpected,
             whiteK,

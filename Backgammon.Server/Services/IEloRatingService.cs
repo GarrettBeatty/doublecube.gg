@@ -14,12 +14,23 @@ public interface IEloRatingService
     /// <param name="redRatedGames">Number of rated games Red player has played</param>
     /// <param name="whiteWon">True if White won, false if Red won</param>
     /// <returns>Tuple of (WhiteNewRating, RedNewRating)</returns>
+    /// <summary>
+    /// Calculate new ratings for both players after a game
+    /// </summary>
+    /// <param name="whiteRating">White player's current rating</param>
+    /// <param name="redRating">Red player's current rating</param>
+    /// <param name="whiteRatedGames">Number of rated games White player has played</param>
+    /// <param name="redRatedGames">Number of rated games Red player has played</param>
+    /// <param name="whiteWon">True if White won, false if Red won</param>
+    /// <param name="stakes">Game stakes multiplier (1=Normal, 2=Gammon, 3=Backgammon) multiplied by cube value</param>
+    /// <returns>Tuple of (WhiteNewRating, RedNewRating)</returns>
     (int WhiteNewRating, int RedNewRating) CalculateNewRatings(
         int whiteRating,
         int redRating,
         int whiteRatedGames,
         int redRatedGames,
-        bool whiteWon);
+        bool whiteWon,
+        int stakes = 1);
 
     /// <summary>
     /// Calculate expected score for a player based on rating difference
