@@ -31,14 +31,14 @@ public class EloRatingService : IEloRatingService
             throw new ArgumentException($"Invalid EloRating:StartingRating configuration: {_startingRating}. Must be greater than 0.", nameof(configuration));
         }
 
-        if (_kFactorNew <= 0)
+        if (_kFactorNew <= 0 || _kFactorNew > 100)
         {
-            throw new ArgumentException($"Invalid EloRating:KFactorNew configuration: {_kFactorNew}. Must be greater than 0.", nameof(configuration));
+            throw new ArgumentException($"Invalid EloRating:KFactorNew configuration: {_kFactorNew}. Must be between 1 and 100.", nameof(configuration));
         }
 
-        if (_kFactorEstablished <= 0)
+        if (_kFactorEstablished <= 0 || _kFactorEstablished > 100)
         {
-            throw new ArgumentException($"Invalid EloRating:KFactorEstablished configuration: {_kFactorEstablished}. Must be greater than 0.", nameof(configuration));
+            throw new ArgumentException($"Invalid EloRating:KFactorEstablished configuration: {_kFactorEstablished}. Must be between 1 and 100.", nameof(configuration));
         }
 
         if (_gamesForEstablished < 0)

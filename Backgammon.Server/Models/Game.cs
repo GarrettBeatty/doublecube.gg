@@ -199,10 +199,10 @@ public class Game
     public bool IsAiOpponent { get; set; }
 
     /// <summary>
-    /// Whether this game affects player ratings (ranked vs casual)
+    /// Whether this game affects player ratings (rated vs unrated)
     /// </summary>
-    [JsonPropertyName("isRanked")]
-    public bool IsRanked { get; set; } = true;
+    [JsonPropertyName("isRated")]
+    public bool IsRated { get; set; } = true;
 
     /// <summary>
     /// White player's rating before the game

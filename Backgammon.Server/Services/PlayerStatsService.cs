@@ -8,6 +8,8 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class PlayerStatsService : IPlayerStatsService
 {
+    private const int MinimumRating = 100;
+
     private readonly IUserRepository _userRepository;
     private readonly IEloRatingService _eloRatingService;
     private readonly ILogger<PlayerStatsService> _logger;
@@ -38,7 +40,8 @@ public class PlayerStatsService : IPlayerStatsService
                 return;
             }
 
-            // Skip stats for AI games
+            // Skip stats for AI games - AI opponents don't have ratings and games against them
+            // shouldn't affect player rankings to prevent rating inflation/manipulation
             if (game.IsAiOpponent)
             {
                 _logger.LogInformation("Skipping stats update for game {GameId} - AI opponent", game.GameId);
@@ -59,8 +62,14 @@ public class PlayerStatsService : IPlayerStatsService
                 redUser = await _userRepository.GetByUserIdAsync(game.RedUserId);
             }
 
-            // Update ratings if this is a ranked game with two registered users
-            if (game.IsRanked && whiteUser != null && redUser != null)
+            // Update ratings only for rated games between two registered users
+            // Unrated games and games with anonymous players don't affect ELO ratings
+            // TODO: Race condition risk - If a player completes two games simultaneously, rating updates
+            // could be lost (read-modify-write pattern without locking). Consider implementing:
+            // - Optimistic locking with DynamoDB conditional writes (version/timestamp field)
+            // - Application-level distributed locking (Redis) per user during rating updates
+            // - Queue-based processing to serialize rating updates per player
+            if (game.IsRated && whiteUser != null && redUser != null)
             {
                 try
                 {
@@ -78,14 +87,14 @@ public class PlayerStatsService : IPlayerStatsService
                         redUser.RatedGamesCount,
                         whiteWon);
 
-                    // Update white player rating
-                    whiteUser.Rating = whiteNewRating;
+                    // Update white player rating (enforce minimum rating floor for defense in depth)
+                    whiteUser.Rating = Math.Max(MinimumRating, whiteNewRating);
                     whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteNewRating);
                     whiteUser.RatingLastUpdatedAt = DateTime.UtcNow;
                     whiteUser.RatedGamesCount++;
 
-                    // Update red player rating
-                    redUser.Rating = redNewRating;
+                    // Update red player rating (enforce minimum rating floor for defense in depth)
+                    redUser.Rating = Math.Max(MinimumRating, redNewRating);
                     redUser.PeakRating = Math.Max(redUser.PeakRating, redNewRating);
                     redUser.RatingLastUpdatedAt = DateTime.UtcNow;
                     redUser.RatedGamesCount++;

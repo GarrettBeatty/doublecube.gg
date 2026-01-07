@@ -341,8 +341,8 @@ public static class DynamoDbHelpers
         // AI opponent flag
         item["isAiOpponent"] = new AttributeValue { BOOL = game.IsAiOpponent };
 
-        // Ranked flag
-        item["isRanked"] = new AttributeValue { BOOL = game.IsRanked };
+        // Rated flag
+        item["isRated"] = new AttributeValue { BOOL = game.IsRated };
 
         // Rating changes
         if (game.WhiteRatingBefore.HasValue)
@@ -413,7 +413,7 @@ public static class DynamoDbHelpers
             CompletedAt = GetNullableDateTime(item, "completedAt"),
             DurationSeconds = GetInt(item, "durationSeconds"),
             IsAiOpponent = GetBool(item, "isAiOpponent", false),
-            IsRanked = GetBool(item, "isRanked", true),
+            IsRated = GetBool(item, "isRated", true),
             MatchId = GetStringOrNull(item, "matchId"),
             IsMatchGame = GetBool(item, "isMatchGame", false),
             IsCrawfordGame = GetBool(item, "isCrawfordGame", false),

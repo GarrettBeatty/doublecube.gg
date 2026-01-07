@@ -369,4 +369,56 @@ public class EloRatingServiceTests
         Assert.Equal(32, kFactorNew);
         Assert.Equal(24, kFactorEstablished);
     }
+
+    [Fact]
+    public void CalculateNewRatings_LoserRatingWouldDropBelow100_EnforcesFloor()
+    {
+        // Player with rating 110 loses to equal-rated opponent
+        // Would drop by ~12 points (110 - 12 = 98), but floor is 100
+        // Act
+        var (whiteNew, redNew) = _service.CalculateNewRatings(
+            whiteRating: 110,
+            redRating: 110,
+            whiteRatedGames: 30,
+            redRatedGames: 30,
+            whiteWon: false);
+
+        // Assert - white rating should hit the floor at 100, not go below
+        Assert.Equal(100, whiteNew);
+        Assert.True(redNew > 110); // Red should gain ~12 points
+    }
+
+    [Fact]
+    public void CalculateNewRatings_WinnerAtRatingFloor_CanIncrease()
+    {
+        // Player at minimum rating (100) can still gain rating when they win
+        // Act
+        var (whiteNew, redNew) = _service.CalculateNewRatings(
+            whiteRating: 100,
+            redRating: 1500,
+            whiteRatedGames: 30,
+            redRatedGames: 30,
+            whiteWon: true);
+
+        // Assert - white should be able to increase from floor
+        Assert.True(whiteNew > 100, $"Expected white rating > 100, got {whiteNew}");
+        Assert.True(redNew < 1500);
+    }
+
+    [Fact]
+    public void CalculateNewRatings_BothPlayersAtFloor_StillWorks()
+    {
+        // Both players at minimum rating (100)
+        // Act
+        var (whiteNew, redNew) = _service.CalculateNewRatings(
+            whiteRating: 100,
+            redRating: 100,
+            whiteRatedGames: 30,
+            redRatedGames: 30,
+            whiteWon: true);
+
+        // Assert
+        Assert.True(whiteNew > 100, "Winner should gain rating from floor");
+        Assert.Equal(100, redNew); // Loser stays at floor
+    }
 }
