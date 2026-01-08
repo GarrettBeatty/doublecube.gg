@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Switch } from '@/components/ui/switch'
 
 interface CreateMatchModalProps {
   isOpen: boolean
@@ -29,7 +30,9 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [opponentType, setOpponentType] = useState<'AI' | 'OpenLobby'>(defaultOpponentType)
   const [targetScore, setTargetScore] = useState<number>(1)
   const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
+  const [isRated, setIsRated] = useState<boolean>(true)
   const [isCreating, setIsCreating] = useState(false)
+  const isAuthenticated = authService.isAuthenticated()
 
   // Reset to default when modal opens
   React.useEffect(() => {
@@ -37,17 +40,29 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       setOpponentType(defaultOpponentType)
       setTargetScore(1)
       setTimeControlType('None')
+      setIsRated(true)
     }
   }, [isOpen, defaultOpponentType])
+
+  // Force rated to false when AI opponent is selected
+  React.useEffect(() => {
+    if (opponentType === 'AI') {
+      setIsRated(false)
+    }
+  }, [opponentType])
 
   const handleCreate = async () => {
     setIsCreating(true)
     try {
+      // Determine if game can be rated
+      const canBeRated = isAuthenticated && opponentType !== 'AI'
+
       const config = {
         OpponentType: opponentType,
         TargetScore: targetScore,
         DisplayName: authService.getDisplayName() || 'Player',
         TimeControlType: timeControlType,
+        IsRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
       }
       console.log('[CreateMatchModal] Invoking CreateMatch', config)
       // Always use the match system - single games are just matches with targetScore=1
@@ -136,6 +151,23 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
               </p>
             )}
           </div>
+
+          {/* Rated/Unrated - Only show for authenticated users playing online */}
+          {isAuthenticated && opponentType !== 'AI' && (
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="rated-toggle">Rated Game</Label>
+                <div className="text-sm text-muted-foreground">
+                  This game will affect your rating
+                </div>
+              </div>
+              <Switch
+                id="rated-toggle"
+                checked={isRated}
+                onCheckedChange={setIsRated}
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">

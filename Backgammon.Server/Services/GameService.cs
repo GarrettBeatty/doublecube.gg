@@ -16,6 +16,7 @@ public class GameService : IGameService
 {
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
+    private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IHubContext<GameHub> _hubContext;
@@ -24,6 +25,7 @@ public class GameService : IGameService
     public GameService(
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
+        IUserRepository userRepository,
         IAiMoveService aiMoveService,
         IGameActionOrchestrator gameActionOrchestrator,
         IHubContext<GameHub> hubContext,
@@ -31,6 +33,7 @@ public class GameService : IGameService
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
+        _userRepository = userRepository;
         _aiMoveService = aiMoveService;
         _gameActionOrchestrator = gameActionOrchestrator;
         _hubContext = hubContext;
@@ -78,6 +81,19 @@ public class GameService : IGameService
         if (!string.IsNullOrEmpty(displayName))
         {
             session.SetPlayerName(playerId, displayName);
+        }
+
+        // Fetch and set player rating (independent of display name)
+        _logger.LogInformation("Fetching user for playerId: {PlayerId}", playerId);
+        var user = await _userRepository.GetByUserIdAsync(playerId);
+        if (user != null)
+        {
+            _logger.LogInformation("Found user {UserId} with rating {Rating}", user.UserId, user.Rating);
+            SetPlayerRating(session, playerId, user.Rating);
+        }
+        else
+        {
+            _logger.LogWarning("No user found for playerId: {PlayerId}", playerId);
         }
 
         if (session.IsFull)
@@ -232,6 +248,7 @@ public class GameService : IGameService
 
         // Create a new game session
         var session = _sessionManager.CreateGame();
+        session.IsRated = false; // AI games are always unrated
         await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
         _logger.LogDebug(
             "Created game session {GameId}",
@@ -243,6 +260,19 @@ public class GameService : IGameService
         if (!string.IsNullOrEmpty(displayName))
         {
             session.SetPlayerName(playerId, displayName);
+        }
+
+        // Fetch and set player rating
+        _logger.LogInformation("Fetching user for playerId: {PlayerId}", playerId);
+        var user = await _userRepository.GetByUserIdAsync(playerId);
+        if (user != null)
+        {
+            _logger.LogInformation("Found user {UserId} with rating {Rating}", user.UserId, user.Rating);
+            SetPlayerRating(session, playerId, user.Rating);
+        }
+        else
+        {
+            _logger.LogWarning("No user found for playerId: {PlayerId}", playerId);
         }
 
         _logger.LogDebug(
@@ -259,7 +289,7 @@ public class GameService : IGameService
             aiPlayerId);
 
         _logger.LogInformation(
-            "Created AI game {GameId}. Human: {PlayerId}, AI: {AiPlayerId}",
+            "Created AI game {GameId}. Human: {PlayerId}, AI: {AiPlayerId} (unrated)",
             session.Id,
             playerId,
             aiPlayerId);
@@ -398,6 +428,26 @@ public class GameService : IGameService
         if (match.Status == "Completed")
         {
             _logger.LogInformation("Match {MatchId} completed. Winner: {WinnerId}", match.MatchId, match.WinnerId);
+        }
+    }
+
+    private void SetPlayerRating(GameSession session, string playerId, int rating)
+    {
+        if (session.WhitePlayerId == playerId)
+        {
+            session.WhiteRating = rating;
+            session.WhiteRatingBefore = rating;
+            _logger.LogInformation("Set White player rating to {Rating} for game {GameId}", rating, session.Id);
+        }
+        else if (session.RedPlayerId == playerId)
+        {
+            session.RedRating = rating;
+            session.RedRatingBefore = rating;
+            _logger.LogInformation("Set Red player rating to {Rating} for game {GameId}", rating, session.Id);
+        }
+        else
+        {
+            _logger.LogWarning("Could not set rating for playerId {PlayerId} - not found as White or Red in game {GameId}", playerId, session.Id);
         }
     }
 }

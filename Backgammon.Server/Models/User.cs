@@ -8,6 +8,16 @@ namespace Backgammon.Server.Models;
 public class User
 {
     /// <summary>
+    /// Default starting ELO rating for new users
+    /// </summary>
+    public const int DefaultStartingRating = 1500;
+
+    /// <summary>
+    /// Minimum allowed ELO rating (floor)
+    /// </summary>
+    public const int MinimumRating = 100;
+
+    /// <summary>
     /// Cosmos DB document id - uses userId as the unique identifier
     /// </summary>
     [JsonPropertyName("id")]
@@ -78,6 +88,30 @@ public class User
     /// </summary>
     [JsonPropertyName("stats")]
     public UserStats Stats { get; set; } = new();
+
+    /// <summary>
+    /// Current ELO rating (1500 = starting rating)
+    /// </summary>
+    [JsonPropertyName("rating")]
+    public int Rating { get; set; } = DefaultStartingRating;
+
+    /// <summary>
+    /// Highest rating ever achieved
+    /// </summary>
+    [JsonPropertyName("peakRating")]
+    public int PeakRating { get; set; } = DefaultStartingRating;
+
+    /// <summary>
+    /// When the rating was last updated
+    /// </summary>
+    [JsonPropertyName("ratingLastUpdatedAt")]
+    public DateTime? RatingLastUpdatedAt { get; set; }
+
+    /// <summary>
+    /// Number of rated games played (used for K-factor calculation)
+    /// </summary>
+    [JsonPropertyName("ratedGamesCount")]
+    public int RatedGamesCount { get; set; } = 0;
 
     /// <summary>
     /// Anonymous player IDs that have been linked to this account

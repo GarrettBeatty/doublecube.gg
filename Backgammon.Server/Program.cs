@@ -181,6 +181,9 @@ builder.Services.AddSingleton<PositionEvaluatorFactory>();
 builder.Services.AddSingleton<AnalysisService>();
 // ========== END ANALYSIS CONFIGURATION ==========
 
+// ELO rating service
+builder.Services.AddSingleton<IEloRatingService, EloRatingService>();
+
 // Feature flags configuration
 builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder.Configuration.GetSection("Features"));
 

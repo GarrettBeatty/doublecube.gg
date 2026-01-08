@@ -13,6 +13,8 @@ interface PlayerCardProps {
   pipCount?: number
   checkersOnBar?: number
   bornOff?: number
+  rating?: number
+  ratingChange?: number
 }
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -24,6 +26,8 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   pipCount,
   checkersOnBar,
   bornOff,
+  rating,
+  ratingChange,
 }) => {
   const colorClass = color === CheckerColor.White ? 'bg-gray-100 text-gray-900' : 'bg-red-600 text-white'
 
@@ -42,6 +46,16 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
               <div className="font-semibold">{playerName}</div>
               {username && (
                 <div className="text-xs text-muted-foreground">@{username}</div>
+              )}
+              {rating !== undefined && (
+                <div className="text-xs font-medium text-muted-foreground">
+                  Rating: {rating}
+                  {ratingChange !== undefined && ratingChange !== 0 && (
+                    <span className={cn('ml-1', ratingChange > 0 ? 'text-green-600' : 'text-red-600')}>
+                      ({ratingChange > 0 ? '+' : ''}{ratingChange})
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </div>

@@ -37,7 +37,8 @@ public class MatchService : IMatchService
         string opponentType,
         string? player1DisplayName = null,
         string? player2Id = null,
-        TimeControlConfig? timeControl = null)
+        TimeControlConfig? timeControl = null,
+        bool isRated = true)
     {
         try
         {
@@ -163,6 +164,9 @@ public class MatchService : IMatchService
             session.Player1Score = match.Player1Score;
             session.Player2Score = match.Player2Score;
             session.IsCrawfordGame = match.IsCrawfordGame;
+
+            // Set rated/unrated flag (AI matches are always unrated)
+            session.IsRated = opponentType == "AI" ? false : isRated;
 
             // Configure time controls if enabled
             if (match.TimeControl != null && match.TimeControl.Type != TimeControlType.None)

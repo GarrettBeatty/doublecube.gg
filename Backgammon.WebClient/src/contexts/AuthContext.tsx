@@ -76,6 +76,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           username: response.user.username,
           email: null,
           createdAt: response.user.createdAt,
+          rating: response.user.rating,
+          peakRating: response.user.peakRating,
+          ratedGamesCount: response.user.ratedGamesCount,
         }
 
         setUser(newUser)
@@ -97,6 +100,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           username: response.user.username,
           email: data.email || null,
           createdAt: response.user.createdAt,
+          rating: response.user.rating,
+          peakRating: response.user.peakRating,
+          ratedGamesCount: response.user.ratedGamesCount,
         }
 
         setUser(newUser)

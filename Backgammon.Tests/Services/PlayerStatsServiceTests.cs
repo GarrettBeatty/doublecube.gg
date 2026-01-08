@@ -8,14 +8,19 @@ namespace Backgammon.Tests.Services;
 public class PlayerStatsServiceTests
 {
     private readonly Mock<IUserRepository> _mockUserRepository;
+    private readonly Mock<IEloRatingService> _mockEloRatingService;
     private readonly Mock<ILogger<PlayerStatsService>> _mockLogger;
     private readonly PlayerStatsService _service;
 
     public PlayerStatsServiceTests()
     {
         _mockUserRepository = new Mock<IUserRepository>();
+        _mockEloRatingService = new Mock<IEloRatingService>();
         _mockLogger = new Mock<ILogger<PlayerStatsService>>();
-        _service = new PlayerStatsService(_mockUserRepository.Object, _mockLogger.Object);
+        _service = new PlayerStatsService(
+            _mockUserRepository.Object,
+            _mockEloRatingService.Object,
+            _mockLogger.Object);
     }
 
     [Fact]
@@ -126,8 +131,8 @@ public class PlayerStatsServiceTests
         Assert.Equal(1, redUser.Stats.Losses);
         Assert.Equal(0, redUser.Stats.WinStreak);
 
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("red-user", redUser.Stats), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(whiteUser), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(redUser), Times.Once);
     }
 
     [Fact]
@@ -290,7 +295,7 @@ public class PlayerStatsServiceTests
         await _service.UpdateStatsAfterGameCompletionAsync(game);
 
         _mockUserRepository.Verify(
-            r => r.UpdateStatsAsync(It.IsAny<string>(), It.IsAny<UserStats>()),
+            r => r.UpdateUserAsync(It.IsAny<User>()),
             Times.Never);
     }
 
@@ -322,7 +327,280 @@ public class PlayerStatsServiceTests
         await _service.UpdateStatsAfterGameCompletionAsync(game);
 
         // Assert
-        _mockUserRepository.Verify(r => r.UpdateStatsAsync("white-user", whiteUser.Stats), Times.Once);
+        _mockUserRepository.Verify(r => r.UpdateUserAsync(whiteUser), Times.Once);
         Assert.Equal(1, whiteUser.Stats.Wins);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_UnratedGame_DoesNotUpdateRatings()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false,
+            IsRated = false // Unrated game
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - ratings should not change for unrated games
+        Assert.Equal(1500, whiteUser.Rating);
+        Assert.Equal(1500, redUser.Rating);
+        Assert.Equal(0, whiteUser.RatedGamesCount);
+        Assert.Equal(0, redUser.RatedGamesCount);
+
+        // Stats should still update (wins/losses)
+        Assert.Equal(1, whiteUser.Stats.Wins);
+        Assert.Equal(1, redUser.Stats.Losses);
+
+        // ELO service should not be called for unrated games
+        _mockEloRatingService.Verify(
+            s => s.CalculateNewRatings(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<bool>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_RatedGame_UpdatesRatingsAndIncrementsCoun()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false,
+            IsRated = true // Rated game
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // Mock ELO calculation
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 0, 0, true))
+            .Returns((1516, 1484));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - ratings should be updated
+        Assert.Equal(1516, whiteUser.Rating);
+        Assert.Equal(1484, redUser.Rating);
+        Assert.Equal(1, whiteUser.RatedGamesCount);
+        Assert.Equal(1, redUser.RatedGamesCount);
+        Assert.NotNull(whiteUser.RatingLastUpdatedAt);
+        Assert.NotNull(redUser.RatingLastUpdatedAt);
+
+        // Game should have rating snapshots
+        Assert.Equal(1500, game.WhiteRatingBefore);
+        Assert.Equal(1516, game.WhiteRatingAfter);
+        Assert.Equal(1500, game.RedRatingBefore);
+        Assert.Equal(1484, game.RedRatingAfter);
+
+        // ELO service should be called
+        _mockEloRatingService.Verify(
+            s => s.CalculateNewRatings(1500, 1500, 0, 0, true),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_PeakRating_IncreasesWhenRatingGoesUp()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 5,
+            PeakRating = 1520, // Previous peak
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 5,
+            PeakRating = 1550,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            Stakes = 1,
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // White wins and goes to 1530 (new peak)
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 5, 5, true))
+            .Returns((1530, 1488));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - white's peak should increase
+        Assert.Equal(1530, whiteUser.Rating);
+        Assert.Equal(1530, whiteUser.PeakRating); // New peak
+
+        // Red's peak should stay the same (rating decreased)
+        Assert.Equal(1488, redUser.Rating);
+        Assert.Equal(1550, redUser.PeakRating); // Unchanged
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_PeakRating_DoesNotDecreaseWhenRatingDrops()
+    {
+        // Arrange
+        var user = new User
+        {
+            UserId = "user-123",
+            Rating = 1600,
+            RatedGamesCount = 10,
+            PeakRating = 1650, // Historical peak
+            Stats = new UserStats()
+        };
+        var opponent = new User
+        {
+            UserId = "opponent-123",
+            Rating = 1600,
+            RatedGamesCount = 10,
+            PeakRating = 1600,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "user-123",
+            RedUserId = "opponent-123",
+            Winner = "Red", // User loses
+            Stakes = 1,
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("user-123")).ReturnsAsync(user);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("opponent-123")).ReturnsAsync(opponent);
+
+        // User loses and drops to 1588
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1600, 1600, 10, 10, false))
+            .Returns((1588, 1612));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - user's peak should NOT decrease
+        Assert.Equal(1588, user.Rating);
+        Assert.Equal(1650, user.PeakRating); // Unchanged from historical peak
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_RatingFloorEnforcement_InPlayerStatsService()
+    {
+        // Arrange - User at very low rating
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 105,
+            RatedGamesCount = 30,
+            PeakRating = 500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 30,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "Red", // White loses
+            Stakes = 1,
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // ELO service would return 89 (below floor), but PlayerStatsService should enforce minimum of 100
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(105, 1500, 30, 30, false))
+            .Returns((89, 1516));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - PlayerStatsService should enforce the floor at 100 (defense in depth)
+        Assert.Equal(100, whiteUser.Rating); // Enforced by PlayerStatsService
+        Assert.Equal(1516, redUser.Rating);
     }
 }

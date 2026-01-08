@@ -9,13 +9,16 @@ namespace Backgammon.Server.Services;
 public class PlayerStatsService : IPlayerStatsService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IEloRatingService _eloRatingService;
     private readonly ILogger<PlayerStatsService> _logger;
 
     public PlayerStatsService(
         IUserRepository userRepository,
+        IEloRatingService eloRatingService,
         ILogger<PlayerStatsService> logger)
     {
         _userRepository = userRepository;
+        _eloRatingService = eloRatingService;
         _logger = logger;
     }
 
@@ -35,35 +38,109 @@ public class PlayerStatsService : IPlayerStatsService
                 return;
             }
 
-            // Skip stats for AI games
+            // Skip stats for AI games - AI opponents don't have ratings and games against them
+            // shouldn't affect player rankings to prevent rating inflation/manipulation
             if (game.IsAiOpponent)
             {
                 _logger.LogInformation("Skipping stats update for game {GameId} - AI opponent", game.GameId);
                 return;
             }
 
-            // Update white player stats if registered
+            // Fetch both users
+            User? whiteUser = null;
+            User? redUser = null;
+
             if (!string.IsNullOrEmpty(game.WhiteUserId))
             {
-                var user = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
-                if (user != null)
+                whiteUser = await _userRepository.GetByUserIdAsync(game.WhiteUserId);
+            }
+
+            if (!string.IsNullOrEmpty(game.RedUserId))
+            {
+                redUser = await _userRepository.GetByUserIdAsync(game.RedUserId);
+            }
+
+            // Update ratings only for rated games between two registered users
+            // Unrated games and games with anonymous players don't affect ELO ratings
+            // Defensive check: AI games should never be rated (enforced in GameEngineMapper)
+            // TODO: Race condition risk - If a player completes two games simultaneously, rating updates
+            // could be lost (read-modify-write pattern without locking). Consider implementing:
+            // - Optimistic locking with DynamoDB conditional writes (version/timestamp field)
+            // - Application-level distributed locking (Redis) per user during rating updates
+            // - Queue-based processing to serialize rating updates per player
+            if (game.IsRated && !game.IsAiOpponent && whiteUser != null && redUser != null)
+            {
+                try
                 {
-                    var isWinner = game.Winner == "White";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
+                    var whiteWon = game.Winner == "White";
+
+                    // Store ratings before calculation
+                    game.WhiteRatingBefore = whiteUser.Rating;
+                    game.RedRatingBefore = redUser.Rating;
+
+                    // Calculate new ratings, incorporating stakes
+                    // Stakes = WinType multiplier (1=Normal, 2=Gammon, 3=Backgammon) * DoublingCube value
+                    var (whiteNewRating, redNewRating) = _eloRatingService.CalculateNewRatings(
+                        whiteUser.Rating,
+                        redUser.Rating,
+                        whiteUser.RatedGamesCount,
+                        redUser.RatedGamesCount,
+                        whiteWon,
+                        game.Stakes);
+
+                    // Apply rating floor and update white player rating
+                    var whiteFlooredRating = Math.Max(User.MinimumRating, whiteNewRating);
+                    whiteUser.Rating = whiteFlooredRating;
+                    whiteUser.PeakRating = Math.Max(whiteUser.PeakRating, whiteFlooredRating);
+                    whiteUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    whiteUser.RatedGamesCount++;
+
+                    // Apply rating floor and update red player rating
+                    var redFlooredRating = Math.Max(User.MinimumRating, redNewRating);
+                    redUser.Rating = redFlooredRating;
+                    redUser.PeakRating = Math.Max(redUser.PeakRating, redFlooredRating);
+                    redUser.RatingLastUpdatedAt = DateTime.UtcNow;
+                    redUser.RatedGamesCount++;
+
+                    // Store ratings after calculation (use floored values for consistency)
+                    game.WhiteRatingAfter = whiteFlooredRating;
+                    game.RedRatingAfter = redFlooredRating;
+
+                    // Calculate deltas for logging
+                    var whiteDelta = whiteFlooredRating - game.WhiteRatingBefore;
+                    var redDelta = redFlooredRating - game.RedRatingBefore;
+
+                    _logger.LogInformation(
+                        "Updated ratings for game {GameId}: White {WhiteBefore}→{WhiteAfter} ({WhiteDelta:+#;-#;0}), Red {RedBefore}→{RedAfter} ({RedDelta:+#;-#;0})",
+                        game.GameId,
+                        game.WhiteRatingBefore,
+                        game.WhiteRatingAfter,
+                        whiteDelta,
+                        game.RedRatingBefore,
+                        game.RedRatingAfter,
+                        redDelta);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to update ratings for game {GameId}", game.GameId);
+                    // Continue with stats updates even if rating update fails
                 }
             }
 
-            // Update red player stats if registered
-            if (!string.IsNullOrEmpty(game.RedUserId))
+            // Update white player stats if registered
+            if (whiteUser != null)
             {
-                var user = await _userRepository.GetByUserIdAsync(game.RedUserId);
-                if (user != null)
-                {
-                    var isWinner = game.Winner == "Red";
-                    UpdateStats(user.Stats, isWinner, game.Stakes);
-                    await _userRepository.UpdateStatsAsync(user.UserId, user.Stats);
-                }
+                var isWinner = game.Winner == "White";
+                UpdateStats(whiteUser.Stats, isWinner, game.Stakes);
+                await _userRepository.UpdateUserAsync(whiteUser);
+            }
+
+            // Update red player stats if registered
+            if (redUser != null)
+            {
+                var isWinner = game.Winner == "Red";
+                UpdateStats(redUser.Stats, isWinner, game.Stakes);
+                await _userRepository.UpdateUserAsync(redUser);
             }
         }
         catch (Exception ex)

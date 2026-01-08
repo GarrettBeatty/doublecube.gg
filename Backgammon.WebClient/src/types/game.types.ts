@@ -83,12 +83,17 @@ export interface GameState {
   doublingCubeValue: number
   doublingCubeOwner: CheckerColor | null
   isAnalysisMode: boolean
+  isRated: boolean
   whitePlayerName: string
   redPlayerName: string
   whiteUsername: string | null
   redUsername: string | null
   whitePlayerId: string
   redPlayerId: string
+  whiteRating?: number
+  redRating?: number
+  whiteRatingChange?: number
+  redRatingChange?: number
   winner: CheckerColor | null
   createdAt: string
   updatedAt: string
@@ -157,6 +162,9 @@ export interface User {
   username: string
   email: string | null
   createdAt: string
+  rating: number
+  peakRating: number
+  ratedGamesCount: number
 }
 
 export interface Profile {
@@ -166,6 +174,9 @@ export interface Profile {
   gamesPlayed: number
   gamesWon: number
   winRate: number
+  rating: number
+  peakRating: number
+  ratedGamesCount: number
   createdAt: string
   recentGames: GameSummary[]
 }
@@ -235,6 +246,9 @@ export interface AuthResponse {
     userId: string
     username: string
     displayName: string
+    rating: number
+    peakRating: number
+    ratedGamesCount: number
     stats?: {
       totalGames: number
       wins: number

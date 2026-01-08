@@ -14,7 +14,7 @@ import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { authService } from '@/services/auth.service'
-import { Eye, BarChart3 } from 'lucide-react'
+import { Eye, BarChart3, Trophy, TrendingUp } from 'lucide-react'
 
 export const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>()
@@ -153,6 +153,8 @@ export const GamePage: React.FC = () => {
     pipCount: currentGameState.whitePipCount,
     checkersOnBar: currentGameState.whiteCheckersOnBar,
     bornOff: currentGameState.whiteBornOff,
+    rating: currentGameState.whiteRating,
+    ratingChange: currentGameState.whiteRatingChange,
   }
 
   const redPlayer = {
@@ -164,6 +166,8 @@ export const GamePage: React.FC = () => {
     pipCount: currentGameState.redPipCount,
     checkersOnBar: currentGameState.redCheckersOnBar,
     bornOff: currentGameState.redBornOff,
+    rating: currentGameState.redRating,
+    ratingChange: currentGameState.redRatingChange,
   }
 
   return (
@@ -246,12 +250,30 @@ export const GamePage: React.FC = () => {
           <div>
             <Card>
               <CardContent className="p-2 relative">
-                {currentGameState.isAnalysisMode && (
-                  <Badge variant="secondary" className="mb-4">
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Analysis Mode
-                  </Badge>
-                )}
+                <div className="flex gap-2 mb-4">
+                  {currentGameState.isAnalysisMode && (
+                    <Badge variant="secondary">
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Analysis Mode
+                    </Badge>
+                  )}
+
+                  {!currentGameState.isAnalysisMode && (
+                    <Badge variant={currentGameState.isRated ? "default" : "outline"}>
+                      {currentGameState.isRated ? (
+                        <>
+                          <Trophy className="h-4 w-4 mr-2" />
+                          Rated
+                        </>
+                      ) : (
+                        <>
+                          <TrendingUp className="h-4 w-4 mr-2" />
+                          Unrated
+                        </>
+                      )}
+                    </Badge>
+                  )}
+                </div>
 
                 {/* Board with overlay controls */}
                 <div className="relative">

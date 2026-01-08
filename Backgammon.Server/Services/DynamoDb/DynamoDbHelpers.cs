@@ -36,9 +36,9 @@ public static class DynamoDbHelpers
     // Helper to get int
     public static int GetInt(Dictionary<string, AttributeValue> item, string key, int defaultValue = 0)
     {
-        if (item.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value.N))
+        if (item.TryGetValue(key, out var value) && int.TryParse(value.N, out var result))
         {
-            return int.Parse(value.N);
+            return result;
         }
 
         return defaultValue;
@@ -119,12 +119,21 @@ public static class DynamoDbHelpers
             ["lastLoginAt"] = new AttributeValue { S = user.LastLoginAt.ToString("O") },
             ["lastSeenAt"] = new AttributeValue { S = user.LastSeenAt.ToString("O") },
             ["stats"] = MarshalUserStats(user.Stats),
+            ["rating"] = new AttributeValue { N = user.Rating.ToString() },
+            ["peakRating"] = new AttributeValue { N = user.PeakRating.ToString() },
+            ["ratedGamesCount"] = new AttributeValue { N = user.RatedGamesCount.ToString() },
             ["isActive"] = new AttributeValue { BOOL = user.IsActive },
             ["isBanned"] = new AttributeValue { BOOL = user.IsBanned },
             ["GSI1PK"] = new AttributeValue { S = $"USERNAME#{user.UsernameNormalized}" },
             ["GSI1SK"] = new AttributeValue { S = "PROFILE" },
             ["entityType"] = new AttributeValue { S = "USER" }
         };
+
+        // Optional rating last updated timestamp
+        if (user.RatingLastUpdatedAt.HasValue)
+        {
+            item["ratingLastUpdatedAt"] = new AttributeValue { S = user.RatingLastUpdatedAt.Value.ToString("O") };
+        }
 
         // Optional email
         if (!string.IsNullOrEmpty(user.Email))
@@ -183,6 +192,12 @@ public static class DynamoDbHelpers
         {
             user.Stats = UnmarshalUserStats(statsValue.M);
         }
+
+        // Rating fields (with defaults for existing users)
+        user.Rating = GetInt(item, "rating", User.DefaultStartingRating);
+        user.PeakRating = GetInt(item, "peakRating", User.DefaultStartingRating);
+        user.RatedGamesCount = GetInt(item, "ratedGamesCount", 0);
+        user.RatingLastUpdatedAt = GetNullableDateTime(item, "ratingLastUpdatedAt");
 
         return user;
     }
@@ -326,6 +341,30 @@ public static class DynamoDbHelpers
         // AI opponent flag
         item["isAiOpponent"] = new AttributeValue { BOOL = game.IsAiOpponent };
 
+        // Rated flag
+        item["isRated"] = new AttributeValue { BOOL = game.IsRated };
+
+        // Rating changes
+        if (game.WhiteRatingBefore.HasValue)
+        {
+            item["whiteRatingBefore"] = new AttributeValue { N = game.WhiteRatingBefore.Value.ToString() };
+        }
+
+        if (game.RedRatingBefore.HasValue)
+        {
+            item["redRatingBefore"] = new AttributeValue { N = game.RedRatingBefore.Value.ToString() };
+        }
+
+        if (game.WhiteRatingAfter.HasValue)
+        {
+            item["whiteRatingAfter"] = new AttributeValue { N = game.WhiteRatingAfter.Value.ToString() };
+        }
+
+        if (game.RedRatingAfter.HasValue)
+        {
+            item["redRatingAfter"] = new AttributeValue { N = game.RedRatingAfter.Value.ToString() };
+        }
+
         // Match-related properties
         if (!string.IsNullOrEmpty(game.MatchId))
         {
@@ -374,11 +413,33 @@ public static class DynamoDbHelpers
             CompletedAt = GetNullableDateTime(item, "completedAt"),
             DurationSeconds = GetInt(item, "durationSeconds"),
             IsAiOpponent = GetBool(item, "isAiOpponent", false),
+            IsRated = GetBool(item, "isRated", true),
             MatchId = GetStringOrNull(item, "matchId"),
             IsMatchGame = GetBool(item, "isMatchGame", false),
             IsCrawfordGame = GetBool(item, "isCrawfordGame", false),
             WinType = GetStringOrNull(item, "winType")
         };
+
+        // Rating changes (nullable ints)
+        if (item.TryGetValue("whiteRatingBefore", out var whiteRatingBeforeValue) && int.TryParse(whiteRatingBeforeValue.N, out var whiteRatingBefore))
+        {
+            game.WhiteRatingBefore = whiteRatingBefore;
+        }
+
+        if (item.TryGetValue("redRatingBefore", out var redRatingBeforeValue) && int.TryParse(redRatingBeforeValue.N, out var redRatingBefore))
+        {
+            game.RedRatingBefore = redRatingBefore;
+        }
+
+        if (item.TryGetValue("whiteRatingAfter", out var whiteRatingAfterValue) && int.TryParse(whiteRatingAfterValue.N, out var whiteRatingAfter))
+        {
+            game.WhiteRatingAfter = whiteRatingAfter;
+        }
+
+        if (item.TryGetValue("redRatingAfter", out var redRatingAfterValue) && int.TryParse(redRatingAfterValue.N, out var redRatingAfter))
+        {
+            game.RedRatingAfter = redRatingAfter;
+        }
 
         // Board state
         if (item.TryGetValue("boardState", out var boardStateValue) && boardStateValue.L != null)

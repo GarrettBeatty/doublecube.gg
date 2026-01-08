@@ -41,6 +41,9 @@ class AuthService {
         username: data.user.username,
         email: null,
         createdAt: data.user.createdAt,
+        rating: data.user.rating,
+        peakRating: data.user.peakRating,
+        ratedGamesCount: data.user.ratedGamesCount,
       })
 
       // Update API service with token
@@ -75,6 +78,9 @@ class AuthService {
         username: authData.user.username,
         email: data.email || null,
         createdAt: authData.user.createdAt,
+        rating: authData.user.rating,
+        peakRating: authData.user.peakRating,
+        ratedGamesCount: authData.user.ratedGamesCount,
       })
 
       // Update API service with token
