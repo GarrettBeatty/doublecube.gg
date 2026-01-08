@@ -44,4 +44,45 @@ export interface CreateMatchRequest {
   targetScore: number
   friendUserId?: string
   timeControlType?: 'None' | 'ChicagoPoint'
+  isCorrespondence?: boolean
+  timePerMoveDays?: number
+}
+
+// Correspondence game types
+export interface CorrespondenceGameDto {
+  matchId: string
+  gameId: string
+  opponentId: string
+  opponentName: string
+  opponentRating: number
+  isYourTurn: boolean
+  timePerMoveDays: number
+  turnDeadline: string | null
+  timeRemaining: string | null // ISO duration string
+  moveCount: number
+  matchScore: string
+  targetScore: number
+  isRated: boolean
+  lastUpdatedAt: string
+}
+
+export interface CorrespondenceGamesResponse {
+  yourTurnGames: CorrespondenceGameDto[]
+  waitingGames: CorrespondenceGameDto[]
+  totalYourTurn: number
+  totalWaiting: number
+}
+
+export interface CorrespondenceMatchInvite {
+  matchId: string
+  gameId: string
+  targetScore: number
+  challengerName: string
+  challengerId: string
+  timePerMoveDays: number
+}
+
+export interface CorrespondenceTurnNotification {
+  matchId: string
+  message: string
 }

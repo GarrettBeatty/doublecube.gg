@@ -76,6 +76,32 @@ public class Match
     [JsonPropertyName("player2DisplayName")]
     public string? Player2DisplayName { get; set; }
 
+    // Correspondence game fields
+
+    /// <summary>
+    /// Whether this is a correspondence (async) match
+    /// </summary>
+    [JsonPropertyName("isCorrespondence")]
+    public bool IsCorrespondence { get; set; }
+
+    /// <summary>
+    /// Time allowed per move in days (for correspondence matches)
+    /// </summary>
+    [JsonPropertyName("timePerMoveDays")]
+    public int TimePerMoveDays { get; set; }
+
+    /// <summary>
+    /// Deadline for the current player to make a move (for correspondence matches)
+    /// </summary>
+    [JsonPropertyName("turnDeadline")]
+    public DateTime? TurnDeadline { get; set; }
+
+    /// <summary>
+    /// ID of the player whose turn it is (for correspondence matches)
+    /// </summary>
+    [JsonPropertyName("currentTurnPlayerId")]
+    public string? CurrentTurnPlayerId { get; set; }
+
     // Convenience properties that delegate to CoreMatch
     // These maintain backward compatibility with existing code
 

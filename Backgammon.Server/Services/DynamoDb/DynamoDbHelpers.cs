@@ -618,6 +618,28 @@ public static class DynamoDbHelpers
             item["delaySeconds"] = new AttributeValue { N = match.TimeControl.DelaySeconds.ToString() };
         }
 
+        // Correspondence game fields
+        item["isCorrespondence"] = new AttributeValue { BOOL = match.IsCorrespondence };
+
+        if (match.IsCorrespondence)
+        {
+            item["timePerMoveDays"] = new AttributeValue { N = match.TimePerMoveDays.ToString() };
+
+            if (match.TurnDeadline.HasValue)
+            {
+                item["turnDeadline"] = new AttributeValue { S = match.TurnDeadline.Value.ToString("O") };
+            }
+
+            if (!string.IsNullOrEmpty(match.CurrentTurnPlayerId))
+            {
+                item["currentTurnPlayerId"] = new AttributeValue { S = match.CurrentTurnPlayerId };
+
+                // GSI4 for "my turn" queries - only set when there's a current turn player
+                item["GSI4PK"] = new AttributeValue { S = $"CORRESPONDENCE_TURN#{match.CurrentTurnPlayerId}" };
+                item["GSI4SK"] = new AttributeValue { S = match.TurnDeadline?.Ticks.ToString("D19") ?? match.LastUpdatedAt.Ticks.ToString("D19") };
+            }
+        }
+
         return item;
     }
 
@@ -663,6 +685,12 @@ public static class DynamoDbHelpers
                 DelaySeconds = GetInt(item, "delaySeconds")
             };
         }
+
+        // Parse correspondence fields
+        match.IsCorrespondence = GetBool(item, "isCorrespondence");
+        match.TimePerMoveDays = GetInt(item, "timePerMoveDays");
+        match.TurnDeadline = GetNullableDateTime(item, "turnDeadline");
+        match.CurrentTurnPlayerId = GetStringOrNull(item, "currentTurnPlayerId");
 
         return match;
     }

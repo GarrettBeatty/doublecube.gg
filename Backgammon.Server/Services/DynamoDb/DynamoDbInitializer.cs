@@ -117,7 +117,9 @@ public class DynamoDbInitializer : IHostedService
                 new AttributeDefinition { AttributeName = "GSI2PK", AttributeType = ScalarAttributeType.S },
                 new AttributeDefinition { AttributeName = "GSI2SK", AttributeType = ScalarAttributeType.S },
                 new AttributeDefinition { AttributeName = "GSI3PK", AttributeType = ScalarAttributeType.S },
-                new AttributeDefinition { AttributeName = "GSI3SK", AttributeType = ScalarAttributeType.S }
+                new AttributeDefinition { AttributeName = "GSI3SK", AttributeType = ScalarAttributeType.S },
+                new AttributeDefinition { AttributeName = "GSI4PK", AttributeType = ScalarAttributeType.S },
+                new AttributeDefinition { AttributeName = "GSI4SK", AttributeType = ScalarAttributeType.S }
             },
 
             // On-demand billing (pay per request)
@@ -158,6 +160,18 @@ public class DynamoDbInitializer : IHostedService
                     {
                         new KeySchemaElement { AttributeName = "GSI3PK", KeyType = KeyType.HASH },
                         new KeySchemaElement { AttributeName = "GSI3SK", KeyType = KeyType.RANGE }
+                    },
+                    Projection = new Projection { ProjectionType = ProjectionType.ALL }
+                },
+
+                // GSI4: Correspondence "My Turn" Index
+                new GlobalSecondaryIndex
+                {
+                    IndexName = "GSI4",
+                    KeySchema = new List<KeySchemaElement>
+                    {
+                        new KeySchemaElement { AttributeName = "GSI4PK", KeyType = KeyType.HASH },
+                        new KeySchemaElement { AttributeName = "GSI4SK", KeyType = KeyType.RANGE }
                     },
                     Projection = new Projection { ProjectionType = ProjectionType.ALL }
                 }

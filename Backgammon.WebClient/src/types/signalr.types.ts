@@ -23,6 +23,11 @@ export const HubMethods = {
   ContinueMatch: 'ContinueMatch',
   GetMatchStatus: 'GetMatchStatus',
 
+  // Correspondence actions
+  GetCorrespondenceGames: 'GetCorrespondenceGames',
+  CreateCorrespondenceMatch: 'CreateCorrespondenceMatch',
+  NotifyCorrespondenceTurnComplete: 'NotifyCorrespondenceTurnComplete',
+
   // Chat
   SendChatMessage: 'SendChatMessage',
 
@@ -65,6 +70,10 @@ export const HubEvents = {
   // Time control events
   TimeUpdate: 'TimeUpdate',
   PlayerTimedOut: 'PlayerTimedOut',
+
+  // Correspondence events
+  CorrespondenceMatchInvite: 'CorrespondenceMatchInvite',
+  CorrespondenceTurnNotification: 'CorrespondenceTurnNotification',
 } as const
 
 // Event handler types

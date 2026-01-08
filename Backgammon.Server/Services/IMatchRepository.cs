@@ -61,4 +61,24 @@ public interface IMatchRepository
     /// Update match status
     /// </summary>
     Task UpdateMatchStatusAsync(string matchId, string status);
+
+    /// <summary>
+    /// Get correspondence matches where it's a specific player's turn
+    /// </summary>
+    Task<List<Match>> GetCorrespondenceMatchesForTurnAsync(string playerId);
+
+    /// <summary>
+    /// Get correspondence matches where the player is waiting for opponent
+    /// </summary>
+    Task<List<Match>> GetCorrespondenceMatchesWaitingAsync(string playerId);
+
+    /// <summary>
+    /// Get all correspondence matches with expired deadlines (for timeout processing)
+    /// </summary>
+    Task<List<Match>> GetExpiredCorrespondenceMatchesAsync();
+
+    /// <summary>
+    /// Update correspondence turn info (current player and deadline)
+    /// </summary>
+    Task UpdateCorrespondenceTurnAsync(string matchId, string currentTurnPlayerId, DateTime turnDeadline);
 }

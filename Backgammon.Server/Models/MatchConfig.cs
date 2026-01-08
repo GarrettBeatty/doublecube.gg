@@ -35,4 +35,15 @@ public class MatchConfig
     /// AI matches are always unrated regardless of this setting
     /// </summary>
     public bool IsRated { get; set; } = true;
+
+    /// <summary>
+    /// Whether this is a correspondence (async) match
+    /// </summary>
+    public bool IsCorrespondence { get; set; }
+
+    /// <summary>
+    /// Time allowed per move in days (for correspondence matches)
+    /// Valid values: 1, 3, 7, or custom
+    /// </summary>
+    public int TimePerMoveDays { get; set; } = 3;
 }
