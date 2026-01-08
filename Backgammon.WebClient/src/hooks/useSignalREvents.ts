@@ -213,13 +213,20 @@ export const useSignalREvents = () => {
     // Error - Server error message
     connection.on(HubEvents.Error, (errorMessage: string) => {
       console.error('[SignalR] Error:', errorMessage)
-      // TODO: Show error toast
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      })
     })
 
     // Info - Server info message
     connection.on(HubEvents.Info, (infoMessage: string) => {
       console.log('[SignalR] Info:', infoMessage)
-      // TODO: Show info toast
+      toast({
+        title: 'Info',
+        description: infoMessage,
+      })
     })
 
     // MatchCreated - Match and first game created, navigate to game page
