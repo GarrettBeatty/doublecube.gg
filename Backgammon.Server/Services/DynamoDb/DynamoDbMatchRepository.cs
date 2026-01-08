@@ -605,4 +605,134 @@ public class DynamoDbMatchRepository : IMatchRepository
             }
         });
     }
+
+    public async Task<List<Match>> GetCorrespondenceMatchesForTurnAsync(string playerId)
+    {
+        try
+        {
+            // Query GSI4 for matches where it's this player's turn
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI4",
+                KeyConditionExpression = "GSI4PK = :pk",
+                FilterExpression = "#status = :inProgress",
+                ExpressionAttributeNames = new Dictionary<string, string>
+                {
+                    ["#status"] = "status"
+                },
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = $"CORRESPONDENCE_TURN#{playerId}" },
+                    [":inProgress"] = new AttributeValue { S = "InProgress" }
+                },
+                ScanIndexForward = true // Sort by deadline (earliest first)
+            });
+
+            var matches = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
+            _logger.LogDebug("Retrieved {Count} correspondence matches for player {PlayerId}'s turn", matches.Count, playerId);
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve correspondence matches for player {PlayerId}'s turn", playerId);
+            return new List<Match>();
+        }
+    }
+
+    public async Task<List<Match>> GetCorrespondenceMatchesWaitingAsync(string playerId)
+    {
+        try
+        {
+            // Get all correspondence matches for the player where it's NOT their turn
+            var allMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
+
+            // Filter to correspondence matches where it's NOT the player's turn
+            var waitingMatches = allMatches
+                .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId != playerId)
+                .OrderBy(m => m.TurnDeadline)
+                .ToList();
+
+            _logger.LogDebug("Retrieved {Count} correspondence matches where player {PlayerId} is waiting", waitingMatches.Count, playerId);
+            return waitingMatches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve correspondence matches where player {PlayerId} is waiting", playerId);
+            return new List<Match>();
+        }
+    }
+
+    public async Task<List<Match>> GetExpiredCorrespondenceMatchesAsync()
+    {
+        try
+        {
+            // Query GSI3 for in-progress matches, then filter for correspondence with expired deadlines
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI3",
+                KeyConditionExpression = "GSI3PK = :pk",
+                FilterExpression = "isCorrespondence = :isCorr AND turnDeadline < :now",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = "MATCH_STATUS#InProgress" },
+                    [":isCorr"] = new AttributeValue { BOOL = true },
+                    [":now"] = new AttributeValue { S = DateTime.UtcNow.ToString("O") }
+                }
+            });
+
+            var matches = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
+            _logger.LogDebug("Retrieved {Count} expired correspondence matches", matches.Count);
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve expired correspondence matches");
+            return new List<Match>();
+        }
+    }
+
+    public async Task UpdateCorrespondenceTurnAsync(string matchId, string currentTurnPlayerId, DateTime turnDeadline)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
+            {
+                TableName = _tableName,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    ["PK"] = new AttributeValue { S = $"MATCH#{matchId}" },
+                    ["SK"] = new AttributeValue { S = "METADATA" }
+                },
+                UpdateExpression = @"
+                    SET currentTurnPlayerId = :turnPlayer,
+                        turnDeadline = :deadline,
+                        lastUpdatedAt = :now,
+                        GSI4PK = :gsi4pk,
+                        GSI4SK = :gsi4sk",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":turnPlayer"] = new AttributeValue { S = currentTurnPlayerId },
+                    [":deadline"] = new AttributeValue { S = turnDeadline.ToString("O") },
+                    [":now"] = new AttributeValue { S = now.ToString("O") },
+                    [":gsi4pk"] = new AttributeValue { S = $"CORRESPONDENCE_TURN#{currentTurnPlayerId}" },
+                    [":gsi4sk"] = new AttributeValue { S = turnDeadline.Ticks.ToString("D19") }
+                }
+            });
+
+            _logger.LogInformation(
+                "Updated correspondence turn for match {MatchId} - Turn: {PlayerId}, Deadline: {Deadline}",
+                matchId,
+                currentTurnPlayerId,
+                turnDeadline);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update correspondence turn for match {MatchId}", matchId);
+            throw;
+        }
+    }
 }
