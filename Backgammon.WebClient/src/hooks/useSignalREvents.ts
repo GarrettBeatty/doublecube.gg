@@ -5,7 +5,16 @@ import { useGameStore } from '@/stores/gameStore'
 import { audioService } from '@/services/audio.service'
 import { useToast } from '@/hooks/use-toast'
 import { GameState, CheckerColor } from '@/types/game.types'
-import { HubEvents, MatchData, TimeUpdateEvent, TimeoutEvent } from '@/types/signalr.types'
+import {
+  HubEvents,
+  MatchCreatedEvent,
+  MatchGameStartingEvent,
+  MatchUpdateEvent,
+  MatchContinuedEvent,
+  OpponentJoinedMatchEvent,
+  TimeUpdateEvent,
+  TimeoutEvent,
+} from '@/types/signalr.types'
 
 export const useSignalREvents = () => {
   const navigate = useNavigate()
@@ -214,23 +223,23 @@ export const useSignalREvents = () => {
     })
 
     // MatchCreated - Match and first game created, navigate to game page
-    connection.on(HubEvents.MatchCreated, (data: MatchData) => {
+    connection.on(HubEvents.MatchCreated, (data: MatchCreatedEvent) => {
       console.log('[SignalR] MatchCreated', { matchId: data.matchId, gameId: data.gameId, opponentType: data.opponentType })
-      setCurrentGameId(data.gameId as string)
+      setCurrentGameId(data.gameId)
       // Navigate to game page immediately - game handles waiting state
       navigateRef.current(`/game/${data.gameId}`, { replace: true })
     })
 
     // OpponentJoinedMatch - Opponent joined the match
-    connection.on(HubEvents.OpponentJoinedMatch, (data: MatchData) => {
+    connection.on(HubEvents.OpponentJoinedMatch, (data: OpponentJoinedMatchEvent) => {
       console.log('[SignalR] OpponentJoinedMatch', { matchId: data.matchId, player2Name: data.player2Name })
       // Game page will receive WaitingForOpponent → GameStart flow
     })
 
     // MatchGameStarting - Match game starting, navigate to game
-    connection.on(HubEvents.MatchGameStarting, (data: MatchData) => {
+    connection.on(HubEvents.MatchGameStarting, (data: MatchGameStartingEvent) => {
       console.log('[SignalR] MatchGameStarting', { matchId: data.matchId, gameId: data.gameId })
-      setCurrentGameId(data.gameId as string)
+      setCurrentGameId(data.gameId)
       // Force navigation even if on same route
       navigateRef.current(`/game/${data.gameId}`, { replace: true })
     })
@@ -272,15 +281,7 @@ export const useSignalREvents = () => {
     })
 
     // MatchUpdate - Match score/state updated
-    connection.on(HubEvents.MatchUpdate, (data: {
-      matchId: string
-      player1Score: number
-      player2Score: number
-      targetScore: number
-      isCrawfordGame: boolean
-      matchComplete: boolean
-      matchWinner: string | null
-    }) => {
+    connection.on(HubEvents.MatchUpdate, (data: MatchUpdateEvent) => {
       console.log('[SignalR] MatchUpdate', data)
 
       setMatchState({
@@ -295,14 +296,7 @@ export const useSignalREvents = () => {
     })
 
     // MatchContinued - Next game in match started
-    connection.on(HubEvents.MatchContinued, (data: {
-      matchId: string
-      gameId: string
-      player1Score: number
-      player2Score: number
-      targetScore: number
-      isCrawfordGame: boolean
-    }) => {
+    connection.on(HubEvents.MatchContinued, (data: MatchContinuedEvent) => {
       console.log('[SignalR] MatchContinued', data)
 
       // Update match state
