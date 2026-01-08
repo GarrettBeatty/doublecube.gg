@@ -122,10 +122,11 @@ interface DragState {
 
 interface BoardSVGProps {
   gameState: GameState | null
+  isSpectator?: boolean
 }
 
 // Internal component (not exported)
-const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
+const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = false }) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
@@ -1083,12 +1084,12 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       (yourColor === CheckerColor.Red && gameState.redOpeningRoll != null)
     )
 
-    // Button visibility logic (from BoardOverlayControls)
+    // Button visibility logic (from BoardOverlayControls) - hide all buttons for spectators
     const hideRollForCustomDice = gameState.isAnalysisMode && isCustomDiceEnabled
-    const canRoll = !hideRollForCustomDice && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
+    const canRoll = !isSpectator && !hideRollForCustomDice && isGameInProgress && (isOpeningRoll ? (!youHaveRolled || gameState.isOpeningRollTie) : (isYourTurn && !hasDiceRolled))
 
     const hasUsedAllMoves = gameState.remainingMoves && gameState.remainingMoves.length === 0
-    const canEndTurn = isGameInProgress && !isOpeningRoll && hasDiceRolled && (
+    const canEndTurn = !isSpectator && isGameInProgress && !isOpeningRoll && hasDiceRolled && (
       gameState.isAnalysisMode ? (hasUsedAllMoves || !gameState.hasValidMoves) : (!gameState.hasValidMoves && isYourTurn)
     )
 
@@ -1096,7 +1097,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
     const totalMoves = hasDiceRolled ? (isDoubles ? 4 : gameState.dice.length) : 0
     const remainingMovesCount = gameState.remainingMoves?.length ?? 0
     const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
-    const canUndo = isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (gameState.isAnalysisMode || isYourTurn)
+    const canUndo = !isSpectator && isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (gameState.isAnalysisMode || isYourTurn)
 
     // Button positions
     const leftSideX = CONFIG.viewBox.width * 0.2216  // 22.16%
@@ -1210,7 +1211,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState }) => {
       )
       buttonsGroupRef.current.appendChild(endButton)
     }
-  }, [gameState, invoke, isBoardFlipped])
+  }, [gameState, invoke, isBoardFlipped, isSpectator])
 
   // Initialize board
   useEffect(() => {
