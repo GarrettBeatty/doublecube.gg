@@ -4,10 +4,15 @@ import { CheckerColor } from '@/types/game.types'
 import { MatchLobby } from '@/types/match.types'
 import { LobbyGame } from '@/types/home.types'
 
+// Type definitions for mapper functions
+export type CheckerColorUI = 'White' | 'Red'
+export type FriendStatusUI = 'Online' | 'Playing' | 'Offline'
+export type TimeControlTypeValue = 'None' | 'ChicagoPoint' | string
+
 /**
  * Map CheckerColor enum to UI display string
  */
-export const mapCheckerColorToUI = (color: CheckerColor): 'White' | 'Red' => {
+export const mapCheckerColorToUI = (color: CheckerColor): CheckerColorUI => {
   return color === CheckerColor.White ? 'White' : 'Red'
 }
 
@@ -28,9 +33,9 @@ export const mapMatchLobbyToLobbyGame = (lobby: MatchLobby): LobbyGame => {
 }
 
 /**
- * Map friend status enum to UI display string
+ * Map friend status to UI display string
  */
-export const mapFriendStatusToUI = (status: string): 'Online' | 'Playing' | 'Offline' => {
+export const mapFriendStatusToUI = (status: string): FriendStatusUI => {
   const normalized = status.toLowerCase()
   if (normalized === 'online') return 'Online'
   if (normalized === 'playing' || normalized === 'ingame') return 'Playing'
@@ -50,7 +55,7 @@ export const formatRating = (rating?: number | null): string => {
  * Supports Chicago Point time control format
  */
 export const formatTimeControl = (
-  timeControlType?: string | null,
+  timeControlType?: TimeControlTypeValue | null,
   delaySeconds?: number | null,
   matchLength?: number
 ): string => {

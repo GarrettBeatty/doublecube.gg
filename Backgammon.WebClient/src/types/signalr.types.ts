@@ -85,11 +85,12 @@ export interface SignalREventHandlers {
   // Match events
   onMatchCreated: (matchData: MatchCreatedEvent) => void
   onOpponentJoinedMatch: (matchData: OpponentJoinedMatchEvent) => void
-  onMatchUpdate: (matchData: MatchData) => void
-  onMatchContinued: (matchData: MatchData) => void
-  onMatchStatus: (matchData: MatchData) => void
-  onMatchGameCompleted: (matchData: MatchData) => void
-  onMatchCompleted: (matchData: MatchData) => void
+  onMatchGameStarting: (matchData: MatchGameStartingEvent) => void
+  onMatchUpdate: (matchData: MatchUpdateEvent) => void
+  onMatchContinued: (matchData: MatchContinuedEvent) => void
+  onMatchStatus: (matchData: MatchUpdateEvent) => void
+  onMatchGameCompleted: (matchData: MatchGameCompletedEvent) => void
+  onMatchCompleted: (matchData: MatchCompletedEvent) => void
 }
 
 // Connection state
@@ -102,11 +103,13 @@ export enum ConnectionState {
 }
 
 // Match event data types
+export type OpponentTypeString = 'AI' | 'OpenLobby' | 'Friend'
+
 export interface MatchCreatedEvent {
   matchId: string
   gameId: string
   targetScore: number
-  opponentType: 'AI' | 'OpenLobby' | 'Friend'
+  opponentType: OpponentTypeString
   player1Id: string
   player2Id: string | null
   player1Name: string
@@ -136,8 +139,43 @@ export interface TimeoutEvent {
   winner: string
 }
 
-// Generic match event data
-export interface MatchData {
+// Match event data types
+export interface MatchGameStartingEvent {
   matchId: string
-  [key: string]: unknown
+  gameId: string
+}
+
+export interface MatchUpdateEvent {
+  matchId: string
+  player1Score: number
+  player2Score: number
+  targetScore: number
+  isCrawfordGame: boolean
+  matchComplete: boolean
+  matchWinner: string | null
+}
+
+export interface MatchContinuedEvent {
+  matchId: string
+  gameId: string
+  player1Score: number
+  player2Score: number
+  targetScore: number
+  isCrawfordGame: boolean
+}
+
+export interface MatchGameCompletedEvent {
+  matchId: string
+  gameId: string
+  winner: string
+  points: number
+}
+
+export interface MatchCompletedEvent {
+  matchId: string
+  winner: string
+  finalScore: {
+    player1: number
+    player2: number
+  }
 }
