@@ -48,6 +48,7 @@ public class GameHub : Hub
     private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
     private readonly AnalysisService _analysisService;
+    private readonly IUserRepository _userRepository;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -66,7 +67,8 @@ public class GameHub : Hub
         IGameImportExportService gameImportExportService,
         IChatService chatService,
         ILogger<GameHub> logger,
-        AnalysisService analysisService)
+        AnalysisService analysisService,
+        IUserRepository userRepository)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -85,6 +87,7 @@ public class GameHub : Hub
         _chatService = chatService;
         _logger = logger;
         _analysisService = analysisService;
+        _userRepository = userRepository;
     }
 
     /// <summary>
@@ -1084,6 +1087,109 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting active games for player");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Get recent opponents for the current player with head-to-head records
+    /// </summary>
+    /// <param name="limit">Maximum number of opponents to return</param>
+    /// <param name="includeAi">Whether to include AI opponents</param>
+    /// <returns>List of recent opponents with their statistics</returns>
+    public async Task<List<RecentOpponentDto>> GetRecentOpponents(int limit = 10, bool includeAi = false)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+
+            // Get all completed matches for the player
+            var matches = await _matchService.GetPlayerMatchesAsync(playerId, "Completed");
+
+            // Group matches by opponent and aggregate statistics
+            var opponentStats = new Dictionary<string, (string Name, int Wins, int Losses, DateTime LastPlayed, bool IsAi)>();
+
+            foreach (var match in matches)
+            {
+                var isPlayer1 = match.Player1Id == playerId;
+                var opponentId = isPlayer1 ? match.Player2Id : match.Player1Id;
+                var opponentName = isPlayer1 ? match.Player2Name : match.Player1Name;
+                var myScore = isPlayer1 ? match.Player1Score : match.Player2Score;
+                var opponentScore = isPlayer1 ? match.Player2Score : match.Player1Score;
+                var isAi = match.OpponentType == "AI";
+
+                // Skip if opponent ID is missing
+                if (string.IsNullOrEmpty(opponentId))
+                    continue;
+
+                // Skip AI opponents if not requested
+                if (isAi && !includeAi)
+                    continue;
+
+                var matchTime = match.CompletedAt ?? match.CreatedAt;
+                var didWin = myScore > opponentScore;
+
+                if (opponentStats.TryGetValue(opponentId, out var existing))
+                {
+                    opponentStats[opponentId] = (
+                        existing.Name,
+                        existing.Wins + (didWin ? 1 : 0),
+                        existing.Losses + (didWin ? 0 : 1),
+                        matchTime > existing.LastPlayed ? matchTime : existing.LastPlayed,
+                        isAi
+                    );
+                }
+                else
+                {
+                    opponentStats[opponentId] = (
+                        opponentName ?? "Unknown",
+                        didWin ? 1 : 0,
+                        didWin ? 0 : 1,
+                        matchTime,
+                        isAi
+                    );
+                }
+            }
+
+            // Sort by most recent and take the limit
+            var recentOpponents = opponentStats
+                .OrderByDescending(kvp => kvp.Value.LastPlayed)
+                .Take(limit)
+                .ToList();
+
+            // Get opponent ratings from user profiles (non-AI only)
+            var nonAiOpponentIds = recentOpponents
+                .Where(kvp => !kvp.Value.IsAi)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            var opponentUsers = nonAiOpponentIds.Count > 0
+                ? await _userRepository.GetUsersByIdsAsync(nonAiOpponentIds)
+                : new List<User>();
+
+            var userRatings = opponentUsers.ToDictionary(
+                u => u.UserId,
+                u => u.Stats?.Rating ?? 1500
+            );
+
+            // Build the result DTOs
+            var result = recentOpponents.Select(kvp => new RecentOpponentDto
+            {
+                OpponentId = kvp.Key,
+                OpponentName = kvp.Value.Name,
+                OpponentRating = kvp.Value.IsAi ? 0 : (userRatings.TryGetValue(kvp.Key, out var rating) ? rating : 0),
+                TotalMatches = kvp.Value.Wins + kvp.Value.Losses,
+                Wins = kvp.Value.Wins,
+                Losses = kvp.Value.Losses,
+                LastPlayedAt = kvp.Value.LastPlayed,
+                IsAi = kvp.Value.IsAi
+            }).ToList();
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting recent opponents for player");
             throw;
         }
     }

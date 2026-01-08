@@ -63,3 +63,16 @@ export interface RecentGame {
   completedAt?: string
   createdAt: string
 }
+
+export interface RecentOpponent {
+  opponentId: string
+  opponentName: string
+  opponentRating: number
+  totalMatches: number
+  wins: number
+  losses: number
+  record: string
+  winRate: number
+  lastPlayedAt: string
+  isAi: boolean
+}
