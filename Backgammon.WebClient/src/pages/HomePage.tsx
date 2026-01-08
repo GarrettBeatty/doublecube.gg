@@ -121,7 +121,7 @@ export function HomePage() {
 
             <DailyPuzzle />
             <OnlineFriends onChallengeClick={handleChallengeFromFriendsList} />
-            <RecentOpponents onChallengeClick={(_opponentId, _opponentName) => {
+            <RecentOpponents onChallengeClick={() => {
               // Open friends dialog to initiate challenge
               // TODO: Add direct challenge support for recent opponents
               setShowFriendsDialog(true)

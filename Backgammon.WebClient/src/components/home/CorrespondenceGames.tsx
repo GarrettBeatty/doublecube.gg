@@ -1,7 +1,6 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, Dice6, RotateCcw } from "lucide-react";
+import { Clock, User, Dice6 } from "lucide-react";
 
 interface CorrespondenceGame {
   id: string;
