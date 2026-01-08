@@ -103,3 +103,7 @@ local-config.json
 # Vite build outputs (WebClient)
 Backgammon.WebClient/wwwroot/assets/
 Backgammon.WebClient/wwwroot/index.html
+
+# Git worktrees (Crystal)
+/worktrees/
+/worktree-*/
