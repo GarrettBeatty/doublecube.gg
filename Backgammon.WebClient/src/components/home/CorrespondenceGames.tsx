@@ -62,38 +62,6 @@ const mockCorrespondenceGames: CorrespondenceGame[] = [
   },
 ];
 
-interface RecentOpponent {
-  id: string;
-  username: string;
-  rating: number;
-  lastPlayed: string;
-  gamesPlayed: number;
-}
-
-const mockRecentOpponents: RecentOpponent[] = [
-  {
-    id: "1",
-    username: "SlowStrategist",
-    rating: 1876,
-    lastPlayed: "2 hours ago",
-    gamesPlayed: 5,
-  },
-  {
-    id: "2",
-    username: "QuickMover",
-    rating: 1945,
-    lastPlayed: "Yesterday",
-    gamesPlayed: 12,
-  },
-  {
-    id: "3",
-    username: "DiceRoller",
-    rating: 1823,
-    lastPlayed: "2 days ago",
-    gamesPlayed: 8,
-  },
-];
-
 export function CorrespondenceGames() {
   const yourTurnGames = mockCorrespondenceGames.filter((game) => game.yourTurn);
 
@@ -189,36 +157,6 @@ export function CorrespondenceGames() {
             ))}
         </div>
       </div>
-
-      {/* Recent Opponents */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Recent Opponents</CardTitle>
-          <CardDescription>Challenge them to a rematch</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {mockRecentOpponents.map((opponent) => (
-            <div
-              key={opponent.id}
-              className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent transition-colors"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">{opponent.username}</span>
-                  <span className="text-sm text-muted-foreground">({opponent.rating})</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {opponent.gamesPlayed} games • {opponent.lastPlayed}
-                </div>
-              </div>
-              <Button size="sm" variant="outline">
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Rematch
-              </Button>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

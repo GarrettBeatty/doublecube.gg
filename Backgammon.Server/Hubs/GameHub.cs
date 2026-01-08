@@ -1120,11 +1120,15 @@ public class GameHub : Hub
 
                 // Skip if opponent ID is missing
                 if (string.IsNullOrEmpty(opponentId))
+                {
                     continue;
+                }
 
                 // Skip AI opponents if not requested
                 if (isAi && !includeAi)
+                {
                     continue;
+                }
 
                 var matchTime = match.CompletedAt ?? match.CreatedAt;
                 var didWin = myScore > opponentScore;
@@ -1136,8 +1140,7 @@ public class GameHub : Hub
                         existing.Wins + (didWin ? 1 : 0),
                         existing.Losses + (didWin ? 0 : 1),
                         matchTime > existing.LastPlayed ? matchTime : existing.LastPlayed,
-                        isAi
-                    );
+                        isAi);
                 }
                 else
                 {
@@ -1146,8 +1149,7 @@ public class GameHub : Hub
                         didWin ? 1 : 0,
                         didWin ? 0 : 1,
                         matchTime,
-                        isAi
-                    );
+                        isAi);
                 }
             }
 
@@ -1169,8 +1171,7 @@ public class GameHub : Hub
 
             var userRatings = opponentUsers.ToDictionary(
                 u => u.UserId,
-                u => u.Stats?.Rating ?? 1500
-            );
+                u => u?.Rating ?? 1500);
 
             // Build the result DTOs
             var result = recentOpponents.Select(kvp => new RecentOpponentDto
