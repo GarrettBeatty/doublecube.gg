@@ -151,7 +151,7 @@ public class GameHub : Hub
         {
             var connectionId = Context.ConnectionId;
             var effectivePlayerId = GetEffectivePlayerId(playerId);
-            var displayName = GetAuthenticatedDisplayName();
+            var displayName = await GetEffectiveDisplayNameAsync(effectivePlayerId);
 
             if (string.IsNullOrEmpty(gameId))
             {
@@ -1904,6 +1904,23 @@ public class GameHub : Hub
     private string? GetAuthenticatedDisplayName()
     {
         return Context.User?.FindFirst("displayName")?.Value;
+    }
+
+    /// <summary>
+    /// Gets the effective display name for a player, checking JWT claims first, then database
+    /// </summary>
+    private async Task<string?> GetEffectiveDisplayNameAsync(string playerId)
+    {
+        // First try JWT claims (for authenticated users)
+        var claimDisplayName = GetAuthenticatedDisplayName();
+        if (!string.IsNullOrEmpty(claimDisplayName))
+        {
+            return claimDisplayName;
+        }
+
+        // Fall back to database lookup (for anonymous users)
+        var user = await _userRepository.GetByUserIdAsync(playerId);
+        return user?.DisplayName;
     }
 
     private string GetEffectivePlayerId(string anonymousPlayerId)
