@@ -37,7 +37,7 @@ function GameCard({
   isYourTurn: boolean;
   onPlay: (gameId: string) => void;
 }) {
-  const isUrgent = isYourTurn && game.timeRemaining && parseInt(game.timeRemaining.split(".")[0]) <= 1;
+  const isUrgent = isYourTurn && game.timeRemaining && game.timeRemaining.includes(".") && parseInt(game.timeRemaining.split(".")[0]) <= 1;
 
   return (
     <div

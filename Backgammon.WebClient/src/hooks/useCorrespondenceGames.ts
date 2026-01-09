@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods, HubEvents } from '@/types/signalr.types'
 import {
@@ -43,6 +43,10 @@ export const useCorrespondenceGames = () => {
     }
   }, [isConnected, invoke])
 
+  // Use ref to avoid re-registering event handlers
+  const fetchRef = useRef(fetchCorrespondenceGames)
+  fetchRef.current = fetchCorrespondenceGames
+
   useEffect(() => {
     fetchCorrespondenceGames()
 
@@ -50,14 +54,14 @@ export const useCorrespondenceGames = () => {
     const handleMatchInvite = (invite: CorrespondenceMatchInvite) => {
       console.log('Received correspondence match invite:', invite)
       // Refetch to include the new match
-      fetchCorrespondenceGames()
+      fetchRef.current()
     }
 
     // Listen for turn notifications (when it becomes your turn)
     const handleTurnNotification = (notification: CorrespondenceTurnNotification) => {
       console.log('Correspondence turn notification:', notification)
       // Refetch to update the lists
-      fetchCorrespondenceGames()
+      fetchRef.current()
     }
 
     connection?.on(HubEvents.CorrespondenceMatchInvite, handleMatchInvite)
@@ -67,7 +71,7 @@ export const useCorrespondenceGames = () => {
       connection?.off(HubEvents.CorrespondenceMatchInvite, handleMatchInvite)
       connection?.off(HubEvents.CorrespondenceTurnNotification, handleTurnNotification)
     }
-  }, [fetchCorrespondenceGames, connection])
+  }, [connection, fetchCorrespondenceGames])
 
   const createCorrespondenceMatch = useCallback(
     async (config: {

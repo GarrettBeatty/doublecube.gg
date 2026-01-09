@@ -46,9 +46,9 @@ public class CorrespondenceGameDto
     public DateTime? TurnDeadline { get; set; }
 
     /// <summary>
-    /// Time remaining until the turn deadline expires
+    /// Time remaining until the turn deadline expires (formatted as "d.hh:mm:ss")
     /// </summary>
-    public TimeSpan? TimeRemaining { get; set; }
+    public string? TimeRemaining { get; set; }
 
     /// <summary>
     /// Total number of moves made in the current game

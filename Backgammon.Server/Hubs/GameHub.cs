@@ -1701,25 +1701,24 @@ public class GameHub : Hub
                 match.TimePerMoveDays);
 
             // For friend matches, notify the friend if they're online
-            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
+            if (config.OpponentType == "Friend"
+                && !string.IsNullOrEmpty(config.OpponentId)
+                && _sessionManager.IsPlayerOnline(config.OpponentId))
             {
-                if (_sessionManager.IsPlayerOnline(config.OpponentId))
+                var opponentConnection = GetPlayerConnection(config.OpponentId);
+                if (!string.IsNullOrEmpty(opponentConnection))
                 {
-                    var opponentConnection = GetPlayerConnection(config.OpponentId);
-                    if (!string.IsNullOrEmpty(opponentConnection))
-                    {
-                        await Clients.Client(opponentConnection).SendAsync(
-                            "CorrespondenceMatchInvite",
-                            new
-                            {
-                                matchId = match.MatchId,
-                                gameId = firstGame.GameId,
-                                targetScore = match.TargetScore,
-                                challengerName = match.Player1Name,
-                                challengerId = match.Player1Id,
-                                timePerMoveDays = match.TimePerMoveDays
-                            });
-                    }
+                    await Clients.Client(opponentConnection).SendAsync(
+                        "CorrespondenceMatchInvite",
+                        new
+                        {
+                            matchId = match.MatchId,
+                            gameId = firstGame.GameId,
+                            targetScore = match.TargetScore,
+                            challengerName = match.Player1Name,
+                            challengerId = match.Player1Id,
+                            timePerMoveDays = match.TimePerMoveDays
+                        });
                 }
             }
         }
@@ -1731,8 +1730,9 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Notify that a turn has been completed in a correspondence game
-    /// Called automatically after EndTurn in correspondence matches
+    /// Notify that a turn has been completed in a correspondence game.
+    /// This hub method should be called explicitly by the client after EndTurn in correspondence matches
+    /// to inform the server that the turn has been completed and to trigger notification of the next player.
     /// </summary>
     public async Task NotifyCorrespondenceTurnComplete(string matchId, string nextPlayerId)
     {

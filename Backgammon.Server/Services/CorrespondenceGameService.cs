@@ -112,15 +112,9 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 
             // Get player 1 info
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            string player1Name;
-            if (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
-            {
-                player1Name = player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
-            }
-            else
-            {
-                player1Name = player1DisplayName;
-            }
+            var player1Name = (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
+                ? player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}"
+                : player1DisplayName;
 
             // Create match with correspondence fields
             var match = new Match
@@ -264,6 +258,11 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 
             // The player who timed out loses
             var timedOutPlayerId = match.CurrentTurnPlayerId;
+            if (timedOutPlayerId == null)
+            {
+                _logger.LogWarning("Cannot handle timeout for match {MatchId}: CurrentTurnPlayerId is null", matchId);
+                return;
+            }
             var winnerId = timedOutPlayerId == match.Player1Id ? match.Player2Id : match.Player1Id;
 
             // Complete the match
@@ -372,6 +371,15 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 games.TryGetValue(match.CurrentGameId, out currentGame);
             }
 
+            // Calculate time remaining and format as string for frontend compatibility
+            string? timeRemainingStr = null;
+            if (match.TurnDeadline.HasValue)
+            {
+                var timeRemaining = match.TurnDeadline.Value - DateTime.UtcNow;
+                // Format as "d.hh:mm:ss" to match .NET TimeSpan.ToString() format
+                timeRemainingStr = timeRemaining.ToString(@"d\.hh\:mm\:ss");
+            }
+
             var dto = new CorrespondenceGameDto
             {
                 MatchId = match.MatchId,
@@ -382,9 +390,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 IsYourTurn = isYourTurn,
                 TimePerMoveDays = match.TimePerMoveDays,
                 TurnDeadline = match.TurnDeadline,
-                TimeRemaining = match.TurnDeadline.HasValue
-                    ? match.TurnDeadline.Value - DateTime.UtcNow
-                    : null,
+                TimeRemaining = timeRemainingStr,
                 MoveCount = currentGame?.MoveCount ?? 0,
                 MatchScore = $"{match.Player1Score}-{match.Player2Score}",
                 TargetScore = match.TargetScore,

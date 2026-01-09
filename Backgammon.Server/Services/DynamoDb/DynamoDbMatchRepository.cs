@@ -646,6 +646,8 @@ public class DynamoDbMatchRepository : IMatchRepository
         try
         {
             // Query GSI3 for in-progress matches, then filter for correspondence with expired deadlines
+            // Note: ISO 8601 datetime strings (format "O") are lexicographically sortable,
+            // so string comparison in DynamoDB filter expressions works correctly for UTC times
             var response = await _dynamoDbClient.QueryAsync(new QueryRequest
             {
                 TableName = _tableName,
