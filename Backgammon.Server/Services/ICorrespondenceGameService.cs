@@ -44,4 +44,11 @@ public interface ICorrespondenceGameService
     /// Handle timeout - forfeit the game for the player who ran out of time
     /// </summary>
     Task HandleTimeoutAsync(string matchId);
+
+    /// <summary>
+    /// Initialize turn tracking when a player joins an OpenLobby correspondence match.
+    /// Sets CurrentTurnPlayerId to Player1 and TurnDeadline based on timePerMoveDays.
+    /// </summary>
+    /// <param name="matchId">The match ID to initialize turn tracking for</param>
+    Task InitializeTurnTrackingAsync(string matchId);
 }

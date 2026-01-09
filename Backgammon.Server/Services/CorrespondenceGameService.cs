@@ -92,12 +92,6 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 throw new ArgumentException("Correspondence games support 'OpenLobby' or 'Friend' opponent types");
             }
 
-            // OpenLobby not yet supported for correspondence games
-            if (opponentType == "OpenLobby")
-            {
-                throw new ArgumentException("OpenLobby not yet supported for correspondence matches - please challenge a specific friend");
-            }
-
             // Validate player2Id for Friend matches
             if (opponentType == "Friend" && string.IsNullOrWhiteSpace(player2Id))
             {
@@ -306,6 +300,38 @@ public class CorrespondenceGameService : ICorrespondenceGameService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to handle timeout for match {MatchId}", matchId);
+            throw;
+        }
+    }
+
+    public async Task InitializeTurnTrackingAsync(string matchId)
+    {
+        try
+        {
+            var match = await _matchRepository.GetMatchByIdAsync(matchId);
+            if (match == null || !match.IsCorrespondence)
+            {
+                _logger.LogWarning("Cannot initialize turn tracking: match {MatchId} not found or not correspondence", matchId);
+                return;
+            }
+
+            // Player1 (White) always goes first in backgammon
+            var turnDeadline = DateTime.UtcNow.AddDays(match.TimePerMoveDays);
+
+            await _matchRepository.UpdateCorrespondenceTurnAsync(
+                matchId,
+                match.Player1Id,
+                turnDeadline);
+
+            _logger.LogInformation(
+                "Initialized turn tracking for correspondence match {MatchId}. First player: {PlayerId}, Deadline: {Deadline}",
+                matchId,
+                match.Player1Id,
+                turnDeadline);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to initialize turn tracking for match {MatchId}", matchId);
             throw;
         }
     }

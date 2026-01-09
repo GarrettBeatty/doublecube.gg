@@ -1575,6 +1575,23 @@ public class GameHub : Hub
                 });
             }
 
+            // For correspondence matches, notify Player1 it's their turn
+            if (match.IsCorrespondence && _sessionManager.IsPlayerOnline(match.Player1Id))
+            {
+                var player1Connection = GetPlayerConnection(match.Player1Id);
+                if (!string.IsNullOrEmpty(player1Connection))
+                {
+                    await Clients.Client(player1Connection).SendAsync(
+                        "CorrespondenceTurnNotification",
+                        new
+                        {
+                            matchId = match.MatchId,
+                            gameId = match.CurrentGameId,
+                            message = "Opponent joined! It's your turn."
+                        });
+                }
+            }
+
             _logger.LogInformation("Player {PlayerId} joined match {MatchId}", playerId, matchId);
         }
         catch (Exception ex)

@@ -13,6 +13,7 @@ public class MatchService : IMatchService
     private readonly IGameSessionManager _gameSessionManager;
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly ILogger<MatchService> _logger;
 
     public MatchService(
@@ -21,6 +22,7 @@ public class MatchService : IMatchService
         IGameSessionManager gameSessionManager,
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
+        ICorrespondenceGameService correspondenceGameService,
         ILogger<MatchService> logger)
     {
         _matchRepository = matchRepository;
@@ -28,6 +30,7 @@ public class MatchService : IMatchService
         _gameSessionManager = gameSessionManager;
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
+        _correspondenceGameService = correspondenceGameService;
         _logger = logger;
     }
 
@@ -501,6 +504,16 @@ public class MatchService : IMatchService
             match.LastUpdatedAt = DateTime.UtcNow;
 
             await _matchRepository.UpdateMatchAsync(match);
+
+            // For correspondence matches, initialize turn tracking
+            if (match.IsCorrespondence)
+            {
+                await _correspondenceGameService.InitializeTurnTrackingAsync(matchId);
+                _logger.LogInformation(
+                    "Initialized correspondence turn tracking for match {MatchId} after player {PlayerId} joined",
+                    matchId,
+                    player2Id);
+            }
 
             _logger.LogInformation(
                 "Player {Player2Id} joined match {MatchId}, Status: WaitingForPlayers → InProgress",

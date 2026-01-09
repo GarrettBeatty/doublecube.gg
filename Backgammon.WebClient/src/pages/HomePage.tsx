@@ -13,9 +13,9 @@ import { GameLobby } from '@/components/home/GameLobby'
 import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
 import { CorrespondenceGames } from '@/components/home/CorrespondenceGames'
+import { CorrespondenceLobbies } from '@/components/home/CorrespondenceLobbies'
 import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
-import { RecentGames } from '@/components/home/RecentGames'
 import { RecentOpponents } from '@/components/home/RecentOpponents'
 
 // Import modals
@@ -143,14 +143,12 @@ export function HomePage() {
               </TabsList>
 
               <TabsContent value="lobby" className="mt-6">
-                <div className="space-y-6">
-                  <GameLobby />
-                  <RecentGames />
-                </div>
+                <GameLobby />
               </TabsContent>
 
-              <TabsContent value="correspondence" className="mt-6">
+              <TabsContent value="correspondence" className="mt-6 space-y-6">
                 <CorrespondenceGames />
+                <CorrespondenceLobbies />
               </TabsContent>
             </Tabs>
           </div>
