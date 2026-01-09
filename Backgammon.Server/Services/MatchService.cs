@@ -73,19 +73,14 @@ public class MatchService : IMatchService
                 throw new ArgumentException("Player IDs cannot be identical");
             }
 
-            // Get player 1 name
+            // Get player 1 info - all users (including anonymous) are now in the database
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
+            if (player1 == null)
+            {
+                throw new ArgumentException($"Player {player1Id} not found in database");
+            }
 
-            // If displayName is just "Player" (guest), append player ID for uniqueness
-            string player1Name;
-            if (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
-            {
-                player1Name = player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
-            }
-            else
-            {
-                player1Name = player1DisplayName;
-            }
+            string player1Name = player1.DisplayName;
 
             // Create match (Status defaults to WaitingForPlayers from constructor)
             var match = new Match
@@ -113,9 +108,13 @@ public class MatchService : IMatchService
             {
                 // Set friend as player 2
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
+                if (player2 == null)
+                {
+                    throw new ArgumentException($"Player {player2Id} not found in database");
+                }
+
                 match.Player2Id = player2Id;
-                // Use same formatting logic as player1 for consistency
-                match.Player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+                match.Player2Name = player2.DisplayName;
                 match.Status = "InProgress";  // Friend match with both players ready
                 match.IsOpenLobby = false;
             }
@@ -483,22 +482,15 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.Status})");
             }
 
-            // Get player 2 name
+            // Get player 2 info - all users (including anonymous) are now in the database
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-
-            // If displayName is just "Player" (guest), append player ID for uniqueness
-            string player2Name;
-            if (string.IsNullOrEmpty(player2DisplayName) || player2DisplayName == "Player")
+            if (player2 == null)
             {
-                player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
-            }
-            else
-            {
-                player2Name = player2DisplayName;
+                throw new ArgumentException($"Player {player2Id} not found in database");
             }
 
             match.Player2Id = player2Id;
-            match.Player2Name = player2Name;
+            match.Player2Name = player2.DisplayName;
             match.Player2DisplayName = player2DisplayName;
             match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
