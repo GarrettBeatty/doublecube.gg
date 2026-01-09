@@ -160,6 +160,7 @@ export interface Player {
 export interface User {
   userId: string
   username: string
+  displayName: string
   email: string | null
   createdAt: string
   rating: number

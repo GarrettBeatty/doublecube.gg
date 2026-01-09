@@ -74,6 +74,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const newUser: User = {
           userId: response.user.userId,
           username: response.user.username,
+          displayName: response.user.displayName,
           email: null,
           createdAt: response.user.createdAt,
           rating: response.user.rating,
@@ -98,6 +99,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const newUser: User = {
           userId: response.user.userId,
           username: response.user.username,
+          displayName: response.user.displayName,
           email: data.email || null,
           createdAt: response.user.createdAt,
           rating: response.user.rating,

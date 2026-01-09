@@ -39,6 +39,7 @@ class AuthService {
       this.setUser({
         userId: data.user.userId,
         username: data.user.username,
+        displayName: data.user.displayName,
         email: null,
         createdAt: data.user.createdAt,
         rating: data.user.rating,
@@ -76,6 +77,7 @@ class AuthService {
       this.setUser({
         userId: authData.user.userId,
         username: authData.user.username,
+        displayName: authData.user.displayName,
         email: data.email || null,
         createdAt: authData.user.createdAt,
         rating: authData.user.rating,
@@ -139,7 +141,7 @@ class AuthService {
 
   getDisplayName(): string | null {
     const user = this.getUser()
-    return user?.username || null
+    return user?.displayName || null
   }
 
   private generatePlayerId(): string {
