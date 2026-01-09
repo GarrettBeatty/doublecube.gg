@@ -137,8 +137,11 @@ public class GameHub : Hub
             }
             else
             {
-                _logger.LogInformation("User {PlayerId} already exists - Display Name: {DisplayName}, IsAnonymous: {IsAnonymous}",
-                    playerId, user.DisplayName, user.IsAnonymous);
+                _logger.LogInformation(
+                    "User {PlayerId} already exists - Display Name: {DisplayName}, IsAnonymous: {IsAnonymous}",
+                    playerId,
+                    user.DisplayName,
+                    user.IsAnonymous);
             }
         }
         catch (Exception ex)
