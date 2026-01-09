@@ -28,6 +28,8 @@ export const useSignalREvents = () => {
     setMatchState,
     setShowGameResultModal,
     setLastGameResult,
+    setPendingDoubleOffer,
+    myColor,
   } = useGameStore()
   const { toast } = useToast()
   const prevGameStateRef = useRef<GameState | null>(null)
@@ -178,8 +180,11 @@ export const useSignalREvents = () => {
         console.log('[SignalR] DoubleOffered', { currentStakes, newStakes })
         audioService.playSound('double-offer')
 
-        // TODO: Show double offer modal
-        // For now, log to console
+        // Determine which player offered the double (opposite of your color)
+        const offerFrom = myColor === CheckerColor.White ? CheckerColor.Red : CheckerColor.White
+
+        // Update store to show the response modal
+        setPendingDoubleOffer(offerFrom, newStakes)
       }
     )
 
@@ -348,7 +353,7 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.MatchUpdate)
       connection.off(HubEvents.MatchContinued)
     }
-  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, setMatchState, setShowGameResultModal, setLastGameResult, toast])
+  }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, setMatchState, setShowGameResultModal, setLastGameResult, setPendingDoubleOffer, myColor, toast])
 
   return { connection }
 }

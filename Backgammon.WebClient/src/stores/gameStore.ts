@@ -19,6 +19,16 @@ interface MatchState {
   matchWinner: string | null
 }
 
+interface DoublingCubeState {
+  value: number
+  owner: CheckerColor | null
+  canDouble: boolean
+  pendingOffer: boolean
+  pendingResponse: boolean
+  offerFrom: CheckerColor | null
+  newValue: number | null
+}
+
 interface GameStore {
   // Game state
   currentGameState: GameState | null
@@ -32,6 +42,9 @@ interface GameStore {
   showGameResultModal: boolean
   lastGameWinner: CheckerColor | null
   lastGamePoints: number
+
+  // Doubling cube state
+  doublingCube: DoublingCubeState
 
   // Analysis mode toggles
   isFreeMoveEnabled: boolean
@@ -84,6 +97,9 @@ interface GameStore {
   setMatchState: (matchState: MatchState | null) => void
   setShowGameResultModal: (show: boolean) => void
   setLastGameResult: (winner: CheckerColor | null, points: number) => void
+  setDoublingCubeState: (state: Partial<DoublingCubeState>) => void
+  setPendingDoubleOffer: (from: CheckerColor, newValue: number) => void
+  clearPendingDoubleOffer: () => void
   resetGame: () => void
 }
 
@@ -98,6 +114,15 @@ export const useGameStore = create<GameStore>((set) => ({
   showGameResultModal: false,
   lastGameWinner: null,
   lastGamePoints: 0,
+  doublingCube: {
+    value: 1,
+    owner: null,
+    canDouble: false,
+    pendingOffer: false,
+    pendingResponse: false,
+    offerFrom: null,
+    newValue: null,
+  },
   isFreeMoveEnabled: false,
   isCustomDiceEnabled: false,
   selectedChecker: null,
@@ -154,10 +179,26 @@ export const useGameStore = create<GameStore>((set) => ({
         dice: state.dice,
       })
 
+      // Determine if the current player can double
+      const canDouble =
+        state.isYourTurn &&
+        state.dice.length === 0 && // No dice rolled yet
+        !state.isCrawfordGame && // Not in Crawford game
+        (state.doublingCubeOwner === null || state.doublingCubeOwner === state.yourColor)
+
       return {
         currentGameState: state,
         isAnalysisMode: state.isAnalysisMode,
         validSources,
+        doublingCube: {
+          value: state.doublingCubeValue,
+          owner: state.doublingCubeOwner,
+          canDouble,
+          pendingOffer: prevState.doublingCube.pendingOffer,
+          pendingResponse: prevState.doublingCube.pendingResponse,
+          offerFrom: prevState.doublingCube.offerFrom,
+          newValue: prevState.doublingCube.newValue,
+        },
       }
     }),
 
@@ -238,6 +279,33 @@ export const useGameStore = create<GameStore>((set) => ({
   setLastGameResult: (winner, points) =>
     set({ lastGameWinner: winner, lastGamePoints: points }),
 
+  setDoublingCubeState: (state) =>
+    set((prev) => ({
+      doublingCube: { ...prev.doublingCube, ...state },
+    })),
+
+  setPendingDoubleOffer: (from, newValue) =>
+    set((prev) => ({
+      doublingCube: {
+        ...prev.doublingCube,
+        pendingOffer: false,
+        pendingResponse: true,
+        offerFrom: from,
+        newValue,
+      },
+    })),
+
+  clearPendingDoubleOffer: () =>
+    set((prev) => ({
+      doublingCube: {
+        ...prev.doublingCube,
+        pendingOffer: false,
+        pendingResponse: false,
+        offerFrom: null,
+        newValue: null,
+      },
+    })),
+
   resetGame: () =>
     set({
       currentGameState: null,
@@ -249,6 +317,15 @@ export const useGameStore = create<GameStore>((set) => ({
       showGameResultModal: false,
       lastGameWinner: null,
       lastGamePoints: 0,
+      doublingCube: {
+        value: 1,
+        owner: null,
+        canDouble: false,
+        pendingOffer: false,
+        pendingResponse: false,
+        offerFrom: null,
+        newValue: null,
+      },
       isFreeMoveEnabled: false,
       isCustomDiceEnabled: false,
       selectedChecker: null,
