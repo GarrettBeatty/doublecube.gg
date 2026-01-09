@@ -45,35 +45,3 @@ public interface ICorrespondenceGameService
     /// </summary>
     Task HandleTimeoutAsync(string matchId);
 }
-
-/// <summary>
-/// DTO for correspondence game information
-/// </summary>
-public class CorrespondenceGameDto
-{
-    public string MatchId { get; set; } = string.Empty;
-    public string GameId { get; set; } = string.Empty;
-    public string OpponentId { get; set; } = string.Empty;
-    public string OpponentName { get; set; } = string.Empty;
-    public int OpponentRating { get; set; }
-    public bool IsYourTurn { get; set; }
-    public int TimePerMoveDays { get; set; }
-    public DateTime? TurnDeadline { get; set; }
-    public TimeSpan? TimeRemaining { get; set; }
-    public int MoveCount { get; set; }
-    public string MatchScore { get; set; } = string.Empty;
-    public int TargetScore { get; set; }
-    public bool IsRated { get; set; }
-    public DateTime LastUpdatedAt { get; set; }
-}
-
-/// <summary>
-/// Response containing both "your turn" and "waiting" games
-/// </summary>
-public class CorrespondenceGamesResponse
-{
-    public List<CorrespondenceGameDto> YourTurnGames { get; set; } = new();
-    public List<CorrespondenceGameDto> WaitingGames { get; set; } = new();
-    public int TotalYourTurn { get; set; }
-    public int TotalWaiting { get; set; }
-}

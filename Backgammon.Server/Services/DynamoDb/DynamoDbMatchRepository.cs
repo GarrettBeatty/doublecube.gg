@@ -584,28 +584,6 @@ public class DynamoDbMatchRepository : IMatchRepository
         }
     }
 
-    private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)
-    {
-        await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
-        {
-            TableName = _tableName,
-            Key = new Dictionary<string, AttributeValue>
-            {
-                ["PK"] = new AttributeValue { S = $"USER#{playerId}" },
-                ["SK"] = new AttributeValue { S = $"MATCH#{reversedTimestamp}#{matchId}" }
-            },
-            UpdateExpression = "SET #status = :status",
-            ExpressionAttributeNames = new Dictionary<string, string>
-            {
-                ["#status"] = "status"
-            },
-            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
-            {
-                [":status"] = new AttributeValue { S = status }
-            }
-        });
-    }
-
     public async Task<List<Match>> GetCorrespondenceMatchesForTurnAsync(string playerId)
     {
         try
@@ -734,5 +712,27 @@ public class DynamoDbMatchRepository : IMatchRepository
             _logger.LogError(ex, "Failed to update correspondence turn for match {MatchId}", matchId);
             throw;
         }
+    }
+
+    private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)
+    {
+        await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
+        {
+            TableName = _tableName,
+            Key = new Dictionary<string, AttributeValue>
+            {
+                ["PK"] = new AttributeValue { S = $"USER#{playerId}" },
+                ["SK"] = new AttributeValue { S = $"MATCH#{reversedTimestamp}#{matchId}" }
+            },
+            UpdateExpression = "SET #status = :status",
+            ExpressionAttributeNames = new Dictionary<string, string>
+            {
+                ["#status"] = "status"
+            },
+            ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+            {
+                [":status"] = new AttributeValue { S = status }
+            }
+        });
     }
 }
