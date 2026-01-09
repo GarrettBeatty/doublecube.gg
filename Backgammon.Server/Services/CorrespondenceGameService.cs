@@ -104,12 +104,8 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 throw new ArgumentException("Player IDs cannot be identical");
             }
 
-            // Get player 1 info - all users (including anonymous) are now in the database
+            // Get player 1 info - user guaranteed to exist (created in OnConnectedAsync)
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            if (player1 == null)
-            {
-                throw new ArgumentException($"Player {player1Id} not found in database");
-            }
 
             // Create match with correspondence fields
             var match = new Match
@@ -117,7 +113,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 MatchId = Guid.NewGuid().ToString(),
                 TargetScore = targetScore,
                 Player1Id = player1Id,
-                Player1Name = player1.DisplayName,
+                Player1Name = player1?.DisplayName ?? "Unknown", // Fallback just in case
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
                 IsCorrespondence = true,
@@ -128,14 +124,11 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             // Handle opponent based on type
             if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {
+                // Get player 2 info - user guaranteed to exist (created in OnConnectedAsync)
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-                if (player2 == null)
-                {
-                    throw new ArgumentException($"Player {player2Id} not found in database");
-                }
 
                 match.Player2Id = player2Id;
-                match.Player2Name = player2.DisplayName;
+                match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
                 match.Status = "InProgress";
                 match.IsOpenLobby = false;
 

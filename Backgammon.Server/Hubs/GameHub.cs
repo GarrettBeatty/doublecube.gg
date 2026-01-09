@@ -51,6 +51,7 @@ public class GameHub : Hub
     private readonly IUserRepository _userRepository;
     private readonly IFriendService _friendService;
     private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly IAuthService _authService;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -72,7 +73,8 @@ public class GameHub : Hub
         AnalysisService analysisService,
         IUserRepository userRepository,
         IFriendService friendService,
-        ICorrespondenceGameService correspondenceGameService)
+        ICorrespondenceGameService correspondenceGameService,
+        IAuthService authService)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -94,6 +96,47 @@ public class GameHub : Hub
         _userRepository = userRepository;
         _friendService = friendService;
         _correspondenceGameService = correspondenceGameService;
+        _authService = authService;
+    }
+
+    /// <summary>
+    /// Called when a client connects to the hub.
+    /// Auto-creates anonymous users if they don't exist in the database.
+    /// </summary>
+    public override async Task OnConnectedAsync()
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+
+            // Check if user exists in database
+            var user = await _userRepository.GetByUserIdAsync(playerId);
+
+            if (user == null)
+            {
+                // Auto-create anonymous user
+                var displayName = GetAuthenticatedDisplayName() ?? GenerateAnonymousDisplayName(playerId);
+
+                _logger.LogInformation("Auto-creating anonymous user {PlayerId} with display name {DisplayName}", playerId, displayName);
+
+                var result = await _authService.RegisterAnonymousUserAsync(playerId, displayName);
+
+                if (!result.Success)
+                {
+                    _logger.LogWarning("Failed to auto-create anonymous user {PlayerId}: {Error}", playerId, result.Error);
+                }
+            }
+            else
+            {
+                _logger.LogDebug("User {PlayerId} already exists (IsAnonymous: {IsAnonymous})", playerId, user.IsAnonymous);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in OnConnectedAsync for connection {ConnectionId}", Context.ConnectionId);
+        }
+
+        await base.OnConnectedAsync();
     }
 
     /// <summary>
@@ -1785,6 +1828,17 @@ public class GameHub : Hub
             _logger.LogError(ex, "Error notifying correspondence turn completion for match {MatchId}", matchId);
             await Clients.Caller.SendAsync("Error", ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Generate a consistent anonymous display name from a player ID
+    /// </summary>
+    private static string GenerateAnonymousDisplayName(string playerId)
+    {
+        // Extract the random suffix (last part after final underscore)
+        var parts = playerId.Split('_');
+        var suffix = parts.Length > 0 ? parts[^1] : "unknown";
+        return $"Anonymous-{suffix[..Math.Min(6, suffix.Length)]}";
     }
 
     private string? GetAuthenticatedUserId()

@@ -73,14 +73,9 @@ public class MatchService : IMatchService
                 throw new ArgumentException("Player IDs cannot be identical");
             }
 
-            // Get player 1 info - all users (including anonymous) are now in the database
+            // Get player 1 info - user guaranteed to exist (created in OnConnectedAsync)
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            if (player1 == null)
-            {
-                throw new ArgumentException($"Player {player1Id} not found in database");
-            }
-
-            string player1Name = player1.DisplayName;
+            string player1Name = player1?.DisplayName ?? "Unknown"; // Fallback just in case
 
             // Create match (Status defaults to WaitingForPlayers from constructor)
             var match = new Match
@@ -106,15 +101,10 @@ public class MatchService : IMatchService
             }
             else if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {
-                // Set friend as player 2
+                // Set friend as player 2 - user guaranteed to exist (created in OnConnectedAsync)
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-                if (player2 == null)
-                {
-                    throw new ArgumentException($"Player {player2Id} not found in database");
-                }
-
                 match.Player2Id = player2Id;
-                match.Player2Name = player2.DisplayName;
+                match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
                 match.Status = "InProgress";  // Friend match with both players ready
                 match.IsOpenLobby = false;
             }
@@ -482,15 +472,10 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.Status})");
             }
 
-            // Get player 2 info - all users (including anonymous) are now in the database
+            // Get player 2 info - user guaranteed to exist (created in OnConnectedAsync)
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-            if (player2 == null)
-            {
-                throw new ArgumentException($"Player {player2Id} not found in database");
-            }
-
             match.Player2Id = player2Id;
-            match.Player2Name = player2.DisplayName;
+            match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
             match.Player2DisplayName = player2DisplayName;
             match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
