@@ -75,6 +75,7 @@ export const HubEvents = {
   // Correspondence events
   CorrespondenceMatchInvite: 'CorrespondenceMatchInvite',
   CorrespondenceTurnNotification: 'CorrespondenceTurnNotification',
+  CorrespondenceLobbyCreated: 'CorrespondenceLobbyCreated',
 } as const
 
 // Event handler types

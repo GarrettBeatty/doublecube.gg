@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Plus, UserPlus, Bot, BarChart3 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useToast } from '@/hooks/use-toast'
+import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
 
 // Import all home components
 import { GameLobby } from '@/components/home/GameLobby'
@@ -26,6 +27,7 @@ export function HomePage() {
   const { isConnected } = useSignalR()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const { totalYourTurn } = useCorrespondenceGames()
 
   // Modal state
   const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
@@ -136,9 +138,11 @@ export function HomePage() {
                 </TabsTrigger>
                 <TabsTrigger value="correspondence" className="flex-1 relative">
                   Correspondence
-                  <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
-                    2
-                  </Badge>
+                  {totalYourTurn > 0 && (
+                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                      {totalYourTurn}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               </TabsList>
 

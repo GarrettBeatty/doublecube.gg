@@ -89,6 +89,7 @@ export function CorrespondenceGames() {
   const {
     yourTurnGames,
     waitingGames,
+    myLobbies,
     totalYourTurn,
     isLoading,
     error,
@@ -121,14 +122,14 @@ export function CorrespondenceGames() {
     );
   }
 
-  const hasGames = yourTurnGames.length > 0 || waitingGames.length > 0;
+  const hasGames = yourTurnGames.length > 0 || waitingGames.length > 0 || myLobbies.length > 0;
 
   return (
     <div className="space-y-6">
       {/* Header with actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">Correspondence Games</h2>
+          <h2 className="text-lg font-semibold">My Correspondence Games</h2>
           <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -144,12 +145,8 @@ export function CorrespondenceGames() {
           <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
             <div className="text-muted-foreground text-center">
               <p className="text-lg mb-2">No correspondence games</p>
-              <p className="text-sm">Start a new game to play at your own pace</p>
+              <p className="text-sm">Use the "New Game" button above to start a game at your own pace</p>
             </div>
-            <Button onClick={() => setIsCreateModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Game
-            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -202,6 +199,51 @@ export function CorrespondenceGames() {
               </div>
             )}
           </div>
+
+          {/* My Lobbies Section - Games created by user waiting for opponents */}
+          {myLobbies.length > 0 && (
+            <div>
+              <h3 className="text-lg font-semibold mb-3">My Lobbies</h3>
+              <div className="space-y-2">
+                {myLobbies.map((lobby) => (
+                  <div
+                    key={lobby.matchId}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-blue-500/5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">Waiting for opponent</span>
+                          {lobby.isRated && (
+                            <Badge variant="outline" className="text-xs">
+                              Rated
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {lobby.timePerMoveDays} day{lobby.timePerMoveDays > 1 ? 's' : ''}/move
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {lobby.targetScore}pt match
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePlayGame(lobby.gameId)}
+                    >
+                      View
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
 

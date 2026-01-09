@@ -48,15 +48,29 @@ public class CorrespondenceGameService : ICorrespondenceGameService
         var yourTurnMatches = await _matchRepository.GetCorrespondenceMatchesForTurnAsync(playerId);
         var waitingMatches = await _matchRepository.GetCorrespondenceMatchesWaitingAsync(playerId);
 
+        // Get lobbies created by the player that are waiting for opponents
+        var myLobbiesMatches = await _matchRepository.GetPlayerMatchesAsync(
+            playerId,
+            status: "WaitingForPlayers",
+            limit: 50);
+
+        // Filter to only correspondence lobbies where player is creator (Player1)
+        var myCorrespondenceLobbies = myLobbiesMatches
+            .Where(m => m.IsCorrespondence && m.Player1Id == playerId)
+            .ToList();
+
         var yourTurnGames = await ConvertToGameDtos(yourTurnMatches, playerId, isYourTurn: true);
         var waitingGames = await ConvertToGameDtos(waitingMatches, playerId, isYourTurn: false);
+        var myLobbies = await ConvertToGameDtos(myCorrespondenceLobbies, playerId, isYourTurn: false);
 
         return new CorrespondenceGamesResponse
         {
             YourTurnGames = yourTurnGames,
             WaitingGames = waitingGames,
+            MyLobbies = myLobbies,
             TotalYourTurn = yourTurnGames.Count,
-            TotalWaiting = waitingGames.Count
+            TotalWaiting = waitingGames.Count,
+            TotalMyLobbies = myLobbies.Count
         };
     }
 

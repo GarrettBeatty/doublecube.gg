@@ -71,8 +71,10 @@ export interface CorrespondenceGameDto {
 export interface CorrespondenceGamesResponse {
   yourTurnGames: CorrespondenceGameDto[]
   waitingGames: CorrespondenceGameDto[]
+  myLobbies: CorrespondenceGameDto[]
   totalYourTurn: number
   totalWaiting: number
+  totalMyLobbies: number
 }
 
 export interface CorrespondenceMatchInvite {

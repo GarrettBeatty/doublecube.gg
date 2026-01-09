@@ -1762,6 +1762,24 @@ public class GameHub : Hub
                 playerId,
                 match.TimePerMoveDays);
 
+            // For OpenLobby, broadcast to all clients that a new lobby is available
+            if (config.OpponentType == "OpenLobby")
+            {
+                await Clients.All.SendAsync("CorrespondenceLobbyCreated", new
+                {
+                    matchId = match.MatchId,
+                    gameId = firstGame.GameId,
+                    creatorName = match.Player1Name,
+                    targetScore = match.TargetScore,
+                    timePerMoveDays = match.TimePerMoveDays,
+                    isRated = match.IsRated
+                });
+
+                _logger.LogInformation(
+                    "Broadcast CorrespondenceLobbyCreated event for match {MatchId}",
+                    match.MatchId);
+            }
+
             // For friend matches, notify the friend if they're online
             if (config.OpponentType == "Friend"
                 && !string.IsNullOrEmpty(config.OpponentId)

@@ -12,6 +12,7 @@ export const useCorrespondenceGames = () => {
   const { invoke, isConnected, connection } = useSignalR()
   const [yourTurnGames, setYourTurnGames] = useState<CorrespondenceGameDto[]>([])
   const [waitingGames, setWaitingGames] = useState<CorrespondenceGameDto[]>([])
+  const [myLobbies, setMyLobbies] = useState<CorrespondenceGameDto[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,12 +33,14 @@ export const useCorrespondenceGames = () => {
       if (response) {
         setYourTurnGames(response.yourTurnGames || [])
         setWaitingGames(response.waitingGames || [])
+        setMyLobbies(response.myLobbies || [])
       }
     } catch (err) {
       console.error('Error fetching correspondence games:', err)
       setError('Failed to load correspondence games')
       setYourTurnGames([])
       setWaitingGames([])
+      setMyLobbies([])
     } finally {
       setIsLoading(false)
     }
@@ -109,8 +112,10 @@ export const useCorrespondenceGames = () => {
   return {
     yourTurnGames,
     waitingGames,
+    myLobbies,
     totalYourTurn: yourTurnGames.length,
     totalWaiting: waitingGames.length,
+    totalMyLobbies: myLobbies.length,
     isLoading,
     error,
     createCorrespondenceMatch,

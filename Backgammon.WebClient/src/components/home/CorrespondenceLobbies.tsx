@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { useSignalR } from '@/contexts/SignalRContext';
-import { HubMethods } from '@/types/signalr.types';
+import { HubMethods, HubEvents } from '@/types/signalr.types';
+import { authService } from '@/services/auth.service';
 
 interface CorrespondenceLobby {
   matchId: string;
@@ -21,7 +22,7 @@ interface CorrespondenceLobby {
 }
 
 export function CorrespondenceLobbies() {
-  const { invoke, isConnected } = useSignalR();
+  const { invoke, isConnected, connection } = useSignalR();
   const [lobbies, setLobbies] = useState<CorrespondenceLobby[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +37,12 @@ export function CorrespondenceLobbies() {
       // GetMatchLobbies returns an array directly, not wrapped in an object
       const allLobbies = await invoke<CorrespondenceLobby[]>(HubMethods.GetMatchLobbies);
 
-      // Filter for correspondence lobbies only
+      // Get current player ID to filter out their own lobbies
+      const currentPlayerId = authService.getOrCreatePlayerId();
+
+      // Filter for correspondence lobbies that are NOT created by the current player
       const correspondenceLobbies = (allLobbies || [])
-        .filter((l) => l.isCorrespondence);
+        .filter((l) => l.isCorrespondence && l.creatorPlayerId !== currentPlayerId);
 
       setLobbies(correspondenceLobbies);
     } catch (err) {
@@ -51,10 +55,23 @@ export function CorrespondenceLobbies() {
 
   useEffect(() => {
     fetchLobbies();
-    // Auto-refresh every 30 seconds
+
+    // Listen for new correspondence lobbies being created
+    const handleLobbyCreated = () => {
+      console.log('Correspondence lobby created - refreshing list');
+      fetchLobbies();
+    };
+
+    connection?.on(HubEvents.CorrespondenceLobbyCreated, handleLobbyCreated);
+
+    // Auto-refresh every 30 seconds as fallback
     const interval = setInterval(fetchLobbies, 30000);
-    return () => clearInterval(interval);
-  }, [fetchLobbies]);
+
+    return () => {
+      connection?.off(HubEvents.CorrespondenceLobbyCreated, handleLobbyCreated);
+      clearInterval(interval);
+    };
+  }, [connection, fetchLobbies]);
 
   const handleJoinLobby = async (matchId: string) => {
     try {
