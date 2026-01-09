@@ -108,6 +108,15 @@ public class GameHub : Hub
         try
         {
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var jwtDisplayName = GetAuthenticatedDisplayName();
+            var jwtUserId = GetAuthenticatedUserId();
+
+            _logger.LogInformation("========== SignalR Connection ==========");
+            _logger.LogInformation("Connection ID: {ConnectionId}", Context.ConnectionId);
+            _logger.LogInformation("Player ID: {PlayerId}", playerId);
+            _logger.LogInformation("JWT User ID: {JwtUserId}", jwtUserId ?? "null");
+            _logger.LogInformation("JWT Display Name: {JwtDisplayName}", jwtDisplayName ?? "null");
+            _logger.LogInformation("=========================================");
 
             // Check if user exists in database
             var user = await _userRepository.GetByUserIdAsync(playerId);
@@ -115,7 +124,7 @@ public class GameHub : Hub
             if (user == null)
             {
                 // Auto-create anonymous user
-                var displayName = GetAuthenticatedDisplayName() ?? GenerateAnonymousDisplayName(playerId);
+                var displayName = jwtDisplayName ?? GenerateAnonymousDisplayName(playerId);
 
                 _logger.LogInformation("Auto-creating anonymous user {PlayerId} with display name {DisplayName}", playerId, displayName);
 
@@ -128,7 +137,8 @@ public class GameHub : Hub
             }
             else
             {
-                _logger.LogDebug("User {PlayerId} already exists (IsAnonymous: {IsAnonymous})", playerId, user.IsAnonymous);
+                _logger.LogInformation("User {PlayerId} already exists - Display Name: {DisplayName}, IsAnonymous: {IsAnonymous}",
+                    playerId, user.DisplayName, user.IsAnonymous);
             }
         }
         catch (Exception ex)
@@ -152,6 +162,14 @@ public class GameHub : Hub
             var connectionId = Context.ConnectionId;
             var effectivePlayerId = GetEffectivePlayerId(playerId);
             var displayName = await GetEffectiveDisplayNameAsync(effectivePlayerId);
+
+            _logger.LogInformation("========== JoinGame Request ==========");
+            _logger.LogInformation("Connection ID: {ConnectionId}", connectionId);
+            _logger.LogInformation("Player ID (from client): {PlayerId}", playerId);
+            _logger.LogInformation("Effective Player ID: {EffectivePlayerId}", effectivePlayerId);
+            _logger.LogInformation("Display Name (resolved): {DisplayName}", displayName ?? "null");
+            _logger.LogInformation("Game ID: {GameId}", gameId ?? "null");
+            _logger.LogInformation("======================================");
 
             if (string.IsNullOrEmpty(gameId))
             {

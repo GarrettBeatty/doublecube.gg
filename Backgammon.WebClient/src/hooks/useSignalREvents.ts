@@ -55,11 +55,14 @@ export const useSignalREvents = () => {
 
     // GameUpdate - Board state changes
     connection.on(HubEvents.GameUpdate, (gameState: GameState) => {
-      console.log('[SignalR] GameUpdate', {
-        gameId: gameState.gameId,
-        currentPlayer: gameState.currentPlayer,
-        isYourTurn: gameState.isYourTurn,
-      })
+      console.log('[SignalR] ========== GAME UPDATE RECEIVED ==========')
+      console.log('[SignalR] Game ID:', gameState.gameId)
+      console.log('[SignalR] White Player Name:', gameState.whitePlayerName)
+      console.log('[SignalR] Red Player Name:', gameState.redPlayerName)
+      console.log('[SignalR] Current Player:', gameState.currentPlayer)
+      console.log('[SignalR] Is Your Turn:', gameState.isYourTurn)
+      console.log('[SignalR] Your Color:', gameState.yourColor)
+      console.log('[SignalR] =================================================')
 
       // Check if update is for the current game we're viewing
       const currentPath = window.location.pathname
@@ -104,7 +107,14 @@ export const useSignalREvents = () => {
 
     // GameStart - Both players connected, game starts
     connection.on(HubEvents.GameStart, (gameState: GameState) => {
-      console.log('[SignalR] GameStart', gameState.gameId)
+      console.log('[SignalR] ========== GAME START RECEIVED ==========')
+      console.log('[SignalR] Game ID:', gameState.gameId)
+      console.log('[SignalR] White Player Name:', gameState.whitePlayerName)
+      console.log('[SignalR] Red Player Name:', gameState.redPlayerName)
+      console.log('[SignalR] Current Player:', gameState.currentPlayer)
+      console.log('[SignalR] Is Your Turn:', gameState.isYourTurn)
+      console.log('[SignalR] Your Color:', gameState.yourColor)
+      console.log('[SignalR] ================================================')
 
       // Check if we're on a game page and if it's for a different game
       const currentPath = window.location.pathname
