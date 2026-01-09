@@ -181,13 +181,15 @@ export interface Profile {
   recentGames: GameSummary[]
 }
 
+export type GameResultType = 'Won' | 'Lost' | 'In Progress'
+
 export interface GameSummary {
   gameId: string
   opponentName: string
   opponentUsername: string | null
   yourColor: CheckerColor
   winner: CheckerColor | null
-  result: string // "Won" | "Lost" | "In Progress"
+  result: GameResultType
   points: number
   completedAt: string | null
 }

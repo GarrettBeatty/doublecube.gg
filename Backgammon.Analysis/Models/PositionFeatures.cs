@@ -7,6 +7,7 @@ namespace Backgammon.Analysis.Models;
 public class PositionFeatures
 {
     // Basic race metrics
+
     /// <summary>
     /// Total pip count for the player (distance to bear off all checkers)
     /// </summary>
@@ -18,6 +19,7 @@ public class PositionFeatures
     public int PipDifference { get; set; }
 
     // Tactical features
+
     /// <summary>
     /// Number of blots (unprotected single checkers)
     /// </summary>
@@ -34,6 +36,7 @@ public class PositionFeatures
     public int CheckersOnBar { get; set; }
 
     // Strategic features
+
     /// <summary>
     /// Length of longest prime (consecutive owned points forming a wall)
     /// </summary>
@@ -50,6 +53,7 @@ public class PositionFeatures
     public int HomeboardCoverage { get; set; }
 
     // Distribution and position type
+
     /// <summary>
     /// Distribution quality score (0-1). Higher = better spread, lower = too stacked.
     /// </summary>
@@ -66,6 +70,7 @@ public class PositionFeatures
     public bool IsRace { get; set; }
 
     // Advanced metrics
+
     /// <summary>
     /// Wasted pips from inefficient stacking (e.g., 5 checkers on one point)
     /// </summary>

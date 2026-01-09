@@ -17,6 +17,7 @@ import { CorrespondenceGames } from '@/components/home/CorrespondenceGames'
 import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { RecentGames } from '@/components/home/RecentGames'
+import { RecentOpponents } from '@/components/home/RecentOpponents'
 
 // Import modals
 import { CreateMatchModal } from '@/components/modals/CreateMatchModal'
@@ -120,6 +121,11 @@ export function HomePage() {
 
             <DailyPuzzle />
             <OnlineFriends onChallengeClick={handleChallengeFromFriendsList} />
+            <RecentOpponents onChallengeClick={() => {
+              // Open friends dialog to initiate challenge
+              // TODO: Add direct challenge support for recent opponents
+              setShowFriendsDialog(true)
+            }} />
           </div>
 
           {/* Center Column - Tabbed Content (col-span-6) */}

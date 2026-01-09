@@ -51,13 +51,14 @@ cd Backgammon.AI && dotnet run
 
 **Multi-project solution** for a Backgammon game with console UI, web multiplayer, and AI framework:
 
-- **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`.
+- **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`, `Match`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
-- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`.
+- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`, `MatchService`, `EloRatingService`.
 - **Backgammon.WebClient** - React + TypeScript + Vite frontend with real-time SignalR communication. Uses shadcn/ui, TailwindCSS, Zustand for state management.
 - **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI` and `GreedyAI`.
+- **Backgammon.Analysis** - Position evaluation and analysis. Integrates with GNU Backgammon (`GnubgEvaluator`) and provides `HeuristicEvaluator`.
 - **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, services)
-- **Backgammon.Tests** / **Backgammon.IntegrationTests** - xUnit test projects
+- **Backgammon.Tests** - xUnit test project
 
 ## Database: DynamoDB
 
@@ -92,12 +93,13 @@ All entities (Users, Games, Friendships) stored in one table with composite PK/S
 **Tech Stack:**
 - **React 18** - UI framework with functional components and hooks
 - **TypeScript 5.3** - Type-safe development
-- **Vite 5** - Fast build tool and dev server
+- **Vite 7** - Fast build tool and dev server
 - **shadcn/ui** - Accessible component library built on Radix UI
-- **TailwindCSS** - Utility-first CSS framework
+- **TailwindCSS 3** - Utility-first CSS framework
 - **Zustand** - Lightweight state management
 - **SignalR (@microsoft/signalr 8.0)** - Real-time WebSocket communication
-- **React Router** - Client-side routing
+- **React Router 6** - Client-side routing
+- **Recharts** - Data visualization for statistics
 
 **Project Structure:**
 ```
@@ -105,18 +107,22 @@ Backgammon.WebClient/
 ├── src/                      # Source code (NOT committed build outputs)
 │   ├── components/           # React components
 │   │   ├── game/            # Game-specific components (BoardSVG, PlayerCard, etc.)
+│   │   ├── friends/         # Friend list and social features
+│   │   ├── home/            # Home page components
+│   │   ├── layout/          # Layout components
 │   │   ├── modals/          # Modal dialogs
 │   │   └── ui/              # shadcn/ui components
 │   ├── contexts/            # React contexts (SignalRContext, etc.)
 │   ├── hooks/               # Custom React hooks (useSignalREvents)
+│   ├── lib/                 # Utility libraries
 │   ├── pages/               # Route pages (HomePage, GamePage)
 │   ├── services/            # Service layer (signalr.service, audio.service, etc.)
 │   ├── stores/              # Zustand stores (gameStore)
+│   ├── styles/              # Global styles
 │   ├── types/               # TypeScript type definitions
+│   ├── utils/               # Utility functions
 │   └── main.tsx             # App entry point
 ├── wwwroot/                 # Build output directory (gitignored)
-│   ├── assets/              # Generated CSS/JS bundles
-│   └── index.html           # Generated HTML
 ├── index.html               # Vite HTML template
 ├── vite.config.ts           # Vite configuration
 ├── tailwind.config.js       # TailwindCSS configuration
@@ -269,10 +275,45 @@ while (engine.RemainingMoves.Count > 0) {
 
 `GetValidMoves()` returns new list each call after `ExecuteMove()` changes state.
 
+## ELO Rating System
+
+The server implements an ELO-based rating system for player skill tracking:
+
+**Key Components:**
+- `EloRatingService` - Calculates rating changes after matches
+- `PlayerStatsService` - Tracks wins, losses, rating history
+- Rating stored per user in DynamoDB
+
+**Rating Flow:**
+1. Match completes → `EloRatingService.CalculateNewRatings()`
+2. Ratings updated based on outcome and opponent strength
+3. Stats persisted via `PlayerStatsService`
+
+See `docs/elo-rating-implementation-plan.md` for detailed algorithm.
+
+## Position Analysis (Backgammon.Analysis)
+
+The Analysis project provides move evaluation and suggestions:
+
+**Evaluators:**
+- `GnubgEvaluator` - Uses GNU Backgammon for expert-level analysis
+- `HeuristicEvaluator` - Fast built-in position scoring
+
+**Models:**
+- `PositionEvaluation` - Win/gammon/backgammon probabilities
+- `MoveSequenceEvaluation` - Ranked move suggestions
+- `CubeDecision` - Double/take/pass recommendations
+
+**Integration:**
+The server's `AnalysisService` exposes evaluation through SignalR for real-time hints.
+
+See `docs/GNUBG_SETUP.md` for GNU Backgammon configuration.
+
 ## Aspire Development
 
 When working with Aspire orchestration:
-1. Run with `aspire run` from Backgammon.AppHost
-2. Changes to AppHost.cs require restart
+1. Run with `dotnet run` from Backgammon.AppHost directory
+2. Changes to AppHost Program.cs require restart
 3. Use Aspire MCP tools to check resource status and debug
 4. Avoid persistent containers during development
+5. See `AGENTS.md` for Aspire-specific agent instructions

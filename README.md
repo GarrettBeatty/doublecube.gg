@@ -18,46 +18,48 @@ cd Backgammon.AppHost
 dotnet run
 ```
 
-Opens Aspire Dashboard with observability for all services. See [ASPIRE_SETUP.md](ASPIRE_SETUP.md) for details.
+Opens Aspire Dashboard with observability for all services.
 
 ## Project Structure
 
 ```
-Backgammon/
-├── Backgammon.AppHost/       # .NET Aspire orchestrator
+doublecube.gg/
+├── Backgammon.AppHost/         # .NET Aspire orchestrator
 ├── Backgammon.ServiceDefaults/ # Shared Aspire configuration
-├── Backgammon.Core/          # Game logic library
-│   ├── Board.cs              # Game board with 24 points
-│   ├── CheckerColor.cs       # Enum for White/Red
-│   ├── Dice.cs               # Dice rolling logic
-│   ├── DoublingCube.cs       # Doubling cube implementation
-│   ├── GameEngine.cs         # Main game engine and rules
-│   ├── Move.cs               # Represents a checker move
-│   ├── Player.cs             # Player representation
-│   └── Point.cs              # Point (triangle) on the board
-├── Backgammon.Console/       # Console interface
-│   └── Program.cs            # Text-based game interface
-├── Backgammon.Server/           # SignalR multiplayer server
-│   ├── Hubs/                 # SignalR hub for real-time game
-│   ├── Services/             # Game session management + DynamoDB
-│   ├── Models/               # DTOs and game state
-│   └── Program.cs            # Web server startup
-├── Backgammon.WebClient/     # Web UI client (frontend)
-│   ├── wwwroot/              # Static HTML/CSS/JS files
-│   │   ├── index.html        # Main game interface
-│   │   ├── styles.css        # Modern responsive UI
-│   │   └── game.js           # SignalR client logic
-│   └── Program.cs            # Static file server
-├── TestClient/               # SignalR test client (console)
-│   └── Program.cs            # Example .NET SignalR client
-├── Backgammon.AI/            # AI simulation framework
-│   ├── IBackgammonAI.cs      # AI player interface
-│   ├── RandomAI.cs           # Random move AI
-│   ├── GreedyAI.cs           # Greedy strategy AI
-│   ├── AISimulator.cs        # Game simulation engine
-│   └── Program.cs            # AI vs AI runner
-└── Backgammon.Tests/         # xUnit test project
-    └── GameEngineTests.cs    # Unit tests for game logic
+├── Backgammon.Core/            # Game logic library
+│   ├── Board.cs                # Game board with 24 points
+│   ├── Match.cs                # Match play with Crawford rule
+│   ├── GameEngine.cs           # Main game engine and rules
+│   ├── DoublingCube.cs         # Doubling cube implementation
+│   ├── Dice.cs                 # Dice rolling logic
+│   ├── Move.cs                 # Represents a checker move
+│   └── Player.cs               # Player representation
+├── Backgammon.Console/         # Console interface with Spectre.Console
+├── Backgammon.Server/          # SignalR multiplayer server
+│   ├── Hubs/                   # SignalR hub for real-time game
+│   ├── Services/               # Game/Match/ELO services + DynamoDB
+│   ├── Models/                 # DTOs and game state
+│   └── Program.cs              # Web server startup
+├── Backgammon.WebClient/       # React + TypeScript + Vite frontend
+│   ├── src/                    # Source code
+│   │   ├── components/         # React components (game, ui, modals)
+│   │   ├── pages/              # Route pages (Home, Game)
+│   │   ├── services/           # SignalR service layer
+│   │   ├── stores/             # Zustand state management
+│   │   └── types/              # TypeScript definitions
+│   └── package.json            # npm dependencies
+├── Backgammon.AI/              # AI simulation framework
+│   ├── IBackgammonAI.cs        # AI player interface
+│   ├── RandomAI.cs             # Random move AI
+│   ├── GreedyAI.cs             # Greedy strategy AI
+│   └── AISimulator.cs          # Game simulation engine
+├── Backgammon.Analysis/        # Position analysis (GNU Backgammon integration)
+│   ├── Gnubg/                  # GNU Backgammon evaluator
+│   ├── Models/                 # Evaluation models
+│   └── HeuristicEvaluator.cs   # Built-in heuristic evaluator
+├── Backgammon.Tests/           # xUnit test project
+├── infra/                      # AWS CDK infrastructure
+└── docs/                       # Additional documentation
 ```
 
 ## Features
@@ -102,11 +104,12 @@ Backgammon/
 
 ### 🌐 Web Multiplayer (Recommended)
 
-**Quick Start (One Command):**
+**Using Aspire (Recommended):**
 ```bash
-./start-web.sh
+cd Backgammon.AppHost
+dotnet run
 ```
-This script starts both the server and client automatically. Open `http://localhost:3000` in your browser!
+This starts DynamoDB Local, the SignalR server, and the frontend automatically with observability.
 
 **Manual Start:**
 
@@ -120,7 +123,7 @@ Server runs on `http://localhost:5000`
 **Terminal 2 - Start Web Client:**
 ```bash
 cd Backgammon.WebClient
-dotnet run
+npm run dev
 ```
 Web UI runs on `http://localhost:3000`
 
@@ -136,14 +139,6 @@ dotnet run
 ### 🤖 AI Simulation
 
 ```bash
-cd Backgammon.AI
-dotnet run
-```
-cd Backgammon.Server
-dotnet run
-# Server runs on http://localhost:5000
-
-# Run AI simulations
 cd Backgammon.AI
 dotnet run
 ```
@@ -179,13 +174,15 @@ See [Backgammon.Server/README.md](Backgammon.Server/README.md) for full document
 ### Quick Start - Multiplayer
 
 ```bash
-# Terminal 1: Start server
-cd Backgammon.Server
-dotnet run
+# Option 1: Using Aspire (starts everything)
+cd Backgammon.AppHost && dotnet run
 
-# Terminal 2: Test client
-cd Backgammon.Server/TestClient
-dotnet run
+# Option 2: Manual (two terminals)
+# Terminal 1: Start server
+cd Backgammon.Server && dotnet run
+
+# Terminal 2: Start web client
+cd Backgammon.WebClient && npm run dev
 ```
 
 ### Game Controls (Console)
@@ -237,18 +234,30 @@ if (game.GameOver)
 
 ## Architecture
 
-The project is split into two parts:
-
 ### Backgammon.Core (Game Logic)
 - **Board**: Manages 24 points and checker positions
 - **GameEngine**: Enforces all backgammon rules and validates moves
+- **Match**: Multi-game match play with Crawford rule support
 - **Player**: Tracks player state (checkers on bar, borne off)
 - **Dice**: Handles random dice rolls
 - **Move**: Represents checker movements
 - **DoublingCube**: Manages stakes and doubling
 
+### Backgammon.Server (Multiplayer Backend)
+- **GameHub**: SignalR hub for real-time game communication
+- **MatchService**: Orchestrates match lifecycle and scoring
+- **EloRatingService**: Player skill rating system
+- **DynamoDB Repositories**: Persistent storage for users, games, matches
+- See [Backgammon.Server/README.md](Backgammon.Server/README.md) for API documentation
+
+### Backgammon.WebClient (React Frontend)
+- **React 18** with TypeScript and Vite
+- **shadcn/ui** + TailwindCSS for modern UI
+- **Zustand** for state management
+- **SignalR** client for real-time updates
+
 ### Backgammon.Console (UI)
-- Text-based visualization of the board
+- Text-based visualization using Spectre.Console
 - Interactive move selection
 - Turn-by-turn gameplay
 
@@ -258,6 +267,11 @@ The project is split into two parts:
 - **GreedyAI**: Strategy-based AI that prioritizes bearing off and hitting
 - **AISimulator**: Run games between two AIs and collect statistics
 - See [Backgammon.AI/README.md](Backgammon.AI/README.md) for details on creating your own AI
+
+### Backgammon.Analysis (Position Evaluation)
+- **GnubgEvaluator**: Integration with GNU Backgammon for expert analysis
+- **HeuristicEvaluator**: Built-in position scoring
+- Move analysis and best move suggestions
 
 ## Getting Started
 
@@ -287,11 +301,11 @@ Potential additions to the project:
 - [ ] GUI version (WPF, Blazor, or MAUI)
 - [x] AI opponent framework
 - [ ] Advanced AI strategies (Monte Carlo, neural networks)
-- [ ] Network multiplayer
-- [ ] Move suggestion/hint system
-- [ ] Game replay and save/load functionality
-- [ ] Match play with Crawford rule
-- [ ] Statistics tracking
+- [x] Network multiplayer (SignalR + React)
+- [x] Move suggestion/hint system (GNU Backgammon integration)
+- [x] Game replay and save/load functionality (SGF format)
+- [x] Match play with Crawford rule
+- [x] Statistics tracking (ELO rating system)
 - [x] Undo/redo moves
 - [ ] Optional rules (automatic doubles, beavers, Jacoby rule)
 
