@@ -141,6 +141,12 @@ public class GameService : IGameService
             }
         }
 
+        // Send initial game state to the joining player (even if waiting for opponent)
+        // This ensures they see their correct display name immediately
+        var initialState = session.GetState(connectionId);
+        await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", initialState);
+        _logger.LogInformation("Sent initial GameState to player {PlayerId} in game {GameId}", playerId, session.Id);
+
         if (session.IsFull)
         {
             // If game was already started, this is a reconnection - just send current state
