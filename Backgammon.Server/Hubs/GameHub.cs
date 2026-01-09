@@ -101,52 +101,57 @@ public class GameHub : Hub
 
     /// <summary>
     /// Called when a client connects to the hub.
-    /// Auto-creates anonymous users if they don't exist in the database.
+    /// Validates that the user exists and updates their last seen timestamp.
+    /// User creation must happen via HTTP /api/auth/register-anonymous BEFORE connecting.
     /// </summary>
     public override async Task OnConnectedAsync()
     {
         try
         {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-            var jwtDisplayName = GetAuthenticatedDisplayName();
             var jwtUserId = GetAuthenticatedUserId();
+            var jwtDisplayName = GetAuthenticatedDisplayName();
+            var connectionId = Context.ConnectionId;
 
             _logger.LogInformation("========== SignalR Connection ==========");
-            _logger.LogInformation("Connection ID: {ConnectionId}", Context.ConnectionId);
-            _logger.LogInformation("Player ID: {PlayerId}", playerId);
+            _logger.LogInformation("Connection ID: {ConnectionId}", connectionId);
             _logger.LogInformation("JWT User ID: {JwtUserId}", jwtUserId ?? "null");
             _logger.LogInformation("JWT Display Name: {JwtDisplayName}", jwtDisplayName ?? "null");
             _logger.LogInformation("=========================================");
 
-            // Check if user exists in database
-            var user = await _userRepository.GetByUserIdAsync(playerId);
+            // Validate authentication - user must have valid JWT
+            if (string.IsNullOrEmpty(jwtUserId))
+            {
+                _logger.LogWarning("SignalR connection rejected - no JWT user ID for connection {ConnectionId}", connectionId);
+                throw new HubException("Authentication required. Please ensure you're registered before connecting.");
+            }
+
+            // Validate user exists in database (should always exist if JWT is valid)
+            var user = await _userRepository.GetByUserIdAsync(jwtUserId);
 
             if (user == null)
             {
-                // Auto-create anonymous user
-                var displayName = jwtDisplayName ?? GenerateAnonymousDisplayName(playerId);
-
-                _logger.LogInformation("Auto-creating anonymous user {PlayerId} with display name {DisplayName}", playerId, displayName);
-
-                var result = await _authService.RegisterAnonymousUserAsync(playerId, displayName);
-
-                if (!result.Success)
-                {
-                    _logger.LogWarning("Failed to auto-create anonymous user {PlayerId}: {Error}", playerId, result.Error);
-                }
+                _logger.LogError(
+                    "SignalR connection rejected - user {UserId} from JWT not found in database (connection {ConnectionId})",
+                    jwtUserId,
+                    connectionId);
+                throw new HubException("Invalid authentication token. User not found.");
             }
-            else
-            {
-                _logger.LogInformation(
-                    "User {PlayerId} already exists - Display Name: {DisplayName}, IsAnonymous: {IsAnonymous}",
-                    playerId,
-                    user.DisplayName,
-                    user.IsAnonymous);
-            }
+
+            _logger.LogInformation(
+                "User {UserId} ({DisplayName}) connected successfully - IsAnonymous: {IsAnonymous}",
+                user.UserId,
+                user.DisplayName,
+                user.IsAnonymous);
+        }
+        catch (HubException)
+        {
+            // Re-throw HubExceptions to client
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error in OnConnectedAsync for connection {ConnectionId}", Context.ConnectionId);
+            throw new HubException("Connection failed. Please try again.");
         }
 
         await base.OnConnectedAsync();
@@ -164,7 +169,7 @@ public class GameHub : Hub
         {
             var connectionId = Context.ConnectionId;
             var effectivePlayerId = GetEffectivePlayerId(playerId);
-            var displayName = await GetEffectiveDisplayNameAsync(effectivePlayerId);
+            var displayName = GetEffectiveDisplayNameAsync(effectivePlayerId);
 
             _logger.LogInformation("========== JoinGame Request ==========");
             _logger.LogInformation("Connection ID: {ConnectionId}", connectionId);
@@ -1928,24 +1933,22 @@ public class GameHub : Hub
     }
 
     /// <summary>
-    /// Gets the effective display name for a player, checking JWT claims first, then database
+    /// Gets the effective display name for a player from JWT claims.
+    /// Since OnConnectedAsync validates user exists, JWT will always have displayName claim.
     /// </summary>
-    private async Task<string?> GetEffectiveDisplayNameAsync(string playerId)
+    private string? GetEffectiveDisplayNameAsync(string playerId)
     {
-        // First try JWT claims (for authenticated users)
+        // JWT claims should always have displayName after HTTP registration
         var claimDisplayName = GetAuthenticatedDisplayName();
-        if (!string.IsNullOrEmpty(claimDisplayName))
+
+        if (string.IsNullOrEmpty(claimDisplayName))
         {
-            _logger.LogDebug("Found displayName in JWT claims: {DisplayName} for player {PlayerId}", claimDisplayName, playerId);
-            return claimDisplayName;
+            _logger.LogWarning(
+                "No displayName in JWT claims for player {PlayerId} - this should not happen after proper registration",
+                playerId);
         }
 
-        // Fall back to database lookup (for anonymous users)
-        _logger.LogDebug("No displayName in JWT claims, fetching from database for player {PlayerId}", playerId);
-        var user = await _userRepository.GetByUserIdAsync(playerId);
-        var displayName = user?.DisplayName;
-        _logger.LogDebug("Database lookup returned displayName: {DisplayName} for player {PlayerId}", displayName ?? "null", playerId);
-        return displayName;
+        return claimDisplayName;
     }
 
     private string GetEffectivePlayerId(string anonymousPlayerId)
