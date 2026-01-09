@@ -7,19 +7,17 @@ import { HubMethods } from '@/types/signalr.types';
 
 interface CorrespondenceLobby {
   matchId: string;
-  gameId: string;
-  creatorId: string;
-  creatorName: string;
-  creatorRating: number;
+  creatorPlayerId: string;
+  creatorUsername: string;
+  opponentType: string;
   targetScore: number;
-  timePerMoveDays: number;
-  isRated: boolean;
+  status: string;
+  opponentPlayerId: string | null;
+  opponentUsername: string | null;
   createdAt: string;
+  isOpenLobby: boolean;
   isCorrespondence: boolean;
-}
-
-interface MatchLobbiesResponse {
-  lobbies: CorrespondenceLobby[];
+  timePerMoveDays: number;
 }
 
 export function CorrespondenceLobbies() {
@@ -35,10 +33,11 @@ export function CorrespondenceLobbies() {
       setIsLoading(true);
       setError(null);
 
-      const response = await invoke<MatchLobbiesResponse>(HubMethods.GetMatchLobbies);
+      // GetMatchLobbies returns an array directly, not wrapped in an object
+      const allLobbies = await invoke<CorrespondenceLobby[]>(HubMethods.GetMatchLobbies);
 
       // Filter for correspondence lobbies only
-      const correspondenceLobbies = (response?.lobbies || [])
+      const correspondenceLobbies = (allLobbies || [])
         .filter((l) => l.isCorrespondence);
 
       setLobbies(correspondenceLobbies);
@@ -114,11 +113,7 @@ export function CorrespondenceLobbies() {
                 <User className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold">{lobby.creatorName}</span>
-                    <span className="text-sm text-muted-foreground">({lobby.creatorRating})</span>
-                    {lobby.isRated && (
-                      <Badge variant="outline" className="text-xs">Rated</Badge>
-                    )}
+                    <span className="font-semibold">{lobby.creatorUsername || 'Anonymous'}</span>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="secondary" className="text-xs flex items-center gap-1">
