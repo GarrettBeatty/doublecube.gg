@@ -132,7 +132,8 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 OpponentType = opponentType,
                 IsCorrespondence = true,
                 TimePerMoveDays = timePerMoveDays,
-                TimeControl = new TimeControlConfig { Type = TimeControlType.None } // No real-time clock for correspondence
+                TimeControl = new TimeControlConfig { Type = TimeControlType.None }, // No real-time clock for correspondence
+                IsRated = isRated // Set from parameter
             };
 
             // Handle opponent based on type

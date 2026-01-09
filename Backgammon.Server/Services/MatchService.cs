@@ -86,7 +86,8 @@ public class MatchService : IMatchService
                 Player1Name = player1Name,
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
-                TimeControl = timeControl ?? new TimeControlConfig() // Default to None if not specified
+                TimeControl = timeControl ?? new TimeControlConfig(), // Default to None if not specified
+                IsRated = isRated // Set from parameter
             };
 
             // Handle opponent based on type
@@ -98,6 +99,7 @@ public class MatchService : IMatchService
                 match.Player2Name = "Computer";
                 match.Status = "InProgress";  // AI matches start immediately
                 match.IsOpenLobby = false;
+                match.IsRated = false; // AI matches are always unrated
             }
             else if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {

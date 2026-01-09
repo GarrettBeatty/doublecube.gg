@@ -1569,12 +1569,14 @@ public class GameHub : Hub
                     matchId = match.MatchId,
                     gameId = firstGame.GameId,
                     creatorName = match.Player1Name,
-                    targetScore = match.TargetScore
+                    targetScore = match.TargetScore,
+                    isRated = match.IsRated
                 });
 
                 _logger.LogInformation(
-                    "Broadcast LobbyCreated event for match {MatchId}",
-                    match.MatchId);
+                    "Broadcast LobbyCreated event for match {MatchId} (isRated: {IsRated})",
+                    match.MatchId,
+                    match.IsRated);
             }
 
             // For friend matches, notify the friend if they're online
@@ -1804,12 +1806,14 @@ public class GameHub : Hub
                     gameId = firstGame.GameId,
                     creatorName = match.Player1Name,
                     targetScore = match.TargetScore,
-                    timePerMoveDays = match.TimePerMoveDays
+                    timePerMoveDays = match.TimePerMoveDays,
+                    isRated = match.IsRated
                 });
 
                 _logger.LogInformation(
-                    "Broadcast CorrespondenceLobbyCreated event for match {MatchId}",
-                    match.MatchId);
+                    "Broadcast CorrespondenceLobbyCreated event for match {MatchId} (isRated: {IsRated})",
+                    match.MatchId,
+                    match.IsRated);
             }
 
             // For friend matches, notify the friend if they're online

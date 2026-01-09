@@ -65,6 +65,12 @@ public class Match
     public bool IsOpenLobby { get; set; }
 
     /// <summary>
+    /// Whether the match affects player ratings (AI matches are always unrated)
+    /// </summary>
+    [JsonPropertyName("isRated")]
+    public bool IsRated { get; set; } = true;
+
+    /// <summary>
     /// Display name for Player 1 (for anonymous players)
     /// </summary>
     [JsonPropertyName("player1DisplayName")]
