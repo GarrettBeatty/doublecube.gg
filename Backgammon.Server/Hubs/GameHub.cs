@@ -1915,12 +1915,16 @@ public class GameHub : Hub
         var claimDisplayName = GetAuthenticatedDisplayName();
         if (!string.IsNullOrEmpty(claimDisplayName))
         {
+            _logger.LogDebug("Found displayName in JWT claims: {DisplayName} for player {PlayerId}", claimDisplayName, playerId);
             return claimDisplayName;
         }
 
         // Fall back to database lookup (for anonymous users)
+        _logger.LogDebug("No displayName in JWT claims, fetching from database for player {PlayerId}", playerId);
         var user = await _userRepository.GetByUserIdAsync(playerId);
-        return user?.DisplayName;
+        var displayName = user?.DisplayName;
+        _logger.LogDebug("Database lookup returned displayName: {DisplayName} for player {PlayerId}", displayName ?? "null", playerId);
+        return displayName;
     }
 
     private string GetEffectivePlayerId(string anonymousPlayerId)
