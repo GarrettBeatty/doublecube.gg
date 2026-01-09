@@ -158,6 +158,15 @@ public static class GameEngineMapper
             }
         }
 
+        // Restore winner if game is completed/abandoned
+        if (!string.IsNullOrEmpty(game.Winner))
+        {
+            var winnerColor = Enum.Parse<CheckerColor>(game.Winner);
+            engine.Winner = winnerColor == CheckerColor.White
+                ? engine.WhitePlayer
+                : engine.RedPlayer;
+        }
+
         ValidateRestoredState(engine);
 
         return session;

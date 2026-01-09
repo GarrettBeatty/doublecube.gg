@@ -45,9 +45,46 @@ public class GameService : IGameService
     public async Task JoinGameAsync(string connectionId, string playerId, string? displayName, string gameId)
     {
         var session = _sessionManager.GetGame(gameId);
+
+        // If not in memory, try loading from database (for completed/abandoned games)
         if (session == null)
         {
-            throw new InvalidOperationException($"Game {gameId} not found");
+            var game = await _gameRepository.GetGameByGameIdAsync(gameId);
+            if (game == null)
+            {
+                throw new InvalidOperationException($"Game {gameId} not found");
+            }
+
+            // If game is completed or abandoned, load it as read-only view
+            if (game.Status == "Completed" || game.Status == "Abandoned")
+            {
+                _logger.LogInformation(
+                    "Loading {Status} game {GameId} for viewing by {PlayerId}",
+                    game.Status,
+                    gameId,
+                    playerId);
+
+                // Reconstruct session from database for viewing only
+                session = GameEngineMapper.FromGame(game);
+
+                // Add to group for notifications but don't add to session manager
+                await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
+
+                // Send as spectator view (read-only) - use SpectatorJoined event
+                var viewState = session.GetState(null);
+                await _hubContext.Clients.Client(connectionId).SendAsync("SpectatorJoined", viewState);
+
+                _logger.LogInformation(
+                    "Sent {Status} game {GameId} state to viewer {PlayerId}",
+                    game.Status,
+                    gameId,
+                    playerId);
+
+                return;
+            }
+
+            // Game exists but is in progress - shouldn't be removed from memory
+            throw new InvalidOperationException($"Game {gameId} not found in active games");
         }
 
         await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);

@@ -12,6 +12,7 @@ import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { MatchResultsPage } from './pages/MatchResultsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 import { Toaster } from './components/ui/toaster'
 import { audioService } from './services/audio.service'
 
@@ -62,6 +63,7 @@ function AppContent() {
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/match-results/:matchId" element={<MatchResultsPage />} />
           <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Layout>
 

@@ -55,7 +55,7 @@ public class GameEngine
 
     public bool GameOver { get; private set; }
 
-    public Player? Winner { get; private set; }
+    public Player? Winner { get; set; }
 
     // Match-related properties
     public bool IsCrawfordGame { get; set; }

@@ -10,6 +10,7 @@ import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
 import { GameResultModal } from '@/components/modals/GameResultModal'
+import { NotFound } from '@/components/NotFound'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,17 +20,37 @@ import { Eye, BarChart3, Trophy, TrendingUp } from 'lucide-react'
 export const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { invoke, isConnected, connection } = useSignalR()
 
   const { currentGameState, isSpectator, setCurrentGameId, resetGame } = useGameStore()
   const [isLoading, setIsLoading] = useState(true)
   const [lastJoinedGameId, setLastJoinedGameId] = useState<string | null>(null)
+  const [gameNotFound, setGameNotFound] = useState(false)
   const lastJoinedGameIdRef = useRef<string | null>(null)
 
   // Keep ref in sync with state
   useEffect(() => {
     lastJoinedGameIdRef.current = lastJoinedGameId
   }, [lastJoinedGameId])
+
+  // Listen for error events (like "Game not found")
+  useEffect(() => {
+    if (!connection) return
+
+    const handleError = (errorMessage: string) => {
+      console.error('[GamePage] SignalR Error:', errorMessage)
+      if (errorMessage.includes('not found') || errorMessage.includes('Game') && errorMessage.includes('not found')) {
+        setGameNotFound(true)
+        setIsLoading(false)
+      }
+    }
+
+    connection.on('Error', handleError)
+
+    return () => {
+      connection.off('Error', handleError)
+    }
+  }, [connection])
 
   // Cleanup when component unmounts (navigating away from game page entirely)
   useEffect(() => {
@@ -79,6 +100,7 @@ export const GamePage: React.FC = () => {
       resetGame()
       setCurrentGameId(gameId)
       setIsLoading(true)
+      setGameNotFound(false)
       setLastJoinedGameId(gameId)
 
       // Join the game
@@ -91,7 +113,6 @@ export const GamePage: React.FC = () => {
       } catch (error) {
         console.error('[GamePage] Failed to join game:', error)
         setIsLoading(false)
-        // Still show the page, game state might arrive via other events
       }
     }
 
@@ -126,6 +147,15 @@ export const GamePage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+    )
+  }
+
+  if (gameNotFound) {
+    return (
+      <NotFound
+        title="Game Not Found"
+        message={`The game with ID ${gameId} could not be found. It may have been deleted or the link may be incorrect.`}
+      />
     )
   }
 
@@ -277,7 +307,7 @@ export const GamePage: React.FC = () => {
 
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <BoardSVG gameState={currentGameState} />
+                  <BoardSVG gameState={currentGameState} isSpectator={isSpectator} />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={isSpectator}
