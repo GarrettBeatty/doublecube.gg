@@ -12,6 +12,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
     private readonly IGameRepository _gameRepository;
     private readonly IGameSessionManager _gameSessionManager;
     private readonly IUserRepository _userRepository;
+    private readonly IPlayerStatsService _playerStatsService;
     private readonly ILogger<CorrespondenceGameService> _logger;
 
     public CorrespondenceGameService(
@@ -19,12 +20,14 @@ public class CorrespondenceGameService : ICorrespondenceGameService
         IGameRepository gameRepository,
         IGameSessionManager gameSessionManager,
         IUserRepository userRepository,
+        IPlayerStatsService playerStatsService,
         ILogger<CorrespondenceGameService> logger)
     {
         _matchRepository = matchRepository;
         _gameRepository = gameRepository;
         _gameSessionManager = gameSessionManager;
         _userRepository = userRepository;
+        _playerStatsService = playerStatsService;
         _logger = logger;
     }
 
@@ -87,6 +90,12 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             if (!new[] { "OpenLobby", "Friend" }.Contains(opponentType))
             {
                 throw new ArgumentException("Correspondence games support 'OpenLobby' or 'Friend' opponent types");
+            }
+
+            // OpenLobby not yet supported for correspondence games
+            if (opponentType == "OpenLobby")
+            {
+                throw new ArgumentException("OpenLobby not yet supported for correspondence matches - please challenge a specific friend");
             }
 
             // Validate player2Id for Friend matches
@@ -269,6 +278,25 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 
             await _matchRepository.UpdateMatchAsync(match);
 
+            // Update player stats and ELO ratings for rated matches
+            if (match.IsRated && !string.IsNullOrEmpty(match.CurrentGameId))
+            {
+                var currentGame = await _gameRepository.GetGameByGameIdAsync(match.CurrentGameId);
+                if (currentGame != null)
+                {
+                    // Mark game as completed by forfeit
+                    currentGame.Status = Models.GameStatus.Abandoned;
+                    await _gameRepository.SaveGameAsync(currentGame);
+
+                    // Update stats (includes ELO rating updates)
+                    await _playerStatsService.UpdateStatsAfterGameCompletionAsync(currentGame);
+
+                    _logger.LogInformation(
+                        "Updated stats and ELO ratings for timeout in match {MatchId}",
+                        matchId);
+                }
+            }
+
             _logger.LogInformation(
                 "Correspondence match {MatchId} ended by timeout. Winner: {WinnerId}, Timed out: {TimedOutId}",
                 matchId,
@@ -287,8 +315,42 @@ public class CorrespondenceGameService : ICorrespondenceGameService
         string playerId,
         bool isYourTurn)
     {
-        var dtos = new List<CorrespondenceGameDto>();
+        if (matches.Count == 0)
+        {
+            return new List<CorrespondenceGameDto>();
+        }
 
+        // Batch fetch all opponent user data to avoid N+1 queries
+        var opponentIds = matches
+            .Select(m => m.Player1Id == playerId ? m.Player2Id : m.Player1Id)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .ToList();
+
+        var opponentUsers = await _userRepository.GetUsersByIdsAsync(opponentIds!);
+        var opponentRatings = opponentUsers.ToDictionary(
+            u => u.UserId,
+            u => u.Rating);
+
+        // Batch fetch all current game data to avoid N+1 queries
+        var gameIds = matches
+            .Select(m => m.CurrentGameId)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Distinct()
+            .ToList();
+
+        var games = new Dictionary<string, ServerGame>();
+        foreach (var gameId in gameIds)
+        {
+            var game = await _gameRepository.GetGameByGameIdAsync(gameId!);
+            if (game != null)
+            {
+                games[gameId!] = game;
+            }
+        }
+
+        // Build DTOs with pre-fetched data
+        var dtos = new List<CorrespondenceGameDto>();
         foreach (var match in matches)
         {
             // Determine opponent info
@@ -296,22 +358,18 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             var opponentId = isPlayer1 ? match.Player2Id : match.Player1Id;
             var opponentName = isPlayer1 ? match.Player2Name : match.Player1Name;
 
-            // Get opponent rating
+            // Get opponent rating from pre-fetched data
             int opponentRating = 1500; // Default
-            if (!string.IsNullOrEmpty(opponentId))
+            if (!string.IsNullOrEmpty(opponentId) && opponentRatings.TryGetValue(opponentId, out var rating))
             {
-                var opponent = await _userRepository.GetByUserIdAsync(opponentId);
-                if (opponent != null)
-                {
-                    opponentRating = opponent.Rating;
-                }
+                opponentRating = rating;
             }
 
-            // Get current game info
+            // Get current game info from pre-fetched data
             ServerGame? currentGame = null;
             if (!string.IsNullOrEmpty(match.CurrentGameId))
             {
-                currentGame = await _gameRepository.GetGameByGameIdAsync(match.CurrentGameId);
+                games.TryGetValue(match.CurrentGameId, out currentGame);
             }
 
             var dto = new CorrespondenceGameDto

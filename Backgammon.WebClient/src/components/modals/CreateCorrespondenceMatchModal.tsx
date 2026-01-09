@@ -30,9 +30,8 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
   friendName,
 }) => {
   const { createCorrespondenceMatch } = useCorrespondenceGames()
-  const [opponentType, setOpponentType] = useState<'Friend' | 'OpenLobby'>(
-    friendUserId ? 'Friend' : defaultOpponentType
-  )
+  // Note: Only Friend matches supported for correspondence games currently
+  const [opponentType] = useState<'Friend'>('Friend')
   const [targetScore, setTargetScore] = useState<number>(5)
   const [timePerMoveDays, setTimePerMoveDays] = useState<number>(3)
   const [isRated, setIsRated] = useState<boolean>(true)
@@ -43,13 +42,12 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
   // Reset state when modal opens
   React.useEffect(() => {
     if (isOpen) {
-      setOpponentType(friendUserId ? 'Friend' : defaultOpponentType)
       setTargetScore(5)
       setTimePerMoveDays(3)
       setIsRated(true)
       setError(null)
     }
-  }, [isOpen, defaultOpponentType, friendUserId])
+  }, [isOpen])
 
   const handleCreate = async () => {
     setIsCreating(true)
@@ -85,19 +83,29 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Opponent Type (only show if not challenging a friend) */}
+          {/* Note: Correspondence games only support Friend matches currently */}
           {!friendUserId && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                Correspondence games currently require a specific opponent.
+                Please select a friend to challenge from your friends list.
+              </p>
+            </div>
+          )}
+
+          {/* Opponent Type - Hidden for now, only Friend supported */}
+          {false && !friendUserId && (
             <div className="space-y-3">
               <Label>Opponent</Label>
               <RadioGroup
                 value={opponentType}
-                onValueChange={(value) => setOpponentType(value as 'Friend' | 'OpenLobby')}
+                onValueChange={() => {}}
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="OpenLobby" id="opponent-open" />
-                  <Label htmlFor="opponent-open" className="font-normal cursor-pointer">
+                  <RadioGroupItem value="OpenLobby" id="opponent-open" disabled />
+                  <Label htmlFor="opponent-open" className="font-normal cursor-pointer opacity-50">
                     <div className="flex flex-col">
-                      <span>Open Challenge</span>
+                      <span>Open Challenge (Coming Soon)</span>
                       <span className="text-sm text-muted-foreground">
                         Anyone can accept your challenge
                       </span>

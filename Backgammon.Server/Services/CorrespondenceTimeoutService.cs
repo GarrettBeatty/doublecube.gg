@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,18 +9,34 @@ namespace Backgammon.Server.Services;
 /// Background service that periodically checks for expired correspondence games
 /// and handles timeouts (auto-forfeit).
 /// </summary>
+/// <summary>
+/// Configuration options for correspondence timeout checking
+/// </summary>
+public class CorrespondenceTimeoutOptions
+{
+    /// <summary>
+    /// How often to check for expired correspondence games (in hours)
+    /// </summary>
+    public int CheckIntervalHours { get; set; } = 1;
+}
+
 public class CorrespondenceTimeoutService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CorrespondenceTimeoutService> _logger;
-    private readonly TimeSpan _checkInterval = TimeSpan.FromHours(1);
+    private readonly TimeSpan _checkInterval;
 
     public CorrespondenceTimeoutService(
         IServiceProvider serviceProvider,
-        ILogger<CorrespondenceTimeoutService> logger)
+        ILogger<CorrespondenceTimeoutService> logger,
+        IConfiguration configuration)
     {
         _serviceProvider = serviceProvider;
         _logger = logger;
+
+        // Read check interval from configuration, default to 1 hour
+        var checkIntervalHours = configuration.GetValue<int?>("CorrespondenceTimeout:CheckIntervalHours") ?? 1;
+        _checkInterval = TimeSpan.FromHours(checkIntervalHours);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
