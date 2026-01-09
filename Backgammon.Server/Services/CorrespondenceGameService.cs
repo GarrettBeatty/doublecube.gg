@@ -121,13 +121,18 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             // Get player 1 info - user guaranteed to exist (created in OnConnectedAsync)
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
 
+            // Use player1DisplayName parameter if provided (from frontend), otherwise fall back to database
+            var player1Name = !string.IsNullOrWhiteSpace(player1DisplayName)
+                ? player1DisplayName
+                : player1?.DisplayName ?? "Unknown";
+
             // Create match with correspondence fields
             var match = new Match
             {
                 MatchId = Guid.NewGuid().ToString(),
                 TargetScore = targetScore,
                 Player1Id = player1Id,
-                Player1Name = player1?.DisplayName ?? "Unknown", // Fallback just in case
+                Player1Name = player1Name, // Use display name from parameter or database
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
                 IsCorrespondence = true,
