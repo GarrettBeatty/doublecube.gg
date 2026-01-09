@@ -1621,6 +1621,153 @@ public class GameHub : Hub
         return await Task.Run(() => _analysisService.FindBestMoves(session.Engine, evaluatorType));
     }
 
+    // ==================== Correspondence Game Methods ====================
+
+    /// <summary>
+    /// Get all correspondence games for the current user
+    /// </summary>
+    public async Task<CorrespondenceGamesResponse> GetCorrespondenceGames()
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var response = await _correspondenceGameService.GetAllCorrespondenceGamesAsync(playerId);
+
+            _logger.LogInformation(
+                "Retrieved correspondence games for player {PlayerId}: {YourTurn} your turn, {Waiting} waiting",
+                playerId,
+                response.TotalYourTurn,
+                response.TotalWaiting);
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting correspondence games");
+            throw new HubException("Failed to retrieve correspondence games");
+        }
+    }
+
+    /// <summary>
+    /// Create a new correspondence match
+    /// </summary>
+    public async Task CreateCorrespondenceMatch(MatchConfig config)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+
+            // Validate correspondence-specific settings
+            if (!config.IsCorrespondence)
+            {
+                throw new ArgumentException("IsCorrespondence must be true for correspondence matches");
+            }
+
+            if (config.TimePerMoveDays <= 0 || config.TimePerMoveDays > 30)
+            {
+                throw new ArgumentException("TimePerMoveDays must be between 1 and 30");
+            }
+
+            // Create correspondence match
+            var (match, firstGame) = await _correspondenceGameService.CreateCorrespondenceMatchAsync(
+                playerId,
+                config.TargetScore,
+                config.TimePerMoveDays,
+                config.OpponentType,
+                config.DisplayName,
+                config.OpponentId,
+                config.IsRated);
+
+            // Send MatchCreated event with game ID
+            await Clients.Caller.SendAsync("MatchCreated", new
+            {
+                matchId = match.MatchId,
+                gameId = firstGame.GameId,
+                targetScore = match.TargetScore,
+                opponentType = match.OpponentType,
+                player1Id = match.Player1Id,
+                player2Id = match.Player2Id,
+                player1Name = match.Player1Name,
+                player2Name = match.Player2Name,
+                isCorrespondence = true,
+                timePerMoveDays = match.TimePerMoveDays,
+                turnDeadline = match.TurnDeadline
+            });
+
+            _logger.LogInformation(
+                "Correspondence match {MatchId} created for player {PlayerId}, time per move: {TimePerMove} days",
+                match.MatchId,
+                playerId,
+                match.TimePerMoveDays);
+
+            // For friend matches, notify the friend if they're online
+            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
+            {
+                if (_sessionManager.IsPlayerOnline(config.OpponentId))
+                {
+                    var opponentConnection = GetPlayerConnection(config.OpponentId);
+                    if (!string.IsNullOrEmpty(opponentConnection))
+                    {
+                        await Clients.Client(opponentConnection).SendAsync(
+                            "CorrespondenceMatchInvite",
+                            new
+                            {
+                                matchId = match.MatchId,
+                                gameId = firstGame.GameId,
+                                targetScore = match.TargetScore,
+                                challengerName = match.Player1Name,
+                                challengerId = match.Player1Id,
+                                timePerMoveDays = match.TimePerMoveDays
+                            });
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating correspondence match");
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Notify that a turn has been completed in a correspondence game
+    /// Called automatically after EndTurn in correspondence matches
+    /// </summary>
+    public async Task NotifyCorrespondenceTurnComplete(string matchId, string nextPlayerId)
+    {
+        try
+        {
+            await _correspondenceGameService.HandleTurnCompletedAsync(matchId, nextPlayerId);
+
+            // Notify next player if they're online
+            if (_sessionManager.IsPlayerOnline(nextPlayerId))
+            {
+                var nextPlayerConnection = GetPlayerConnection(nextPlayerId);
+                if (!string.IsNullOrEmpty(nextPlayerConnection))
+                {
+                    await Clients.Client(nextPlayerConnection).SendAsync(
+                        "CorrespondenceTurnNotification",
+                        new
+                        {
+                            matchId = matchId,
+                            message = "It's your turn!"
+                        });
+                }
+            }
+
+            _logger.LogInformation(
+                "Correspondence turn completed for match {MatchId}, next player: {NextPlayerId}",
+                matchId,
+                nextPlayerId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error notifying correspondence turn completion for match {MatchId}", matchId);
+            await Clients.Caller.SendAsync("Error", ex.Message);
+        }
+    }
+
     private string? GetAuthenticatedUserId()
     {
         return Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -1906,152 +2053,5 @@ public class GameHub : Hub
 
         var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
         return count + player.CheckersOnBar + player.CheckersBornOff;
-    }
-
-    // ==================== Correspondence Game Methods ====================
-
-    /// <summary>
-    /// Get all correspondence games for the current user
-    /// </summary>
-    public async Task<CorrespondenceGamesResponse> GetCorrespondenceGames()
-    {
-        try
-        {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-            var response = await _correspondenceGameService.GetAllCorrespondenceGamesAsync(playerId);
-
-            _logger.LogInformation(
-                "Retrieved correspondence games for player {PlayerId}: {YourTurn} your turn, {Waiting} waiting",
-                playerId,
-                response.TotalYourTurn,
-                response.TotalWaiting);
-
-            return response;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting correspondence games");
-            throw new HubException("Failed to retrieve correspondence games");
-        }
-    }
-
-    /// <summary>
-    /// Create a new correspondence match
-    /// </summary>
-    public async Task CreateCorrespondenceMatch(MatchConfig config)
-    {
-        try
-        {
-            var playerId = GetEffectivePlayerId(Context.ConnectionId);
-
-            // Validate correspondence-specific settings
-            if (!config.IsCorrespondence)
-            {
-                throw new ArgumentException("IsCorrespondence must be true for correspondence matches");
-            }
-
-            if (config.TimePerMoveDays <= 0 || config.TimePerMoveDays > 30)
-            {
-                throw new ArgumentException("TimePerMoveDays must be between 1 and 30");
-            }
-
-            // Create correspondence match
-            var (match, firstGame) = await _correspondenceGameService.CreateCorrespondenceMatchAsync(
-                playerId,
-                config.TargetScore,
-                config.TimePerMoveDays,
-                config.OpponentType,
-                config.DisplayName,
-                config.OpponentId,
-                config.IsRated);
-
-            // Send MatchCreated event with game ID
-            await Clients.Caller.SendAsync("MatchCreated", new
-            {
-                matchId = match.MatchId,
-                gameId = firstGame.GameId,
-                targetScore = match.TargetScore,
-                opponentType = match.OpponentType,
-                player1Id = match.Player1Id,
-                player2Id = match.Player2Id,
-                player1Name = match.Player1Name,
-                player2Name = match.Player2Name,
-                isCorrespondence = true,
-                timePerMoveDays = match.TimePerMoveDays,
-                turnDeadline = match.TurnDeadline
-            });
-
-            _logger.LogInformation(
-                "Correspondence match {MatchId} created for player {PlayerId}, time per move: {TimePerMove} days",
-                match.MatchId,
-                playerId,
-                match.TimePerMoveDays);
-
-            // For friend matches, notify the friend if they're online
-            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
-            {
-                if (_sessionManager.IsPlayerOnline(config.OpponentId))
-                {
-                    var opponentConnection = GetPlayerConnection(config.OpponentId);
-                    if (!string.IsNullOrEmpty(opponentConnection))
-                    {
-                        await Clients.Client(opponentConnection).SendAsync(
-                            "CorrespondenceMatchInvite",
-                            new
-                            {
-                                matchId = match.MatchId,
-                                gameId = firstGame.GameId,
-                                targetScore = match.TargetScore,
-                                challengerName = match.Player1Name,
-                                challengerId = match.Player1Id,
-                                timePerMoveDays = match.TimePerMoveDays
-                            });
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating correspondence match");
-            await Clients.Caller.SendAsync("Error", ex.Message);
-        }
-    }
-
-    /// <summary>
-    /// Notify that a turn has been completed in a correspondence game
-    /// Called automatically after EndTurn in correspondence matches
-    /// </summary>
-    public async Task NotifyCorrespondenceTurnComplete(string matchId, string nextPlayerId)
-    {
-        try
-        {
-            await _correspondenceGameService.HandleTurnCompletedAsync(matchId, nextPlayerId);
-
-            // Notify next player if they're online
-            if (_sessionManager.IsPlayerOnline(nextPlayerId))
-            {
-                var nextPlayerConnection = GetPlayerConnection(nextPlayerId);
-                if (!string.IsNullOrEmpty(nextPlayerConnection))
-                {
-                    await Clients.Client(nextPlayerConnection).SendAsync(
-                        "CorrespondenceTurnNotification",
-                        new
-                        {
-                            matchId = matchId,
-                            message = "It's your turn!"
-                        });
-                }
-            }
-
-            _logger.LogInformation(
-                "Correspondence turn completed for match {MatchId}, next player: {NextPlayerId}",
-                matchId,
-                nextPlayerId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error notifying correspondence turn completion for match {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", ex.Message);
-        }
     }
 }
