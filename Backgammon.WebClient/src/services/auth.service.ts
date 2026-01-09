@@ -12,6 +12,7 @@ const PLAYER_ID_KEY = 'playerId'
 
 class AuthService {
   private baseUrl: string = ''
+  private registrationPromise: Promise<void> | null = null
 
   async initialize(): Promise<void> {
     // Wait for API service to initialize
@@ -180,7 +181,15 @@ class AuthService {
       }
     } else {
       // No token - register as anonymous user
-      await this.registerAnonymousUser()
+      this.registrationPromise = this.registerAnonymousUser()
+      await this.registrationPromise
+    }
+  }
+
+  // Ensure anonymous user registration is complete
+  async ensureRegistered(): Promise<void> {
+    if (this.registrationPromise) {
+      await this.registrationPromise
     }
   }
 

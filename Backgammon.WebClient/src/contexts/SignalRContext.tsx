@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { HubConnection } from '@microsoft/signalr'
 import { signalRService } from '@/services/signalr.service'
+import { authService } from '@/services/auth.service'
 import { ConnectionState } from '@/types/signalr.types'
 
 interface SignalRContextType {
@@ -35,6 +36,9 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
     const initializeConnection = async () => {
       try {
         setConnectionState(ConnectionState.Connecting)
+
+        // Ensure anonymous user registration is complete before connecting
+        await authService.ensureRegistered()
 
         // Initialize SignalR service
         const conn = await signalRService.initialize()
