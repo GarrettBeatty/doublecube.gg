@@ -10,6 +10,8 @@ export interface MatchLobby {
   opponentPlayerId: string | null
   opponentUsername: string | null
   createdAt: string
+  isCorrespondence?: boolean
+  timePerMoveDays?: number
 }
 
 export interface MatchGame {

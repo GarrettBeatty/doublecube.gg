@@ -40,8 +40,10 @@ export function GameLobby() {
     }
   };
 
-  // Map backend lobbies to UI display format
-  const lobbyGames: LobbyGame[] = lobbies.map(mapMatchLobbyToLobbyGame);
+  // Map backend lobbies to UI display format, filtering out correspondence games
+  const lobbyGames: LobbyGame[] = lobbies
+    .filter((lobby) => !lobby.isCorrespondence)
+    .map(mapMatchLobbyToLobbyGame);
 
   // Apply client-side filtering
   const filteredLobbies = lobbyGames.filter((game) => {

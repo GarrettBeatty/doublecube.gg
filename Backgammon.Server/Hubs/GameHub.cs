@@ -1238,7 +1238,9 @@ public class GameHub : Hub
                 opponentPlayerId = m.Player2Id,
                 opponentUsername = m.Player2Name,
                 createdAt = m.CreatedAt.ToString("O"),
-                isOpenLobby = m.IsOpenLobby
+                isOpenLobby = m.IsOpenLobby,
+                isCorrespondence = m.IsCorrespondence,
+                timePerMoveDays = m.TimePerMoveDays
             }).ToList<object>();
 
             return lobbyList;
