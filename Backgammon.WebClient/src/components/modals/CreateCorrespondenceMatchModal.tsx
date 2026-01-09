@@ -25,7 +25,6 @@ interface CreateCorrespondenceMatchModalProps {
 export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchModalProps> = ({
   isOpen,
   onClose,
-  defaultOpponentType = 'OpenLobby',
   friendUserId,
   friendName,
 }) => {
@@ -93,28 +92,8 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
             </div>
           )}
 
-          {/* Opponent Type - Hidden for now, only Friend supported */}
-          {false && !friendUserId && (
-            <div className="space-y-3">
-              <Label>Opponent</Label>
-              <RadioGroup
-                value={opponentType}
-                onValueChange={() => {}}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="OpenLobby" id="opponent-open" disabled />
-                  <Label htmlFor="opponent-open" className="font-normal cursor-pointer opacity-50">
-                    <div className="flex flex-col">
-                      <span>Open Challenge (Coming Soon)</span>
-                      <span className="text-sm text-muted-foreground">
-                        Anyone can accept your challenge
-                      </span>
-                    </div>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          )}
+          {/* Opponent Type - Removed: only Friend matches supported currently
+              OpenLobby support can be added in the future */}
 
           {/* Match Length */}
           <div className="space-y-3">
