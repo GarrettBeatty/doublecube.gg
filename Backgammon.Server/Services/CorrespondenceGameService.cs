@@ -263,6 +263,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 _logger.LogWarning("Cannot handle timeout for match {MatchId}: CurrentTurnPlayerId is null", matchId);
                 return;
             }
+
             var winnerId = timedOutPlayerId == match.Player1Id ? match.Player2Id : match.Player1Id;
 
             // Complete the match
