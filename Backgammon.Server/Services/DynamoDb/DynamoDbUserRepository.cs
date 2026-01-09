@@ -34,6 +34,7 @@ public class DynamoDbUserRepository : IUserRepository
                     ["PK"] = new AttributeValue { S = $"USER#{userId}" },
                     ["SK"] = new AttributeValue { S = "PROFILE" }
                 }
+
                 // Using eventually consistent reads (default) since CachedUserService
                 // caches users immediately after creation, eliminating race conditions
             });

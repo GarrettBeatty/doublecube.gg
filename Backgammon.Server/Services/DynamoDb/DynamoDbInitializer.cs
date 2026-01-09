@@ -48,6 +48,13 @@ public class DynamoDbInitializer : IHostedService
             if (tableExists)
             {
                 _logger.LogInformation("DynamoDB table '{TableName}' already exists", _tableName);
+
+                // Check if GSI4 exists and add it if missing (for local development only)
+                if (_isLocalEnvironment)
+                {
+                    await EnsureGsi4ExistsAsync(cancellationToken);
+                }
+
                 _initializationTcs.SetResult(true);
                 return;
             }
@@ -79,6 +86,102 @@ public class DynamoDbInitializer : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
+    }
+
+    private async Task EnsureGsi4ExistsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await _dynamoDbClient.DescribeTableAsync(_tableName, cancellationToken);
+            var existingIndexes = response.Table.GlobalSecondaryIndexes;
+
+            // Check if GSI4 already exists
+            if (existingIndexes?.Any(gsi => gsi.IndexName == "GSI4") == true)
+            {
+                _logger.LogInformation("GSI4 already exists on table '{TableName}'", _tableName);
+                return;
+            }
+
+            _logger.LogInformation("GSI4 not found on table '{TableName}'. Adding GSI4...", _tableName);
+
+            // Add GSI4 to the table
+            var updateRequest = new UpdateTableRequest
+            {
+                TableName = _tableName,
+                AttributeDefinitions = new List<AttributeDefinition>
+                {
+                    new AttributeDefinition { AttributeName = "GSI4PK", AttributeType = ScalarAttributeType.S },
+                    new AttributeDefinition { AttributeName = "GSI4SK", AttributeType = ScalarAttributeType.S }
+                },
+                GlobalSecondaryIndexUpdates = new List<GlobalSecondaryIndexUpdate>
+                {
+                    new GlobalSecondaryIndexUpdate
+                    {
+                        Create = new CreateGlobalSecondaryIndexAction
+                        {
+                            IndexName = "GSI4",
+                            KeySchema = new List<KeySchemaElement>
+                            {
+                                new KeySchemaElement { AttributeName = "GSI4PK", KeyType = KeyType.HASH },
+                                new KeySchemaElement { AttributeName = "GSI4SK", KeyType = KeyType.RANGE }
+                            },
+                            Projection = new Projection { ProjectionType = ProjectionType.ALL }
+                        }
+                    }
+                }
+            };
+
+            await _dynamoDbClient.UpdateTableAsync(updateRequest, cancellationToken);
+            _logger.LogInformation("GSI4 creation initiated on table '{TableName}'", _tableName);
+
+            // Wait for the index to become active
+            await WaitForGsi4ActiveAsync(cancellationToken);
+            _logger.LogInformation("GSI4 is now active on table '{TableName}'", _tableName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to ensure GSI4 exists on table '{TableName}'", _tableName);
+            throw;
+        }
+    }
+
+    private async Task WaitForGsi4ActiveAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Waiting for GSI4 to become active on table '{TableName}'...", _tableName);
+
+        var maxAttempts = 30;
+        var attemptCount = 0;
+
+        while (attemptCount < maxAttempts)
+        {
+            try
+            {
+                var response = await _dynamoDbClient.DescribeTableAsync(_tableName, cancellationToken);
+                var gsi4 = response.Table.GlobalSecondaryIndexes?.FirstOrDefault(gsi => gsi.IndexName == "GSI4");
+
+                if (gsi4?.IndexStatus == IndexStatus.ACTIVE)
+                {
+                    _logger.LogInformation("GSI4 is now active on table '{TableName}'", _tableName);
+                    return;
+                }
+
+                _logger.LogInformation("GSI4 status: {Status}. Waiting...", gsi4?.IndexStatus);
+                await Task.Delay(2000, cancellationToken);
+                attemptCount++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Error checking GSI4 status (attempt {Attempt}/{MaxAttempts})",
+                    attemptCount + 1,
+                    maxAttempts);
+                attemptCount++;
+                await Task.Delay(2000, cancellationToken);
+            }
+        }
+
+        throw new TimeoutException($"GSI4 on table '{_tableName}' did not become active within the expected time");
     }
 
     private async Task<bool> TableExistsAsync(CancellationToken cancellationToken)
