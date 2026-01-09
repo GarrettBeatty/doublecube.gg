@@ -19,8 +19,8 @@ export const useMatchLobbies = () => {
       setIsLoading(true)
       setError(null)
 
-      // Try to fetch match lobbies from backend
-      const matchLobbies = await invoke<MatchLobby[]>('GetMatchLobbies')
+      // Try to fetch match lobbies from backend (regular lobbies only)
+      const matchLobbies = await invoke<MatchLobby[]>('GetMatchLobbies', 'regular')
       setLobbies(matchLobbies || [])
     } catch (err) {
       console.warn('GetMatchLobbies not implemented yet:', err)

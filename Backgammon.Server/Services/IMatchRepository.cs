@@ -45,7 +45,9 @@ public interface IMatchRepository
     /// <summary>
     /// Get open lobbies waiting for opponents
     /// </summary>
-    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50);
+    /// <param name="limit">Maximum number of lobbies to return</param>
+    /// <param name="isCorrespondence">Filter by lobby type: true for correspondence, false for regular, null for all</param>
+    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null);
 
     /// <summary>
     /// Delete a match and all associated data

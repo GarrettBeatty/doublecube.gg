@@ -34,17 +34,17 @@ export function CorrespondenceLobbies() {
       setIsLoading(true);
       setError(null);
 
-      // GetMatchLobbies returns an array directly, not wrapped in an object
-      const allLobbies = await invoke<CorrespondenceLobby[]>(HubMethods.GetMatchLobbies);
+      // GetMatchLobbies with 'correspondence' filter returns only correspondence lobbies
+      const allLobbies = await invoke<CorrespondenceLobby[]>(HubMethods.GetMatchLobbies, 'correspondence');
 
       // Get current player ID to filter out their own lobbies
       const currentPlayerId = authService.getOrCreatePlayerId();
 
-      // Filter for correspondence lobbies that are NOT created by the current player
-      const correspondenceLobbies = (allLobbies || [])
-        .filter((l) => l.isCorrespondence && l.creatorPlayerId !== currentPlayerId);
+      // Filter out lobbies created by the current player (they appear in "My Lobbies" instead)
+      const availableLobbies = (allLobbies || [])
+        .filter((l) => l.creatorPlayerId !== currentPlayerId);
 
-      setLobbies(correspondenceLobbies);
+      setLobbies(availableLobbies);
     } catch (err) {
       console.error('Error fetching correspondence lobbies:', err);
       setError('Failed to load correspondence lobbies');

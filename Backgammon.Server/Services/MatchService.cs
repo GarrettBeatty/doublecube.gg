@@ -394,9 +394,19 @@ public class MatchService : IMatchService
         return await _matchRepository.GetActiveMatchesAsync();
     }
 
-    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null)
     {
-        return await _matchRepository.GetOpenLobbiesAsync(limit);
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence);
+    }
+
+    public async Task<List<Match>> GetRegularLobbiesAsync(int limit = 50)
+    {
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence: false);
+    }
+
+    public async Task<List<Match>> GetCorrespondenceLobbiesAsync(int limit = 50)
+    {
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence: true);
     }
 
     public async Task AbandonMatchAsync(string matchId, string abandoningPlayerId)

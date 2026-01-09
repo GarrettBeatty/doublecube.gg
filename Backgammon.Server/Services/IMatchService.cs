@@ -68,7 +68,19 @@ public interface IMatchService
     /// <summary>
     /// Get open lobbies waiting for opponents
     /// </summary>
-    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50);
+    /// <param name="limit">Maximum number of lobbies to return</param>
+    /// <param name="isCorrespondence">Filter by lobby type: true for correspondence, false for regular, null for all</param>
+    Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null);
+
+    /// <summary>
+    /// Get open regular (non-correspondence) lobbies
+    /// </summary>
+    Task<List<Match>> GetRegularLobbiesAsync(int limit = 50);
+
+    /// <summary>
+    /// Get open correspondence lobbies
+    /// </summary>
+    Task<List<Match>> GetCorrespondenceLobbiesAsync(int limit = 50);
 
     /// <summary>
     /// Abandon a match

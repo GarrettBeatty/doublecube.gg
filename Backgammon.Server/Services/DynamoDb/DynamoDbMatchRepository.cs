@@ -406,28 +406,42 @@ public class DynamoDbMatchRepository : IMatchRepository
         }
     }
 
-    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null)
     {
         try
         {
+            // Build filter expression
+            var filterExpression = "isOpenLobby = :isOpen";
+            var expressionAttributeValues = new Dictionary<string, AttributeValue>
+            {
+                [":pk"] = new AttributeValue { S = "MATCH_STATUS#WaitingForPlayers" },
+                [":isOpen"] = new AttributeValue { BOOL = true }
+            };
+
+            // Add correspondence filter if specified
+            if (isCorrespondence.HasValue)
+            {
+                filterExpression += " AND isCorrespondence = :isCorrespondence";
+                expressionAttributeValues[":isCorrespondence"] = new AttributeValue { BOOL = isCorrespondence.Value };
+            }
+
             // Query GSI3 for WaitingForPlayers status - FAST!
             var response = await _dynamoDbClient.QueryAsync(new QueryRequest
             {
                 TableName = _tableName,
                 IndexName = "GSI3",
                 KeyConditionExpression = "GSI3PK = :pk",
-                FilterExpression = "isOpenLobby = :isOpen",  // Only public lobbies
-                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
-                {
-                    [":pk"] = new AttributeValue { S = "MATCH_STATUS#WaitingForPlayers" },
-                    [":isOpen"] = new AttributeValue { BOOL = true }
-                },
+                FilterExpression = filterExpression,
+                ExpressionAttributeValues = expressionAttributeValues,
                 Limit = limit,
                 ScanIndexForward = false // Most recent first
             });
 
             var lobbies = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
-            _logger.LogDebug("Retrieved {Count} open lobbies via GSI3", lobbies.Count);
+            _logger.LogDebug(
+                "Retrieved {Count} open lobbies via GSI3 (isCorrespondence: {IsCorrespondence})",
+                lobbies.Count,
+                isCorrespondence?.ToString() ?? "all");
             return lobbies;
         }
         catch (Exception ex)

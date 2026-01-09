@@ -1264,11 +1264,23 @@ public class GameHub : Hub
         }
     }
 
-    public async Task<List<object>> GetMatchLobbies()
+    /// <summary>
+    /// Get match lobbies, optionally filtered by type
+    /// </summary>
+    /// <param name="lobbyType">Filter by type: "regular", "correspondence", or null for all</param>
+    public async Task<List<object>> GetMatchLobbies(string? lobbyType = null)
     {
         try
         {
-            var lobbies = await _matchService.GetOpenLobbiesAsync();
+            // Parse lobby type filter
+            bool? isCorrespondence = lobbyType?.ToLower() switch
+            {
+                "correspondence" => true,
+                "regular" => false,
+                _ => null
+            };
+
+            var lobbies = await _matchService.GetOpenLobbiesAsync(isCorrespondence: isCorrespondence);
 
             var lobbyList = lobbies.Select(m => new
             {
@@ -1285,6 +1297,11 @@ public class GameHub : Hub
                 isCorrespondence = m.IsCorrespondence,
                 timePerMoveDays = m.TimePerMoveDays
             }).ToList<object>();
+
+            _logger.LogDebug(
+                "Retrieved {Count} match lobbies (filter: {LobbyType})",
+                lobbyList.Count,
+                lobbyType ?? "all");
 
             return lobbyList;
         }
@@ -1552,8 +1569,7 @@ public class GameHub : Hub
                     matchId = match.MatchId,
                     gameId = firstGame.GameId,
                     creatorName = match.Player1Name,
-                    targetScore = match.TargetScore,
-                    isRated = match.IsRated
+                    targetScore = match.TargetScore
                 });
 
                 _logger.LogInformation(
@@ -1788,8 +1804,7 @@ public class GameHub : Hub
                     gameId = firstGame.GameId,
                     creatorName = match.Player1Name,
                     targetScore = match.TargetScore,
-                    timePerMoveDays = match.TimePerMoveDays,
-                    isRated = match.IsRated
+                    timePerMoveDays = match.TimePerMoveDays
                 });
 
                 _logger.LogInformation(
