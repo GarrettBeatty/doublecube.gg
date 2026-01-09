@@ -1804,7 +1804,8 @@ public class GameHub : Hub
                 {
                     matchId = match.MatchId,
                     gameId = firstGame.GameId,
-                    creatorName = match.Player1Name,
+                    creatorPlayerId = match.Player1Id,
+                    creatorUsername = match.Player1Name,
                     targetScore = match.TargetScore,
                     timePerMoveDays = match.TimePerMoveDays,
                     isRated = match.IsRated

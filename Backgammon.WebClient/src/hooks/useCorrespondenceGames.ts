@@ -7,6 +7,7 @@ import {
   CorrespondenceMatchInvite,
   CorrespondenceTurnNotification,
 } from '@/types/match.types'
+import { authService } from '@/services/auth.service'
 
 export const useCorrespondenceGames = () => {
   const { invoke, isConnected, connection } = useSignalR()
@@ -96,6 +97,7 @@ export const useCorrespondenceGames = () => {
           OpponentId: config.friendUserId,
           IsCorrespondence: true,
           IsRated: config.isRated ?? true,
+          DisplayName: authService.getDisplayName(),
         })
       } catch (err) {
         console.error('Error creating correspondence match:', err)
