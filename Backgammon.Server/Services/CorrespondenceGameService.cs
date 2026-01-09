@@ -285,7 +285,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 if (currentGame != null && currentGame.IsRated)
                 {
                     // Mark game as completed (status remains as is, match winner determines outcome)
-                    currentGame.Status = Models.GameStatus.Completed;
+                    currentGame.Status = "Completed";
                     await _gameRepository.SaveGameAsync(currentGame);
 
                     // Update stats (includes ELO rating updates)
