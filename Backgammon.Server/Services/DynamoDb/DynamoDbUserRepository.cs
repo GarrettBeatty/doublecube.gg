@@ -33,14 +33,17 @@ public class DynamoDbUserRepository : IUserRepository
                 {
                     ["PK"] = new AttributeValue { S = $"USER#{userId}" },
                     ["SK"] = new AttributeValue { S = "PROFILE" }
-                }
+                },
+                ConsistentRead = true // Ensure read-your-own-write consistency for recently created users
             });
 
             if (!response.IsItemSet)
             {
+                _logger.LogWarning("User {UserId} not found (ConsistentRead=true)", userId);
                 return null;
             }
 
+            _logger.LogDebug("Successfully retrieved user {UserId} with ConsistentRead", userId);
             return DynamoDbHelpers.UnmarshalUser(response.Item);
         }
         catch (Exception ex)
