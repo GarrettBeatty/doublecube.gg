@@ -122,130 +122,112 @@ export function CorrespondenceGames() {
     );
   }
 
-  const hasGames = yourTurnGames.length > 0 || waitingGames.length > 0 || myLobbies.length > 0;
+  const hasActiveGames = yourTurnGames.length > 0 || waitingGames.length > 0;
+  const hasLobbies = myLobbies.length > 0;
+
+  // Combine your turn and waiting games, sorted by your turn first
+  const allActiveGames = [...yourTurnGames, ...waitingGames];
 
   return (
     <div className="space-y-6">
-      {/* Header with actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold">My Correspondence Games</h2>
-          <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
+      {/* My Correspondence Games Section */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">My Correspondence Games</h2>
+            {totalYourTurn > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {totalYourTurn} your turn
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Game
           </Button>
         </div>
-        <Button onClick={() => setIsCreateModalOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Game
-        </Button>
+
+        {hasActiveGames ? (
+          <div className="space-y-2">
+            {allActiveGames.map((game) => (
+              <GameCard
+                key={game.matchId}
+                game={game}
+                isYourTurn={game.isYourTurn}
+                onPlay={handlePlayGame}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
+              <div className="text-muted-foreground text-center">
+                <p className="text-base mb-2">No active games</p>
+                <p className="text-sm">Create a new game or join an available game below</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {!hasGames ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
-            <div className="text-muted-foreground text-center">
-              <p className="text-lg mb-2">No correspondence games</p>
-              <p className="text-sm">Use the "New Game" button above to start a game at your own pace</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          {/* Your Turn Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold">Your Turn</h3>
-              {totalYourTurn > 0 && (
-                <Badge variant="destructive" className="animate-pulse">
-                  {totalYourTurn} waiting
-                </Badge>
-              )}
-            </div>
-            {yourTurnGames.length > 0 ? (
-              <div className="space-y-2">
-                {yourTurnGames.map((game) => (
-                  <GameCard
-                    key={game.matchId}
-                    game={game}
-                    isYourTurn={true}
-                    onPlay={handlePlayGame}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-sm py-4 text-center border rounded-lg">
-                No games waiting for your move
-              </div>
-            )}
-          </div>
+      {/* Available Games Section - Open lobbies waiting for players */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Available Games</h2>
+        </div>
 
-          {/* Opponent's Turn Section - Active games where it's not your turn */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Opponent's Turn</h3>
-            {waitingGames.length > 0 ? (
-              <div className="space-y-2">
-                {waitingGames.map((game) => (
-                  <GameCard
-                    key={game.matchId}
-                    game={game}
-                    isYourTurn={false}
-                    onPlay={handlePlayGame}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="text-muted-foreground text-sm py-4 text-center border rounded-lg">
-                All your games are waiting for your move
-              </div>
-            )}
-          </div>
-
-          {/* My Lobbies Section - Games created by user waiting for someone to join */}
-          {myLobbies.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3">Open Lobbies</h3>
-              <div className="space-y-2">
-                {myLobbies.map((lobby) => (
-                  <div
-                    key={lobby.matchId}
-                    className="flex items-center justify-between p-4 border rounded-lg bg-blue-500/5"
-                  >
-                    <div className="flex items-center gap-3">
-                      <User className="h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">Waiting for player to join</span>
-                          {lobby.isRated && (
-                            <Badge variant="outline" className="text-xs">
-                              Rated
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {lobby.timePerMoveDays} day{lobby.timePerMoveDays > 1 ? 's' : ''}/move
-                          </Badge>
-                          <Badge variant="outline" className="text-xs">
-                            {lobby.targetScore}pt match
-                          </Badge>
-                        </div>
-                      </div>
+        {hasLobbies ? (
+          <div className="space-y-2">
+            {myLobbies.map((lobby) => (
+              <div
+                key={lobby.matchId}
+                className="flex items-center justify-between p-4 border rounded-lg bg-blue-500/5 hover:bg-blue-500/10 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">Waiting for player to join</span>
+                      {lobby.isRated && (
+                        <Badge variant="outline" className="text-xs">
+                          Rated
+                        </Badge>
+                      )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handlePlayGame(lobby.gameId)}
-                    >
-                      View
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {lobby.timePerMoveDays} day{lobby.timePerMoveDays > 1 ? 's' : ''}/move
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {lobby.targetScore}pt match
+                      </Badge>
+                    </div>
                   </div>
-                ))}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePlayGame(lobby.gameId)}
+                >
+                  View
+                </Button>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <div className="text-muted-foreground text-center text-sm">
+                No open lobbies available
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Create Match Modal */}
       <CreateCorrespondenceMatchModal
