@@ -122,6 +122,62 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<AuthResponse> RegisterAnonymousUserAsync(string playerId, string displayName)
+    {
+        try
+        {
+            // Check if user already exists with this player ID
+            var existingUser = await _userRepository.GetByUserIdAsync(playerId);
+            if (existingUser != null)
+            {
+                // User already registered, return existing token
+                var existingToken = GenerateToken(existingUser);
+                return new AuthResponse
+                {
+                    Success = true,
+                    Token = existingToken,
+                    User = UserDto.FromUser(existingUser)
+                };
+            }
+
+            // Create anonymous user
+            var user = new User
+            {
+                UserId = playerId,
+                Username = displayName, // Use display name as username for anonymous users
+                UsernameNormalized = displayName.ToLowerInvariant(),
+                DisplayName = displayName,
+                Email = null,
+                EmailNormalized = null,
+                PasswordHash = string.Empty, // No password for anonymous users
+                CreatedAt = DateTime.UtcNow,
+                LastLoginAt = DateTime.UtcNow,
+                LastSeenAt = DateTime.UtcNow,
+                Stats = new UserStats(),
+                IsActive = true,
+                IsAnonymous = true
+            };
+
+            await _userRepository.CreateUserAsync(user);
+
+            _logger.LogInformation("Anonymous user registered with ID {UserId} and display name {DisplayName}", user.UserId, displayName);
+
+            var token = GenerateToken(user);
+
+            return new AuthResponse
+            {
+                Success = true,
+                Token = token,
+                User = UserDto.FromUser(user)
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to register anonymous user {PlayerId}", playerId);
+            return new AuthResponse { Success = false, Error = "Anonymous registration failed. Please try again." };
+        }
+    }
+
     public async Task<AuthResponse> LoginAsync(LoginRequest request)
     {
         try

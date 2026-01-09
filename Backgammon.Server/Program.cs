@@ -574,6 +574,13 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IAuthService a
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 }).RequireCors(selectedCorsPolicy);
 
+// Register anonymous user
+app.MapPost("/api/auth/register-anonymous", async (AnonymousRegisterRequest request, IAuthService authService) =>
+{
+    var result = await authService.RegisterAnonymousUserAsync(request.PlayerId, request.DisplayName);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+}).RequireCors(selectedCorsPolicy);
+
 // Login
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
 {

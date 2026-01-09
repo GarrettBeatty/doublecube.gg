@@ -84,6 +84,12 @@ public class User
     public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
 
     /// <summary>
+    /// Whether this is an anonymous user (no email/password)
+    /// </summary>
+    [JsonPropertyName("isAnonymous")]
+    public bool IsAnonymous { get; set; } = false;
+
+    /// <summary>
     /// User's game statistics (denormalized for fast reads)
     /// </summary>
     [JsonPropertyName("stats")]

@@ -104,11 +104,12 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 throw new ArgumentException("Player IDs cannot be identical");
             }
 
-            // Get player 1 info
+            // Get player 1 info - all users (including anonymous) are now in the database
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-            var player1Name = (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
-                ? player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}"
-                : player1DisplayName;
+            if (player1 == null)
+            {
+                throw new ArgumentException($"Player {player1Id} not found in database");
+            }
 
             // Create match with correspondence fields
             var match = new Match
@@ -116,7 +117,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 MatchId = Guid.NewGuid().ToString(),
                 TargetScore = targetScore,
                 Player1Id = player1Id,
-                Player1Name = player1Name,
+                Player1Name = player1.DisplayName,
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
                 IsCorrespondence = true,
@@ -128,8 +129,13 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
+                if (player2 == null)
+                {
+                    throw new ArgumentException($"Player {player2Id} not found in database");
+                }
+
                 match.Player2Id = player2Id;
-                match.Player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+                match.Player2Name = player2.DisplayName;
                 match.Status = "InProgress";
                 match.IsOpenLobby = false;
 
