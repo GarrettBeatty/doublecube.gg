@@ -80,6 +80,7 @@ export const useCorrespondenceGames = () => {
       timePerMoveDays: number
       friendUserId?: string
       isRated?: boolean
+      displayName?: string
     }) => {
       if (!isConnected) {
         throw new Error('Not connected to server')
@@ -93,6 +94,7 @@ export const useCorrespondenceGames = () => {
           OpponentId: config.friendUserId,
           IsCorrespondence: true,
           IsRated: config.isRated ?? true,
+          DisplayName: config.displayName,
         })
       } catch (err) {
         console.error('Error creating correspondence match:', err)
