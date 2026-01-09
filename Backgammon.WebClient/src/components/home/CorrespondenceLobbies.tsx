@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, User, RefreshCw, AlertCircle } from 'lucide-react';
@@ -28,7 +28,7 @@ export function CorrespondenceLobbies() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchLobbies = async () => {
+  const fetchLobbies = useCallback(async () => {
     if (!isConnected) return;
 
     try {
@@ -48,14 +48,14 @@ export function CorrespondenceLobbies() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [isConnected, invoke]);
 
   useEffect(() => {
     fetchLobbies();
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchLobbies, 30000);
     return () => clearInterval(interval);
-  }, [isConnected]);
+  }, [fetchLobbies]);
 
   const handleJoinLobby = async (matchId: string) => {
     try {
