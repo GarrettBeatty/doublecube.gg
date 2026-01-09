@@ -67,7 +67,7 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
         timePerMoveDays,
         friendUserId: opponentType === 'Friend' ? friendUserId : undefined,
         isRated: isAuthenticated ? isRated : false,
-        displayName: authService.getDisplayName() || 'Player',
+        displayName: authService.getDisplayName(),
       })
       onClose()
     } catch (err) {

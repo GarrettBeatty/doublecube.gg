@@ -137,9 +137,17 @@ class AuthService {
     return user?.userId || this.getOrCreatePlayerId()
   }
 
-  getDisplayName(): string | null {
+  getDisplayName(): string {
     const user = this.getUser()
-    return user?.username || null
+    if (user?.username) {
+      return user.username
+    }
+
+    // For anonymous users, generate a consistent display name from their player ID
+    const playerId = this.getOrCreatePlayerId()
+    // Extract the random suffix (last part after final underscore)
+    const suffix = playerId.split('_').pop() || 'anonymous'
+    return `Anonymous-${suffix.substring(0, 6)}`
   }
 
   private generatePlayerId(): string {
