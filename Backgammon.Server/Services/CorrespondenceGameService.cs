@@ -278,14 +278,14 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 
             await _matchRepository.UpdateMatchAsync(match);
 
-            // Update player stats and ELO ratings for rated matches
-            if (match.IsRated && !string.IsNullOrEmpty(match.CurrentGameId))
+            // Update player stats and ELO ratings for rated games
+            if (!string.IsNullOrEmpty(match.CurrentGameId))
             {
                 var currentGame = await _gameRepository.GetGameByGameIdAsync(match.CurrentGameId);
-                if (currentGame != null)
+                if (currentGame != null && currentGame.IsRated)
                 {
-                    // Mark game as completed by forfeit
-                    currentGame.Status = Models.GameStatus.Abandoned;
+                    // Mark game as completed (status remains as is, match winner determines outcome)
+                    currentGame.Status = Models.GameStatus.Completed;
                     await _gameRepository.SaveGameAsync(currentGame);
 
                     // Update stats (includes ELO rating updates)

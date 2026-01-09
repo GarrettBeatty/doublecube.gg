@@ -9,17 +9,6 @@ namespace Backgammon.Server.Services;
 /// Background service that periodically checks for expired correspondence games
 /// and handles timeouts (auto-forfeit).
 /// </summary>
-/// <summary>
-/// Configuration options for correspondence timeout checking
-/// </summary>
-public class CorrespondenceTimeoutOptions
-{
-    /// <summary>
-    /// How often to check for expired correspondence games (in hours)
-    /// </summary>
-    public int CheckIntervalHours { get; set; } = 1;
-}
-
 public class CorrespondenceTimeoutService : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
