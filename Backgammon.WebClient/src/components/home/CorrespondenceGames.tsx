@@ -179,9 +179,9 @@ export function CorrespondenceGames() {
             )}
           </div>
 
-          {/* Waiting for Opponent Section */}
+          {/* Opponent's Turn Section - Active games where it's not your turn */}
           <div>
-            <h3 className="text-lg font-semibold mb-3">Waiting for Opponent</h3>
+            <h3 className="text-lg font-semibold mb-3">Opponent's Turn</h3>
             {waitingGames.length > 0 ? (
               <div className="space-y-2">
                 {waitingGames.map((game) => (
@@ -195,15 +195,15 @@ export function CorrespondenceGames() {
               </div>
             ) : (
               <div className="text-muted-foreground text-sm py-4 text-center border rounded-lg">
-                No games waiting for opponent
+                All your games are waiting for your move
               </div>
             )}
           </div>
 
-          {/* My Lobbies Section - Games created by user waiting for opponents */}
+          {/* My Lobbies Section - Games created by user waiting for someone to join */}
           {myLobbies.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold mb-3">My Lobbies</h3>
+              <h3 className="text-lg font-semibold mb-3">Open Lobbies</h3>
               <div className="space-y-2">
                 {myLobbies.map((lobby) => (
                   <div
@@ -214,7 +214,7 @@ export function CorrespondenceGames() {
                       <User className="h-5 w-5 text-muted-foreground" />
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold">Waiting for opponent</span>
+                          <span className="font-semibold">Waiting for player to join</span>
                           {lobby.isRated && (
                             <Badge variant="outline" className="text-xs">
                               Rated
