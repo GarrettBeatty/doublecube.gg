@@ -114,23 +114,31 @@ public class GameService : IGameService
         // Register player connection for game action lookups
         _sessionManager.RegisterPlayerConnection(connectionId, session.Id);
 
-        // Set display name if authenticated
-        if (!string.IsNullOrEmpty(displayName))
-        {
-            session.SetPlayerName(playerId, displayName);
-        }
-
-        // Fetch and set player rating (independent of display name)
+        // Fetch user data to set both display name and rating
         _logger.LogInformation("Fetching user for playerId: {PlayerId}", playerId);
         var user = await _userRepository.GetByUserIdAsync(playerId);
         if (user != null)
         {
-            _logger.LogInformation("Found user {UserId} with rating {Rating}", user.UserId, user.Rating);
+            _logger.LogInformation("Found user {UserId} with rating {Rating} and display name {DisplayName}", user.UserId, user.Rating, user.DisplayName);
+
+            // Set display name from database (prioritize authenticated displayName parameter if provided)
+            var effectiveDisplayName = !string.IsNullOrEmpty(displayName) ? displayName : user.DisplayName;
+            if (!string.IsNullOrEmpty(effectiveDisplayName))
+            {
+                session.SetPlayerName(playerId, effectiveDisplayName);
+            }
+
             SetPlayerRating(session, playerId, user.Rating);
         }
         else
         {
             _logger.LogWarning("No user found for playerId: {PlayerId}", playerId);
+
+            // Fall back to authenticated display name if user not found in database
+            if (!string.IsNullOrEmpty(displayName))
+            {
+                session.SetPlayerName(playerId, displayName);
+            }
         }
 
         if (session.IsFull)

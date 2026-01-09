@@ -158,9 +158,31 @@ public class AuthService : IAuthService
                 IsAnonymous = true
             };
 
-            await _userRepository.CreateUserAsync(user);
+            try
+            {
+                await _userRepository.CreateUserAsync(user);
+                _logger.LogInformation("Anonymous user registered with ID {UserId} and display name {DisplayName}", user.UserId, displayName);
+            }
+            catch (InvalidOperationException)
+            {
+                // Race condition: user was created between our check and now (e.g., by OnConnectedAsync)
+                // Fetch the existing user and return its token
+                _logger.LogInformation("Anonymous user {UserId} already exists (race condition), returning existing token", playerId);
+                var raceConditionUser = await _userRepository.GetByUserIdAsync(playerId);
+                if (raceConditionUser != null)
+                {
+                    var raceToken = GenerateToken(raceConditionUser);
+                    return new AuthResponse
+                    {
+                        Success = true,
+                        Token = raceToken,
+                        User = UserDto.FromUser(raceConditionUser)
+                    };
+                }
 
-            _logger.LogInformation("Anonymous user registered with ID {UserId} and display name {DisplayName}", user.UserId, displayName);
+                // If user still doesn't exist somehow, fall through to generic error
+                throw;
+            }
 
             var token = GenerateToken(user);
 
