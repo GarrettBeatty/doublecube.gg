@@ -306,6 +306,8 @@ export const useSignalREvents = () => {
     connection.on(HubEvents.MatchUpdate, (data: MatchUpdateEvent) => {
       console.log('[SignalR] MatchUpdate', data)
 
+      // Include current timestamp when receiving updates
+      // Server events are authoritative, so we always apply them
       setMatchState({
         matchId: data.matchId,
         player1Score: data.player1Score,
@@ -314,6 +316,7 @@ export const useSignalREvents = () => {
         isCrawfordGame: data.isCrawfordGame,
         matchComplete: data.matchComplete,
         matchWinner: data.matchWinner,
+        lastUpdatedAt: new Date().toISOString(),
       })
     })
 
@@ -321,7 +324,7 @@ export const useSignalREvents = () => {
     connection.on(HubEvents.MatchContinued, (data: MatchContinuedEvent) => {
       console.log('[SignalR] MatchContinued', data)
 
-      // Update match state
+      // Update match state with timestamp
       setMatchState({
         matchId: data.matchId,
         player1Score: data.player1Score,
@@ -330,6 +333,7 @@ export const useSignalREvents = () => {
         isCrawfordGame: data.isCrawfordGame,
         matchComplete: false,
         matchWinner: null,
+        lastUpdatedAt: new Date().toISOString(),
       })
 
       // Close the result modal
