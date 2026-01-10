@@ -234,41 +234,50 @@ public class GameHub : Hub
                 return;
             }
 
-            // Get initial dice count to detect if moves were made
-            var initialDiceCount = session.Engine.Dice.GetMoves().Count;
-            var currentRemainingCount = session.Engine.RemainingMoves.Count;
-
-            // Allow setting dice if:
-            // 1. No remaining moves (turn ended), OR
-            // 2. All moves still available (no moves made yet)
-            var noMovesLeft = currentRemainingCount == 0;
-            var noMovesMadeYet = currentRemainingCount == initialDiceCount;
-
-            if (!noMovesLeft && !noMovesMadeYet)
-            {
-                await Clients.Caller.SendAsync("Error", "End your turn or undo moves before setting new dice");
-                return;
-            }
-
-            // Validate dice values
+            // Validate dice values early (before acquiring lock)
             if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6)
             {
                 await Clients.Caller.SendAsync("Error", "Dice values must be between 1 and 6");
                 return;
             }
 
-            // Set the dice
-            session.Engine.Dice.SetDice(die1, die2);
-            session.Engine.RemainingMoves.Clear();
-            session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+            // Acquire lock to prevent race conditions with multi-tab access
+            await session.GameActionLock.WaitAsync();
+            try
+            {
+                // Get initial dice count to detect if moves were made
+                var initialDiceCount = session.Engine.Dice.GetMoves().Count;
+                var currentRemainingCount = session.Engine.RemainingMoves.Count;
 
-            _logger.LogInformation(
-                "Set dice to [{Die1}, {Die2}] in analysis game {GameId}",
-                die1,
-                die2,
-                session.Id);
+                // Allow setting dice if:
+                // 1. No remaining moves (turn ended), OR
+                // 2. All moves still available (no moves made yet)
+                var noMovesLeft = currentRemainingCount == 0;
+                var noMovesMadeYet = currentRemainingCount == initialDiceCount;
 
-            // Broadcast update
+                if (!noMovesLeft && !noMovesMadeYet)
+                {
+                    await Clients.Caller.SendAsync("Error", "End your turn or undo moves before setting new dice");
+                    return;
+                }
+
+                // Set the dice (now atomic with validation)
+                session.Engine.Dice.SetDice(die1, die2);
+                session.Engine.RemainingMoves.Clear();
+                session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+                _logger.LogInformation(
+                    "Set dice to [{Die1}, {Die2}] in analysis game {GameId}",
+                    die1,
+                    die2,
+                    session.Id);
+            }
+            finally
+            {
+                session.GameActionLock.Release();
+            }
+
+            // Broadcast update (outside lock to prevent potential deadlocks)
             await _gameService.BroadcastGameUpdateAsync(session);
         }
         catch (Exception ex)
@@ -1951,9 +1960,36 @@ public class GameHub : Hub
         return claimDisplayName;
     }
 
-    private string GetEffectivePlayerId(string anonymousPlayerId)
+    /// <summary>
+    /// Gets the authenticated player ID from JWT claims.
+    /// Never falls back to client-provided IDs for security reasons.
+    /// </summary>
+    /// <param name="clientProvidedId">Legacy parameter - ignored for security. Use only authenticated ID.</param>
+    /// <returns>The authenticated user ID from JWT</returns>
+    /// <exception cref="HubException">Thrown if no authenticated user found</exception>
+    private string GetEffectivePlayerId(string clientProvidedId)
     {
-        return GetAuthenticatedUserId() ?? anonymousPlayerId;
+        var authenticatedUserId = GetAuthenticatedUserId();
+
+        // Security: Never use client-provided IDs - always require server-validated JWT ID
+        if (string.IsNullOrEmpty(authenticatedUserId))
+        {
+            _logger.LogWarning(
+                "GetEffectivePlayerId called without authenticated user. Client attempted to use ID: {ClientId}",
+                clientProvidedId);
+            throw new HubException("Authentication required. Player ID must come from valid JWT.");
+        }
+
+        // Log if client tried to spoof a different ID
+        if (!string.IsNullOrEmpty(clientProvidedId) && clientProvidedId != authenticatedUserId)
+        {
+            _logger.LogWarning(
+                "Client attempted to use different player ID. JWT ID: {JwtId}, Attempted ID: {AttemptedId}",
+                authenticatedUserId,
+                clientProvidedId);
+        }
+
+        return authenticatedUserId;
     }
 
     private async Task HandleDisconnection(string connectionId)
