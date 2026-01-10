@@ -41,6 +41,7 @@ export function GameLobby() {
   };
 
   // Map backend lobbies to UI display format
+  // Backend already filters to return only regular (non-correspondence) lobbies
   const lobbyGames: LobbyGame[] = lobbies.map(mapMatchLobbyToLobbyGame);
 
   // Apply client-side filtering

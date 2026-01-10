@@ -34,13 +34,18 @@ public class DynamoDbUserRepository : IUserRepository
                     ["PK"] = new AttributeValue { S = $"USER#{userId}" },
                     ["SK"] = new AttributeValue { S = "PROFILE" }
                 }
+
+                // Using eventually consistent reads (default) since CachedUserService
+                // caches users immediately after creation, eliminating race conditions
             });
 
             if (!response.IsItemSet)
             {
+                _logger.LogWarning("User {UserId} not found", userId);
                 return null;
             }
 
+            _logger.LogDebug("Successfully retrieved user {UserId}", userId);
             return DynamoDbHelpers.UnmarshalUser(response.Item);
         }
         catch (Exception ex)

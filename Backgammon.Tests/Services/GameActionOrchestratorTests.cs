@@ -18,6 +18,8 @@ public class GameActionOrchestratorTests
     private readonly Mock<IGameSessionManager> _mockSessionManager;
     private readonly Mock<IHubContext<GameHub>> _mockHubContext;
     private readonly Mock<ILogger<GameActionOrchestrator>> _mockLogger;
+    private readonly Mock<ICorrespondenceGameService> _mockCorrespondenceGameService;
+    private readonly Mock<IMatchRepository> _mockMatchRepository;
     private readonly GameActionOrchestrator _orchestrator;
 
     public GameActionOrchestratorTests()
@@ -29,6 +31,8 @@ public class GameActionOrchestratorTests
         _mockSessionManager = new Mock<IGameSessionManager>();
         _mockHubContext = new Mock<IHubContext<GameHub>>();
         _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
+        _mockCorrespondenceGameService = new Mock<ICorrespondenceGameService>();
+        _mockMatchRepository = new Mock<IMatchRepository>();
 
         // Set up HubContext mock chain for broadcasting
         var mockClients = new Mock<IHubClients>();
@@ -46,7 +50,9 @@ public class GameActionOrchestratorTests
             _mockMatchService.Object,
             _mockSessionManager.Object,
             _mockHubContext.Object,
-            _mockLogger.Object);
+            _mockLogger.Object,
+            _mockCorrespondenceGameService.Object,
+            _mockMatchRepository.Object);
     }
 
     [Fact]

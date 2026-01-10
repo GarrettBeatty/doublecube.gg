@@ -60,7 +60,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       const config = {
         OpponentType: opponentType,
         TargetScore: targetScore,
-        DisplayName: authService.getDisplayName() || 'Player',
+        DisplayName: authService.getDisplayName(),
         TimeControlType: timeControlType,
         IsRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
       }

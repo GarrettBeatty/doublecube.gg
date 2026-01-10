@@ -13,6 +13,11 @@ public interface IAuthService
     Task<AuthResponse> RegisterAsync(RegisterRequest request);
 
     /// <summary>
+    /// Register an anonymous user
+    /// </summary>
+    Task<AuthResponse> RegisterAnonymousUserAsync(string playerId, string displayName);
+
+    /// <summary>
     /// Authenticate a user and return a JWT token
     /// </summary>
     Task<AuthResponse> LoginAsync(LoginRequest request);

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { HubConnection } from '@microsoft/signalr'
 import { signalRService } from '@/services/signalr.service'
 import { ConnectionState } from '@/types/signalr.types'
+import { useAuth } from './AuthContext'
 
 interface SignalRContextType {
   connection: HubConnection | null
@@ -26,17 +27,27 @@ interface SignalRProviderProps {
 }
 
 export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) => {
+  const { isReady: authReady } = useAuth()
   const [connection, setConnection] = useState<HubConnection | null>(null)
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     ConnectionState.Disconnected
   )
 
   useEffect(() => {
+    // CRITICAL: Wait for authentication to complete before connecting to SignalR
+    // This ensures JWT with displayName exists and user is in database
+    if (!authReady) {
+      console.log('[SignalRContext] Waiting for authentication to complete...')
+      return
+    }
+
+    console.log('[SignalRContext] Authentication ready, initializing SignalR connection...')
+
     const initializeConnection = async () => {
       try {
         setConnectionState(ConnectionState.Connecting)
 
-        // Initialize SignalR service
+        // Initialize SignalR service (JWT will be attached automatically from localStorage)
         const conn = await signalRService.initialize()
         setConnection(conn)
 
@@ -56,11 +67,11 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
           setConnectionState(ConnectionState.Disconnected)
         })
 
-        // Start the connection
+        // Start the connection with JWT
         await signalRService.start()
         setConnectionState(ConnectionState.Connected)
 
-        console.log('[SignalRContext] Connection established')
+        console.log('[SignalRContext] SignalR connection established successfully')
       } catch (error) {
         console.error('[SignalRContext] Failed to initialize connection:', error)
         setConnectionState(ConnectionState.Failed)
@@ -73,7 +84,7 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
     return () => {
       signalRService.stop()
     }
-  }, [])
+  }, [authReady]) // Re-run when auth becomes ready
 
   const invoke = async <T = void,>(
     methodName: string,

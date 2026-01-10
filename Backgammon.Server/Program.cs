@@ -143,6 +143,12 @@ builder.Services.AddSingleton<IFriendService, FriendService>();
 // Match service
 builder.Services.AddSingleton<IMatchService, MatchService>();
 
+// Correspondence game service
+builder.Services.AddSingleton<ICorrespondenceGameService, CorrespondenceGameService>();
+
+// Correspondence timeout background service (checks hourly for expired games)
+builder.Services.AddHostedService<CorrespondenceTimeoutService>();
+
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
@@ -568,6 +574,13 @@ app.MapPost("/api/auth/register", async (RegisterRequest request, IAuthService a
     return result.Success ? Results.Ok(result) : Results.BadRequest(result);
 }).RequireCors(selectedCorsPolicy);
 
+// Register anonymous user
+app.MapPost("/api/auth/register-anonymous", async (AnonymousRegisterRequest request, IAuthService authService) =>
+{
+    var result = await authService.RegisterAnonymousUserAsync(request.PlayerId, request.DisplayName);
+    return result.Success ? Results.Ok(result) : Results.BadRequest(result);
+}).RequireCors(selectedCorsPolicy);
+
 // Login
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService authService) =>
 {
@@ -888,7 +901,9 @@ static async Task EnsureTableExistsAsync(Amazon.DynamoDBv2.IAmazonDynamoDB dynam
             new() { AttributeName = "GSI2PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
             new() { AttributeName = "GSI2SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
             new() { AttributeName = "GSI3PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI3SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S }
+            new() { AttributeName = "GSI3SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI4PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
+            new() { AttributeName = "GSI4SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S }
         },
         BillingMode = Amazon.DynamoDBv2.BillingMode.PAY_PER_REQUEST,
         GlobalSecondaryIndexes = new List<Amazon.DynamoDBv2.Model.GlobalSecondaryIndex>
@@ -920,6 +935,16 @@ static async Task EnsureTableExistsAsync(Amazon.DynamoDBv2.IAmazonDynamoDB dynam
                 {
                     new() { AttributeName = "GSI3PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
                     new() { AttributeName = "GSI3SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
+                },
+                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
+            },
+            new()
+            {
+                IndexName = "GSI4",
+                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
+                {
+                    new() { AttributeName = "GSI4PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
+                    new() { AttributeName = "GSI4SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
                 },
                 Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
             }

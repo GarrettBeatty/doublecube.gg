@@ -46,14 +46,7 @@ public class DynamoDbMatchRepository : IMatchRepository
             var player1Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
                 match.Player1Id,
                 match.MatchId,
-                match.Player2Id,
-                match.Status,
-                match.CreatedAt);
-
-            var player2Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
-                match.Player2Id,
-                match.MatchId,
-                match.Player1Id,
+                match.Player2Id ?? string.Empty, // Empty string for null opponent (OpenLobby)
                 match.Status,
                 match.CreatedAt);
 
@@ -66,14 +59,25 @@ public class DynamoDbMatchRepository : IMatchRepository
                 }
             });
 
-            transactItems.Add(new TransactWriteItem
+            // Only create Player2 index item if Player2Id is set
+            if (!string.IsNullOrEmpty(match.Player2Id))
             {
-                Put = new Put
+                var player2Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
+                    match.Player2Id,
+                    match.MatchId,
+                    match.Player1Id,
+                    match.Status,
+                    match.CreatedAt);
+
+                transactItems.Add(new TransactWriteItem
                 {
-                    TableName = _tableName,
-                    Item = player2Match
-                }
-            });
+                    Put = new Put
+                    {
+                        TableName = _tableName,
+                        Item = player2Match
+                    }
+                });
+            }
 
             await _dynamoDbClient.TransactWriteItemsAsync(new TransactWriteItemsRequest
             {
@@ -192,11 +196,17 @@ public class DynamoDbMatchRepository : IMatchRepository
             // Update player-match index items
             var reversedTimestamp = (DateTime.MaxValue.Ticks - match.CreatedAt.Ticks).ToString("D19");
 
-            var playerIndexUpdateTasks = new[]
+            var playerIndexUpdateTasks = new List<Task>
             {
-                UpdatePlayerMatchIndex(match.Player1Id, match.MatchId, reversedTimestamp, match.Status),
-                UpdatePlayerMatchIndex(match.Player2Id, match.MatchId, reversedTimestamp, match.Status)
+                UpdatePlayerMatchIndex(match.Player1Id, match.MatchId, reversedTimestamp, match.Status)
             };
+
+            // Only update Player2 index if Player2Id exists
+            if (!string.IsNullOrEmpty(match.Player2Id))
+            {
+                playerIndexUpdateTasks.Add(
+                    UpdatePlayerMatchIndex(match.Player2Id, match.MatchId, reversedTimestamp, match.Status));
+            }
 
             await Task.WhenAll(playerIndexUpdateTasks);
 
@@ -406,28 +416,42 @@ public class DynamoDbMatchRepository : IMatchRepository
         }
     }
 
-    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null)
     {
         try
         {
+            // Build filter expression
+            var filterExpression = "isOpenLobby = :isOpen";
+            var expressionAttributeValues = new Dictionary<string, AttributeValue>
+            {
+                [":pk"] = new AttributeValue { S = "MATCH_STATUS#WaitingForPlayers" },
+                [":isOpen"] = new AttributeValue { BOOL = true }
+            };
+
+            // Add correspondence filter if specified
+            if (isCorrespondence.HasValue)
+            {
+                filterExpression += " AND isCorrespondence = :isCorrespondence";
+                expressionAttributeValues[":isCorrespondence"] = new AttributeValue { BOOL = isCorrespondence.Value };
+            }
+
             // Query GSI3 for WaitingForPlayers status - FAST!
             var response = await _dynamoDbClient.QueryAsync(new QueryRequest
             {
                 TableName = _tableName,
                 IndexName = "GSI3",
                 KeyConditionExpression = "GSI3PK = :pk",
-                FilterExpression = "isOpenLobby = :isOpen",  // Only public lobbies
-                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
-                {
-                    [":pk"] = new AttributeValue { S = "MATCH_STATUS#WaitingForPlayers" },
-                    [":isOpen"] = new AttributeValue { BOOL = true }
-                },
+                FilterExpression = filterExpression,
+                ExpressionAttributeValues = expressionAttributeValues,
                 Limit = limit,
                 ScanIndexForward = false // Most recent first
             });
 
             var lobbies = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
-            _logger.LogDebug("Retrieved {Count} open lobbies via GSI3", lobbies.Count);
+            _logger.LogDebug(
+                "Retrieved {Count} open lobbies via GSI3 (isCorrespondence: {IsCorrespondence})",
+                lobbies.Count,
+                isCorrespondence?.ToString() ?? "all");
             return lobbies;
         }
         catch (Exception ex)
@@ -582,6 +606,222 @@ public class DynamoDbMatchRepository : IMatchRepository
             _logger.LogError(ex, "Failed to update match status for {MatchId}", matchId);
             throw;
         }
+    }
+
+    public async Task<List<Match>> GetCorrespondenceMatchesForTurnAsync(string playerId)
+    {
+        try
+        {
+            // Query GSI4 for matches where it's this player's turn
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI4",
+                KeyConditionExpression = "GSI4PK = :pk",
+                FilterExpression = "#status = :inProgress",
+                ExpressionAttributeNames = new Dictionary<string, string>
+                {
+                    ["#status"] = "status"
+                },
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = $"CORRESPONDENCE_TURN#{playerId}" },
+                    [":inProgress"] = new AttributeValue { S = "InProgress" }
+                },
+                ScanIndexForward = true // Sort by deadline (earliest first)
+            });
+
+            var matches = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
+
+            // Also get matches where CurrentTurnPlayerId is null (opening roll phase)
+            // These won't be in GSI4, so we need to fetch them separately
+            var allPlayerMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
+
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesForTurnAsync: GetPlayerMatchesAsync returned {Count} InProgress matches for player {PlayerId}",
+                allPlayerMatches.Count,
+                playerId);
+
+            var openingRollMatches = allPlayerMatches
+                .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId == null)
+                .ToList();
+
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesForTurnAsync: Found {Count} opening roll matches (CurrentTurnPlayerId=null) for player {PlayerId}",
+                openingRollMatches.Count,
+                playerId);
+
+            // Log each opening roll match
+            foreach (var match in openingRollMatches)
+            {
+                _logger.LogInformation(
+                    "Opening roll match: {MatchId}, Player1={P1}, Player2={P2}, Status={Status}",
+                    match.MatchId,
+                    match.Player1Id,
+                    match.Player2Id,
+                    match.Status);
+            }
+
+            // Combine both lists
+            matches.AddRange(openingRollMatches);
+
+            // Sort by deadline
+            matches = matches.OrderBy(m => m.TurnDeadline).ToList();
+
+            _logger.LogInformation(
+                "Retrieved {Count} correspondence matches for player {PlayerId}'s turn ({YourTurn} specific turn, {OpeningRoll} opening roll)",
+                matches.Count,
+                playerId,
+                matches.Count - openingRollMatches.Count,
+                openingRollMatches.Count);
+
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve correspondence matches for player {PlayerId}'s turn", playerId);
+            return new List<Match>();
+        }
+    }
+
+    public async Task<List<Match>> GetCorrespondenceMatchesWaitingAsync(string playerId)
+    {
+        try
+        {
+            // Get all correspondence matches for the player where it's NOT their turn
+            var allMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
+
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesWaitingAsync: Found {TotalMatches} InProgress matches for player {PlayerId}",
+                allMatches.Count,
+                playerId);
+
+            // Log each match's correspondence status and current turn
+            foreach (var match in allMatches)
+            {
+                _logger.LogInformation(
+                    "Match {MatchId}: IsCorrespondence={IsCorr}, CurrentTurnPlayerId={CurrentTurn}, Player1={P1}, Player2={P2}",
+                    match.MatchId,
+                    match.IsCorrespondence,
+                    match.CurrentTurnPlayerId ?? "null",
+                    match.Player1Id,
+                    match.Player2Id);
+            }
+
+            // Filter to correspondence matches where it's NOT the player's turn
+            // Note: CurrentTurnPlayerId == null means opening roll phase (both players need to roll)
+            // In this case, we DON'T show it in waiting games - it will be shown in "your turn" games
+            var waitingMatches = allMatches
+                .Where(m => m.IsCorrespondence
+                    && m.CurrentTurnPlayerId != null
+                    && m.CurrentTurnPlayerId != playerId)
+                .OrderBy(m => m.TurnDeadline)
+                .ToList();
+
+            _logger.LogInformation("Retrieved {Count} correspondence matches where player {PlayerId} is waiting", waitingMatches.Count, playerId);
+            return waitingMatches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve correspondence matches where player {PlayerId} is waiting", playerId);
+            return new List<Match>();
+        }
+    }
+
+    public async Task<List<Match>> GetExpiredCorrespondenceMatchesAsync()
+    {
+        try
+        {
+            // Query GSI3 for in-progress matches, then filter for correspondence with expired deadlines
+            // Note: ISO 8601 datetime strings (format "O") are lexicographically sortable,
+            // so string comparison in DynamoDB filter expressions works correctly for UTC times
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                IndexName = "GSI3",
+                KeyConditionExpression = "GSI3PK = :pk",
+                FilterExpression = "isCorrespondence = :isCorr AND turnDeadline < :now",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = "MATCH_STATUS#InProgress" },
+                    [":isCorr"] = new AttributeValue { BOOL = true },
+                    [":now"] = new AttributeValue { S = DateTime.UtcNow.ToString("O") }
+                }
+            });
+
+            var matches = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
+            _logger.LogDebug("Retrieved {Count} expired correspondence matches", matches.Count);
+            return matches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve expired correspondence matches");
+            return new List<Match>();
+        }
+    }
+
+    public async Task UpdateCorrespondenceTurnAsync(string matchId, string currentTurnPlayerId, DateTime turnDeadline)
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+
+            await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
+            {
+                TableName = _tableName,
+                Key = new Dictionary<string, AttributeValue>
+                {
+                    ["PK"] = new AttributeValue { S = $"MATCH#{matchId}" },
+                    ["SK"] = new AttributeValue { S = "METADATA" }
+                },
+                UpdateExpression = @"
+                    SET currentTurnPlayerId = :turnPlayer,
+                        turnDeadline = :deadline,
+                        lastUpdatedAt = :now,
+                        GSI4PK = :gsi4pk,
+                        GSI4SK = :gsi4sk",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":turnPlayer"] = new AttributeValue { S = currentTurnPlayerId },
+                    [":deadline"] = new AttributeValue { S = turnDeadline.ToString("O") },
+                    [":now"] = new AttributeValue { S = now.ToString("O") },
+                    [":gsi4pk"] = new AttributeValue { S = $"CORRESPONDENCE_TURN#{currentTurnPlayerId}" },
+                    [":gsi4sk"] = new AttributeValue { S = turnDeadline.Ticks.ToString("D19") }
+                }
+            });
+
+            _logger.LogInformation(
+                "Updated correspondence turn for match {MatchId} - Turn: {PlayerId}, Deadline: {Deadline}",
+                matchId,
+                currentTurnPlayerId,
+                turnDeadline);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to update correspondence turn for match {MatchId}", matchId);
+            throw;
+        }
+    }
+
+    public async Task CreatePlayerMatchIndexAsync(string playerId, string matchId, string opponentId, string status, DateTime createdAt)
+    {
+        var playerMatchItem = DynamoDbHelpers.CreatePlayerMatchIndexItem(
+            playerId,
+            matchId,
+            opponentId,
+            status,
+            createdAt);
+
+        await _dynamoDbClient.PutItemAsync(new PutItemRequest
+        {
+            TableName = _tableName,
+            Item = playerMatchItem
+        });
+
+        _logger.LogInformation(
+            "Created player-match index for player {PlayerId}, match {MatchId}",
+            playerId,
+            matchId);
     }
 
     private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)

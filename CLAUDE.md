@@ -15,6 +15,92 @@ Serena provides semantic, symbol-aware operations that are more efficient and ac
 
 Serena has been initialized with project-specific memories about architecture, conventions, and workflows.
 
+## Code Quality & Style Guidelines
+
+### StyleCop Analyzers (C# Backend)
+
+This project enforces StyleCop code quality rules. **Always follow these guidelines when writing C# code:**
+
+#### Critical StyleCop Rules
+
+1. **SA1402: File may only contain a single type**
+   - Each file must contain only ONE class, interface, enum, or struct
+   - Exception: Nested types within a parent type are allowed
+   - ❌ BAD: Two classes in one file
+   - ✅ GOOD: One class per file
+
+2. **SA1649: File name should match first type name**
+   - File name must exactly match the class/type name
+   - Example: Class `UserRepository` → File `UserRepository.cs`
+   - Case-sensitive match required
+
+3. **SA1633: File should have header**
+   - Use XML documentation comments (`///`) for all public types and members
+   - Document purpose, parameters, return values, and exceptions
+
+4. **SA1200: Using directives should be placed correctly**
+   - Place all `using` statements outside the namespace
+   - Order: System namespaces first, then third-party, then project namespaces
+
+5. **SA1309: Field names should not begin with underscore**
+   - This rule is typically **disabled** in this project (private fields use `_fieldName` convention)
+   - If enabled, would require private fields without underscores
+
+#### Common StyleCop Patterns in This Project
+
+```csharp
+// ✅ GOOD: Follows all StyleCop rules
+using System;
+using Microsoft.Extensions.Logging;
+using Backgammon.Server.Models;
+
+namespace Backgammon.Server.Services;
+
+/// <summary>
+/// Manages user authentication and authorization.
+/// </summary>
+public class AuthService
+{
+    private readonly ILogger<AuthService> _logger;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuthService"/> class.
+    /// </summary>
+    /// <param name="logger">Logger for diagnostic output.</param>
+    public AuthService(ILogger<AuthService> logger)
+    {
+        _logger = logger;
+    }
+}
+```
+
+#### When Creating New Files
+
+1. **One class per file** - Create separate files for each class
+2. **Match file name to class name** exactly
+3. **Add XML documentation** for all public members
+4. **Use proper namespace** matching the folder structure
+5. **Order usings** correctly (System first, then alphabetically)
+
+#### Quick StyleCop Checklist
+
+Before committing C# code:
+- [ ] One type per file
+- [ ] File name matches class name exactly
+- [ ] XML documentation on public types/members
+- [ ] Usings are outside namespace and ordered correctly
+- [ ] Private fields use `_camelCase` convention
+- [ ] No unused using statements
+- [ ] Proper indentation (4 spaces, not tabs)
+
+### Frontend Code Quality (TypeScript/React)
+
+- Follow ESLint rules (enforced by build)
+- No unused variables or imports
+- Avoid constant expressions in conditionals (`false &&`, `true ||`)
+- Use TypeScript strict mode patterns
+- Prefer functional components with hooks
+
 ## Build & Run Commands
 
 ```bash

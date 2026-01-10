@@ -14,6 +14,7 @@ public class MatchServiceValidationTests
     private readonly Mock<IGameSessionManager> _gameSessionManagerMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IAiMoveService> _aiMoveServiceMock;
+    private readonly Mock<ICorrespondenceGameService> _correspondenceGameServiceMock;
     private readonly Mock<ILogger<MatchService>> _loggerMock;
     private readonly MatchService _matchService;
 
@@ -24,6 +25,7 @@ public class MatchServiceValidationTests
         _gameSessionManagerMock = new Mock<IGameSessionManager>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _aiMoveServiceMock = new Mock<IAiMoveService>();
+        _correspondenceGameServiceMock = new Mock<ICorrespondenceGameService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
         // Setup GameSessionManager to return a valid session
@@ -36,6 +38,7 @@ public class MatchServiceValidationTests
             _gameSessionManagerMock.Object,
             _userRepositoryMock.Object,
             _aiMoveServiceMock.Object,
+            _correspondenceGameServiceMock.Object,
             _loggerMock.Object);
     }
 
@@ -227,8 +230,8 @@ public class MatchServiceValidationTests
         var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.Equal("Player p1", match.Player1Name);
-        Assert.Equal("Player p2", match.Player2Name);
+        Assert.Equal("Unknown", match.Player1Name);
+        Assert.Equal("Unknown", match.Player2Name);
     }
 
     [Fact]
@@ -250,8 +253,8 @@ public class MatchServiceValidationTests
         var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "Friend", null, player2Id);
 
         // Assert
-        Assert.Equal("Player player12", match.Player1Name);
-        Assert.Equal("Player player98", match.Player2Name);
+        Assert.Equal("Unknown", match.Player1Name);
+        Assert.Equal("Unknown", match.Player2Name);
     }
 
     [Fact]

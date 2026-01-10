@@ -12,6 +12,7 @@ const PLAYER_ID_KEY = 'playerId'
 
 class AuthService {
   private baseUrl: string = ''
+  private registrationPromise: Promise<void> | null = null
 
   async initialize(): Promise<void> {
     // Wait for API service to initialize
@@ -137,9 +138,17 @@ class AuthService {
     return user?.userId || this.getOrCreatePlayerId()
   }
 
-  getDisplayName(): string | null {
+  getDisplayName(): string {
     const user = this.getUser()
-    return user?.username || null
+    if (user?.username) {
+      return user.username
+    }
+
+    // For anonymous users, generate a consistent display name from their player ID
+    const playerId = this.getOrCreatePlayerId()
+    // Extract the random suffix (last part after final underscore)
+    const suffix = playerId.split('_').pop() || 'anonymous'
+    return `Anonymous-${suffix.substring(0, 6)}`
   }
 
   private generatePlayerId(): string {
@@ -170,6 +179,62 @@ class AuthService {
         // Clear session on network error to be safe
         this.logout()
       }
+    } else {
+      // No token - register as anonymous user
+      this.registrationPromise = this.registerAnonymousUser()
+      await this.registrationPromise
+    }
+  }
+
+  // Ensure anonymous user registration is complete
+  async ensureRegistered(): Promise<void> {
+    if (this.registrationPromise) {
+      await this.registrationPromise
+    }
+  }
+
+  // Register anonymous user with the backend
+  async registerAnonymousUser(): Promise<void> {
+    try {
+      const playerId = this.getOrCreatePlayerId()
+      const displayName = this.getDisplayName()
+
+      const response = await fetch(`${this.baseUrl}/api/auth/register-anonymous`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId,
+          displayName,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error('[AuthService] Anonymous registration failed')
+        return
+      }
+
+      const data: AuthResponse = await response.json()
+
+      if (data.success && data.token) {
+        // Store token and user info
+        this.setToken(data.token)
+        this.setUser({
+          userId: data.user.userId,
+          username: data.user.username,
+          email: null,
+          createdAt: data.user.createdAt,
+          rating: data.user.rating,
+          peakRating: data.user.peakRating,
+          ratedGamesCount: data.user.ratedGamesCount,
+        })
+
+        // Update API service with token
+        apiService.setAuthToken(data.token)
+
+        console.log('[AuthService] Anonymous user registered:', data.user.username)
+      }
+    } catch (error) {
+      console.error('[AuthService] Failed to register anonymous user:', error)
     }
   }
 }

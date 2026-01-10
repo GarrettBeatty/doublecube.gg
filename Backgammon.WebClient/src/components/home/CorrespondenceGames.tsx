@@ -1,161 +1,229 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, Dice6 } from "lucide-react";
+import { Clock, User, RefreshCw, Plus, AlertCircle } from "lucide-react";
+import { useCorrespondenceGames } from "@/hooks/useCorrespondenceGames";
+import { CreateCorrespondenceMatchModal } from "@/components/modals/CreateCorrespondenceMatchModal";
+import { CorrespondenceGameDto } from "@/types/match.types";
 
-interface CorrespondenceGame {
-  id: string;
-  opponent: string;
-  opponentRating: number;
-  yourTurn: boolean;
-  timePerMove: string;
-  movesPlayed: number;
-  matchScore: string;
-  matchLength: string;
-  doublingCube: boolean;
+function formatTimeRemaining(timeRemaining: string | null): string {
+  if (!timeRemaining) return "No deadline";
+
+  // Parse ISO duration format (e.g., "2.12:30:00" for 2 days, 12 hours, 30 minutes)
+  // TimeSpan.ToString() returns "d.hh:mm:ss" format
+  const match = timeRemaining.match(/^(\d+)\.?(\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return timeRemaining;
+
+  const days = parseInt(match[1]) || 0;
+  const hours = parseInt(match[2]) || 0;
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  } else if (hours > 0) {
+    return `${hours}h`;
+  } else {
+    return "< 1h";
+  }
 }
 
-const mockCorrespondenceGames: CorrespondenceGame[] = [
-  {
-    id: "1",
-    opponent: "SlowStrategist",
-    opponentRating: 1876,
-    yourTurn: true,
-    timePerMove: "3 days",
-    movesPlayed: 12,
-    matchScore: "2-1",
-    matchLength: "5-point",
-    doublingCube: true,
-  },
-  {
-    id: "2",
-    opponent: "PatiencePlayer",
-    opponentRating: 2012,
-    yourTurn: false,
-    timePerMove: "5 days",
-    movesPlayed: 8,
-    matchScore: "0-0",
-    matchLength: "7-point",
-    doublingCube: true,
-  },
-  {
-    id: "3",
-    opponent: "WeekendWarrior",
-    opponentRating: 1654,
-    yourTurn: true,
-    timePerMove: "1 day",
-    movesPlayed: 24,
-    matchScore: "4-3",
-    matchLength: "7-point",
-    doublingCube: false,
-  },
-  {
-    id: "4",
-    opponent: "CasualThinker",
-    opponentRating: 1789,
-    yourTurn: false,
-    timePerMove: "7 days",
-    movesPlayed: 5,
-    matchScore: "1-1",
-    matchLength: "3-point",
-    doublingCube: true,
-  },
-];
+function GameCard({
+  game,
+  isYourTurn,
+  onPlay,
+}: {
+  game: CorrespondenceGameDto;
+  isYourTurn: boolean;
+  onPlay: (gameId: string) => void;
+}) {
+  const isUrgent = isYourTurn && game.timeRemaining && game.timeRemaining.includes(".") && parseInt(game.timeRemaining.split(".")[0]) <= 1;
+
+  return (
+    <div
+      className={`flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors ${
+        isYourTurn ? "bg-green-500/5" : "opacity-60"
+      } ${isUrgent ? "border-orange-500" : ""}`}
+    >
+      <div className="flex items-center gap-3">
+        <User className="h-5 w-5 text-muted-foreground" />
+        <div>
+          <div className="flex items-center gap-2">
+            <span className={isYourTurn ? "font-semibold" : ""}>{game.opponentName}</span>
+            <span className="text-sm text-muted-foreground">({game.opponentRating})</span>
+            {game.isRated && (
+              <Badge variant="outline" className="text-xs">
+                Rated
+              </Badge>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <Badge
+              variant={isUrgent ? "destructive" : "secondary"}
+              className="text-xs flex items-center gap-1"
+            >
+              <Clock className="h-3 w-3" />
+              {formatTimeRemaining(game.timeRemaining)}
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {game.matchScore} / {game.targetScore}pt
+            </Badge>
+            <span className="text-xs text-muted-foreground">{game.moveCount} moves</span>
+          </div>
+        </div>
+      </div>
+      <Button
+        size="sm"
+        variant={isYourTurn ? "default" : "outline"}
+        className={isYourTurn ? "bg-green-600 hover:bg-green-700" : ""}
+        onClick={() => onPlay(game.gameId)}
+      >
+        {isYourTurn ? "Play" : "View"}
+      </Button>
+    </div>
+  );
+}
 
 export function CorrespondenceGames() {
-  const yourTurnGames = mockCorrespondenceGames.filter((game) => game.yourTurn);
+  const navigate = useNavigate();
+  const {
+    yourTurnGames,
+    waitingGames,
+    myLobbies,
+    totalYourTurn,
+    isLoading,
+    error,
+    refresh,
+  } = useCorrespondenceGames();
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const handlePlayGame = (gameId: string) => {
+    navigate(`/game/${gameId}`);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-muted-foreground">Loading correspondence games...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 gap-4">
+        <AlertCircle className="h-8 w-8 text-muted-foreground" />
+        <div className="text-muted-foreground">{error}</div>
+        <Button variant="outline" onClick={refresh}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const hasAnyGames = yourTurnGames.length > 0 || waitingGames.length > 0 || myLobbies.length > 0;
+
+  // Combine all games: lobbies first (waiting for opponent), then your turn, then waiting for opponent's turn
+  const allGames = [
+    ...myLobbies.map(lobby => ({ ...lobby, type: 'lobby' as const })),
+    ...yourTurnGames.map(game => ({ ...game, type: 'active' as const })),
+    ...waitingGames.map(game => ({ ...game, type: 'active' as const }))
+  ];
 
   return (
     <div className="space-y-6">
+      {/* My Correspondence Games Section */}
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-lg font-semibold">Your Turn</h3>
-          {yourTurnGames.length > 0 && (
-            <Badge variant="destructive" className="animate-pulse">
-              {yourTurnGames.length} waiting
-            </Badge>
-          )}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-semibold">My Correspondence Games</h2>
+            {totalYourTurn > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {totalYourTurn} your turn
+              </Badge>
+            )}
+            <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={() => setIsCreateModalOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Game
+          </Button>
         </div>
-        <div className="space-y-2">
-          {yourTurnGames.map((game) => (
-            <div
-              key={game.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors bg-green-500/5"
-            >
-              <div className="flex items-center gap-3">
-                <User className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{game.opponent}</span>
-                    <span className="text-sm text-muted-foreground">({game.opponentRating})</span>
+
+        {hasAnyGames ? (
+          <div className="space-y-2">
+            {allGames.map((item) => {
+              if (item.type === 'lobby') {
+                // Render lobby card (waiting for opponent to join)
+                return (
+                  <div
+                    key={item.matchId}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-amber-600" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-amber-700 dark:text-amber-500">Waiting for opponent to join</span>
+                          {item.isRated && (
+                            <Badge variant="outline" className="text-xs">
+                              Rated
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {item.timePerMoveDays} day{item.timePerMoveDays > 1 ? 's' : ''}/move
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {item.targetScore}pt match
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePlayGame(item.gameId)}
+                    >
+                      View
+                    </Button>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {game.timePerMove}/move
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {game.matchScore} in {game.matchLength}
-                    </Badge>
-                    {game.doublingCube && (
-                      <Badge variant="outline" className="text-xs flex items-center gap-1">
-                        <Dice6 className="h-3 w-3" />
-                        Cube
-                      </Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground">{game.movesPlayed} moves</span>
-                  </div>
-                </div>
+                );
+              } else {
+                // Render active game card
+                return (
+                  <GameCard
+                    key={item.matchId}
+                    game={item}
+                    isYourTurn={item.isYourTurn}
+                    onPlay={handlePlayGame}
+                  />
+                );
+              }
+            })}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
+              <div className="text-muted-foreground text-center">
+                <p className="text-base mb-2">No correspondence games</p>
+                <p className="text-sm">Create a new game or join an available game below</p>
               </div>
-              <Button size="sm" className="bg-green-600 hover:bg-green-700">
-                Play
-              </Button>
-            </div>
-          ))}
-        </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold mb-3">Waiting for Opponent</h3>
-        <div className="space-y-2">
-          {mockCorrespondenceGames
-            .filter((game) => !game.yourTurn)
-            .map((game) => (
-              <div
-                key={game.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors opacity-60"
-              >
-                <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span>{game.opponent}</span>
-                      <span className="text-sm text-muted-foreground">({game.opponentRating})</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {game.timePerMove}/move
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {game.matchScore} in {game.matchLength}
-                      </Badge>
-                      {game.doublingCube && (
-                        <Badge variant="outline" className="text-xs flex items-center gap-1">
-                          <Dice6 className="h-3 w-3" />
-                          Cube
-                        </Badge>
-                      )}
-                      <span className="text-xs text-muted-foreground">{game.movesPlayed} moves</span>
-                    </div>
-                  </div>
-                </div>
-                <Button size="sm" variant="outline">
-                  View
-                </Button>
-              </div>
-            ))}
-        </div>
-      </div>
+      {/* Create Match Modal */}
+      <CreateCorrespondenceMatchModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }

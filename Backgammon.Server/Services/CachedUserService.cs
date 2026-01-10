@@ -76,7 +76,24 @@ public class CachedUserService : IUserRepository
     public async Task CreateUserAsync(User user)
     {
         await _userRepository.CreateUserAsync(user);
-        // No need to cache on create - user will be cached on first read
+
+        // CRITICAL: Cache immediately after creation to prevent race conditions
+        // When anonymous users register via HTTP and immediately connect to SignalR,
+        // the SignalR OnConnectedAsync validation happens milliseconds later.
+        // Even with DynamoDB ConsistentRead=true, there can be propagation delays.
+        // Caching here ensures the user is available instantly for subsequent reads.
+        var cacheKey = $"user:id:{user.UserId}";
+        await _cache.SetAsync(
+            cacheKey,
+            user,
+            new HybridCacheEntryOptions
+            {
+                Expiration = _cacheSettings.UserProfile.Expiration,
+                LocalCacheExpiration = _cacheSettings.UserProfile.LocalCacheExpiration
+            },
+            tags: [$"user:{user.UserId}"]);
+
+        _logger.LogDebug("Cached newly created user {UserId} to prevent read-after-write race conditions", user.UserId);
     }
 
     /// <summary>

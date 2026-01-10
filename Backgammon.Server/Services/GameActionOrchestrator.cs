@@ -21,6 +21,8 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<GameActionOrchestrator> _logger;
+    private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly IMatchRepository _matchRepository;
 
     public GameActionOrchestrator(
         IGameRepository gameRepository,
@@ -29,7 +31,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         IMatchService matchService,
         IGameSessionManager sessionManager,
         IHubContext<GameHub> hubContext,
-        ILogger<GameActionOrchestrator> logger)
+        ILogger<GameActionOrchestrator> logger,
+        ICorrespondenceGameService correspondenceGameService,
+        IMatchRepository matchRepository)
     {
         _gameRepository = gameRepository;
         _aiMoveService = aiMoveService;
@@ -38,6 +42,8 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         _sessionManager = sessionManager;
         _hubContext = hubContext;
         _logger = logger;
+        _correspondenceGameService = correspondenceGameService;
+        _matchRepository = matchRepository;
     }
 
     public async Task<ActionResult> RollDiceAsync(GameSession session, string connectionId)
@@ -85,6 +91,31 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     roll,
                     session.Id);
 
+                // For correspondence games, after first player rolls, update turn to the other player
+                if (!string.IsNullOrEmpty(session.MatchId))
+                {
+                    BackgroundTaskHelper.FireAndForget(
+                        async () =>
+                        {
+                            var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+                            if (match?.IsCorrespondence == true && match.CurrentTurnPlayerId == null)
+                            {
+                                // Determine which player needs to roll next
+                                var nextPlayerId = playerColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                                if (!string.IsNullOrEmpty(nextPlayerId))
+                                {
+                                    await _correspondenceGameService.HandleTurnCompletedAsync(session.MatchId, nextPlayerId);
+                                    _logger.LogInformation(
+                                        "Updated correspondence turn tracking after first opening roll for match {MatchId}, waiting for: {PlayerId}",
+                                        session.MatchId,
+                                        nextPlayerId);
+                                }
+                            }
+                        },
+                        _logger,
+                        $"CorrespondenceFirstRoll-{session.Id}");
+                }
+
                 // Check if opening roll is complete
                 if (!session.Engine.IsOpeningRoll)
                 {
@@ -101,8 +132,28 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     // Start broadcasting time updates (only after opening roll completes)
                     session.StartTimeUpdates(_hubContext);
 
-                    // Check if the winner is AI and should start playing
+                    // For correspondence games, update turn tracking with the actual first player
                     var firstPlayerId = GetCurrentPlayerId(session);
+                    if (!string.IsNullOrEmpty(session.MatchId) && !string.IsNullOrEmpty(firstPlayerId))
+                    {
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+                                if (match?.IsCorrespondence == true)
+                                {
+                                    await _correspondenceGameService.HandleTurnCompletedAsync(session.MatchId, firstPlayerId);
+                                    _logger.LogInformation(
+                                        "Updated correspondence turn tracking after opening roll for match {MatchId}, first player: {PlayerId}",
+                                        session.MatchId,
+                                        firstPlayerId);
+                                }
+                            },
+                            _logger,
+                            $"CorrespondenceOpeningRoll-{session.Id}");
+                    }
+
+                    // Check if the winner is AI and should start playing
                     if (_aiMoveService.IsAiPlayer(firstPlayerId))
                     {
                         _logger.LogInformation(
@@ -357,6 +408,30 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             "Turn ended in game {GameId}. Current player: {Player}",
             session.Id,
             session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
+
+        // Handle correspondence game turn tracking
+        if (session.IsMatchGame && !string.IsNullOrEmpty(session.MatchId))
+        {
+            BackgroundTaskHelper.FireAndForget(
+                async () =>
+                {
+                    var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+                    if (match?.IsCorrespondence == true)
+                    {
+                        var nextPlayerId = GetCurrentPlayerId(session);
+                        if (!string.IsNullOrEmpty(nextPlayerId))
+                        {
+                            await _correspondenceGameService.HandleTurnCompletedAsync(session.MatchId, nextPlayerId);
+                            _logger.LogInformation(
+                                "Updated correspondence turn deadline for match {MatchId}, next player: {PlayerId}",
+                                session.MatchId,
+                                nextPlayerId);
+                        }
+                    }
+                },
+                _logger,
+                $"CorrespondenceTurn-{session.Id}");
+        }
 
         // Check if next player is AI and trigger AI turn
         var nextPlayerId = GetCurrentPlayerId(session);

@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  isReady: boolean // True when auth initialization is complete (including anonymous registration)
   login: (credentials: LoginRequest) => Promise<void>
   register: (data: RegisterRequest) => Promise<void>
   logout: () => void
@@ -32,14 +33,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isReady, setIsReady] = useState(false)
 
   // Initialize auth state on mount
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('[AuthContext] Starting authentication initialization...')
+
         // Initialize services
         await authService.initialize()
+
+        // CRITICAL: Complete registration/login BEFORE SignalR connects
+        // This ensures JWT with displayName exists before any SignalR operations
         await authService.restoreSession()
+
+        console.log('[AuthContext] Authentication complete, fetching user state...')
 
         // Restore user from localStorage (only if token still valid after validation)
         const storedUser = authService.getUser()
@@ -48,16 +57,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (storedUser && storedToken) {
           setUser(storedUser)
           setToken(storedToken)
+          console.log('[AuthContext] User authenticated:', storedUser.username)
         } else {
           // Token was invalid, ensure state is cleared
           setUser(null)
           setToken(null)
+          console.log('[AuthContext] No valid authentication found')
         }
+
+        // Mark as ready - SignalR can now safely connect
+        setIsReady(true)
+        console.log('[AuthContext] Auth initialization complete - ready for SignalR connection')
       } catch (error) {
         console.error('[AuthContext] Failed to initialize:', error)
         // Clear auth state on error
         setUser(null)
         setToken(null)
+        setIsReady(true) // Still mark as ready to not block the app
       } finally {
         setIsLoading(false)
       }
@@ -129,6 +145,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     token,
     isAuthenticated: !!token,
     isLoading,
+    isReady,
     login,
     register,
     logout,

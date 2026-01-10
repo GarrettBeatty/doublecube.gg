@@ -13,6 +13,7 @@ public class MatchService : IMatchService
     private readonly IGameSessionManager _gameSessionManager;
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly ILogger<MatchService> _logger;
 
     public MatchService(
@@ -21,6 +22,7 @@ public class MatchService : IMatchService
         IGameSessionManager gameSessionManager,
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
+        ICorrespondenceGameService correspondenceGameService,
         ILogger<MatchService> logger)
     {
         _matchRepository = matchRepository;
@@ -28,6 +30,7 @@ public class MatchService : IMatchService
         _gameSessionManager = gameSessionManager;
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
+        _correspondenceGameService = correspondenceGameService;
         _logger = logger;
     }
 
@@ -70,19 +73,9 @@ public class MatchService : IMatchService
                 throw new ArgumentException("Player IDs cannot be identical");
             }
 
-            // Get player 1 name
+            // Get player 1 info - user guaranteed to exist (created in OnConnectedAsync)
             var player1 = await _userRepository.GetByUserIdAsync(player1Id);
-
-            // If displayName is just "Player" (guest), append player ID for uniqueness
-            string player1Name;
-            if (string.IsNullOrEmpty(player1DisplayName) || player1DisplayName == "Player")
-            {
-                player1Name = player1?.DisplayName ?? $"Player {player1Id.Substring(0, Math.Min(8, player1Id.Length))}";
-            }
-            else
-            {
-                player1Name = player1DisplayName;
-            }
+            string player1Name = player1?.DisplayName ?? "Unknown"; // Fallback just in case
 
             // Create match (Status defaults to WaitingForPlayers from constructor)
             var match = new Match
@@ -93,7 +86,8 @@ public class MatchService : IMatchService
                 Player1Name = player1Name,
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
-                TimeControl = timeControl ?? new TimeControlConfig() // Default to None if not specified
+                TimeControl = timeControl ?? new TimeControlConfig(), // Default to None if not specified
+                IsRated = isRated // Set from parameter
             };
 
             // Handle opponent based on type
@@ -105,14 +99,14 @@ public class MatchService : IMatchService
                 match.Player2Name = "Computer";
                 match.Status = "InProgress";  // AI matches start immediately
                 match.IsOpenLobby = false;
+                match.IsRated = false; // AI matches are always unrated
             }
             else if (opponentType == "Friend" && !string.IsNullOrEmpty(player2Id))
             {
-                // Set friend as player 2
+                // Set friend as player 2 - user guaranteed to exist (created in OnConnectedAsync)
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
                 match.Player2Id = player2Id;
-                // Use same formatting logic as player1 for consistency
-                match.Player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
+                match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
                 match.Status = "InProgress";  // Friend match with both players ready
                 match.IsOpenLobby = false;
             }
@@ -402,9 +396,19 @@ public class MatchService : IMatchService
         return await _matchRepository.GetActiveMatchesAsync();
     }
 
-    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50)
+    public async Task<List<Match>> GetOpenLobbiesAsync(int limit = 50, bool? isCorrespondence = null)
     {
-        return await _matchRepository.GetOpenLobbiesAsync(limit);
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence);
+    }
+
+    public async Task<List<Match>> GetRegularLobbiesAsync(int limit = 50)
+    {
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence: false);
+    }
+
+    public async Task<List<Match>> GetCorrespondenceLobbiesAsync(int limit = 50)
+    {
+        return await _matchRepository.GetOpenLobbiesAsync(limit, isCorrespondence: true);
     }
 
     public async Task AbandonMatchAsync(string matchId, string abandoningPlayerId)
@@ -480,27 +484,33 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.Status})");
             }
 
-            // Get player 2 name
+            // Get player 2 info - user guaranteed to exist (created in OnConnectedAsync)
             var player2 = await _userRepository.GetByUserIdAsync(player2Id);
-
-            // If displayName is just "Player" (guest), append player ID for uniqueness
-            string player2Name;
-            if (string.IsNullOrEmpty(player2DisplayName) || player2DisplayName == "Player")
-            {
-                player2Name = player2?.DisplayName ?? $"Player {player2Id.Substring(0, Math.Min(8, player2Id.Length))}";
-            }
-            else
-            {
-                player2Name = player2DisplayName;
-            }
-
             match.Player2Id = player2Id;
-            match.Player2Name = player2Name;
+            match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
             match.Player2DisplayName = player2DisplayName;
             match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
 
+            // Create Player2's player-match index item (wasn't created when match was initially saved)
+            await _matchRepository.CreatePlayerMatchIndexAsync(
+                player2Id,
+                matchId,
+                match.Player1Id,
+                "InProgress",
+                match.CreatedAt);
+
             await _matchRepository.UpdateMatchAsync(match);
+
+            // For correspondence matches, initialize turn tracking
+            if (match.IsCorrespondence)
+            {
+                await _correspondenceGameService.InitializeTurnTrackingAsync(matchId);
+                _logger.LogInformation(
+                    "Initialized correspondence turn tracking for match {MatchId} after player {PlayerId} joined",
+                    matchId,
+                    player2Id);
+            }
 
             _logger.LogInformation(
                 "Player {Player2Id} joined match {MatchId}, Status: WaitingForPlayers → InProgress",
