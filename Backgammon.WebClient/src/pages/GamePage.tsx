@@ -159,24 +159,6 @@ export const GamePage: React.FC = () => {
     }
   }
 
-  const handleAcceptDouble = async () => {
-    try {
-      await invoke(HubMethods.AcceptDouble)
-      clearPendingDoubleOffer()
-    } catch (error) {
-      console.error('[GamePage] Failed to accept double:', error)
-    }
-  }
-
-  const handleDeclineDouble = async () => {
-    try {
-      await invoke(HubMethods.DeclineDouble)
-      clearPendingDoubleOffer()
-    } catch (error) {
-      console.error('[GamePage] Failed to decline double:', error)
-    }
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
