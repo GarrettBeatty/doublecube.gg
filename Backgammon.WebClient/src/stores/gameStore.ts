@@ -179,13 +179,6 @@ export const useGameStore = create<GameStore>((set) => ({
         dice: state.dice,
       })
 
-      // Determine if the current player can double
-      const canDouble =
-        state.isYourTurn &&
-        state.dice.length === 0 && // No dice rolled yet
-        !state.isCrawfordGame && // Not in Crawford game
-        (state.doublingCubeOwner === null || state.doublingCubeOwner === state.yourColor)
-
       return {
         currentGameState: state,
         isAnalysisMode: state.isAnalysisMode,
@@ -193,7 +186,7 @@ export const useGameStore = create<GameStore>((set) => ({
         doublingCube: {
           value: state.doublingCubeValue,
           owner: state.doublingCubeOwner,
-          canDouble,
+          canDouble: state.canDouble,
           pendingOffer: prevState.doublingCube.pendingOffer,
           pendingResponse: prevState.doublingCube.pendingResponse,
           offerFrom: prevState.doublingCube.offerFrom,

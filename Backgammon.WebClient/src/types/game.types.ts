@@ -82,6 +82,7 @@ export interface GameState {
   redPipCount: number
   doublingCubeValue: number
   doublingCubeOwner: CheckerColor | null
+  canDouble: boolean
   isAnalysisMode: boolean
   isRated: boolean
   whitePlayerName: string

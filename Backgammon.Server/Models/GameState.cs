@@ -68,6 +68,8 @@ public class GameState
 
     public string? DoublingCubeOwner { get; set; }
 
+    public bool CanDouble { get; set; }
+
     public bool IsAnalysisMode { get; set; }
 
     public bool IsRated { get; set; }
