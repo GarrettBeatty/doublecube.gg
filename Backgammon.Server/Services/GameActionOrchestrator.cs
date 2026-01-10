@@ -107,8 +107,28 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     // Start broadcasting time updates (only after opening roll completes)
                     session.StartTimeUpdates(_hubContext);
 
-                    // Check if the winner is AI and should start playing
+                    // For correspondence games, update turn tracking with the actual first player
                     var firstPlayerId = GetCurrentPlayerId(session);
+                    if (!string.IsNullOrEmpty(session.MatchId) && !string.IsNullOrEmpty(firstPlayerId))
+                    {
+                        BackgroundTaskHelper.FireAndForget(
+                            async () =>
+                            {
+                                var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+                                if (match?.IsCorrespondence == true)
+                                {
+                                    await _correspondenceGameService.HandleTurnCompletedAsync(session.MatchId, firstPlayerId);
+                                    _logger.LogInformation(
+                                        "Updated correspondence turn tracking after opening roll for match {MatchId}, first player: {PlayerId}",
+                                        session.MatchId,
+                                        firstPlayerId);
+                                }
+                            },
+                            _logger,
+                            $"CorrespondenceOpeningRoll-{session.Id}");
+                    }
+
+                    // Check if the winner is AI and should start playing
                     if (_aiMoveService.IsAiPlayer(firstPlayerId))
                     {
                         _logger.LogInformation(
