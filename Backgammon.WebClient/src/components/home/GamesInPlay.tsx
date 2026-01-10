@@ -1,110 +1,64 @@
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { User, RefreshCw, Clock, Dice6 } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useActiveGames } from '@/hooks/useActiveGames'
 import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
+import { MiniBoardPreview } from './MiniBoardPreview'
+import { MiniPoint } from '@/types/home.types'
 
-interface GameItemProps {
+interface GameCardProps {
   gameId: string
   opponentName: string
-  opponentRating?: number
   isYourTurn: boolean
-  isCorrespondence: boolean
-  matchScore?: string
-  matchLength?: number
-  targetScore?: number
-  cubeValue?: number
-  isCrawford?: boolean
-  timeRemaining?: string | null
+  board?: MiniPoint[]
+  whiteOnBar?: number
+  redOnBar?: number
+  whiteBornOff?: number
+  redBornOff?: number
   onPlay: (gameId: string) => void
 }
 
-function GameItem({
+function GameCard({
   gameId,
   opponentName,
-  opponentRating,
   isYourTurn,
-  isCorrespondence,
-  matchScore,
-  matchLength,
-  targetScore,
-  cubeValue,
-  isCrawford,
-  timeRemaining,
+  board,
+  whiteOnBar,
+  redOnBar,
+  whiteBornOff,
+  redBornOff,
   onPlay,
-}: GameItemProps) {
+}: GameCardProps) {
   return (
     <div
-      className={`flex items-center justify-between p-4 border rounded-lg hover:bg-accent transition-colors ${
-        isYourTurn ? 'bg-green-500/5 border-green-500/20' : 'opacity-70'
+      className={`cursor-pointer transition-all hover:scale-[1.02] ${
+        isYourTurn ? 'ring-2 ring-green-500 rounded-lg' : ''
       }`}
+      onClick={() => onPlay(gameId)}
     >
-      <div className="flex items-center gap-3">
-        <User className="h-5 w-5 text-muted-foreground" />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className={isYourTurn ? 'font-semibold' : ''}>{opponentName}</span>
-            {opponentRating && (
-              <span className="text-sm text-muted-foreground">({opponentRating})</span>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            <Badge variant={isCorrespondence ? 'secondary' : 'outline'} className="text-xs">
-              {isCorrespondence ? 'Correspondence' : 'Live'}
-            </Badge>
-            {(matchScore || targetScore) && (
-              <Badge variant="outline" className="text-xs">
-                {matchScore || '0-0'} / {matchLength || targetScore}pt
-              </Badge>
-            )}
-            {isCorrespondence && timeRemaining && (
-              <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {formatTimeRemaining(timeRemaining)}
-              </Badge>
-            )}
-            {cubeValue && cubeValue > 1 && (
-              <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                <Dice6 className="h-3 w-3" />
-                {cubeValue}x
-              </Badge>
-            )}
-            {isCrawford && (
-              <Badge variant="outline" className="text-xs">
-                Crawford
-              </Badge>
-            )}
-            {isYourTurn && (
-              <Badge variant="default" className="text-xs bg-green-600">
-                Your turn
-              </Badge>
-            )}
-          </div>
-        </div>
+      {/* Mini Board Preview */}
+      <MiniBoardPreview
+        board={board}
+        whiteOnBar={whiteOnBar}
+        redOnBar={redOnBar}
+        whiteBornOff={whiteBornOff}
+        redBornOff={redBornOff}
+        size={280}
+      />
+
+      {/* Game Info */}
+      <div className="mt-2 text-center">
+        <span className="text-sm font-medium">{opponentName}</span>
+        {isYourTurn && (
+          <Badge variant="default" className="ml-2 text-xs bg-green-600">
+            Your turn
+          </Badge>
+        )}
       </div>
-      <Button
-        size="sm"
-        variant={isYourTurn ? 'default' : 'outline'}
-        className={isYourTurn ? 'bg-green-600 hover:bg-green-700' : ''}
-        onClick={() => onPlay(gameId)}
-      >
-        {isYourTurn ? 'Play' : 'View'}
-      </Button>
     </div>
   )
-}
-
-function formatTimeRemaining(timeRemaining: string | null): string {
-  if (!timeRemaining) return 'No deadline'
-  const match = timeRemaining.match(/^(\d+)\.?(\d{2}):(\d{2}):(\d{2})/)
-  if (!match) return timeRemaining
-  const days = parseInt(match[1]) || 0
-  const hours = parseInt(match[2]) || 0
-  if (days > 0) return `${days}d ${hours}h`
-  if (hours > 0) return `${hours}h`
-  return '< 1h'
 }
 
 export function GamesInPlay() {
@@ -127,53 +81,42 @@ export function GamesInPlay() {
   // Combine all games
   const allCorrespondenceGames = [...yourTurnGames, ...waitingGames]
 
-  // Build unified list
+  // Build unified list with board data
   type UnifiedGame = {
     gameId: string
     opponentName: string
-    opponentRating?: number
     isYourTurn: boolean
-    isCorrespondence: boolean
-    matchScore?: string
-    matchLength?: number
-    targetScore?: number
-    cubeValue?: number
-    isCrawford?: boolean
-    timeRemaining?: string | null
+    board?: MiniPoint[]
+    whiteOnBar?: number
+    redOnBar?: number
+    whiteBornOff?: number
+    redBornOff?: number
   }
 
   const unifiedGames: UnifiedGame[] = [
-    // Live games
+    // Live games (with board state)
     ...liveGames.map(g => ({
       gameId: g.gameId,
       opponentName: g.myColor === 'White' ? g.player2Name : g.player1Name,
-      opponentRating: g.myColor === 'White' ? g.player2Rating : g.player1Rating,
       isYourTurn: g.isYourTurn,
-      isCorrespondence: false,
-      matchScore: g.matchScore,
-      matchLength: g.matchLength,
-      cubeValue: g.cubeValue,
-      isCrawford: g.isCrawford,
+      board: g.board,
+      whiteOnBar: g.whiteCheckersOnBar,
+      redOnBar: g.redCheckersOnBar,
+      whiteBornOff: g.whiteBornOff,
+      redBornOff: g.redBornOff,
     })),
     // Correspondence games
     ...allCorrespondenceGames.map(g => ({
       gameId: g.gameId,
       opponentName: g.opponentName,
-      opponentRating: g.opponentRating,
       isYourTurn: g.isYourTurn,
-      isCorrespondence: true,
-      matchScore: g.matchScore,
-      targetScore: g.targetScore,
-      timeRemaining: g.timeRemaining,
     })),
   ]
 
-  // Sort: your turn first, then by type (live first)
+  // Sort: your turn first
   const sortedGames = unifiedGames.sort((a, b) => {
     if (a.isYourTurn && !b.isYourTurn) return -1
     if (!a.isYourTurn && b.isYourTurn) return 1
-    if (!a.isCorrespondence && b.isCorrespondence) return -1
-    if (a.isCorrespondence && !b.isCorrespondence) return 1
     return 0
   })
 
@@ -209,9 +152,9 @@ export function GamesInPlay() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 gap-6">
           {sortedGames.map((game) => (
-            <GameItem
+            <GameCard
               key={game.gameId}
               {...game}
               onPlay={handlePlayGame}

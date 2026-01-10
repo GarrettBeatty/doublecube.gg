@@ -1,5 +1,11 @@
 // Type definitions for Home Page components
 
+export interface MiniPoint {
+  position: number
+  color: 'White' | 'Red' | null
+  count: number
+}
+
 export interface ActiveGame {
   matchId: string
   gameId: string
@@ -17,6 +23,12 @@ export interface ActiveGame {
   cubeValue?: number
   cubeOwner?: 'White' | 'Red' | 'Center'
   isCrawford?: boolean
+  // Board state for mini preview
+  board?: MiniPoint[]
+  whiteCheckersOnBar?: number
+  redCheckersOnBar?: number
+  whiteBornOff?: number
+  redBornOff?: number
 }
 
 export interface UserStats {

@@ -1409,10 +1409,42 @@ public class GameHub : Hub
                 var isPlayer1 = m.Player1Id == playerId;
                 var opponentId = isPlayer1 ? m.Player2Id : m.Player1Id;
                 var opponentName = isPlayer1 ? m.Player2Name : m.Player1Name;
+                var myColor = isPlayer1 ? "White" : "Red";
 
                 // Try to get current game state if there's an active game session
                 var currentGameId = m.CurrentGameId;
                 var gameSession = currentGameId != null ? _sessionManager.GetSession(currentGameId) : null;
+
+                var currentPlayer = gameSession?.Engine?.CurrentPlayer.ToString() ?? "White";
+                var isYourTurn = currentPlayer == myColor;
+
+                // Get board state if session exists
+                object[]? boardState = null;
+                int whiteOnBar = 0;
+                int redOnBar = 0;
+                int whiteBornOff = 0;
+                int redBornOff = 0;
+
+                if (gameSession?.Engine != null)
+                {
+                    var board = new List<object>();
+                    for (int i = 1; i <= 24; i++)
+                    {
+                        var point = gameSession.Engine.Board.GetPoint(i);
+                        board.Add(new
+                        {
+                            position = i,
+                            color = point.Color?.ToString(),
+                            count = point.Count
+                        });
+                    }
+
+                    boardState = board.ToArray();
+                    whiteOnBar = gameSession.Engine.WhitePlayer.CheckersOnBar;
+                    redOnBar = gameSession.Engine.RedPlayer.CheckersOnBar;
+                    whiteBornOff = gameSession.Engine.WhitePlayer.CheckersBornOff;
+                    redBornOff = gameSession.Engine.RedPlayer.CheckersBornOff;
+                }
 
                 return new
                 {
@@ -1422,14 +1454,21 @@ public class GameHub : Hub
                     player2Name = m.Player2Name ?? "Player 2",
                     player1Rating = 0, // TODO: Fetch from user profile
                     player2Rating = 0, // TODO: Fetch from user profile
-                    currentPlayer = gameSession?.Engine?.CurrentPlayer.ToString() ?? "White",
+                    currentPlayer,
+                    myColor,
+                    isYourTurn,
                     matchScore = $"{m.Player1Score}-{m.Player2Score}",
-                    matchLength = $"{m.TargetScore}-point",
+                    matchLength = m.TargetScore,
                     timeControl = "Standard", // TODO: Add time control to Match model
-                    cubeValue = gameSession?.Engine?.DoublingCube?.Value,
+                    cubeValue = gameSession?.Engine?.DoublingCube?.Value ?? 1,
                     cubeOwner = gameSession?.Engine?.DoublingCube?.Owner?.ToString() ?? "Center",
                     isCrawford = m.IsCrawfordGame,
-                    viewers = 0 // TODO: Add spectator tracking
+                    viewers = 0, // TODO: Add spectator tracking
+                    board = boardState,
+                    whiteCheckersOnBar = whiteOnBar,
+                    redCheckersOnBar = redOnBar,
+                    whiteBornOff,
+                    redBornOff
                 };
             }).ToList<object>();
 
