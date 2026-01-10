@@ -23,6 +23,7 @@ export const HubMethods = {
   JoinMatch: 'JoinMatch',
   ContinueMatch: 'ContinueMatch',
   GetMatchStatus: 'GetMatchStatus',
+  GetMatchState: 'GetMatchState',
   GetMatchLobbies: 'GetMatchLobbies',
   GetActiveGames: 'GetActiveGames',
 
@@ -201,4 +202,19 @@ export interface MatchCompletedEvent {
     player1: number
     player2: number
   }
+}
+
+// Match state DTO (from server's GetMatchState method)
+export interface MatchStateDto {
+  matchId: string
+  player1Score: number
+  player2Score: number
+  targetScore: number
+  isCrawfordGame: boolean
+  matchComplete: boolean
+  matchWinner: string | null
+  player1Name: string
+  player2Name: string
+  currentGameId: string | null
+  lastUpdatedAt: string // ISO date string for staleness detection
 }
