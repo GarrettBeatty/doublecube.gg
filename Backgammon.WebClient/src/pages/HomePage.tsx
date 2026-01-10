@@ -9,7 +9,6 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import { useToast } from '@/hooks/use-toast'
 
 // Import all home components
-import { QuickPlayCard } from '@/components/home/QuickPlayCard'
 import { GameLobby } from '@/components/home/GameLobby'
 import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
@@ -130,11 +129,8 @@ export function HomePage() {
 
           {/* Center Column - Tabbed Content (col-span-6) */}
           <div className="lg:col-span-6">
-            <Tabs defaultValue="quick-pairing" className="w-full">
+            <Tabs defaultValue="lobby" className="w-full">
               <TabsList className="w-full">
-                <TabsTrigger value="quick-pairing" className="flex-1">
-                  Quick Pairing
-                </TabsTrigger>
                 <TabsTrigger value="lobby" className="flex-1">
                   Lobby
                 </TabsTrigger>
@@ -146,15 +142,11 @@ export function HomePage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="quick-pairing" className="mt-6">
+              <TabsContent value="lobby" className="mt-6">
                 <div className="space-y-6">
-                  <QuickPlayCard />
+                  <GameLobby />
                   <RecentGames />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="lobby" className="mt-6">
-                <GameLobby />
               </TabsContent>
 
               <TabsContent value="correspondence" className="mt-6">
