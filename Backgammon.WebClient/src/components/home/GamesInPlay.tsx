@@ -17,6 +17,9 @@ interface GameCardProps {
   redOnBar?: number
   whiteBornOff?: number
   redBornOff?: number
+  dice?: number[]
+  cubeValue?: number
+  cubeOwner?: 'White' | 'Red' | 'Center'
   onPlay: (gameId: string) => void
 }
 
@@ -29,6 +32,9 @@ function GameCard({
   redOnBar,
   whiteBornOff,
   redBornOff,
+  dice,
+  cubeValue,
+  cubeOwner,
   onPlay,
 }: GameCardProps) {
   return (
@@ -45,6 +51,9 @@ function GameCard({
         redOnBar={redOnBar}
         whiteBornOff={whiteBornOff}
         redBornOff={redBornOff}
+        dice={dice}
+        cubeValue={cubeValue}
+        cubeOwner={cubeOwner}
         size={280}
       />
 
@@ -91,6 +100,9 @@ export function GamesInPlay() {
     redOnBar?: number
     whiteBornOff?: number
     redBornOff?: number
+    dice?: number[]
+    cubeValue?: number
+    cubeOwner?: 'White' | 'Red' | 'Center'
   }
 
   const unifiedGames: UnifiedGame[] = [
@@ -104,6 +116,9 @@ export function GamesInPlay() {
       redOnBar: g.redCheckersOnBar,
       whiteBornOff: g.whiteBornOff,
       redBornOff: g.redBornOff,
+      dice: g.dice,
+      cubeValue: g.cubeValue,
+      cubeOwner: g.cubeOwner,
     })),
     // Correspondence games
     ...allCorrespondenceGames.map(g => ({

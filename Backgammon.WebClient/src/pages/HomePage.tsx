@@ -107,10 +107,10 @@ export function HomePage() {
                 <TabsTrigger value="correspondence" className="flex-1">
                   Correspondence
                 </TabsTrigger>
-                <TabsTrigger value="in-play" className="flex-1">
+                <TabsTrigger value="in-play" className="flex-1 gap-2">
                   {totalGamesInPlay > 0 ? `${totalGamesInPlay} Games` : 'My Games'}
                   {totalYourTurn > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    <Badge variant="destructive" className="animate-pulse">
                       {totalYourTurn}
                     </Badge>
                   )}

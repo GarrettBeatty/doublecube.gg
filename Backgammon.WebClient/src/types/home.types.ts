@@ -29,6 +29,7 @@ export interface ActiveGame {
   redCheckersOnBar?: number
   whiteBornOff?: number
   redBornOff?: number
+  dice?: number[]
 }
 
 export interface UserStats {

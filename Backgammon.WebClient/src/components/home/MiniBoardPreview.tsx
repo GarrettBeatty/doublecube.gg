@@ -19,6 +19,9 @@ interface MiniBoardPreviewProps {
   redOnBar?: number
   whiteBornOff?: number
   redBornOff?: number
+  dice?: number[]
+  cubeValue?: number
+  cubeOwner?: 'White' | 'Red' | 'Center'
   size?: number
 }
 
@@ -28,6 +31,9 @@ export function MiniBoardPreview({
   redOnBar = 0,
   whiteBornOff = 0,
   redBornOff = 0,
+  dice,
+  cubeValue = 1,
+  cubeOwner = 'Center',
   size = 160,
 }: MiniBoardPreviewProps) {
   const aspectRatio = 1.3
@@ -242,6 +248,94 @@ export function MiniBoardPreview({
     return elements
   }
 
+  // Render dice
+  const renderDice = () => {
+    if (!dice || dice.length !== 2) return null
+
+    const dieSize = Math.min(width * 0.08, 20)
+    const centerX = width / 2
+    const centerY = height / 2
+    const gap = dieSize * 0.4
+
+    return (
+      <g>
+        {dice.map((value, i) => {
+          const x = centerX + (i === 0 ? -dieSize - gap / 2 : gap / 2)
+          const y = centerY - dieSize / 2
+          return (
+            <g key={`die-${i}`}>
+              <rect
+                x={x}
+                y={y}
+                width={dieSize}
+                height={dieSize}
+                rx={dieSize * 0.15}
+                fill="#fff"
+                stroke="#999"
+                strokeWidth={0.5}
+              />
+              <text
+                x={x + dieSize / 2}
+                y={y + dieSize / 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={dieSize * 0.6}
+                fontWeight="bold"
+                fill="#333"
+              >
+                {value}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
+  // Render doubling cube
+  const renderCube = () => {
+    if (cubeValue <= 1) return null
+
+    const cubeSize = Math.min(width * 0.07, 16)
+    const leftX = boardPadding + bearoffWidth / 2
+
+    // Position based on owner: Center = middle, White = bottom, Red = top
+    let cubeY: number
+    if (cubeOwner === 'White') {
+      cubeY = height - boardPadding - cubeSize - 2
+    } else if (cubeOwner === 'Red') {
+      cubeY = boardPadding + 2
+    } else {
+      cubeY = height / 2 - cubeSize / 2
+    }
+
+    return (
+      <g>
+        <rect
+          x={leftX - cubeSize / 2}
+          y={cubeY}
+          width={cubeSize}
+          height={cubeSize}
+          rx={cubeSize * 0.1}
+          fill="#222"
+          stroke="#444"
+          strokeWidth={0.5}
+        />
+        <text
+          x={leftX}
+          y={cubeY + cubeSize / 2}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fontSize={cubeSize * 0.55}
+          fontWeight="bold"
+          fill="#fff"
+        >
+          {cubeValue}
+        </text>
+      </g>
+    )
+  }
+
   return (
     <svg
       width={width}
@@ -315,6 +409,12 @@ export function MiniBoardPreview({
 
       {/* Born off indicators */}
       {renderBornOff()}
+
+      {/* Dice */}
+      {renderDice()}
+
+      {/* Doubling cube */}
+      {renderCube()}
     </svg>
   )
 }

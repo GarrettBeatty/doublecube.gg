@@ -1425,6 +1425,10 @@ public class GameHub : Hub
                 int whiteBornOff = 0;
                 int redBornOff = 0;
 
+                int[]? diceValues = null;
+                int cubeValue = 1;
+                string cubeOwner = "Center";
+
                 if (gameSession?.Engine != null)
                 {
                     var board = new List<object>();
@@ -1444,6 +1448,16 @@ public class GameHub : Hub
                     redOnBar = gameSession.Engine.RedPlayer.CheckersOnBar;
                     whiteBornOff = gameSession.Engine.WhitePlayer.CheckersBornOff;
                     redBornOff = gameSession.Engine.RedPlayer.CheckersBornOff;
+
+                    // Get dice values if rolled
+                    if (gameSession.Engine.Dice?.Die1 > 0 && gameSession.Engine.Dice?.Die2 > 0)
+                    {
+                        diceValues = new[] { gameSession.Engine.Dice.Die1, gameSession.Engine.Dice.Die2 };
+                    }
+
+                    // Get cube info
+                    cubeValue = gameSession.Engine.DoublingCube?.Value ?? 1;
+                    cubeOwner = gameSession.Engine.DoublingCube?.Owner?.ToString() ?? "Center";
                 }
 
                 return new
@@ -1460,15 +1474,16 @@ public class GameHub : Hub
                     matchScore = $"{m.Player1Score}-{m.Player2Score}",
                     matchLength = m.TargetScore,
                     timeControl = "Standard", // TODO: Add time control to Match model
-                    cubeValue = gameSession?.Engine?.DoublingCube?.Value ?? 1,
-                    cubeOwner = gameSession?.Engine?.DoublingCube?.Owner?.ToString() ?? "Center",
+                    cubeValue,
+                    cubeOwner,
                     isCrawford = m.IsCrawfordGame,
                     viewers = 0, // TODO: Add spectator tracking
                     board = boardState,
                     whiteCheckersOnBar = whiteOnBar,
                     redCheckersOnBar = redOnBar,
                     whiteBornOff,
-                    redBornOff
+                    redBornOff,
+                    dice = diceValues
                 };
             }).ToList<object>();
 
