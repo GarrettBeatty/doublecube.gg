@@ -10,6 +10,7 @@ export const HubMethods = {
   SpectateGame: 'SpectateGame',
   RollDice: 'RollDice',
   MakeMove: 'MakeMove',
+  MakeCombinedMove: 'MakeCombinedMove',
   EndTurn: 'EndTurn',
   UndoLastMove: 'UndoLastMove',
   OfferDouble: 'OfferDouble',
