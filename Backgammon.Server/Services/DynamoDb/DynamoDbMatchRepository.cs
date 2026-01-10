@@ -639,13 +639,30 @@ public class DynamoDbMatchRepository : IMatchRepository
             // Get all correspondence matches for the player where it's NOT their turn
             var allMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
 
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesWaitingAsync: Found {TotalMatches} InProgress matches for player {PlayerId}",
+                allMatches.Count,
+                playerId);
+
+            // Log each match's correspondence status and current turn
+            foreach (var match in allMatches)
+            {
+                _logger.LogInformation(
+                    "Match {MatchId}: IsCorrespondence={IsCorr}, CurrentTurnPlayerId={CurrentTurn}, Player1={P1}, Player2={P2}",
+                    match.MatchId,
+                    match.IsCorrespondence,
+                    match.CurrentTurnPlayerId ?? "null",
+                    match.Player1Id,
+                    match.Player2Id);
+            }
+
             // Filter to correspondence matches where it's NOT the player's turn
             var waitingMatches = allMatches
                 .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId != playerId)
                 .OrderBy(m => m.TurnDeadline)
                 .ToList();
 
-            _logger.LogDebug("Retrieved {Count} correspondence matches where player {PlayerId} is waiting", waitingMatches.Count, playerId);
+            _logger.LogInformation("Retrieved {Count} correspondence matches where player {PlayerId} is waiting", waitingMatches.Count, playerId);
             return waitingMatches;
         }
         catch (Exception ex)
