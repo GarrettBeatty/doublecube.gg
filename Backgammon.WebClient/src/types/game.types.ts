@@ -43,6 +43,11 @@ export interface Move {
   from: number
   to: number
   dieValue: number
+  isHit?: boolean
+  // Combined move properties
+  isCombinedMove?: boolean
+  diceUsed?: number[]
+  intermediatePoints?: number[]
 }
 
 export interface Dice {
