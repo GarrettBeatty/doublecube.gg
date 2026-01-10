@@ -622,7 +622,27 @@ public class DynamoDbMatchRepository : IMatchRepository
             });
 
             var matches = response.Items.Select(DynamoDbHelpers.UnmarshalMatch).ToList();
-            _logger.LogDebug("Retrieved {Count} correspondence matches for player {PlayerId}'s turn", matches.Count, playerId);
+
+            // Also get matches where CurrentTurnPlayerId is null (opening roll phase)
+            // These won't be in GSI4, so we need to fetch them separately
+            var allPlayerMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
+            var openingRollMatches = allPlayerMatches
+                .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId == null)
+                .ToList();
+
+            // Combine both lists
+            matches.AddRange(openingRollMatches);
+
+            // Sort by deadline
+            matches = matches.OrderBy(m => m.TurnDeadline).ToList();
+
+            _logger.LogInformation(
+                "Retrieved {Count} correspondence matches for player {PlayerId}'s turn ({YourTurn} specific turn, {OpeningRoll} opening roll)",
+                matches.Count,
+                playerId,
+                matches.Count - openingRollMatches.Count,
+                openingRollMatches.Count);
+
             return matches;
         }
         catch (Exception ex)
@@ -657,8 +677,12 @@ public class DynamoDbMatchRepository : IMatchRepository
             }
 
             // Filter to correspondence matches where it's NOT the player's turn
+            // Note: CurrentTurnPlayerId == null means opening roll phase (both players need to roll)
+            // In this case, we DON'T show it in waiting games - it will be shown in "your turn" games
             var waitingMatches = allMatches
-                .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId != playerId)
+                .Where(m => m.IsCorrespondence
+                    && m.CurrentTurnPlayerId != null
+                    && m.CurrentTurnPlayerId != playerId)
                 .OrderBy(m => m.TurnDeadline)
                 .ToList();
 

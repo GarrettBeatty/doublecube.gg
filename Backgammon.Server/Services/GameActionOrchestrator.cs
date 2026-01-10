@@ -91,6 +91,31 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     roll,
                     session.Id);
 
+                // For correspondence games, after first player rolls, update turn to the other player
+                if (!string.IsNullOrEmpty(session.MatchId))
+                {
+                    BackgroundTaskHelper.FireAndForget(
+                        async () =>
+                        {
+                            var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+                            if (match?.IsCorrespondence == true && match.CurrentTurnPlayerId == null)
+                            {
+                                // Determine which player needs to roll next
+                                var nextPlayerId = playerColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                                if (!string.IsNullOrEmpty(nextPlayerId))
+                                {
+                                    await _correspondenceGameService.HandleTurnCompletedAsync(session.MatchId, nextPlayerId);
+                                    _logger.LogInformation(
+                                        "Updated correspondence turn tracking after first opening roll for match {MatchId}, waiting for: {PlayerId}",
+                                        session.MatchId,
+                                        nextPlayerId);
+                                }
+                            }
+                        },
+                        _logger,
+                        $"CorrespondenceFirstRoll-{session.Id}");
+                }
+
                 // Check if opening roll is complete
                 if (!session.Engine.IsOpeningRoll)
                 {
