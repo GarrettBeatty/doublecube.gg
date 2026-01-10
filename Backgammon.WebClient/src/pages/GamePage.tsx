@@ -311,13 +311,17 @@ export const GamePage: React.FC = () => {
 
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <BoardSVG gameState={currentGameState} isSpectator={isSpectator} />
+                  <BoardSVG
+                    gameState={currentGameState}
+                    isSpectator={isSpectator}
+                    doublingCube={
+                      !isSpectator ? <DoublingCube onOfferDouble={handleOfferDouble} /> : undefined
+                    }
+                  />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={isSpectator}
                   />
-                  {/* Doubling Cube - positioned on board */}
-                  {!isSpectator && <DoublingCube onOfferDouble={handleOfferDouble} />}
                 </div>
               </CardContent>
             </Card>

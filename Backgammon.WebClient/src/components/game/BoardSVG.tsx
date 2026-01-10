@@ -123,10 +123,11 @@ interface DragState {
 interface BoardSVGProps {
   gameState: GameState | null
   isSpectator?: boolean
+  doublingCube?: React.ReactNode
 }
 
 // Internal component (not exported)
-const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = false }) => {
+const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = false, doublingCube }) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
@@ -1239,7 +1240,9 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       viewBox={`0 0 ${CONFIG.viewBox.width} ${CONFIG.viewBox.height}`}
       className={`board-svg w-full h-auto ${isBoardFlipped ? 'rotate-180' : ''}`}
       style={{ transition: 'transform 0.6s' }}
-    />
+    >
+      {doublingCube}
+    </svg>
   )
 }
 
