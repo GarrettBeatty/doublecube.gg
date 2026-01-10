@@ -42,6 +42,12 @@ export const HubMethods = {
   SetCurrentPlayer: 'SetCurrentPlayer',
   AnalyzePosition: 'AnalyzePosition',
   FindBestMoves: 'FindBestMoves',
+
+  // Daily Puzzle
+  GetDailyPuzzle: 'GetDailyPuzzle',
+  SubmitPuzzleAnswer: 'SubmitPuzzleAnswer',
+  GetPuzzleStreak: 'GetPuzzleStreak',
+  GetHistoricalPuzzle: 'GetHistoricalPuzzle',
 } as const
 
 // SignalR event names (server → client)
