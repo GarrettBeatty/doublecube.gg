@@ -442,8 +442,9 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
         return 0 // Bar
       }
 
-      // Check bear-off
-      if (x >= CONFIG.viewBox.width - CONFIG.bearoffWidth - 10) {
+      // Check bear-off (align with visual bear-off box position)
+      const bearoffStartX = CONFIG.barX! + CONFIG.barWidth + 6 * CONFIG.pointWidth
+      if (x >= bearoffStartX) {
         return 25 // Bear-off
       }
 
@@ -922,7 +923,10 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       const maxVisible = Math.min(count, 5)
 
       for (let i = 0; i < maxVisible; i++) {
-        const cy = startY + CONFIG.checkerSpacing * i
+        // White checkers stack upward (subtract), Red checkers stack downward (add)
+        const cy = color === CheckerColor.White
+          ? startY - CONFIG.checkerSpacing * i
+          : startY + CONFIG.checkerSpacing * i
         
         const checkerColor =
           color === CheckerColor.White ? COLORS.checkerWhite : COLORS.checkerRed
@@ -949,9 +953,14 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
         const textColor =
           color === CheckerColor.White ? COLORS.textDark : COLORS.textLight
 
+        // Position text on the 5th checker (index 4)
+        const textY = color === CheckerColor.White
+          ? startY - CONFIG.checkerSpacing * 4
+          : startY + CONFIG.checkerSpacing * 4
+
         const text = createSVGElement('text', {
           x: bearoffCenterX,
-          y: startY + CONFIG.checkerSpacing * 4,
+          y: textY,
           'text-anchor': 'middle',
           'dominant-baseline': 'middle',
           fill: textColor,
