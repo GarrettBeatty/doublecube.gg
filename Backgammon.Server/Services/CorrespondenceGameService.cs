@@ -334,18 +334,20 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 return;
             }
 
-            // Player1 (White) always goes first in backgammon
-            var turnDeadline = DateTime.UtcNow.AddDays(match.TimePerMoveDays);
+            // For correspondence games, we don't set CurrentTurnPlayerId during initialization
+            // because both players need to roll opening dice. The turn tracking will be set
+            // properly after the opening roll completes in GameActionOrchestrator.
+            // We just set the deadline for the opening roll phase.
 
-            await _matchRepository.UpdateCorrespondenceTurnAsync(
-                matchId,
-                match.Player1Id,
-                turnDeadline);
+            var turnDeadline = DateTime.UtcNow.AddDays(match.TimePerMoveDays);
+            match.TurnDeadline = turnDeadline;
+            match.LastUpdatedAt = DateTime.UtcNow;
+            // Leave CurrentTurnPlayerId as null to indicate opening roll phase
+            await _matchRepository.UpdateMatchAsync(match);
 
             _logger.LogInformation(
-                "Initialized turn tracking for correspondence match {MatchId}. First player: {PlayerId}, Deadline: {Deadline}",
+                "Initialized turn tracking for correspondence match {MatchId}. Opening roll phase, Deadline: {Deadline}",
                 matchId,
-                match.Player1Id,
                 turnDeadline);
         }
         catch (Exception ex)
