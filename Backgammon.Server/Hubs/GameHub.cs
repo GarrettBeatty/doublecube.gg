@@ -49,6 +49,7 @@ public class GameHub : Hub
     private readonly ILogger<GameHub> _logger;
     private readonly AnalysisService _analysisService;
     private readonly IUserRepository _userRepository;
+    private readonly IFriendService _friendService;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -68,7 +69,8 @@ public class GameHub : Hub
         IChatService chatService,
         ILogger<GameHub> logger,
         AnalysisService analysisService,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IFriendService friendService)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -88,6 +90,7 @@ public class GameHub : Hub
         _logger = logger;
         _analysisService = analysisService;
         _userRepository = userRepository;
+        _friendService = friendService;
     }
 
     /// <summary>
@@ -815,6 +818,248 @@ public class GameHub : Hub
             _logger.LogError(ex, "Error getting player profile");
             await Clients.Caller.SendAsync("Error", "Failed to load profile");
             return null;
+        }
+    }
+
+    // ==================== Friends Methods ====================
+
+    /// <summary>
+    /// Get the current user's friends list with online status
+    /// </summary>
+    public async Task<List<FriendDto>> GetFriends()
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("GetFriends called without authentication");
+                return new List<FriendDto>();
+            }
+
+            var friends = await _friendService.GetFriendsAsync(userId);
+            return friends;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting friends list");
+            await Clients.Caller.SendAsync("Error", "Failed to load friends");
+            return new List<FriendDto>();
+        }
+    }
+
+    /// <summary>
+    /// Get pending friend requests for the current user
+    /// </summary>
+    public async Task<List<FriendDto>> GetFriendRequests()
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("GetFriendRequests called without authentication");
+                return new List<FriendDto>();
+            }
+
+            var requests = await _friendService.GetPendingRequestsAsync(userId);
+            return requests;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting friend requests");
+            await Clients.Caller.SendAsync("Error", "Failed to load friend requests");
+            return new List<FriendDto>();
+        }
+    }
+
+    /// <summary>
+    /// Search for players by username
+    /// </summary>
+    public async Task<List<PlayerSearchResultDto>> SearchPlayers(string query)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("SearchPlayers called without authentication");
+                return new List<PlayerSearchResultDto>();
+            }
+
+            if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+            {
+                return new List<PlayerSearchResultDto>();
+            }
+
+            var users = await _userRepository.SearchUsersAsync(query);
+
+            // Exclude the current user from search results
+            var results = users
+                .Where(u => u.UserId != userId)
+                .Select(u => new PlayerSearchResultDto
+                {
+                    UserId = u.UserId,
+                    Username = u.Username,
+                    DisplayName = u.DisplayName ?? u.Username
+                })
+                .ToList();
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error searching players");
+            await Clients.Caller.SendAsync("Error", "Failed to search players");
+            return new List<PlayerSearchResultDto>();
+        }
+    }
+
+    /// <summary>
+    /// Send a friend request to another user
+    /// </summary>
+    public async Task<bool> SendFriendRequest(string toUserId)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                await Clients.Caller.SendAsync("Error", "Must be logged in to send friend requests");
+                return false;
+            }
+
+            var (success, error) = await _friendService.SendFriendRequestAsync(userId, toUserId);
+
+            if (!success)
+            {
+                await Clients.Caller.SendAsync("Error", error ?? "Failed to send friend request");
+                return false;
+            }
+
+            _logger.LogInformation("User {UserId} sent friend request to {ToUserId}", userId, toUserId);
+
+            // Notify the recipient if they're online
+            var recipientConnection = GetPlayerConnection(toUserId);
+            if (!string.IsNullOrEmpty(recipientConnection))
+            {
+                await Clients.Client(recipientConnection).SendAsync("FriendRequestReceived");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending friend request");
+            await Clients.Caller.SendAsync("Error", "Failed to send friend request");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Accept a friend request
+    /// </summary>
+    public async Task<bool> AcceptFriendRequest(string friendUserId)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                await Clients.Caller.SendAsync("Error", "Must be logged in to accept friend requests");
+                return false;
+            }
+
+            var (success, error) = await _friendService.AcceptFriendRequestAsync(userId, friendUserId);
+
+            if (!success)
+            {
+                await Clients.Caller.SendAsync("Error", error ?? "Failed to accept friend request");
+                return false;
+            }
+
+            _logger.LogInformation("User {UserId} accepted friend request from {FriendUserId}", userId, friendUserId);
+
+            // Notify the requester if they're online
+            var requesterConnection = GetPlayerConnection(friendUserId);
+            if (!string.IsNullOrEmpty(requesterConnection))
+            {
+                await Clients.Client(requesterConnection).SendAsync("FriendRequestAccepted");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error accepting friend request");
+            await Clients.Caller.SendAsync("Error", "Failed to accept friend request");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Decline a friend request
+    /// </summary>
+    public async Task<bool> DeclineFriendRequest(string friendUserId)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                await Clients.Caller.SendAsync("Error", "Must be logged in to decline friend requests");
+                return false;
+            }
+
+            var (success, error) = await _friendService.DeclineFriendRequestAsync(userId, friendUserId);
+
+            if (!success)
+            {
+                await Clients.Caller.SendAsync("Error", error ?? "Failed to decline friend request");
+                return false;
+            }
+
+            _logger.LogInformation("User {UserId} declined friend request from {FriendUserId}", userId, friendUserId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error declining friend request");
+            await Clients.Caller.SendAsync("Error", "Failed to decline friend request");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Remove a friend
+    /// </summary>
+    public async Task<bool> RemoveFriend(string friendUserId)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                await Clients.Caller.SendAsync("Error", "Must be logged in to remove friends");
+                return false;
+            }
+
+            var (success, error) = await _friendService.RemoveFriendAsync(userId, friendUserId);
+
+            if (!success)
+            {
+                await Clients.Caller.SendAsync("Error", error ?? "Failed to remove friend");
+                return false;
+            }
+
+            _logger.LogInformation("User {UserId} removed friend {FriendUserId}", userId, friendUserId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing friend");
+            await Clients.Caller.SendAsync("Error", "Failed to remove friend");
+            return false;
         }
     }
 
