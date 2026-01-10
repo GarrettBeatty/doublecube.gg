@@ -19,6 +19,7 @@ public class GameService : IGameService
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
+    private readonly IMatchRepository _matchRepository;
     private readonly IHubContext<GameHub> _hubContext;
     private readonly ILogger<GameService> _logger;
 
@@ -28,6 +29,7 @@ public class GameService : IGameService
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
         IGameActionOrchestrator gameActionOrchestrator,
+        IMatchRepository matchRepository,
         IHubContext<GameHub> hubContext,
         ILogger<GameService> logger)
     {
@@ -36,6 +38,7 @@ public class GameService : IGameService
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
         _gameActionOrchestrator = gameActionOrchestrator;
+        _matchRepository = matchRepository;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -86,6 +89,9 @@ public class GameService : IGameService
             // Game exists but is in progress - shouldn't be removed from memory
             throw new InvalidOperationException($"Game {gameId} not found in active games");
         }
+
+        // Authorization check: verify player is allowed to join this game
+        await AuthorizeGameJoinAsync(session, playerId);
 
         await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
         _logger.LogInformation(
@@ -489,6 +495,90 @@ public class GameService : IGameService
         {
             _logger.LogInformation("Match {MatchId} completed. Winner: {WinnerId}", match.MatchId, match.WinnerId);
         }
+    }
+
+    /// <summary>
+    /// Validates that a player is authorized to join a game.
+    /// For match games, verifies the player is one of the match participants.
+    /// </summary>
+    private async Task AuthorizeGameJoinAsync(GameSession session, string playerId)
+    {
+        // If player is already in the game (reconnection), allow
+        if (session.WhitePlayerId == playerId || session.RedPlayerId == playerId)
+        {
+            _logger.LogDebug(
+                "Player {PlayerId} authorized to join game {GameId} (existing player/reconnection)",
+                playerId,
+                session.Id);
+            return;
+        }
+
+        // If game is not part of a match, check if there's an open slot
+        if (string.IsNullOrEmpty(session.MatchId))
+        {
+            // Standalone game - allow if there's an open slot
+            if (session.WhitePlayerId == null || session.RedPlayerId == null)
+            {
+                _logger.LogDebug(
+                    "Player {PlayerId} authorized to join standalone game {GameId} (open slot)",
+                    playerId,
+                    session.Id);
+                return;
+            }
+
+            // No open slots - will be added as spectator (handled later)
+            return;
+        }
+
+        // Game is part of a match - verify player is a match participant
+        var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+        if (match == null)
+        {
+            _logger.LogWarning(
+                "Match {MatchId} not found for game {GameId}. Denying join for player {PlayerId}",
+                session.MatchId,
+                session.Id,
+                playerId);
+            throw new UnauthorizedAccessException($"Match not found for game {session.Id}");
+        }
+
+        // Check if game is full - if so, anyone authenticated can spectate
+        var gameIsFull = session.WhitePlayerId != null && session.RedPlayerId != null;
+        if (gameIsFull)
+        {
+            _logger.LogDebug(
+                "Player {PlayerId} authorized to spectate full game {GameId} (match {MatchId})",
+                playerId,
+                session.Id,
+                session.MatchId);
+            return;
+        }
+
+        // Game has open player slot - only allow participants or open lobby joiners
+        var isParticipant = match.Player1Id == playerId || match.Player2Id == playerId;
+        var isOpenLobby = match.OpponentType == "OpenLobby" && string.IsNullOrEmpty(match.Player2Id);
+
+        if (!isParticipant && !isOpenLobby)
+        {
+            _logger.LogWarning(
+                "Unauthorized join attempt: Player {PlayerId} tried to join game {GameId} (match {MatchId}). " +
+                "Match participants: {Player1Id}, {Player2Id}. OpponentType: {OpponentType}",
+                playerId,
+                session.Id,
+                session.MatchId,
+                match.Player1Id,
+                match.Player2Id,
+                match.OpponentType);
+
+            throw new UnauthorizedAccessException(
+                "You are not authorized to join this game. Only match participants can join.");
+        }
+
+        _logger.LogDebug(
+            "Player {PlayerId} authorized to join match game {GameId} (match {MatchId})",
+            playerId,
+            session.Id,
+            session.MatchId);
     }
 
     private void SetPlayerRating(GameSession session, string playerId, int rating)

@@ -16,6 +16,7 @@ public class GameSession
     private readonly HashSet<string> _whiteConnections = new();
     private readonly HashSet<string> _redConnections = new();
     private readonly object _timerLock = new();
+    private readonly SemaphoreSlim _gameActionLock = new(1, 1);
     private System.Threading.Timer? _timeUpdateTimer;
 
     public GameSession(string id)
@@ -32,6 +33,11 @@ public class GameSession
     public string Id { get; }
 
     public GameEngine Engine { get; }
+
+    /// <summary>
+    /// Lock for game actions that modify state (prevents race conditions with multi-tab access)
+    /// </summary>
+    public SemaphoreSlim GameActionLock => _gameActionLock;
 
     public string? WhitePlayerId { get; private set; }
 

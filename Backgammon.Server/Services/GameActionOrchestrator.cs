@@ -279,11 +279,19 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
     public async Task<ActionResult> MakeMoveAsync(GameSession session, string connectionId, int from, int to)
     {
-        _logger.LogInformation("MakeMove called: from {From} to {To}", from, to);
+        _logger.LogInformation(
+            "MakeMove request: Game={GameId}, Connection={ConnectionId}, From={From}, To={To}",
+            session.Id,
+            connectionId,
+            from,
+            to);
 
         if (!session.IsPlayerTurn(connectionId))
         {
-            _logger.LogWarning("Not player's turn");
+            _logger.LogWarning(
+                "Move rejected: Not player's turn. Game={GameId}, Connection={ConnectionId}",
+                session.Id,
+                connectionId);
             return ActionResult.Error("Not your turn");
         }
 
@@ -293,35 +301,69 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             return ActionResult.Error("You have run out of time");
         }
 
-        _logger.LogInformation(
-            "Current player: {Player}, Remaining moves: {Moves}",
-            session.Engine.CurrentPlayer.Name,
-            string.Join(",", session.Engine.RemainingMoves));
-
-        // Find the correct die value from valid moves
-        var validMoves = session.Engine.GetValidMoves();
-        var matchingMove = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
-
-        if (matchingMove == null)
+        // Acquire lock to prevent race conditions with multi-tab access
+        await session.GameActionLock.WaitAsync();
+        try
         {
-            _logger.LogWarning("No valid move found from {From} to {To}", from, to);
-            return ActionResult.Error("Invalid move - no matching valid move");
+            _logger.LogDebug(
+                "Current player: {Player}, Remaining moves: {Moves}, Dice: [{Die1},{Die2}]",
+                session.Engine.CurrentPlayer.Name,
+                string.Join(",", session.Engine.RemainingMoves),
+                session.Engine.Dice.Die1,
+                session.Engine.Dice.Die2);
+
+            // Find the correct die value from valid moves (calculated server-side)
+            var validMoves = session.Engine.GetValidMoves();
+            var matchingMove = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
+
+            if (matchingMove == null)
+            {
+                // Security: Log detailed info about rejected move attempt
+                _logger.LogWarning(
+                    "Move rejected: No valid move. Game={GameId}, From={From}, To={To}, ValidMoves=[{ValidMoves}]",
+                    session.Id,
+                    from,
+                    to,
+                    string.Join("; ", validMoves.Select(m => $"{m.From}->{m.To}")));
+                return ActionResult.Error("Invalid move - no matching valid move");
+            }
+
+            _logger.LogDebug("Found valid move with die value: {DieValue}", matchingMove.DieValue);
+
+            var isValid = session.Engine.IsValidMove(matchingMove);
+            if (!isValid)
+            {
+                _logger.LogWarning(
+                    "Move rejected: IsValidMove returned false. Game={GameId}, Move={From}->{To}",
+                    session.Id,
+                    from,
+                    to);
+                return ActionResult.Error("Invalid move");
+            }
+
+            if (!session.Engine.ExecuteMove(matchingMove))
+            {
+                _logger.LogWarning(
+                    "Move rejected: ExecuteMove returned false. Game={GameId}, Move={From}->{To}",
+                    session.Id,
+                    from,
+                    to);
+                return ActionResult.Error("Invalid move");
+            }
+
+            _logger.LogInformation(
+                "Move executed: Game={GameId}, Move={From}->{To}, DieUsed={Die}",
+                session.Id,
+                from,
+                to,
+                matchingMove.DieValue);
+
+            session.UpdateActivity();
         }
-
-        _logger.LogInformation("Found valid move with die value: {DieValue}", matchingMove.DieValue);
-
-        var isValid = session.Engine.IsValidMove(matchingMove);
-        _logger.LogInformation("Move validity check: {IsValid}", isValid);
-
-        if (!session.Engine.ExecuteMove(matchingMove))
+        finally
         {
-            _logger.LogWarning("ExecuteMove returned false - invalid move");
-            return ActionResult.Error("Invalid move");
+            session.GameActionLock.Release();
         }
-
-        _logger.LogInformation("Move executed successfully");
-
-        session.UpdateActivity();
 
         // Broadcast and save
         await BroadcastGameUpdateAsync(session);

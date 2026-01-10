@@ -461,11 +461,17 @@ public class GameEngine
     /// <summary>
     /// Accept a double
     /// </summary>
-    public void AcceptDouble()
+    /// <returns>True if double was accepted successfully, false if at max cube value</returns>
+    public bool AcceptDouble()
     {
-        DoublingCube.Double(GetOpponent().Color);
+        if (!DoublingCube.Double(GetOpponent().Color))
+        {
+            return false;
+        }
+
         // Record that the double was accepted
         _pendingDoublingAction = Core.DoublingAction.Accepted;
+        return true;
     }
 
     /// <summary>

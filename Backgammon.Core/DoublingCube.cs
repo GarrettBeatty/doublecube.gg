@@ -5,6 +5,11 @@ namespace Backgammon.Core;
 /// </summary>
 public class DoublingCube
 {
+    /// <summary>
+    /// Maximum allowed cube value (standard backgammon limit)
+    /// </summary>
+    public const int MaxCubeValue = 64;
+
     public DoublingCube()
     {
         Value = 1;
@@ -20,16 +25,29 @@ public class DoublingCube
     /// </summary>
     public bool CanDouble(CheckerColor color)
     {
+        // Cannot double if already at max value
+        if (Value >= MaxCubeValue)
+        {
+            return false;
+        }
+
         return Owner == null || Owner == color;
     }
 
     /// <summary>
     /// Double the stakes
     /// </summary>
-    public void Double(CheckerColor newOwner)
+    /// <returns>True if doubled successfully, false if already at max value</returns>
+    public bool Double(CheckerColor newOwner)
     {
+        if (Value >= MaxCubeValue)
+        {
+            return false;
+        }
+
         Value *= 2;
         Owner = newOwner;
+        return true;
     }
 
     /// <summary>
