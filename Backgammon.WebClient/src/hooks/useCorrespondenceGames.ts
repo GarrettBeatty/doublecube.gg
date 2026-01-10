@@ -32,6 +32,12 @@ export const useCorrespondenceGames = () => {
       )
 
       if (response) {
+        console.log('[CorrespondenceGames] Fetched:', {
+          yourTurn: response.yourTurnGames?.length || 0,
+          waiting: response.waitingGames?.length || 0,
+          lobbies: response.myLobbies?.length || 0,
+          data: response
+        })
         setYourTurnGames(response.yourTurnGames || [])
         setWaitingGames(response.waitingGames || [])
         setMyLobbies(response.myLobbies || [])
