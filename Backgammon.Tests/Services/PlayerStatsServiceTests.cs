@@ -603,4 +603,284 @@ public class PlayerStatsServiceTests
         Assert.Equal(100, whiteUser.Rating); // Enforced by PlayerStatsService
         Assert.Equal(1516, redUser.Rating);
     }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_ValidStakes_NoWarningLogged()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            WinType = "Normal",
+            DoublingCubeValue = 2,
+            Stakes = 2, // Correct: Normal (1) × Cube (2) = 2
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 0, 0, true))
+            .Returns((1516, 1484));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - No warning should be logged for valid stakes
+        Assert.Equal(2, game.Stakes); // Stakes unchanged
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stakes mismatch")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_InvalidStakes_WarningLoggedAndCorrected()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            WinType = "Gammon",
+            DoublingCubeValue = 2,
+            Stakes = 3, // WRONG: Should be Gammon (2) × Cube (2) = 4
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 0, 0, true))
+            .Returns((1516, 1484));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - Stakes should be corrected
+        Assert.Equal(4, game.Stakes); // Corrected to expected value
+
+        // Assert - Warning should be logged
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stakes mismatch")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_BackgammonWithDoublingCube_ValidatesCorrectly()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            WinType = "Backgammon",
+            DoublingCubeValue = 4,
+            Stakes = 12, // Correct: Backgammon (3) × Cube (4) = 12
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 0, 0, true))
+            .Returns((1516, 1484));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - No correction needed, stakes already correct
+        Assert.Equal(12, game.Stakes);
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stakes mismatch")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_NormalWinCube1_ValidatesCorrectly()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            RatedGamesCount = 0,
+            PeakRating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            WinType = "Normal",
+            DoublingCubeValue = 1,
+            Stakes = 1, // Correct: Normal (1) × Cube (1) = 1
+            IsAiOpponent = false,
+            IsRated = true
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+        _mockEloRatingService
+            .Setup(s => s.CalculateNewRatings(1500, 1500, 0, 0, true))
+            .Returns((1516, 1484));
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - Stakes correct, no warning
+        Assert.Equal(1, game.Stakes);
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stakes mismatch")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateStatsAfterGameCompletionAsync_UnratedGame_SkipsStakesValidation()
+    {
+        // Arrange
+        var whiteUser = new User
+        {
+            UserId = "white-user",
+            Rating = 1500,
+            Stats = new UserStats()
+        };
+        var redUser = new User
+        {
+            UserId = "red-user",
+            Rating = 1500,
+            Stats = new UserStats()
+        };
+
+        var game = new Game
+        {
+            GameId = "game-123",
+            WhitePlayerId = "white-player",
+            RedPlayerId = "red-player",
+            WhiteUserId = "white-user",
+            RedUserId = "red-user",
+            Winner = "White",
+            WinType = "Normal",
+            DoublingCubeValue = 1,
+            Stakes = 999, // Invalid, but should be ignored for unrated games
+            IsAiOpponent = false,
+            IsRated = false
+        };
+
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("white-user")).ReturnsAsync(whiteUser);
+        _mockUserRepository.Setup(r => r.GetByUserIdAsync("red-user")).ReturnsAsync(redUser);
+
+        // Act
+        await _service.UpdateStatsAfterGameCompletionAsync(game);
+
+        // Assert - Validation not performed for unrated games
+        Assert.Equal(999, game.Stakes); // Unchanged
+        _mockLogger.Verify(
+            x => x.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stakes mismatch")),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
 }
