@@ -83,4 +83,9 @@ public interface IMatchRepository
     /// Update correspondence turn info (current player and deadline)
     /// </summary>
     Task UpdateCorrespondenceTurnAsync(string matchId, string currentTurnPlayerId, DateTime turnDeadline);
+
+    /// <summary>
+    /// Create a player-match index item (used when a player joins an existing match)
+    /// </summary>
+    Task CreatePlayerMatchIndexAsync(string playerId, string matchId, string opponentId, string status, DateTime createdAt);
 }

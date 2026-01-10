@@ -492,6 +492,14 @@ public class MatchService : IMatchService
             match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
 
+            // Create Player2's player-match index item (wasn't created when match was initially saved)
+            await _matchRepository.CreatePlayerMatchIndexAsync(
+                player2Id,
+                matchId,
+                match.Player1Id,
+                "InProgress",
+                match.CreatedAt);
+
             await _matchRepository.UpdateMatchAsync(match);
 
             // For correspondence matches, initialize turn tracking

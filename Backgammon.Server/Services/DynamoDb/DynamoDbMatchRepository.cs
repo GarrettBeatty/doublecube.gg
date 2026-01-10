@@ -803,6 +803,27 @@ public class DynamoDbMatchRepository : IMatchRepository
         }
     }
 
+    public async Task CreatePlayerMatchIndexAsync(string playerId, string matchId, string opponentId, string status, DateTime createdAt)
+    {
+        var playerMatchItem = DynamoDbHelpers.CreatePlayerMatchIndexItem(
+            playerId,
+            matchId,
+            opponentId,
+            status,
+            createdAt);
+
+        await _dynamoDbClient.PutItemAsync(new PutItemRequest
+        {
+            TableName = _tableName,
+            Item = playerMatchItem
+        });
+
+        _logger.LogInformation(
+            "Created player-match index for player {PlayerId}, match {MatchId}",
+            playerId,
+            matchId);
+    }
+
     private async Task UpdatePlayerMatchIndex(string playerId, string matchId, string reversedTimestamp, string status)
     {
         await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
