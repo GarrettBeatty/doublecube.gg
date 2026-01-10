@@ -72,6 +72,29 @@ public class PlayerStatsService : IPlayerStatsService
             {
                 try
                 {
+                    // Validate stakes match game outcome (data integrity check)
+                    var expectedStakes = game.WinType switch
+                    {
+                        "Normal" => 1 * game.DoublingCubeValue,
+                        "Gammon" => 2 * game.DoublingCubeValue,
+                        "Backgammon" => 3 * game.DoublingCubeValue,
+                        _ => throw new InvalidOperationException($"Unknown win type: {game.WinType}")
+                    };
+
+                    if (game.Stakes != expectedStakes)
+                    {
+                        _logger.LogWarning(
+                            "Stakes mismatch in game {GameId}: expected {Expected} (WinType={WinType} × Cube={Cube}), got {Actual}. Using expected value.",
+                            game.GameId,
+                            expectedStakes,
+                            game.WinType,
+                            game.DoublingCubeValue,
+                            game.Stakes);
+
+                        // Use the expected value for rating calculation to prevent data integrity issues
+                        game.Stakes = expectedStakes;
+                    }
+
                     var whiteWon = game.Winner == "White";
 
                     // Store ratings before calculation
