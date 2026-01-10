@@ -636,9 +636,31 @@ public class DynamoDbMatchRepository : IMatchRepository
             // Also get matches where CurrentTurnPlayerId is null (opening roll phase)
             // These won't be in GSI4, so we need to fetch them separately
             var allPlayerMatches = await GetPlayerMatchesAsync(playerId, "InProgress", limit: 100);
+
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesForTurnAsync: GetPlayerMatchesAsync returned {Count} InProgress matches for player {PlayerId}",
+                allPlayerMatches.Count,
+                playerId);
+
             var openingRollMatches = allPlayerMatches
                 .Where(m => m.IsCorrespondence && m.CurrentTurnPlayerId == null)
                 .ToList();
+
+            _logger.LogInformation(
+                "GetCorrespondenceMatchesForTurnAsync: Found {Count} opening roll matches (CurrentTurnPlayerId=null) for player {PlayerId}",
+                openingRollMatches.Count,
+                playerId);
+
+            // Log each opening roll match
+            foreach (var match in openingRollMatches)
+            {
+                _logger.LogInformation(
+                    "Opening roll match: {MatchId}, Player1={P1}, Player2={P2}, Status={Status}",
+                    match.MatchId,
+                    match.Player1Id,
+                    match.Player2Id,
+                    match.Status);
+            }
 
             // Combine both lists
             matches.AddRange(openingRollMatches);
