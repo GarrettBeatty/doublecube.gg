@@ -780,6 +780,9 @@ public class GameHub : Hub
         var playerId = GetEffectivePlayerId(Context.ConnectionId);
         _playerConnectionService.RemoveConnection(playerId);
 
+        // Clean up chat rate limit history
+        _chatService.CleanupConnection(Context.ConnectionId);
+
         await HandleDisconnection(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }
