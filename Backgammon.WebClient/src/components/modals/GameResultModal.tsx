@@ -52,7 +52,15 @@ export const GameResultModal: React.FC = () => {
     setShowGameResultModal(false)
   }
 
-  if (!matchState || !currentGameState) return null
+  const handlePlayAgain = () => {
+    setShowGameResultModal(false)
+    navigate('/')
+  }
+
+  if (!currentGameState) return null
+
+  // Determine if this is a match game with valid match state
+  const isMatchGame = currentGameState.isMatchGame && matchState
 
   const isWinner = lastGameWinner === myColor
   const winnerName =
@@ -63,16 +71,23 @@ export const GameResultModal: React.FC = () => {
   // Assuming player1 is White and player2 is Red (standard match setup)
   const isWhitePlayer1 = true
 
+  // Determine the title based on game type
+  const getTitle = () => {
+    if (!isMatchGame) return 'Game Over!'
+    if (matchState.matchComplete) return 'Match Complete!'
+    return 'Game Complete!'
+  }
+
   return (
     <Dialog open={showGameResultModal} onOpenChange={setShowGameResultModal}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Trophy className={isWinner ? 'text-yellow-500' : 'text-muted-foreground'} />
-            {matchState.matchComplete ? 'Match Complete!' : 'Game Complete!'}
+            {getTitle()}
           </DialogTitle>
           <DialogDescription>
-            {isWinner ? 'Congratulations! You won this game.' : 'Better luck next time!'}
+            {isWinner ? 'Congratulations! You won!' : 'Better luck next time!'}
           </DialogDescription>
         </DialogHeader>
 
@@ -95,34 +110,36 @@ export const GameResultModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Match Score */}
-          <div className="rounded-lg border p-4 space-y-2">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-4 w-4" />
-              <span className="font-semibold">
-                Match Score (to {matchState.targetScore})
-              </span>
+          {/* Match Score - only shown for match games */}
+          {isMatchGame && (
+            <div className="rounded-lg border p-4 space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-4 w-4" />
+                <span className="font-semibold">
+                  Match Score (to {matchState.targetScore})
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={myColor === CheckerColor.White ? 'font-bold' : ''}>
+                  {currentGameState.whitePlayerName}:
+                </span>
+                <span className={myColor === CheckerColor.White ? 'font-bold text-lg' : ''}>
+                  {isWhitePlayer1 ? matchState.player1Score : matchState.player2Score}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={myColor === CheckerColor.Red ? 'font-bold' : ''}>
+                  {currentGameState.redPlayerName}:
+                </span>
+                <span className={myColor === CheckerColor.Red ? 'font-bold text-lg' : ''}>
+                  {isWhitePlayer1 ? matchState.player2Score : matchState.player1Score}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between">
-              <span className={myColor === CheckerColor.White ? 'font-bold' : ''}>
-                {currentGameState.whitePlayerName}:
-              </span>
-              <span className={myColor === CheckerColor.White ? 'font-bold text-lg' : ''}>
-                {isWhitePlayer1 ? matchState.player1Score : matchState.player2Score}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className={myColor === CheckerColor.Red ? 'font-bold' : ''}>
-                {currentGameState.redPlayerName}:
-              </span>
-              <span className={myColor === CheckerColor.Red ? 'font-bold text-lg' : ''}>
-                {isWhitePlayer1 ? matchState.player2Score : matchState.player1Score}
-              </span>
-            </div>
-          </div>
+          )}
 
-          {/* Crawford Game Indicator */}
-          {matchState.isCrawfordGame && !matchState.matchComplete && (
+          {/* Crawford Game Indicator - only for match games */}
+          {isMatchGame && matchState.isCrawfordGame && !matchState.matchComplete && (
             <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3 text-sm">
               <span className="font-semibold text-amber-700 dark:text-amber-400">
                 Crawford Game:
@@ -131,8 +148,8 @@ export const GameResultModal: React.FC = () => {
             </div>
           )}
 
-          {/* Match Complete Message */}
-          {matchState.matchComplete && (
+          {/* Match Complete Message - only for match games */}
+          {isMatchGame && matchState.matchComplete && (
             <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3">
               <p className="text-center font-semibold text-green-700 dark:text-green-400">
                 {matchState.matchWinner ? (
@@ -148,22 +165,35 @@ export const GameResultModal: React.FC = () => {
         </div>
 
         <DialogFooter className="gap-2">
-          {matchState.matchComplete ? (
+          {isMatchGame ? (
+            // Match game buttons
+            matchState.matchComplete ? (
+              <>
+                <Button variant="outline" onClick={handleClose}>
+                  Close
+                </Button>
+                <Button onClick={handleViewMatchResults}>
+                  View Match Results
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={handleClose}>
+                  Stay Here
+                </Button>
+                <Button onClick={handleContinueMatch}>
+                  Continue to Next Game
+                </Button>
+              </>
+            )
+          ) : (
+            // Standalone game buttons
             <>
               <Button variant="outline" onClick={handleClose}>
                 Close
               </Button>
-              <Button onClick={handleViewMatchResults}>
-                View Match Results
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button variant="outline" onClick={handleClose}>
-                Stay Here
-              </Button>
-              <Button onClick={handleContinueMatch}>
-                Continue to Next Game
+              <Button onClick={handlePlayAgain}>
+                Play Again
               </Button>
             </>
           )}
