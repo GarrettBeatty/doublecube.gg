@@ -443,9 +443,10 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       }
 
       // Check bear-off (align with visual bear-off box position)
+      // White bears off to 0 (moves 24→1), Red bears off to 25 (moves 1→24)
       const bearoffStartX = CONFIG.barX! + CONFIG.barWidth + 6 * CONFIG.pointWidth
       if (x >= bearoffStartX) {
-        return 25 // Bear-off
+        return gameState?.currentPlayer === CheckerColor.White ? 0 : 25
       }
 
       // Check points
@@ -474,7 +475,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
 
       return result
     },
-    [isBoardFlipped]
+    [isBoardFlipped, gameState?.currentPlayer]
   )
 
   // Drag handlers

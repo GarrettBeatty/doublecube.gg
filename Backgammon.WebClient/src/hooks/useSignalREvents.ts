@@ -159,10 +159,8 @@ export const useSignalREvents = () => {
         // Store game result for modal display
         setLastGameResult(winner, points)
 
-        // Show result modal if this is a match game
-        if (gameState.isMatchGame) {
-          setShowGameResultModal(true)
-        }
+        // Show result modal for all game types
+        setShowGameResultModal(true)
       }
     )
 
