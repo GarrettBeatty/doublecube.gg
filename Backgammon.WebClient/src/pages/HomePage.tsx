@@ -1,23 +1,22 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Toaster } from '@/components/ui/toaster'
-import { Plus, UserPlus, Bot, BarChart3 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useToast } from '@/hooks/use-toast'
 import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
+import { useActiveGames } from '@/hooks/useActiveGames'
 
 // Import all home components
 import { GameLobby } from '@/components/home/GameLobby'
 import { OnlineFriends } from '@/components/home/OnlineFriends'
 import { DailyPuzzle } from '@/components/home/DailyPuzzle'
-import { CorrespondenceGames } from '@/components/home/CorrespondenceGames'
 import { CorrespondenceLobbies } from '@/components/home/CorrespondenceLobbies'
+import { GamesInPlay } from '@/components/home/GamesInPlay'
 import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { RecentOpponents } from '@/components/home/RecentOpponents'
+import { QuickPlayHero } from '@/components/home/QuickPlayHero'
 
 // Import modals
 import { CreateMatchModal } from '@/components/modals/CreateMatchModal'
@@ -26,8 +25,12 @@ import { FriendsDialog } from '@/components/friends/FriendsDialog'
 export function HomePage() {
   const { isConnected } = useSignalR()
   const { toast } = useToast()
-  const navigate = useNavigate()
-  const { totalYourTurn } = useCorrespondenceGames()
+  const { yourTurnGames, waitingGames, totalYourTurn: corrYourTurn } = useCorrespondenceGames()
+  const { games: liveGames, yourTurnCount: liveYourTurn } = useActiveGames()
+
+  // Calculate total games in play
+  const totalGamesInPlay = liveGames.length + yourTurnGames.length + waitingGames.length
+  const totalYourTurn = corrYourTurn + liveYourTurn
 
   // Modal state
   const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
@@ -71,55 +74,20 @@ export function HomePage() {
     setShowFriendsDialog(true)
   }
 
-  const handleOpenAnalysisBoard = () => {
-    navigate('/analysis')
-  }
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8">
+        {/* Hero Quick-Play Section */}
+        <QuickPlayHero
+          onCreateGame={handleCreateGame}
+          onPlayComputer={handlePlayVsComputer}
+          onChallengeFriend={handleChallengeFriend}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-          {/* Left Column - Actions (col-span-3) */}
+          {/* Left Column - Social & Engagement (col-span-3) */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Action Buttons */}
-            <div className="space-y-3">
-              <Button
-                className="w-full flex items-center gap-2"
-                size="lg"
-                onClick={handleCreateGame}
-              >
-                <Plus className="h-5 w-5" />
-                Create a Game Lobby
-              </Button>
-              <Button
-                className="w-full flex items-center gap-2"
-                variant="outline"
-                size="lg"
-                onClick={handleChallengeFriend}
-              >
-                <UserPlus className="h-5 w-5" />
-                Challenge a Friend
-              </Button>
-              <Button
-                className="w-full flex items-center gap-2"
-                variant="outline"
-                size="lg"
-                onClick={handlePlayVsComputer}
-              >
-                <Bot className="h-5 w-5" />
-                Play Against Computer
-              </Button>
-              <Button
-                className="w-full flex items-center gap-2"
-                variant="outline"
-                size="lg"
-                onClick={handleOpenAnalysisBoard}
-              >
-                <BarChart3 className="h-5 w-5" />
-                Analysis Board
-              </Button>
-            </div>
-
             <DailyPuzzle />
             <OnlineFriends onChallengeClick={handleChallengeFromFriendsList} />
             <RecentOpponents onChallengeClick={() => {
@@ -136,10 +104,13 @@ export function HomePage() {
                 <TabsTrigger value="lobby" className="flex-1">
                   Lobby
                 </TabsTrigger>
-                <TabsTrigger value="correspondence" className="flex-1 relative">
+                <TabsTrigger value="correspondence" className="flex-1">
                   Correspondence
+                </TabsTrigger>
+                <TabsTrigger value="in-play" className="flex-1 gap-2">
+                  {totalGamesInPlay > 0 ? `${totalGamesInPlay} Games` : 'My Games'}
                   {totalYourTurn > 0 && (
-                    <Badge variant="destructive" className="ml-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                    <Badge variant="destructive" className="animate-pulse">
                       {totalYourTurn}
                     </Badge>
                   )}
@@ -147,12 +118,15 @@ export function HomePage() {
               </TabsList>
 
               <TabsContent value="lobby" className="mt-6">
-                <GameLobby />
+                <GameLobby onCreateGame={handleCreateGame} />
               </TabsContent>
 
-              <TabsContent value="correspondence" className="mt-6 space-y-6">
-                <CorrespondenceGames />
+              <TabsContent value="correspondence" className="mt-6">
                 <CorrespondenceLobbies />
+              </TabsContent>
+
+              <TabsContent value="in-play" className="mt-6">
+                <GamesInPlay />
               </TabsContent>
             </Tabs>
           </div>

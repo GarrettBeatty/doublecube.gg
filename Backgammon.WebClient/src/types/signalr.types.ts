@@ -24,6 +24,7 @@ export const HubMethods = {
   ContinueMatch: 'ContinueMatch',
   GetMatchStatus: 'GetMatchStatus',
   GetMatchLobbies: 'GetMatchLobbies',
+  GetActiveGames: 'GetActiveGames',
 
   // Correspondence actions
   GetCorrespondenceGames: 'GetCorrespondenceGames',

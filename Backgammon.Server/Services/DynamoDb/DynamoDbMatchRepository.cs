@@ -158,6 +158,14 @@ public class DynamoDbMatchRepository : IMatchRepository
                 ["#status"] = "status"
             };
 
+            // Add Player2 info if set (for when player 2 joins)
+            if (!string.IsNullOrEmpty(match.Player2Id))
+            {
+                updateExpression += ", player2Id = :p2Id, player2Name = :p2Name";
+                expressionAttributeValues[":p2Id"] = new AttributeValue { S = match.Player2Id };
+                expressionAttributeValues[":p2Name"] = new AttributeValue { S = match.Player2Name ?? "Unknown" };
+            }
+
             // Add game IDs if they've changed
             if (match.GameIds.Any())
             {

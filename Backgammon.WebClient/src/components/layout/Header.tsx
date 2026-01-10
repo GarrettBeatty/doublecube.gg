@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ConnectionState } from '@/types/signalr.types'
-import { Gamepad2, Trophy, Users, Settings } from 'lucide-react'
+import { Gamepad2, Trophy, Users, Settings, BarChart3 } from 'lucide-react'
 
 interface HeaderProps {
   onLoginClick: () => void
@@ -93,6 +93,14 @@ export const Header: React.FC<HeaderProps> = ({
             <Button variant="ghost" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Community
+            </Button>
+            <Button
+              variant="ghost"
+              className="flex items-center gap-2"
+              onClick={() => navigate('/analysis')}
+            >
+              <BarChart3 className="h-4 w-4" />
+              Analysis
             </Button>
           </nav>
 

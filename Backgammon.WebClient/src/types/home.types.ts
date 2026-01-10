@@ -1,19 +1,35 @@
 // Type definitions for Home Page components
 
+export interface MiniPoint {
+  position: number
+  color: 'White' | 'Red' | null
+  count: number
+}
+
 export interface ActiveGame {
+  matchId: string
   gameId: string
   player1Name: string
   player2Name: string
   player1Rating?: number
   player2Rating?: number
   currentPlayer: 'White' | 'Red'
+  myColor: 'White' | 'Red'
+  isYourTurn: boolean
   matchScore?: string
-  matchLength?: string
+  matchLength?: number
   viewers?: number
   timeControl?: string
   cubeValue?: number
   cubeOwner?: 'White' | 'Red' | 'Center'
   isCrawford?: boolean
+  // Board state for mini preview
+  board?: MiniPoint[]
+  whiteCheckersOnBar?: number
+  redCheckersOnBar?: number
+  whiteBornOff?: number
+  redBornOff?: number
+  dice?: number[]
 }
 
 export interface UserStats {
