@@ -123,15 +123,17 @@ interface DragState {
 interface BoardSVGProps {
   gameState: GameState | null
   isSpectator?: boolean
+  onOfferDouble?: () => void
 }
 
 // Internal component (not exported)
-const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = false }) => {
+const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = false, onOfferDouble }) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const checkersGroupRef = useRef<SVGGElement | null>(null)
   const pointsGroupRef = useRef<SVGGElement | null>(null)
   const diceGroupRef = useRef<SVGGElement | null>(null)
   const buttonsGroupRef = useRef<SVGGElement | null>(null)
+  const doublingCubeGroupRef = useRef<SVGGElement | null>(null)
 
   const { selectedChecker, validSources, isBoardFlipped, isFreeMoveEnabled, highlightedMoves } =
     useGameStore()
@@ -756,6 +758,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
     const buttonsGroup = createSVGElement('g', { id: 'buttons' }) as SVGGElement
     svgRef.current.appendChild(buttonsGroup)
     buttonsGroupRef.current = buttonsGroup
+
+    // Doubling cube group
+    const doublingCubeGroup = createSVGElement('g', { id: 'doubling-cube' }) as SVGGElement
+    svgRef.current.appendChild(doublingCubeGroup)
+    doublingCubeGroupRef.current = doublingCubeGroup
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -1108,6 +1115,10 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
     const movesMade = totalMoves > 0 && remainingMovesCount < totalMoves
     const canUndo = !isSpectator && isGameInProgress && !isOpeningRoll && hasDiceRolled && movesMade && (gameState.isAnalysisMode || isYourTurn)
 
+    // Doubling cube logic
+    const { doublingCube } = useGameStore.getState()
+    const canDouble = !isSpectator && doublingCube.canDouble && !hasDiceRolled && !isOpeningRoll
+
     // Button positions
     const leftSideX = CONFIG.viewBox.width * 0.2216  // 22.16%
     const rightSideX = CONFIG.viewBox.width * 0.7265  // 72.65%
@@ -1205,6 +1216,22 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       buttonsGroupRef.current.appendChild(undoButton)
     }
 
+    // Render Double button (appears in same position as Undo but only before rolling)
+    if (canDouble && onOfferDouble) {
+      const doubleButton = createButton(
+        leftSideX,
+        centerY,
+        32,  // smaller radius
+        'Double',
+        () => {
+          onOfferDouble()
+        },
+        '#fbbf24',  // yellow-400 background
+        '#111827'   // dark text
+      )
+      buttonsGroupRef.current.appendChild(doubleButton)
+    }
+
     // Render End Turn button
     if (canEndTurn) {
       const endButton = createButton(
@@ -1220,7 +1247,113 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       )
       buttonsGroupRef.current.appendChild(endButton)
     }
-  }, [gameState, invoke, isBoardFlipped, isSpectator])
+  }, [gameState, invoke, isBoardFlipped, isSpectator, onOfferDouble])
+
+  // Render doubling cube
+  const renderDoublingCube = useCallback(() => {
+    if (!doublingCubeGroupRef.current || !gameState || isSpectator) return
+
+    doublingCubeGroupRef.current.innerHTML = ''
+
+    const { doublingCube } = useGameStore.getState()
+    const { value, owner } = doublingCube
+    const isCrawfordGame = gameState.isCrawfordGame
+
+    // Position on right margin (near bearoff area)
+    const cubeX = CONFIG.viewBox.width - CONFIG.padding - 35
+    const cubeSize = 50
+    const centerY = CONFIG.viewBox.height / 2
+
+    // Determine position based on ownership
+    let cubeY = centerY // center by default
+
+    if (owner !== null) {
+      // Position at top or bottom based on ownership and board flip
+      const isWhiteSide = (owner === CheckerColor.White && !isBoardFlipped) ||
+                          (owner === CheckerColor.Red && isBoardFlipped)
+
+      if (isWhiteSide) {
+        cubeY = CONFIG.viewBox.height - CONFIG.padding - cubeSize / 2
+      } else {
+        cubeY = CONFIG.padding + cubeSize / 2
+      }
+    }
+
+    // Counter-rotate if board is flipped
+    if (isBoardFlipped) {
+      doublingCubeGroupRef.current.setAttribute('transform', `rotate(180 ${CONFIG.viewBox.width / 2} ${centerY})`)
+    } else {
+      doublingCubeGroupRef.current.removeAttribute('transform')
+    }
+
+    // Always yellow background
+    const fillColor = '#fbbf24' // yellow-400
+    const strokeColor = '#f59e0b' // yellow-600
+
+    // Shadow
+    const shadow = createSVGElement('rect', {
+      x: cubeX - cubeSize / 2 + 2,
+      y: cubeY - cubeSize / 2 + 2,
+      width: cubeSize,
+      height: cubeSize,
+      rx: 8,
+      fill: 'rgba(0, 0, 0, 0.2)',
+      filter: 'blur(4px)',
+    })
+    doublingCubeGroupRef.current.appendChild(shadow)
+
+    // Cube body
+    const cube = createSVGElement('rect', {
+      x: cubeX - cubeSize / 2,
+      y: cubeY - cubeSize / 2,
+      width: cubeSize,
+      height: cubeSize,
+      rx: 8,
+      fill: fillColor,
+      stroke: strokeColor,
+      'stroke-width': 2,
+      style: 'transition: opacity 0.3s;',
+    })
+    doublingCubeGroupRef.current.appendChild(cube)
+
+    // Cube value text
+    const text = createSVGElement('text', {
+      x: cubeX,
+      y: cubeY,
+      'text-anchor': 'middle',
+      'dominant-baseline': 'middle',
+      'font-size': 28,
+      'font-weight': 'bold',
+      fill: '#111827',
+      style: 'user-select: none; pointer-events: none;',
+    })
+    text.textContent = String(value)
+    doublingCubeGroupRef.current.appendChild(text)
+
+    // Crawford indicator
+    if (isCrawfordGame) {
+      const crawfordCircle = createSVGElement('circle', {
+        cx: cubeX + cubeSize / 2 - 8,
+        cy: cubeY - cubeSize / 2 + 8,
+        r: 10,
+        fill: '#ef4444',
+      })
+      doublingCubeGroupRef.current.appendChild(crawfordCircle)
+
+      const crawfordText = createSVGElement('text', {
+        x: cubeX + cubeSize / 2 - 8,
+        y: cubeY - cubeSize / 2 + 8,
+        'text-anchor': 'middle',
+        'dominant-baseline': 'middle',
+        'font-size': 10,
+        'font-weight': 'bold',
+        fill: 'white',
+        style: 'user-select: none; pointer-events: none;',
+      })
+      crawfordText.textContent = 'C'
+      doublingCubeGroupRef.current.appendChild(crawfordText)
+    }
+  }, [gameState, isBoardFlipped, isSpectator])
 
   // Initialize board
   useEffect(() => {
@@ -1241,6 +1374,11 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
   useEffect(() => {
     renderButtons()
   }, [renderButtons])
+
+  // Re-render doubling cube when game state changes
+  useEffect(() => {
+    renderDoublingCube()
+  }, [renderDoublingCube])
 
   return (
     <svg

@@ -10,6 +10,8 @@ import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
 import { GameResultModal } from '@/components/modals/GameResultModal'
+import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
+import { DoubleOfferModal } from '@/components/modals/DoubleOfferModal'
 import { NotFound } from '@/components/NotFound'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -22,10 +24,18 @@ export const GamePage: React.FC = () => {
   const navigate = useNavigate()
   const { invoke, isConnected, connection } = useSignalR()
 
-  const { currentGameState, isSpectator, setCurrentGameId, resetGame } = useGameStore()
+  const {
+    currentGameState,
+    isSpectator,
+    setCurrentGameId,
+    resetGame,
+    doublingCube,
+    clearPendingDoubleOffer,
+  } = useGameStore()
   const [isLoading, setIsLoading] = useState(true)
   const [lastJoinedGameId, setLastJoinedGameId] = useState<string | null>(null)
   const [gameNotFound, setGameNotFound] = useState(false)
+  const [showDoubleConfirmModal, setShowDoubleConfirmModal] = useState(false)
   const lastJoinedGameIdRef = useRef<string | null>(null)
 
   // Keep ref in sync with state
@@ -134,6 +144,19 @@ export const GamePage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, isConnected, navigate, setCurrentGameId, invoke, resetGame])
 
+  // Doubling cube handlers
+  const handleOfferDouble = () => {
+    setShowDoubleConfirmModal(true)
+  }
+
+  const handleConfirmDouble = async () => {
+    try {
+      await invoke(HubMethods.OfferDouble)
+      setShowDoubleConfirmModal(false)
+    } catch (error) {
+      console.error('[GamePage] Failed to offer double:', error)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -253,26 +276,6 @@ export const GamePage: React.FC = () => {
               />
             )}
 
-            {/* Doubling Cube */}
-            {currentGameState.doublingCubeValue > 1 && (
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="text-sm text-muted-foreground mb-2">Stakes</div>
-                  <div className="text-3xl font-bold text-yellow-500">
-                    {currentGameState.doublingCubeValue}x
-                  </div>
-                  {currentGameState.doublingCubeOwner !== null && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Owned by{' '}
-                      {currentGameState.doublingCubeOwner === CheckerColor.White
-                        ? 'White'
-                        : 'Red'}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
             <GameControls gameState={currentGameState} isSpectator={isSpectator} />
           </div>
 
@@ -307,7 +310,11 @@ export const GamePage: React.FC = () => {
 
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <BoardSVG gameState={currentGameState} isSpectator={isSpectator} />
+                  <BoardSVG
+                    gameState={currentGameState}
+                    isSpectator={isSpectator}
+                    onOfferDouble={!isSpectator ? handleOfferDouble : undefined}
+                  />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={isSpectator}
@@ -321,6 +328,27 @@ export const GamePage: React.FC = () => {
 
       {/* Game Result Modal */}
       <GameResultModal />
+
+      {/* Double Confirm Modal - shown when player wants to offer double */}
+      {currentGameState && (
+        <DoubleConfirmModal
+          isOpen={showDoubleConfirmModal}
+          onClose={() => setShowDoubleConfirmModal(false)}
+          onConfirm={handleConfirmDouble}
+          currentValue={doublingCube.value}
+          newValue={doublingCube.value * 2}
+        />
+      )}
+
+      {/* Double Offer Modal - shown when opponent offers double */}
+      {currentGameState && doublingCube.pendingResponse && doublingCube.newValue && (
+        <DoubleOfferModal
+          isOpen={doublingCube.pendingResponse}
+          onClose={clearPendingDoubleOffer}
+          currentStakes={doublingCube.value}
+          newStakes={doublingCube.newValue}
+        />
+      )}
     </div>
   )
 }

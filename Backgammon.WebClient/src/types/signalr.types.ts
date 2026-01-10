@@ -13,7 +13,8 @@ export const HubMethods = {
   EndTurn: 'EndTurn',
   UndoLastMove: 'UndoLastMove',
   OfferDouble: 'OfferDouble',
-  RespondToDouble: 'RespondToDouble',
+  AcceptDouble: 'AcceptDouble',
+  DeclineDouble: 'DeclineDouble',
   AbandonGame: 'AbandonGame',
   LeaveGame: 'LeaveGame',
 

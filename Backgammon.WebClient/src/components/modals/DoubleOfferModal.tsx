@@ -30,7 +30,7 @@ export const DoubleOfferModal: React.FC<DoubleOfferModalProps> = ({
 
   const handleAccept = async () => {
     try {
-      await invoke(HubMethods.RespondToDouble, true)
+      await invoke(HubMethods.AcceptDouble)
       onClose()
     } catch (error) {
       console.error('Failed to accept double:', error)
@@ -39,7 +39,7 @@ export const DoubleOfferModal: React.FC<DoubleOfferModalProps> = ({
 
   const handleDecline = async () => {
     try {
-      await invoke(HubMethods.RespondToDouble, false)
+      await invoke(HubMethods.DeclineDouble)
       onClose()
     } catch (error) {
       console.error('Failed to decline double:', error)
