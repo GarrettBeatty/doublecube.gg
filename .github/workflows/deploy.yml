@@ -206,9 +206,39 @@ jobs:
       run: |
         # Check if services are running
         ssh -i ~/.ssh/deploy_key ec2-user@$EC2_HOST << 'ENDSSH'
-          docker ps
-          echo "---"
-          echo "Service health:"
-          curl -f http://localhost:5000/health || echo "Server health check failed"
-          echo "Server: OK"
+          echo "Container status:"
+          docker ps --format 'table {{.Names}}\t{{.Status}}'
+          echo ""
+          echo "Health checks:"
+
+          # Check container health status via Docker
+          SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "not found")
+          WEBCLIENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "not found")
+          REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "not found")
+          CADDY_STATUS=$(docker inspect --format='{{.State.Status}}' backgammon-caddy 2>/dev/null || echo "not found")
+
+          echo "  Redis: $REDIS_HEALTH"
+          echo "  Server: $SERVER_HEALTH"
+          echo "  WebClient: $WEBCLIENT_HEALTH"
+          echo "  Caddy: $CADDY_STATUS"
+
+          # Verify via Caddy (internal network check)
+          echo ""
+          echo "Endpoint check via Caddy:"
+          DOMAIN=$(aws ssm get-parameter --name /backgammon/dev/domain --query Parameter.Value --output text)
+          if curl -sf --max-time 10 "https://${DOMAIN}/api/health" > /dev/null 2>&1; then
+            echo "  API health endpoint: OK"
+          else
+            echo "  API health endpoint: FAILED (may need DNS propagation)"
+          fi
+
+          # Final status
+          if [ "$SERVER_HEALTH" = "healthy" ] && [ "$WEBCLIENT_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ]; then
+            echo ""
+            echo "✓ All services healthy!"
+          else
+            echo ""
+            echo "⚠ Some services may not be healthy yet"
+            exit 1
+          fi
         ENDSSH
