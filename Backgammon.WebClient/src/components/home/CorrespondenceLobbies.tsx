@@ -89,7 +89,7 @@ export function CorrespondenceLobbies() {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Available Correspondence Games</h3>
+          <h3 className="text-lg font-semibold">Join a Game</h3>
           <Button variant="ghost" size="icon" onClick={fetchLobbies}>
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -109,7 +109,7 @@ export function CorrespondenceLobbies() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Available Correspondence Games</h3>
+        <h3 className="text-lg font-semibold">Join a Game</h3>
         <Button variant="ghost" size="icon" onClick={fetchLobbies} disabled={isLoading}>
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
@@ -117,7 +117,7 @@ export function CorrespondenceLobbies() {
 
       {lobbies.length === 0 ? (
         <div className="text-center text-muted-foreground py-8 border rounded-lg">
-          {isLoading ? 'Loading...' : 'No correspondence lobbies available'}
+          {isLoading ? 'Loading...' : 'No games available to join. Create one to get started!'}
         </div>
       ) : (
         <div className="space-y-2">

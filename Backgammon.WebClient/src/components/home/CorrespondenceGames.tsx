@@ -173,10 +173,10 @@ export function CorrespondenceGames() {
         )}
       </div>
 
-      {/* Available Games Section - Open lobbies waiting for players */}
+      {/* My Open Lobbies Section - Lobbies you created waiting for players */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">Available Games</h2>
+          <h2 className="text-xl font-semibold">My Open Lobbies</h2>
         </div>
 
         {hasLobbies ? (
@@ -190,7 +190,7 @@ export function CorrespondenceGames() {
                   <User className="h-5 w-5 text-muted-foreground" />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold">Waiting for player to join</span>
+                      <span className="font-semibold">Waiting for opponent</span>
                       {lobby.isRated && (
                         <Badge variant="outline" className="text-xs">
                           Rated
@@ -222,7 +222,7 @@ export function CorrespondenceGames() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-8">
               <div className="text-muted-foreground text-center text-sm">
-                No open lobbies available
+                You haven't created any lobbies
               </div>
             </CardContent>
           </Card>
