@@ -257,12 +257,15 @@ public class CombinedMovesTests
         // Act
         var state = session.GetState("test-connection");
 
-        // Assert - Should have combined move from 5 to 0 (bear off)
+        // Assert - Combined bear-off from point 5 to 0 (via intermediate point 2 or 3)
+        // Path: 5 -> 2 (using 3) -> 0 (using 2), or 5 -> 3 (using 2) -> 0 (using 3)
         var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
             m.IsCombinedMove && m.From == 5 && m.To == 0);
 
-        // Note: This may or may not be present depending on bearing off rules
-        // The important thing is it doesn't crash
-        Assert.NotNull(state.ValidMoves);
+        Assert.NotNull(combinedBearOff);
+        Assert.True(combinedBearOff.IsCombinedMove);
+        Assert.Equal(5, combinedBearOff.DieValue); // 3 + 2 = 5
+        Assert.NotNull(combinedBearOff.DiceUsed);
+        Assert.Equal(2, combinedBearOff.DiceUsed.Length);
     }
 }
