@@ -46,14 +46,7 @@ public class DynamoDbMatchRepository : IMatchRepository
             var player1Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
                 match.Player1Id,
                 match.MatchId,
-                match.Player2Id,
-                match.Status,
-                match.CreatedAt);
-
-            var player2Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
-                match.Player2Id,
-                match.MatchId,
-                match.Player1Id,
+                match.Player2Id ?? string.Empty, // Empty string for null opponent (OpenLobby)
                 match.Status,
                 match.CreatedAt);
 
@@ -66,14 +59,25 @@ public class DynamoDbMatchRepository : IMatchRepository
                 }
             });
 
-            transactItems.Add(new TransactWriteItem
+            // Only create Player2 index item if Player2Id is set
+            if (!string.IsNullOrEmpty(match.Player2Id))
             {
-                Put = new Put
+                var player2Match = DynamoDbHelpers.CreatePlayerMatchIndexItem(
+                    match.Player2Id,
+                    match.MatchId,
+                    match.Player1Id,
+                    match.Status,
+                    match.CreatedAt);
+
+                transactItems.Add(new TransactWriteItem
                 {
-                    TableName = _tableName,
-                    Item = player2Match
-                }
-            });
+                    Put = new Put
+                    {
+                        TableName = _tableName,
+                        Item = player2Match
+                    }
+                });
+            }
 
             await _dynamoDbClient.TransactWriteItemsAsync(new TransactWriteItemsRequest
             {
@@ -192,11 +196,17 @@ public class DynamoDbMatchRepository : IMatchRepository
             // Update player-match index items
             var reversedTimestamp = (DateTime.MaxValue.Ticks - match.CreatedAt.Ticks).ToString("D19");
 
-            var playerIndexUpdateTasks = new[]
+            var playerIndexUpdateTasks = new List<Task>
             {
-                UpdatePlayerMatchIndex(match.Player1Id, match.MatchId, reversedTimestamp, match.Status),
-                UpdatePlayerMatchIndex(match.Player2Id, match.MatchId, reversedTimestamp, match.Status)
+                UpdatePlayerMatchIndex(match.Player1Id, match.MatchId, reversedTimestamp, match.Status)
             };
+
+            // Only update Player2 index if Player2Id exists
+            if (!string.IsNullOrEmpty(match.Player2Id))
+            {
+                playerIndexUpdateTasks.Add(
+                    UpdatePlayerMatchIndex(match.Player2Id, match.MatchId, reversedTimestamp, match.Status));
+            }
 
             await Task.WhenAll(playerIndexUpdateTasks);
 
