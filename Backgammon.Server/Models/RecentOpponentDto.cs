@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Data transfer object for recent opponent information
 /// </summary>
+[TranspilationSource]
 public class RecentOpponentDto
 {
     /// <summary>

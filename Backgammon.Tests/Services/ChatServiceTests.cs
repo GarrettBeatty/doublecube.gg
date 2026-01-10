@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -10,14 +11,14 @@ namespace Backgammon.Tests.Services;
 public class ChatServiceTests
 {
     private readonly Mock<IGameSessionManager> _mockSessionManager;
-    private readonly Mock<IHubContext<GameHub>> _mockHubContext;
+    private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
     private readonly Mock<ILogger<ChatService>> _mockLogger;
     private readonly ChatService _service;
 
     public ChatServiceTests()
     {
         _mockSessionManager = new Mock<IGameSessionManager>();
-        _mockHubContext = new Mock<IHubContext<GameHub>>();
+        _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
         _mockLogger = new Mock<ILogger<ChatService>>();
 
         _service = new ChatService(
@@ -60,25 +61,22 @@ public class ChatServiceTests
         // Arrange
         var connectionId = "conn-123";
         var message = "Hello!";
-        var mockClients = new Mock<IHubClients>();
-        var mockCallerClients = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockCallerClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns((GameSession?)null);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClients.Object);
+        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClient.Object);
 
         // Act
         await _service.SendChatMessageAsync(connectionId, message);
 
         // Assert
-        mockCallerClients.Verify(
-            c => c.SendCoreAsync(
-                "Error",
-                It.Is<object[]>(args => args.Length == 1 && (string)args[0] == "Not in a game"),
-                default),
+        mockCallerClient.Verify(
+            c => c.Error("Not in a game"),
             Times.Once);
     }
 
@@ -91,25 +89,25 @@ public class ChatServiceTests
         var session = new GameSession("game-123");
         // No players added, so GetPlayerColor will return null
 
-        var mockClients = new Mock<IHubClients>();
-        var mockGroupClients = new Mock<IClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockGroupClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClients.Object);
+        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClient.Object);
 
         // Act
         await _service.SendChatMessageAsync(connectionId, message);
 
         // Assert
-        mockGroupClients.Verify(
-            c => c.SendCoreAsync(
-                "ReceiveChatMessage",
-                It.IsAny<object[]>(),
-                default),
+        mockGroupClient.Verify(
+            c => c.ReceiveChatMessage(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>()),
             Times.Never);
     }
 
@@ -123,29 +121,22 @@ public class ChatServiceTests
         session.AddPlayer("white-player", connectionId);
         session.SetPlayerName("white-player", "TestWhite");
 
-        var mockClients = new Mock<IHubClients>();
-        var mockGroupClients = new Mock<IClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockGroupClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClients.Object);
+        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClient.Object);
 
         // Act
         await _service.SendChatMessageAsync(connectionId, message);
 
         // Assert
-        mockGroupClients.Verify(
-            c => c.SendCoreAsync(
-                "ReceiveChatMessage",
-                It.Is<object[]>(args =>
-                    args.Length == 3 &&
-                    (string)args[0] == "TestWhite" &&
-                    (string)args[1] == message &&
-                    (string)args[2] == connectionId),
-                default),
+        mockGroupClient.Verify(
+            c => c.ReceiveChatMessage("TestWhite", message, connectionId),
             Times.Once);
     }
 
@@ -160,29 +151,22 @@ public class ChatServiceTests
         session.AddPlayer("red-player", connectionId);
         session.SetPlayerName("red-player", "TestRed");
 
-        var mockClients = new Mock<IHubClients>();
-        var mockGroupClients = new Mock<IClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockGroupClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClients.Object);
+        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClient.Object);
 
         // Act
         await _service.SendChatMessageAsync(connectionId, message);
 
         // Assert
-        mockGroupClients.Verify(
-            c => c.SendCoreAsync(
-                "ReceiveChatMessage",
-                It.Is<object[]>(args =>
-                    args.Length == 3 &&
-                    (string)args[0] == "TestRed" &&
-                    (string)args[1] == message &&
-                    (string)args[2] == connectionId),
-                default),
+        mockGroupClient.Verify(
+            c => c.ReceiveChatMessage("TestRed", message, connectionId),
             Times.Once);
     }
 
@@ -196,27 +180,22 @@ public class ChatServiceTests
         session.AddPlayer("white-player", connectionId);
         // No name set explicitly, should auto-generate from playerId: "Player ayer"
 
-        var mockClients = new Mock<IHubClients>();
-        var mockGroupClients = new Mock<IClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockGroupClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClients.Object);
+        mockClients.Setup(c => c.Group(session.Id)).Returns(mockGroupClient.Object);
 
         // Act
         await _service.SendChatMessageAsync(connectionId, message);
 
         // Assert
-        mockGroupClients.Verify(
-            c => c.SendCoreAsync(
-                "ReceiveChatMessage",
-                It.Is<object[]>(args =>
-                    args.Length == 3 &&
-                    (string)args[0] == "Player ayer"),
-                default),
+        mockGroupClient.Verify(
+            c => c.ReceiveChatMessage("Player ayer", It.IsAny<string>(), It.IsAny<string>()),
             Times.Once);
     }
 }

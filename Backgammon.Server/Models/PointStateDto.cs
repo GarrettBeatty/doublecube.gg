@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Represents a single point on the backgammon board for storage
 /// </summary>
+[TranspilationSource]
 public class PointStateDto
 {
     /// <summary>

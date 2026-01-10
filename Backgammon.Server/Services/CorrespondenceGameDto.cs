@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Services;
 
 /// <summary>
 /// DTO for correspondence game information
 /// </summary>
+[TranspilationSource]
 public class CorrespondenceGameDto
 {
     /// <summary>

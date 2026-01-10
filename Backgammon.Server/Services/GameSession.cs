@@ -1,5 +1,7 @@
 using Backgammon.Core;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
+using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services.GameModes;
 using Microsoft.AspNetCore.SignalR;
 using ServerGameStatus = Backgammon.Server.Models.GameStatus;
@@ -400,7 +402,7 @@ public class GameSession
     /// <summary>
     /// Start broadcasting time updates every second
     /// </summary>
-    public void StartTimeUpdates(IHubContext<Hubs.GameHub> hubContext)
+    public void StartTimeUpdates(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
     {
         if (TimeControl == null || TimeControl.Type == TimeControlType.None)
         {
@@ -516,7 +518,7 @@ public class GameSession
     /// <summary>
     /// Broadcast time update to all connections
     /// </summary>
-    private async Task BroadcastTimeUpdate(IHubContext<Hubs.GameHub> hubContext)
+    private async Task BroadcastTimeUpdate(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
     {
         if (Engine.WhiteTimeState == null || Engine.RedTimeState == null || TimeControl == null)
         {
@@ -539,21 +541,21 @@ public class GameSession
         Console.WriteLine($"[TIME DEBUG]   whiteDelayRemaining: {whiteDelayRemaining}");
         Console.WriteLine($"[TIME DEBUG]   redDelayRemaining: {redDelayRemaining}");
 
-        var timeUpdate = new
+        var timeUpdate = new TimeUpdateDto
         {
-            gameId = Id,
-            whiteReserveSeconds = Engine.WhiteTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
-            redReserveSeconds = Engine.RedTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
+            GameId = Id,
+            WhiteReserveSeconds = Engine.WhiteTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
+            RedReserveSeconds = Engine.RedTimeState.GetRemainingTime(TimeControl.DelaySeconds).TotalSeconds,
             // Only show delay for current player (and only after opening roll is complete and turn has started)
-            whiteIsInDelay = whiteIsInDelay,
-            redIsInDelay = redIsInDelay,
-            whiteDelayRemaining = whiteDelayRemaining,
-            redDelayRemaining = redDelayRemaining
+            WhiteIsInDelay = whiteIsInDelay,
+            RedIsInDelay = redIsInDelay,
+            WhiteDelayRemaining = whiteDelayRemaining,
+            RedDelayRemaining = redDelayRemaining
         };
 
-        Console.WriteLine($"[TIME DEBUG]   Broadcasting whiteReserve: {timeUpdate.whiteReserveSeconds}, redReserve: {timeUpdate.redReserveSeconds}");
+        Console.WriteLine($"[TIME DEBUG]   Broadcasting whiteReserve: {timeUpdate.WhiteReserveSeconds}, redReserve: {timeUpdate.RedReserveSeconds}");
 
-        await hubContext.Clients.Group(Id).SendAsync("TimeUpdate", timeUpdate);
+        await hubContext.Clients.Group(Id).TimeUpdate(timeUpdate);
 
         // Check for timeout
         if (Engine.HasCurrentPlayerTimedOut())
@@ -566,7 +568,7 @@ public class GameSession
     /// <summary>
     /// Handle player timeout
     /// </summary>
-    private async Task HandleTimeout(IHubContext<Hubs.GameHub> hubContext)
+    private async Task HandleTimeout(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
     {
         var losingPlayer = Engine.CurrentPlayer;
         var winningPlayer = Engine.GetOpponent();
@@ -583,20 +585,20 @@ public class GameSession
         Engine.ForfeitGame(winningPlayer);
 
         // Broadcast timeout event
-        var timeoutEvent = new
+        var timeoutEvent = new PlayerTimedOutDto
         {
-            gameId = Id,
-            timedOutPlayer = losingPlayer.Color.ToString(),
-            winner = winningPlayer.Color.ToString()
+            GameId = Id,
+            TimedOutPlayer = losingPlayer.Color.ToString(),
+            Winner = winningPlayer.Color.ToString()
         };
 
-        await hubContext.Clients.Group(Id).SendAsync("PlayerTimedOut", timeoutEvent);
+        await hubContext.Clients.Group(Id).PlayerTimedOut(timeoutEvent);
 
         // Broadcast final game state to all connections so UI updates with winner
         foreach (var connectionId in _whiteConnections.Concat(_redConnections).Concat(_spectatorConnections))
         {
             var state = GetState(connectionId);
-            await hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
+            await hubContext.Clients.Client(connectionId).GameUpdate(state);
         }
     }
 }

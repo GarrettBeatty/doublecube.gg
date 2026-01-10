@@ -4,17 +4,34 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 # Install Node.js and pnpm for Vite build
 RUN apk add --no-cache nodejs npm && npm install -g pnpm
 
+# Install TypedSignalR.Client.TypeScript generator tool
+RUN dotnet tool install --global TypedSignalR.Client.TypeScript.Generator
+ENV PATH="${PATH}:/root/.dotnet/tools"
+
 WORKDIR /src
 
 # Copy csproj files and restore dependencies (layer caching optimization)
 COPY ["Backgammon.WebClient/Backgammon.WebClient.csproj", "Backgammon.WebClient/"]
 COPY ["Backgammon.ServiceDefaults/Backgammon.ServiceDefaults.csproj", "Backgammon.ServiceDefaults/"]
+COPY ["Backgammon.Server/Backgammon.Server.csproj", "Backgammon.Server/"]
+COPY ["Backgammon.Core/Backgammon.Core.csproj", "Backgammon.Core/"]
+COPY ["Backgammon.AI/Backgammon.AI.csproj", "Backgammon.AI/"]
+COPY ["Backgammon.Analysis/Backgammon.Analysis.csproj", "Backgammon.Analysis/"]
 # Use BuildKit cache mount to cache NuGet packages across builds
 RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
-    dotnet restore "Backgammon.WebClient/Backgammon.WebClient.csproj"
+    dotnet restore "Backgammon.WebClient/Backgammon.WebClient.csproj" && \
+    dotnet restore "Backgammon.Server/Backgammon.Server.csproj"
 
-# Copy source code and publish directly (skip separate build step)
+# Copy source code
 COPY . .
+
+# Generate TypeScript types from SignalR hub definitions
+WORKDIR "/src/Backgammon.Server"
+RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
+    dotnet build -c Release --no-restore && \
+    dotnet tsrts --project Backgammon.Server.csproj --output ../Backgammon.WebClient/src/types/generated --asm
+
+# Build and publish WebClient
 WORKDIR "/src/Backgammon.WebClient"
 RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
     dotnet publish "Backgammon.WebClient.csproj" -c Release -o /app/publish --no-restore

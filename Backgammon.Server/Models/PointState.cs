@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Represents a single point on the board
 /// </summary>
+[TranspilationSource]
 public class PointState
 {
     public int Position { get; set; }

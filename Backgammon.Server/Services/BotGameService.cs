@@ -1,6 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -16,7 +17,7 @@ public class BotGameService : BackgroundService
 {
     private readonly IGameSessionManager _sessionManager;
     private readonly IAiMoveService _aiMoveService;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IOptions<FeatureFlags> _features;
     private readonly ILogger<BotGameService> _logger;
 
@@ -35,7 +36,7 @@ public class BotGameService : BackgroundService
     public BotGameService(
         IGameSessionManager sessionManager,
         IAiMoveService aiMoveService,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         IOptions<FeatureFlags> features,
         ILogger<BotGameService> logger)
     {
@@ -148,7 +149,7 @@ public class BotGameService : BackgroundService
                     var state = session.GetState(null);  // null = spectator view
                     foreach (var spectatorId in session.SpectatorConnections)
                     {
-                        await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", state, ct);
+                        await _hubContext.Clients.Client(spectatorId).GameUpdate(state);
                     }
                 });
             }
@@ -170,7 +171,7 @@ public class BotGameService : BackgroundService
                 var finalState = session.GetState(null);
                 foreach (var spectatorId in session.SpectatorConnections)
                 {
-                    await _hubContext.Clients.Client(spectatorId).SendAsync("GameOver", finalState, ct);
+                    await _hubContext.Clients.Client(spectatorId).GameOver(finalState);
                 }
 
                 // Wait before restarting (allow spectators to see results)

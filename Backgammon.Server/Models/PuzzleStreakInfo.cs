@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
@@ -6,6 +7,7 @@ namespace Backgammon.Server.Models;
 /// Entity model for a user's puzzle streak information.
 /// Stored in DynamoDB with PK=USER#{userId}, SK=PUZZLE_STREAK
 /// </summary>
+[TranspilationSource]
 public class PuzzleStreakInfo
 {
     /// <summary>

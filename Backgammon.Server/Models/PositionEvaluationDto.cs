@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Position evaluation data transfer object for client
 /// </summary>
+[TranspilationSource]
 public class PositionEvaluationDto
 {
     [JsonPropertyName("equity")]

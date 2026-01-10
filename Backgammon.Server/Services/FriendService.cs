@@ -1,5 +1,6 @@
 using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -15,7 +16,7 @@ public class FriendService : IFriendService
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserRepository _userRepository;
     private readonly IGameSessionManager _sessionManager;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly HybridCache _cache;
     private readonly CacheSettings _cacheSettings;
     private readonly ILogger<FriendService> _logger;
@@ -24,7 +25,7 @@ public class FriendService : IFriendService
         IFriendshipRepository friendshipRepository,
         IUserRepository userRepository,
         IGameSessionManager sessionManager,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         HybridCache cache,
         CacheSettings cacheSettings,
         ILogger<FriendService> logger)

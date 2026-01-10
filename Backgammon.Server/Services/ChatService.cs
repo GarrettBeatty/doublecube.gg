@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using Backgammon.Core;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -30,7 +31,7 @@ public class ChatService : IChatService
     private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(RateLimitWindowMinutes);
 
     private readonly IGameSessionManager _sessionManager;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<ChatService> _logger;
 
     /// <summary>
@@ -47,7 +48,7 @@ public class ChatService : IChatService
     /// <param name="logger">The logger instance.</param>
     public ChatService(
         IGameSessionManager sessionManager,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<ChatService> logger)
     {
         _sessionManager = sessionManager;
@@ -68,8 +69,7 @@ public class ChatService : IChatService
         if (IsRateLimited(connectionId))
         {
             _logger.LogWarning("Rate limit exceeded for connection {ConnectionId}", connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync(
-                "Error",
+            await _hubContext.Clients.Client(connectionId).Error(
                 $"Rate limit exceeded. Maximum {MaxMessagesPerWindow} messages per minute.");
             return;
         }
@@ -91,7 +91,7 @@ public class ChatService : IChatService
         var session = _sessionManager.GetGameByPlayer(connectionId);
         if (session == null)
         {
-            await _hubContext.Clients.Client(connectionId).SendAsync("Error", "Not in a game");
+            await _hubContext.Clients.Client(connectionId).Error("Not in a game");
             return;
         }
 
@@ -110,8 +110,7 @@ public class ChatService : IChatService
         RecordMessage(connectionId);
 
         // Broadcast to all players in the game
-        await _hubContext.Clients.Group(session.Id).SendAsync(
-            "ReceiveChatMessage",
+        await _hubContext.Clients.Group(session.Id).ReceiveChatMessage(
             senderName,
             message,
             connectionId);

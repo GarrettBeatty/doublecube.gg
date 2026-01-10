@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Move sequence evaluation for client
 /// </summary>
+[TranspilationSource]
 public class MoveSequenceDto
 {
     [JsonPropertyName("moves")]

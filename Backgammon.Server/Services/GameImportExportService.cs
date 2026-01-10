@@ -1,6 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -12,12 +13,12 @@ namespace Backgammon.Server.Services;
 public class GameImportExportService : IGameImportExportService
 {
     private readonly IGameSessionManager _sessionManager;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameImportExportService> _logger;
 
     public GameImportExportService(
         IGameSessionManager sessionManager,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameImportExportService> logger)
     {
         _sessionManager = sessionManager;
@@ -31,7 +32,7 @@ public class GameImportExportService : IGameImportExportService
 
         if (session == null)
         {
-            await _hubContext.Clients.Client(connectionId).SendAsync("Error", "You are not in a game");
+            await _hubContext.Clients.Client(connectionId).Error("You are not in a game");
             return string.Empty;
         }
 
@@ -45,8 +46,7 @@ public class GameImportExportService : IGameImportExportService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error exporting position");
-            await _hubContext.Clients.Client(connectionId).SendAsync(
-                "Error",
+            await _hubContext.Clients.Client(connectionId).Error(
                 $"Failed to export position: {ex.Message}");
             return string.Empty;
         }
@@ -58,7 +58,7 @@ public class GameImportExportService : IGameImportExportService
 
         if (session == null)
         {
-            await _hubContext.Clients.Client(connectionId).SendAsync("Error", "You are not in a game");
+            await _hubContext.Clients.Client(connectionId).Error("You are not in a game");
             return;
         }
 
@@ -66,7 +66,7 @@ public class GameImportExportService : IGameImportExportService
         var features = session.GameMode.GetFeatures();
         if (!features.AllowImportExport)
         {
-            await _hubContext.Clients.Client(connectionId).SendAsync("Error", "Cannot import positions in this game mode");
+            await _hubContext.Clients.Client(connectionId).Error("Cannot import positions in this game mode");
             return;
         }
 
@@ -97,13 +97,13 @@ public class GameImportExportService : IGameImportExportService
             foreach (var whiteConnectionId in session.WhiteConnections)
             {
                 var whiteState = session.GetState(whiteConnectionId);
-                await _hubContext.Clients.Client(whiteConnectionId).SendAsync("GameUpdate", whiteState);
+                await _hubContext.Clients.Client(whiteConnectionId).GameUpdate(whiteState);
             }
 
             foreach (var redConnectionId in session.RedConnections)
             {
                 var redState = session.GetState(redConnectionId);
-                await _hubContext.Clients.Client(redConnectionId).SendAsync("GameUpdate", redState);
+                await _hubContext.Clients.Client(redConnectionId).GameUpdate(redState);
             }
 
             _logger.LogInformation("Position imported successfully for game {GameId}", session.Id);
@@ -111,8 +111,7 @@ public class GameImportExportService : IGameImportExportService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error importing position");
-            await _hubContext.Clients.Client(connectionId).SendAsync(
-                "Error",
+            await _hubContext.Clients.Client(connectionId).Error(
                 $"Failed to import position: {ex.Message}");
         }
     }

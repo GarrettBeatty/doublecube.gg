@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Data transfer object for a move
 /// </summary>
+[TranspilationSource]
 public class MoveDto
 {
     public int From { get; set; }

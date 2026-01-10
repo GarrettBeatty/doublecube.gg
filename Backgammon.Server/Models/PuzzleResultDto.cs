@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Data transfer object for puzzle submission result.
 /// </summary>
+[TranspilationSource]
 public class PuzzleResultDto
 {
     /// <summary>

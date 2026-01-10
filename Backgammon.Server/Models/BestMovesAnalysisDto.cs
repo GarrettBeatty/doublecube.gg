@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Best moves analysis result for client
 /// </summary>
+[TranspilationSource]
 public class BestMovesAnalysisDto
 {
     [JsonPropertyName("initialEvaluation")]
