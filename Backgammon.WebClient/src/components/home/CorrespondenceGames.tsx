@@ -122,11 +122,14 @@ export function CorrespondenceGames() {
     );
   }
 
-  const hasActiveGames = yourTurnGames.length > 0 || waitingGames.length > 0;
-  const hasLobbies = myLobbies.length > 0;
+  const hasAnyGames = yourTurnGames.length > 0 || waitingGames.length > 0 || myLobbies.length > 0;
 
-  // Combine your turn and waiting games, sorted by your turn first
-  const allActiveGames = [...yourTurnGames, ...waitingGames];
+  // Combine all games: lobbies first (waiting for opponent), then your turn, then waiting for opponent's turn
+  const allGames = [
+    ...myLobbies.map(lobby => ({ ...lobby, type: 'lobby' as const })),
+    ...yourTurnGames.map(game => ({ ...game, type: 'active' as const })),
+    ...waitingGames.map(game => ({ ...game, type: 'active' as const }))
+  ];
 
   return (
     <div className="space-y-6">
@@ -150,79 +153,66 @@ export function CorrespondenceGames() {
           </Button>
         </div>
 
-        {hasActiveGames ? (
+        {hasAnyGames ? (
           <div className="space-y-2">
-            {allActiveGames.map((game) => (
-              <GameCard
-                key={game.matchId}
-                game={game}
-                isYourTurn={game.isYourTurn}
-                onPlay={handlePlayGame}
-              />
-            ))}
+            {allGames.map((item) => {
+              if (item.type === 'lobby') {
+                // Render lobby card (waiting for opponent to join)
+                return (
+                  <div
+                    key={item.matchId}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-amber-500/5 border-amber-500/20 hover:bg-amber-500/10 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <User className="h-5 w-5 text-amber-600" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-amber-700 dark:text-amber-500">Waiting for opponent to join</span>
+                          {item.isRated && (
+                            <Badge variant="outline" className="text-xs">
+                              Rated
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {item.timePerMoveDays} day{item.timePerMoveDays > 1 ? 's' : ''}/move
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {item.targetScore}pt match
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePlayGame(item.gameId)}
+                    >
+                      View
+                    </Button>
+                  </div>
+                );
+              } else {
+                // Render active game card
+                return (
+                  <GameCard
+                    key={item.matchId}
+                    game={item}
+                    isYourTurn={item.isYourTurn}
+                    onPlay={handlePlayGame}
+                  />
+                );
+              }
+            })}
           </div>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-8 gap-4">
               <div className="text-muted-foreground text-center">
-                <p className="text-base mb-2">No active games</p>
+                <p className="text-base mb-2">No correspondence games</p>
                 <p className="text-sm">Create a new game or join an available game below</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* My Open Lobbies Section - Lobbies you created waiting for players */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold">My Open Lobbies</h2>
-        </div>
-
-        {hasLobbies ? (
-          <div className="space-y-2">
-            {myLobbies.map((lobby) => (
-              <div
-                key={lobby.matchId}
-                className="flex items-center justify-between p-4 border rounded-lg bg-blue-500/5 hover:bg-blue-500/10 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">Waiting for opponent</span>
-                      {lobby.isRated && (
-                        <Badge variant="outline" className="text-xs">
-                          Rated
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-xs flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {lobby.timePerMoveDays} day{lobby.timePerMoveDays > 1 ? 's' : ''}/move
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        {lobby.targetScore}pt match
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handlePlayGame(lobby.gameId)}
-                >
-                  View
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <div className="text-muted-foreground text-center text-sm">
-                You haven't created any lobbies
               </div>
             </CardContent>
           </Card>
