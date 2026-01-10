@@ -17,6 +17,7 @@ interface MatchState {
   isCrawfordGame: boolean
   matchComplete: boolean
   matchWinner: string | null
+  lastUpdatedAt?: string // ISO timestamp for staleness detection
 }
 
 interface DoublingCubeState {
