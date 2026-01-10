@@ -316,7 +316,10 @@ public class GameSession
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
-            CanDouble = playerColor.HasValue && !(IsCrawfordGame ?? false) && Engine.DoublingCube.CanDouble(playerColor.Value),
+            CanDouble = playerColor.HasValue
+                && !(IsCrawfordGame ?? false)
+                && Engine.CurrentPlayer?.Color == playerColor.Value
+                && Engine.DoublingCube.CanDouble(playerColor.Value),
             IsAnalysisMode = features.ShowAnalysisBadge,
             IsRated = IsRated,
             MatchId = MatchId,
