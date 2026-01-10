@@ -5,7 +5,7 @@ import { HubMethods } from '@/types/signalr.types'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
 import { ChatPanel } from '@/components/game/ChatPanel'
-import { GameState, GameStatus } from '@/types/game.types'
+import { GameState } from '@/types/game.types'
 import { Dice1, RefreshCw, Flag, MessageCircle } from 'lucide-react'
 
 interface GameControlsProps {
@@ -23,11 +23,11 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   if (!gameState) return null
 
-  const isGameInProgress = gameState.status === GameStatus.InProgress
-  const isYourTurn = gameState.isYourTurn
   const hasDiceRolled =
     gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
-  const canDouble = isGameInProgress && isYourTurn && !hasDiceRolled && gameState.doublingCubeOwner === gameState.yourColor
+  // Use server-provided canDouble (checks: IsFull, !IsOpeningRoll, !IsCrawford, IsYourTurn, CubeOwnership)
+  // Also ensure dice haven't been rolled yet (can only double before rolling)
+  const canDouble = gameState.canDouble && !hasDiceRolled
 
   const handleDouble = async () => {
     try {

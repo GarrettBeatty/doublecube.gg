@@ -317,6 +317,8 @@ public class GameSession
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
             CanDouble = playerColor.HasValue
+                && IsFull
+                && !Engine.IsOpeningRoll
                 && !(IsCrawfordGame ?? false)
                 && Engine.CurrentPlayer?.Color == playerColor.Value
                 && Engine.DoublingCube.CanDouble(playerColor.Value),
