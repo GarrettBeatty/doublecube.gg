@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Game summary for profile page
 /// </summary>
+[TranspilationSource]
 public class GameSummaryDto
 {
     /// <summary>

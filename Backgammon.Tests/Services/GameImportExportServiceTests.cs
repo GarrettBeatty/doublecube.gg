@@ -1,5 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
+using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -10,14 +12,14 @@ namespace Backgammon.Tests.Services;
 public class GameImportExportServiceTests
 {
     private readonly Mock<IGameSessionManager> _mockSessionManager;
-    private readonly Mock<IHubContext<GameHub>> _mockHubContext;
+    private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
     private readonly Mock<ILogger<GameImportExportService>> _mockLogger;
     private readonly GameImportExportService _service;
 
     public GameImportExportServiceTests()
     {
         _mockSessionManager = new Mock<IGameSessionManager>();
-        _mockHubContext = new Mock<IHubContext<GameHub>>();
+        _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
         _mockLogger = new Mock<ILogger<GameImportExportService>>();
 
         _service = new GameImportExportService(
@@ -31,26 +33,23 @@ public class GameImportExportServiceTests
     {
         // Arrange
         var connectionId = "conn-123";
-        var mockClients = new Mock<IHubClients>();
-        var mockCallerClients = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockCallerClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns((GameSession?)null);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClients.Object);
+        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClient.Object);
 
         // Act
         var result = await _service.ExportPositionAsync(connectionId);
 
         // Assert
         Assert.Empty(result);
-        mockCallerClients.Verify(
-            c => c.SendCoreAsync(
-                "Error",
-                It.Is<object[]>(args => args.Length == 1 && (string)args[0] == "You are not in a game"),
-                default),
+        mockCallerClient.Verify(
+            c => c.Error("You are not in a game"),
             Times.Once);
     }
 
@@ -84,25 +83,22 @@ public class GameImportExportServiceTests
         // Arrange
         var connectionId = "conn-123";
         var sgf = "(;GM[6])";
-        var mockClients = new Mock<IHubClients>();
-        var mockCallerClients = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockCallerClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns((GameSession?)null);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClients.Object);
+        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClient.Object);
 
         // Act
         await _service.ImportPositionAsync(connectionId, sgf);
 
         // Assert
-        mockCallerClients.Verify(
-            c => c.SendCoreAsync(
-                "Error",
-                It.Is<object[]>(args => args.Length == 1 && (string)args[0] == "You are not in a game"),
-                default),
+        mockCallerClient.Verify(
+            c => c.Error("You are not in a game"),
             Times.Once);
     }
 
@@ -115,25 +111,22 @@ public class GameImportExportServiceTests
         var session = new GameSession("game-123");
         // Default game mode (competitive) doesn't allow import/export
 
-        var mockClients = new Mock<IHubClients>();
-        var mockCallerClients = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockCallerClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClients.Object);
+        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClient.Object);
 
         // Act
         await _service.ImportPositionAsync(connectionId, sgf);
 
         // Assert
-        mockCallerClients.Verify(
-            c => c.SendCoreAsync(
-                "Error",
-                It.Is<object[]>(args => args.Length == 1 && (string)args[0] == "Cannot import positions in this game mode"),
-                default),
+        mockCallerClient.Verify(
+            c => c.Error("Cannot import positions in this game mode"),
             Times.Once);
     }
 
@@ -151,9 +144,9 @@ public class GameImportExportServiceTests
 
         var sgf = "(;GM[6]SZ[24:2]AP[bgammon];B[24/2])";
 
-        var mockClients = new Mock<IHubClients>();
-        var mockWhiteClient = new Mock<ISingleClientProxy>();
-        var mockRedClient = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockWhiteClient = new Mock<IGameHubClient>();
+        var mockRedClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
@@ -168,16 +161,10 @@ public class GameImportExportServiceTests
 
         // Assert
         mockWhiteClient.Verify(
-            c => c.SendCoreAsync(
-                "GameUpdate",
-                It.IsAny<object[]>(),
-                default),
+            c => c.GameUpdate(It.IsAny<GameState>()),
             Times.Once);
         mockRedClient.Verify(
-            c => c.SendCoreAsync(
-                "GameUpdate",
-                It.IsAny<object[]>(),
-                default),
+            c => c.GameUpdate(It.IsAny<GameState>()),
             Times.Once);
     }
 
@@ -192,25 +179,22 @@ public class GameImportExportServiceTests
 
         var invalidSgf = "invalid sgf data";
 
-        var mockClients = new Mock<IHubClients>();
-        var mockCallerClients = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockCallerClient = new Mock<IGameHubClient>();
 
         _mockSessionManager
             .Setup(m => m.GetGameByPlayer(connectionId))
             .Returns(session);
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClients.Object);
+        mockClients.Setup(c => c.Client(connectionId)).Returns(mockCallerClient.Object);
 
         // Act
         await _service.ImportPositionAsync(connectionId, invalidSgf);
 
         // Assert
-        mockCallerClients.Verify(
-            c => c.SendCoreAsync(
-                "Error",
-                It.Is<object[]>(args => args.Length == 1 && ((string)args[0]).StartsWith("Failed to import position:")),
-                default),
+        mockCallerClient.Verify(
+            c => c.Error(It.Is<string>(s => s.StartsWith("Failed to import position:"))),
             Times.Once);
     }
 }

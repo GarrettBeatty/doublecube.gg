@@ -1,6 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -16,7 +17,7 @@ public class GameActionOrchestratorTests
     private readonly Mock<IPlayerStatsService> _mockPlayerStatsService;
     private readonly Mock<IMatchService> _mockMatchService;
     private readonly Mock<IGameSessionManager> _mockSessionManager;
-    private readonly Mock<IHubContext<GameHub>> _mockHubContext;
+    private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
     private readonly Mock<ILogger<GameActionOrchestrator>> _mockLogger;
     private readonly Mock<ICorrespondenceGameService> _mockCorrespondenceGameService;
     private readonly Mock<IMatchRepository> _mockMatchRepository;
@@ -29,19 +30,18 @@ public class GameActionOrchestratorTests
         _mockPlayerStatsService = new Mock<IPlayerStatsService>();
         _mockMatchService = new Mock<IMatchService>();
         _mockSessionManager = new Mock<IGameSessionManager>();
-        _mockHubContext = new Mock<IHubContext<GameHub>>();
+        _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
         _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
         _mockCorrespondenceGameService = new Mock<ICorrespondenceGameService>();
         _mockMatchRepository = new Mock<IMatchRepository>();
 
         // Set up HubContext mock chain for broadcasting
-        var mockClients = new Mock<IHubClients>();
-        var mockSingleClientProxy = new Mock<ISingleClientProxy>();
-        var mockClientProxy = new Mock<IClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockGameHubClient = new Mock<IGameHubClient>();
 
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockSingleClientProxy.Object);
-        mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockClientProxy.Object);
+        mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockGameHubClient.Object);
+        mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockGameHubClient.Object);
 
         _orchestrator = new GameActionOrchestrator(
             _mockGameRepository.Object,
@@ -456,8 +456,8 @@ public class GameActionOrchestratorTests
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
 
-        var mockClients = new Mock<IHubClients>();
-        var mockClient = new Mock<ISingleClientProxy>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
+        var mockClient = new Mock<IGameHubClient>();
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
         mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockClient.Object);
 
@@ -486,7 +486,7 @@ public class GameActionOrchestratorTests
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
 
-        var mockClients = new Mock<IHubClients>();
+        var mockClients = new Mock<IHubClients<IGameHubClient>>();
         _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
 
         _mockAiMoveService

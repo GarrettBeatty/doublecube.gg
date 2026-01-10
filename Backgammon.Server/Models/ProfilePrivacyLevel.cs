@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Privacy levels for profile visibility
 /// </summary>
+[TranspilationSource]
 public enum ProfilePrivacyLevel
 {
     /// <summary>

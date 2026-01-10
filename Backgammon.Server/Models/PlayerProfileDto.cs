@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Player profile data transfer object for public profile pages
 /// </summary>
+[TranspilationSource]
 public class PlayerProfileDto
 {
     /// <summary>

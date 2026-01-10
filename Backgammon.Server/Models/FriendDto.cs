@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Friend data transfer object for API responses
 /// </summary>
+[TranspilationSource]
 public class FriendDto
 {
     /// <summary>

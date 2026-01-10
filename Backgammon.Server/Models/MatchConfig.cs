@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Configuration for creating a new match
 /// </summary>
+[TranspilationSource]
 public class MatchConfig
 {
     /// <summary>

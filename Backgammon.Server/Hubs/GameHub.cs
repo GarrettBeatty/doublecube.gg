@@ -1,7 +1,9 @@
 using System.Security.Claims;
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
+using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Memory;
@@ -29,13 +31,13 @@ namespace Backgammon.Server.Hubs;
 /// - EndTurn() - Complete current turn
 /// - LeaveGame() - Leave current game
 /// </summary>
-public class GameHub : Hub
+public class GameHub : Hub<IGameHubClient>
 {
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly IEloRatingService _eloRatingService;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
     private readonly IDoubleOfferService _doubleOfferService;
@@ -59,7 +61,7 @@ public class GameHub : Hub
         IGameRepository gameRepository,
         IAiMoveService aiMoveService,
         IEloRatingService eloRatingService,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
         IDoubleOfferService doubleOfferService,
@@ -184,7 +186,7 @@ public class GameHub : Hub
 
             if (string.IsNullOrEmpty(gameId))
             {
-                await Clients.Caller.SendAsync("Error", "Game ID is required");
+                await Clients.Caller.Error("Game ID is required");
                 return;
             }
 
@@ -193,7 +195,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error joining game");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -212,7 +214,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating analysis game");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -226,21 +228,21 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             // Only allow in analysis mode
             if (!session.IsAnalysisMode)
             {
-                await Clients.Caller.SendAsync("Error", "Dice can only be set in analysis mode");
+                await Clients.Caller.Error("Dice can only be set in analysis mode");
                 return;
             }
 
             // Validate dice values early (before acquiring lock)
             if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6)
             {
-                await Clients.Caller.SendAsync("Error", "Dice values must be between 1 and 6");
+                await Clients.Caller.Error("Dice values must be between 1 and 6");
                 return;
             }
 
@@ -260,7 +262,7 @@ public class GameHub : Hub
 
                 if (!noMovesLeft && !noMovesMadeYet)
                 {
-                    await Clients.Caller.SendAsync("Error", "End your turn or undo moves before setting new dice");
+                    await Clients.Caller.Error("End your turn or undo moves before setting new dice");
                     return;
                 }
 
@@ -286,7 +288,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting dice");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -308,7 +310,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating AI game");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -338,20 +340,20 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var result = await _gameActionOrchestrator.RollDiceAsync(session, Context.ConnectionId);
             if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error rolling dice");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -365,20 +367,20 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var result = await _gameActionOrchestrator.MakeMoveAsync(session, Context.ConnectionId, from, to);
             if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error making move");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -392,20 +394,20 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var result = await _gameActionOrchestrator.EndTurnAsync(session, Context.ConnectionId);
             if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error ending turn");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -419,20 +421,20 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var result = await _gameActionOrchestrator.UndoLastMoveAsync(session, Context.ConnectionId);
             if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error undoing move");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -446,14 +448,14 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var (success, currentValue, newValue, error) = await _doubleOfferService.OfferDoubleAsync(session, Context.ConnectionId);
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error);
+                await Clients.Caller.Error(error ?? "Failed to offer double");
                 return;
             }
 
@@ -484,7 +486,7 @@ public class GameHub : Hub
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var state = session.GetState(Context.ConnectionId);
-                            await Clients.Caller.SendAsync("DoubleAccepted", state);
+                            await Clients.Caller.DoubleAccepted(state);
                         }
 
                         BackgroundTaskHelper.FireAndForget(
@@ -499,7 +501,7 @@ public class GameHub : Hub
                     else
                     {
                         // AI declined - human wins
-                        await Clients.Caller.SendAsync("Info", "Computer declined the double. You win!");
+                        await Clients.Caller.Info("Computer declined the double. You win!");
 
                         // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
                         await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
@@ -516,7 +518,7 @@ public class GameHub : Hub
                         if (!string.IsNullOrEmpty(Context.ConnectionId))
                         {
                             var finalState = session.GetState(Context.ConnectionId);
-                            await Clients.Caller.SendAsync("GameOver", finalState);
+                            await Clients.Caller.GameOver(finalState);
                         }
 
                         _sessionManager.RemoveGame(session.Id);
@@ -527,7 +529,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error offering double");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -541,7 +543,7 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
@@ -564,7 +566,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error accepting double");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -578,14 +580,14 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var (success, winner, stakes, error) = await _doubleOfferService.DeclineDoubleAsync(session, Context.ConnectionId);
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error);
+                await Clients.Caller.Error(error ?? "Failed to decline double");
                 return;
             }
 
@@ -614,7 +616,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error declining double");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -628,7 +630,7 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
@@ -636,7 +638,7 @@ public class GameHub : Hub
             var abandoningColor = session.GetPlayerColor(Context.ConnectionId);
             if (abandoningColor == null)
             {
-                await Clients.Caller.SendAsync("Error", "You are not a player in this game");
+                await Clients.Caller.Error("You are not a player in this game");
                 return;
             }
 
@@ -671,14 +673,14 @@ public class GameHub : Hub
             if (session.Engine.GameOver)
             {
                 _logger.LogWarning("Game {GameId} is already over, cannot abandon", session.Id);
-                await Clients.Caller.SendAsync("Error", "Game is already finished");
+                await Clients.Caller.Error("Game is already finished");
                 return;
             }
 
             if (!session.Engine.GameStarted)
             {
                 _logger.LogWarning("Game {GameId} hasn't started yet, cannot forfeit", session.Id);
-                await Clients.Caller.SendAsync("Error", "Game hasn't started yet");
+                await Clients.Caller.Error("Game hasn't started yet");
                 return;
             }
 
@@ -713,7 +715,7 @@ public class GameHub : Hub
 
             // Broadcast game over AFTER database is updated
             var finalState = session.GetState();
-            await Clients.Group(session.Id).SendAsync("GameOver", finalState);
+            await Clients.Group(session.Id).GameOver(finalState);
 
             // Remove from memory to prevent memory leak
             _sessionManager.RemoveGame(session.Id);
@@ -722,7 +724,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error abandoning game");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -736,17 +738,17 @@ public class GameHub : Hub
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
             var state = session.GetState(Context.ConnectionId);
-            await Clients.Caller.SendAsync("GameUpdate", state);
+            await Clients.Caller.GameUpdate(state);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting game state");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -762,7 +764,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending chat message");
-            await Clients.Caller.SendAsync("Error", "Failed to send message");
+            await Clients.Caller.Error("Failed to send message");
         }
     }
 
@@ -814,21 +816,21 @@ public class GameHub : Hub
         var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
         if (session == null)
         {
-            await Clients.Caller.SendAsync("Error", "You are not in a game");
+            await Clients.Caller.Error("You are not in a game");
             return;
         }
 
         // Only allow in analysis mode
         if (!session.IsAnalysisMode)
         {
-            await Clients.Caller.SendAsync("Error", "Direct moves only allowed in analysis mode");
+            await Clients.Caller.Error("Direct moves only allowed in analysis mode");
             return;
         }
 
         // Validate basic constraints
         if (!IsValidDirectMove(session.Engine, from, to))
         {
-            await Clients.Caller.SendAsync("Error", "Invalid move: check piece placement rules");
+            await Clients.Caller.Error("Invalid move: check piece placement rules");
             return;
         }
 
@@ -843,7 +845,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error executing direct move in analysis mode");
-            await Clients.Caller.SendAsync("Error", "Failed to move checker");
+            await Clients.Caller.Error("Failed to move checker");
         }
     }
 
@@ -855,13 +857,13 @@ public class GameHub : Hub
         var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
         if (session == null)
         {
-            await Clients.Caller.SendAsync("Error", "You are not in a game");
+            await Clients.Caller.Error("You are not in a game");
             return;
         }
 
         if (!session.IsAnalysisMode)
         {
-            await Clients.Caller.SendAsync("Error", "Can only set player in analysis mode");
+            await Clients.Caller.Error("Can only set player in analysis mode");
             return;
         }
 
@@ -878,7 +880,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting current player in analysis mode");
-            await Clients.Caller.SendAsync("Error", "Failed to set current player");
+            await Clients.Caller.Error("Failed to set current player");
         }
     }
 
@@ -894,7 +896,7 @@ public class GameHub : Hub
 
             if (error != null)
             {
-                await Clients.Caller.SendAsync("Error", error);
+                await Clients.Caller.Error(error);
                 return null;
             }
 
@@ -903,7 +905,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting player profile");
-            await Clients.Caller.SendAsync("Error", "Failed to load profile");
+            await Clients.Caller.Error("Failed to load profile");
             return null;
         }
     }
@@ -930,7 +932,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting friends list");
-            await Clients.Caller.SendAsync("Error", "Failed to load friends");
+            await Clients.Caller.Error("Failed to load friends");
             return new List<FriendDto>();
         }
     }
@@ -955,7 +957,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting friend requests");
-            await Clients.Caller.SendAsync("Error", "Failed to load friend requests");
+            await Clients.Caller.Error("Failed to load friend requests");
             return new List<FriendDto>();
         }
     }
@@ -997,7 +999,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error searching players");
-            await Clients.Caller.SendAsync("Error", "Failed to search players");
+            await Clients.Caller.Error("Failed to search players");
             return new List<PlayerSearchResultDto>();
         }
     }
@@ -1012,7 +1014,7 @@ public class GameHub : Hub
             var userId = GetAuthenticatedUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                await Clients.Caller.SendAsync("Error", "Must be logged in to send friend requests");
+                await Clients.Caller.Error("Must be logged in to send friend requests");
                 return false;
             }
 
@@ -1020,7 +1022,7 @@ public class GameHub : Hub
 
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error ?? "Failed to send friend request");
+                await Clients.Caller.Error(error ?? "Failed to send friend request");
                 return false;
             }
 
@@ -1030,7 +1032,7 @@ public class GameHub : Hub
             var recipientConnection = GetPlayerConnection(toUserId);
             if (!string.IsNullOrEmpty(recipientConnection))
             {
-                await Clients.Client(recipientConnection).SendAsync("FriendRequestReceived");
+                await Clients.Client(recipientConnection).FriendRequestReceived();
             }
 
             return true;
@@ -1038,7 +1040,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending friend request");
-            await Clients.Caller.SendAsync("Error", "Failed to send friend request");
+            await Clients.Caller.Error("Failed to send friend request");
             return false;
         }
     }
@@ -1053,7 +1055,7 @@ public class GameHub : Hub
             var userId = GetAuthenticatedUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                await Clients.Caller.SendAsync("Error", "Must be logged in to accept friend requests");
+                await Clients.Caller.Error("Must be logged in to accept friend requests");
                 return false;
             }
 
@@ -1061,7 +1063,7 @@ public class GameHub : Hub
 
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error ?? "Failed to accept friend request");
+                await Clients.Caller.Error(error ?? "Failed to accept friend request");
                 return false;
             }
 
@@ -1071,7 +1073,7 @@ public class GameHub : Hub
             var requesterConnection = GetPlayerConnection(friendUserId);
             if (!string.IsNullOrEmpty(requesterConnection))
             {
-                await Clients.Client(requesterConnection).SendAsync("FriendRequestAccepted");
+                await Clients.Client(requesterConnection).FriendRequestAccepted();
             }
 
             return true;
@@ -1079,7 +1081,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error accepting friend request");
-            await Clients.Caller.SendAsync("Error", "Failed to accept friend request");
+            await Clients.Caller.Error("Failed to accept friend request");
             return false;
         }
     }
@@ -1094,7 +1096,7 @@ public class GameHub : Hub
             var userId = GetAuthenticatedUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                await Clients.Caller.SendAsync("Error", "Must be logged in to decline friend requests");
+                await Clients.Caller.Error("Must be logged in to decline friend requests");
                 return false;
             }
 
@@ -1102,7 +1104,7 @@ public class GameHub : Hub
 
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error ?? "Failed to decline friend request");
+                await Clients.Caller.Error(error ?? "Failed to decline friend request");
                 return false;
             }
 
@@ -1112,7 +1114,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error declining friend request");
-            await Clients.Caller.SendAsync("Error", "Failed to decline friend request");
+            await Clients.Caller.Error("Failed to decline friend request");
             return false;
         }
     }
@@ -1127,7 +1129,7 @@ public class GameHub : Hub
             var userId = GetAuthenticatedUserId();
             if (string.IsNullOrEmpty(userId))
             {
-                await Clients.Caller.SendAsync("Error", "Must be logged in to remove friends");
+                await Clients.Caller.Error("Must be logged in to remove friends");
                 return false;
             }
 
@@ -1135,7 +1137,7 @@ public class GameHub : Hub
 
             if (!success)
             {
-                await Clients.Caller.SendAsync("Error", error ?? "Failed to remove friend");
+                await Clients.Caller.Error(error ?? "Failed to remove friend");
                 return false;
             }
 
@@ -1145,7 +1147,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error removing friend");
-            await Clients.Caller.SendAsync("Error", "Failed to remove friend");
+            await Clients.Caller.Error("Failed to remove friend");
             return false;
         }
     }
@@ -1157,20 +1159,20 @@ public class GameHub : Hub
             var match = await _matchService.GetMatchAsync(matchId);
             if (match == null)
             {
-                await Clients.Caller.SendAsync("Error", "Match not found");
+                await Clients.Caller.Error("Match not found");
                 return;
             }
 
             if (match.Status != "InProgress")
             {
-                await Clients.Caller.SendAsync("Error", "Match is not in progress");
+                await Clients.Caller.Error("Match is not in progress");
                 return;
             }
 
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
             if (playerId != match.Player1Id && playerId != match.Player2Id)
             {
-                await Clients.Caller.SendAsync("Error", "You are not a player in this match");
+                await Clients.Caller.Error("You are not a player in this match");
                 return;
             }
 
@@ -1199,14 +1201,14 @@ public class GameHub : Hub
             }
 
             // Send match status update
-            await Clients.Caller.SendAsync("MatchContinued", new
+            await Clients.Caller.MatchContinued(new MatchContinuedDto
             {
-                matchId = match.MatchId,
-                gameId = nextGame.GameId,
-                player1Score = match.Player1Score,
-                player2Score = match.Player2Score,
-                targetScore = match.TargetScore,
-                isCrawfordGame = match.IsCrawfordGame
+                MatchId = match.MatchId,
+                GameId = nextGame.GameId,
+                Player1Score = match.Player1Score,
+                Player2Score = match.Player2Score,
+                TargetScore = match.TargetScore,
+                IsCrawfordGame = match.IsCrawfordGame
             });
 
             // Join the new game
@@ -1220,7 +1222,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error continuing match");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1235,14 +1237,14 @@ public class GameHub : Hub
             var match = await _matchService.GetMatchAsync(matchId);
             if (match == null)
             {
-                await Clients.Caller.SendAsync("Error", "Match not found");
+                await Clients.Caller.Error("Match not found");
                 return;
             }
 
             // Authorization: only participants can view match status
             if (match.Player1Id != playerId && match.Player2Id != playerId)
             {
-                await Clients.Caller.SendAsync("Error", "Access denied");
+                await Clients.Caller.Error("Access denied");
                 _logger.LogWarning(
                     "Player {PlayerId} attempted to access match {MatchId} without authorization",
                     playerId,
@@ -1250,26 +1252,26 @@ public class GameHub : Hub
                 return;
             }
 
-            await Clients.Caller.SendAsync("MatchStatus", new
+            await Clients.Caller.MatchStatus(new MatchStatusDto
             {
-                matchId = match.MatchId,
-                targetScore = match.TargetScore,
-                player1Name = match.Player1Name,
-                player2Name = match.Player2Name,
-                player1Score = match.Player1Score,
-                player2Score = match.Player2Score,
-                isCrawfordGame = match.IsCrawfordGame,
-                hasCrawfordGameBeenPlayed = match.HasCrawfordGameBeenPlayed,
-                status = match.Status,
-                winnerId = match.WinnerId,
-                totalGames = match.GameIds.Count,
-                currentGameId = match.CurrentGameId
+                MatchId = match.MatchId,
+                TargetScore = match.TargetScore,
+                Player1Name = match.Player1Name ?? string.Empty,
+                Player2Name = match.Player2Name ?? string.Empty,
+                Player1Score = match.Player1Score,
+                Player2Score = match.Player2Score,
+                IsCrawfordGame = match.IsCrawfordGame,
+                HasCrawfordGameBeenPlayed = match.HasCrawfordGameBeenPlayed,
+                Status = match.Status,
+                WinnerId = match.WinnerId,
+                TotalGames = match.GameIds.Count,
+                CurrentGameId = match.CurrentGameId
             });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting match status");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1283,25 +1285,25 @@ public class GameHub : Hub
             var playerId = GetEffectivePlayerId(Context.ConnectionId);
             var matches = await _matchService.GetPlayerMatchesAsync(playerId, status);
 
-            var matchList = matches.Select(m => new
+            var matchList = matches.Select(m => new MatchSummaryDto
             {
-                matchId = m.MatchId,
-                targetScore = m.TargetScore,
-                opponentId = m.Player1Id == playerId ? m.Player2Id : m.Player1Id,
-                opponentName = m.Player1Id == playerId ? m.Player2Name : m.Player1Name,
-                myScore = m.Player1Id == playerId ? m.Player1Score : m.Player2Score,
-                opponentScore = m.Player1Id == playerId ? m.Player2Score : m.Player1Score,
-                status = m.Status,
-                createdAt = m.CreatedAt,
-                totalGames = m.GameIds.Count
+                MatchId = m.MatchId,
+                TargetScore = m.TargetScore,
+                OpponentId = m.Player1Id == playerId ? m.Player2Id : m.Player1Id,
+                OpponentName = m.Player1Id == playerId ? m.Player2Name : m.Player1Name,
+                MyScore = m.Player1Id == playerId ? m.Player1Score : m.Player2Score,
+                OpponentScore = m.Player1Id == playerId ? m.Player2Score : m.Player1Score,
+                Status = m.Status,
+                CreatedAt = m.CreatedAt,
+                TotalGames = m.GameIds.Count
             }).ToList();
 
-            await Clients.Caller.SendAsync("MyMatches", matchList);
+            await Clients.Caller.MyMatches(matchList);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting player matches");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1637,16 +1639,16 @@ public class GameHub : Hub
                 config.IsRated);
 
             // Send MatchCreated event with game ID
-            await Clients.Caller.SendAsync("MatchCreated", new
+            await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                matchId = match.MatchId,
-                gameId = firstGame.GameId,
-                targetScore = match.TargetScore,
-                opponentType = match.OpponentType,
-                player1Id = match.Player1Id,
-                player2Id = match.Player2Id,
-                player1Name = match.Player1Name,
-                player2Name = match.Player2Name
+                MatchId = match.MatchId,
+                GameId = firstGame.GameId,
+                TargetScore = match.TargetScore,
+                OpponentType = match.OpponentType ?? string.Empty,
+                Player1Id = match.Player1Id,
+                Player2Id = match.Player2Id,
+                Player1Name = match.Player1Name ?? string.Empty,
+                Player2Name = match.Player2Name
             });
 
             _logger.LogInformation(
@@ -1659,13 +1661,13 @@ public class GameHub : Hub
             // For OpenLobby, broadcast to all clients that a new lobby is available
             if (config.OpponentType == "OpenLobby")
             {
-                await Clients.All.SendAsync("LobbyCreated", new
+                await Clients.All.LobbyCreated(new LobbyCreatedDto
                 {
-                    matchId = match.MatchId,
-                    gameId = firstGame.GameId,
-                    creatorName = match.Player1Name,
-                    targetScore = match.TargetScore,
-                    isRated = match.IsRated
+                    MatchId = match.MatchId,
+                    GameId = firstGame.GameId,
+                    CreatorName = match.Player1Name ?? string.Empty,
+                    TargetScore = match.TargetScore,
+                    IsRated = match.IsRated
                 });
 
                 _logger.LogInformation(
@@ -1682,16 +1684,14 @@ public class GameHub : Hub
                     var opponentConnection = GetPlayerConnection(config.OpponentId);
                     if (!string.IsNullOrEmpty(opponentConnection))
                     {
-                        await Clients.Client(opponentConnection).SendAsync(
-                            "MatchInvite",
-                            new
-                            {
-                                matchId = match.MatchId,
-                                gameId = firstGame.GameId,
-                                targetScore = match.TargetScore,
-                                challengerName = match.Player1Name,
-                                challengerId = match.Player1Id
-                            });
+                        await Clients.Client(opponentConnection).MatchInvite(new MatchInviteDto
+                        {
+                            MatchId = match.MatchId,
+                            GameId = firstGame.GameId,
+                            TargetScore = match.TargetScore,
+                            ChallengerName = match.Player1Name ?? string.Empty,
+                            ChallengerId = match.Player1Id
+                        });
                     }
                 }
             }
@@ -1699,7 +1699,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating match");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1726,27 +1726,27 @@ public class GameHub : Hub
             var match = await _matchService.JoinMatchAsync(matchId, playerId, displayName);
 
             // Send MatchCreated to joiner (navigates to game page)
-            await Clients.Caller.SendAsync("MatchCreated", new
+            await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                matchId = match.MatchId,
-                gameId = match.CurrentGameId,
-                targetScore = match.TargetScore,
-                opponentType = match.OpponentType,
-                player1Id = match.Player1Id,
-                player2Id = match.Player2Id,
-                player1Name = match.Player1Name,
-                player2Name = match.Player2Name
+                MatchId = match.MatchId,
+                GameId = match.CurrentGameId ?? string.Empty,
+                TargetScore = match.TargetScore,
+                OpponentType = match.OpponentType ?? string.Empty,
+                Player1Id = match.Player1Id,
+                Player2Id = match.Player2Id,
+                Player1Name = match.Player1Name ?? string.Empty,
+                Player2Name = match.Player2Name
             });
 
             // Notify creator that opponent joined
             var creatorConnection = GetPlayerConnection(match.Player1Id);
             if (!string.IsNullOrEmpty(creatorConnection))
             {
-                await Clients.Client(creatorConnection).SendAsync("OpponentJoinedMatch", new
+                await Clients.Client(creatorConnection).OpponentJoinedMatch(new OpponentJoinedMatchDto
                 {
-                    matchId = match.MatchId,
-                    player2Id = match.Player2Id,
-                    player2Name = match.Player2Name
+                    MatchId = match.MatchId,
+                    Player2Id = match.Player2Id ?? string.Empty,
+                    Player2Name = match.Player2Name ?? string.Empty
                 });
             }
 
@@ -1756,13 +1756,12 @@ public class GameHub : Hub
                 var player1Connection = GetPlayerConnection(match.Player1Id);
                 if (!string.IsNullOrEmpty(player1Connection))
                 {
-                    await Clients.Client(player1Connection).SendAsync(
-                        "CorrespondenceTurnNotification",
-                        new
+                    await Clients.Client(player1Connection).CorrespondenceTurnNotification(
+                        new CorrespondenceTurnNotificationDto
                         {
-                            matchId = match.MatchId,
-                            gameId = match.CurrentGameId,
-                            message = "Opponent joined! It's your turn."
+                            MatchId = match.MatchId,
+                            GameId = match.CurrentGameId,
+                            Message = "Opponent joined! It's your turn."
                         });
                 }
             }
@@ -1772,7 +1771,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error joining match {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1871,19 +1870,19 @@ public class GameHub : Hub
                 config.IsRated);
 
             // Send MatchCreated event with game ID
-            await Clients.Caller.SendAsync("MatchCreated", new
+            await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                matchId = match.MatchId,
-                gameId = firstGame.GameId,
-                targetScore = match.TargetScore,
-                opponentType = match.OpponentType,
-                player1Id = match.Player1Id,
-                player2Id = match.Player2Id,
-                player1Name = match.Player1Name,
-                player2Name = match.Player2Name,
-                isCorrespondence = true,
-                timePerMoveDays = match.TimePerMoveDays,
-                turnDeadline = match.TurnDeadline
+                MatchId = match.MatchId,
+                GameId = firstGame.GameId,
+                TargetScore = match.TargetScore,
+                OpponentType = match.OpponentType ?? string.Empty,
+                Player1Id = match.Player1Id,
+                Player2Id = match.Player2Id,
+                Player1Name = match.Player1Name ?? string.Empty,
+                Player2Name = match.Player2Name,
+                IsCorrespondence = true,
+                TimePerMoveDays = match.TimePerMoveDays,
+                TurnDeadline = match.TurnDeadline
             });
 
             _logger.LogInformation(
@@ -1895,15 +1894,15 @@ public class GameHub : Hub
             // For OpenLobby, broadcast to all clients that a new lobby is available
             if (config.OpponentType == "OpenLobby")
             {
-                await Clients.All.SendAsync("CorrespondenceLobbyCreated", new
+                await Clients.All.CorrespondenceLobbyCreated(new CorrespondenceLobbyCreatedDto
                 {
-                    matchId = match.MatchId,
-                    gameId = firstGame.GameId,
-                    creatorPlayerId = match.Player1Id,
-                    creatorUsername = match.Player1Name,
-                    targetScore = match.TargetScore,
-                    timePerMoveDays = match.TimePerMoveDays,
-                    isRated = match.IsRated
+                    MatchId = match.MatchId,
+                    GameId = firstGame.GameId,
+                    CreatorPlayerId = match.Player1Id,
+                    CreatorUsername = match.Player1Name ?? string.Empty,
+                    TargetScore = match.TargetScore,
+                    TimePerMoveDays = match.TimePerMoveDays,
+                    IsRated = match.IsRated
                 });
 
                 _logger.LogInformation(
@@ -1920,16 +1919,15 @@ public class GameHub : Hub
                 var opponentConnection = GetPlayerConnection(config.OpponentId);
                 if (!string.IsNullOrEmpty(opponentConnection))
                 {
-                    await Clients.Client(opponentConnection).SendAsync(
-                        "CorrespondenceMatchInvite",
-                        new
+                    await Clients.Client(opponentConnection).CorrespondenceMatchInvite(
+                        new CorrespondenceMatchInviteDto
                         {
-                            matchId = match.MatchId,
-                            gameId = firstGame.GameId,
-                            targetScore = match.TargetScore,
-                            challengerName = match.Player1Name,
-                            challengerId = match.Player1Id,
-                            timePerMoveDays = match.TimePerMoveDays
+                            MatchId = match.MatchId,
+                            GameId = firstGame.GameId,
+                            TargetScore = match.TargetScore,
+                            ChallengerName = match.Player1Name ?? string.Empty,
+                            ChallengerId = match.Player1Id,
+                            TimePerMoveDays = match.TimePerMoveDays
                         });
                 }
             }
@@ -1937,7 +1935,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating correspondence match");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -1958,12 +1956,11 @@ public class GameHub : Hub
                 var nextPlayerConnection = GetPlayerConnection(nextPlayerId);
                 if (!string.IsNullOrEmpty(nextPlayerConnection))
                 {
-                    await Clients.Client(nextPlayerConnection).SendAsync(
-                        "CorrespondenceTurnNotification",
-                        new
+                    await Clients.Client(nextPlayerConnection).CorrespondenceTurnNotification(
+                        new CorrespondenceTurnNotificationDto
                         {
-                            matchId = matchId,
-                            message = "It's your turn!"
+                            MatchId = matchId,
+                            Message = "It's your turn!"
                         });
                 }
             }
@@ -1976,7 +1973,7 @@ public class GameHub : Hub
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error notifying correspondence turn completion for match {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
@@ -2164,7 +2161,7 @@ public class GameHub : Hub
                 else
                 {
                     // Notify opponent
-                    await Clients.Group(session.Id).SendAsync("OpponentLeft");
+                    await Clients.Group(session.Id).OpponentLeft();
 
                     _sessionManager.RemovePlayer(connectionId);
 

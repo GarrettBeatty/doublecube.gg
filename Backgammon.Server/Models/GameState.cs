@@ -1,4 +1,5 @@
 using Backgammon.Core;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
@@ -6,6 +7,7 @@ namespace Backgammon.Server.Models;
 /// Data transfer object representing the current state of a game.
 /// This is sent to all clients whenever the game state changes.
 /// </summary>
+[TranspilationSource]
 public class GameState
 {
     public string GameId { get; set; } = string.Empty;

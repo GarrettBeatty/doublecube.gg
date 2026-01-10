@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Response containing both "your turn" and "waiting" correspondence games
 /// </summary>
+[TranspilationSource]
 public class CorrespondenceGamesResponse
 {
     /// <summary>

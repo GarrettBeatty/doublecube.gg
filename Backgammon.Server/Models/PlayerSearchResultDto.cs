@@ -1,8 +1,11 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Player search result data transfer object
 /// </summary>
+[TranspilationSource]
 public class PlayerSearchResultDto
 {
     /// <summary>

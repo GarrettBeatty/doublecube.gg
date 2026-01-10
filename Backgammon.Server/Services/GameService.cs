@@ -1,7 +1,9 @@
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
+using Backgammon.Server.Models.SignalR;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Match = Backgammon.Server.Models.Match;
@@ -20,7 +22,7 @@ public class GameService : IGameService
     private readonly IAiMoveService _aiMoveService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IMatchRepository _matchRepository;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameService> _logger;
 
     public GameService(
@@ -30,7 +32,7 @@ public class GameService : IGameService
         IAiMoveService aiMoveService,
         IGameActionOrchestrator gameActionOrchestrator,
         IMatchRepository matchRepository,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameService> logger)
     {
         _sessionManager = sessionManager;
@@ -75,7 +77,7 @@ public class GameService : IGameService
 
                 // Send as spectator view (read-only) - use SpectatorJoined event
                 var viewState = session.GetState(null);
-                await _hubContext.Clients.Client(connectionId).SendAsync("SpectatorJoined", viewState);
+                await _hubContext.Clients.Client(connectionId).SpectatorJoined(viewState);
 
                 _logger.LogInformation(
                     "Sent {Status} game {GameId} state to viewer {PlayerId}",
@@ -109,7 +111,7 @@ public class GameService : IGameService
             session.AddSpectator(connectionId);
             _sessionManager.RegisterPlayerConnection(connectionId, session.Id); // Register spectator
             var spectatorState = session.GetState(null); // No color for spectators
-            await _hubContext.Clients.Client(connectionId).SendAsync("SpectatorJoined", spectatorState);
+            await _hubContext.Clients.Client(connectionId).SpectatorJoined(spectatorState);
             _logger.LogInformation(
             "Spectator {ConnectionId} joined game {GameId}",
             connectionId,
@@ -159,7 +161,7 @@ public class GameService : IGameService
         _logger.LogInformation("Your Color: {YourColor}", initialState.YourColor);
         _logger.LogInformation("===============================================");
 
-        await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", initialState);
+        await _hubContext.Clients.Client(connectionId).GameUpdate(initialState);
         _logger.LogInformation("GameUpdate sent to connection {ConnectionId}", connectionId);
 
         if (session.IsFull)
@@ -173,7 +175,7 @@ public class GameService : IGameService
                     session.Id);
 
                 var state = session.GetState(connectionId);
-                await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", state);
+                await _hubContext.Clients.Client(connectionId).GameStart(state);
                 return;
             }
 
@@ -220,8 +222,8 @@ public class GameService : IGameService
         {
             // Waiting for opponent - game stays in memory only until opponent joins
             var state = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
-            await _hubContext.Clients.Client(connectionId).SendAsync("WaitingForOpponent", session.Id);
+            await _hubContext.Clients.Client(connectionId).GameUpdate(state);
+            await _hubContext.Clients.Client(connectionId).WaitingForOpponent(session.Id);
             _logger.LogInformation(
                 "Player {PlayerId} waiting in game {GameId} (in-memory only)",
                 playerId,
@@ -249,7 +251,7 @@ public class GameService : IGameService
         else
         {
             // Notify opponent
-            await _hubContext.Clients.Group(session.Id).SendAsync("OpponentLeft");
+            await _hubContext.Clients.Group(session.Id).OpponentLeft();
 
             _sessionManager.RemovePlayer(connectionId);
 
@@ -290,7 +292,7 @@ public class GameService : IGameService
         await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
 
         var state = session.GetState(connectionId);
-        await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", state);
+        await _hubContext.Clients.Client(connectionId).GameStart(state);
 
         // Analysis games are not persisted to database
 
@@ -367,7 +369,7 @@ public class GameService : IGameService
             humanState.IsYourTurn,
             humanState.CurrentPlayer,
             humanState.YourColor);
-        await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", humanState);
+        await _hubContext.Clients.Client(connectionId).GameStart(humanState);
 
         // Save initial game state - fire and forget
         BackgroundTaskHelper.FireAndForget(
@@ -393,20 +395,20 @@ public class GameService : IGameService
         foreach (var connectionId in session.WhiteConnections)
         {
             var whiteState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", whiteState);
+            await _hubContext.Clients.Client(connectionId).GameUpdate(whiteState);
         }
 
         foreach (var connectionId in session.RedConnections)
         {
             var redState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", redState);
+            await _hubContext.Clients.Client(connectionId).GameUpdate(redState);
         }
 
         // Send updates to all spectators
         var spectatorState = session.GetState(null); // null = spectator view
         foreach (var spectatorId in session.SpectatorConnections)
         {
-            await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
+            await _hubContext.Clients.Client(spectatorId).GameUpdate(spectatorState);
         }
     }
 
@@ -416,13 +418,13 @@ public class GameService : IGameService
         foreach (var connectionId in session.WhiteConnections)
         {
             var whiteState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", whiteState);
+            await _hubContext.Clients.Client(connectionId).GameStart(whiteState);
         }
 
         foreach (var connectionId in session.RedConnections)
         {
             var redState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameStart", redState);
+            await _hubContext.Clients.Client(connectionId).GameStart(redState);
         }
 
         _logger.LogInformation("Game {GameId} started with both players", session.Id);
@@ -431,7 +433,7 @@ public class GameService : IGameService
     public async Task BroadcastGameOverAsync(GameSession session)
     {
         var finalState = session.GetState();
-        await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
+        await _hubContext.Clients.Group(session.Id).GameOver(finalState);
 
         _logger.LogInformation(
             "Game {GameId} completed. Winner: {Winner}",
@@ -442,7 +444,7 @@ public class GameService : IGameService
     public async Task SendGameStateToConnectionAsync(GameSession session, string connectionId)
     {
         var state = session.GetState(connectionId);
-        await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
+        await _hubContext.Clients.Client(connectionId).GameUpdate(state);
     }
 
     public async Task BroadcastDoubleOfferAsync(
@@ -458,7 +460,11 @@ public class GameService : IGameService
 
         foreach (var opponentConnectionId in opponentConnections)
         {
-            await _hubContext.Clients.Client(opponentConnectionId).SendAsync("DoubleOffered", currentValue, newValue);
+            await _hubContext.Clients.Client(opponentConnectionId).DoubleOffered(new DoubleOfferDto
+            {
+                CurrentStakes = currentValue,
+                NewStakes = newValue
+            });
         }
     }
 
@@ -468,27 +474,27 @@ public class GameService : IGameService
         foreach (var connectionId in session.WhiteConnections)
         {
             var whiteState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("DoubleAccepted", whiteState);
+            await _hubContext.Clients.Client(connectionId).DoubleAccepted(whiteState);
         }
 
         foreach (var connectionId in session.RedConnections)
         {
             var redState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("DoubleAccepted", redState);
+            await _hubContext.Clients.Client(connectionId).DoubleAccepted(redState);
         }
     }
 
     public async Task BroadcastMatchUpdateAsync(Match match, string gameId)
     {
-        await _hubContext.Clients.Group(gameId).SendAsync("MatchUpdate", new
+        await _hubContext.Clients.Group(gameId).MatchUpdate(new MatchUpdateDto
         {
-            matchId = match.MatchId,
-            player1Score = match.Player1Score,
-            player2Score = match.Player2Score,
-            targetScore = match.TargetScore,
-            isCrawfordGame = match.IsCrawfordGame,
-            matchComplete = match.Status == "Completed",
-            matchWinner = match.WinnerId
+            MatchId = match.MatchId,
+            Player1Score = match.Player1Score,
+            Player2Score = match.Player2Score,
+            TargetScore = match.TargetScore,
+            IsCrawfordGame = match.IsCrawfordGame,
+            MatchComplete = match.Status == "Completed",
+            MatchWinner = match.WinnerId
         });
 
         if (match.Status == "Completed")

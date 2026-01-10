@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
@@ -6,6 +7,7 @@ namespace Backgammon.Server.Models;
 /// Data transfer object for sending daily puzzle data to the client.
 /// Note: Best moves are NOT included until the user solves the puzzle.
 /// </summary>
+[TranspilationSource]
 public class DailyPuzzleDto
 {
     /// <summary>

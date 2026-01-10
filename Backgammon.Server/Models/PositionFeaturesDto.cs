@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Position features DTO
 /// </summary>
+[TranspilationSource]
 public class PositionFeaturesDto
 {
     [JsonPropertyName("pipCount")]

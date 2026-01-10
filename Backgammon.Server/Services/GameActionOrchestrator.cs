@@ -1,7 +1,9 @@
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
 using Backgammon.Server.Hubs;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
+using Backgammon.Server.Models.SignalR;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Match = Backgammon.Server.Models.Match;
@@ -19,7 +21,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     private readonly IPlayerStatsService _playerStatsService;
     private readonly IMatchService _matchService;
     private readonly IGameSessionManager _sessionManager;
-    private readonly IHubContext<GameHub> _hubContext;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameActionOrchestrator> _logger;
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IMatchRepository _matchRepository;
@@ -30,7 +32,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         IPlayerStatsService playerStatsService,
         IMatchService matchService,
         IGameSessionManager sessionManager,
-        IHubContext<GameHub> hubContext,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameActionOrchestrator> logger,
         ICorrespondenceGameService correspondenceGameService,
         IMatchRepository matchRepository)
@@ -536,19 +538,19 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 foreach (var connectionId in session.WhiteConnections)
                 {
                     var whiteState = session.GetState(connectionId);
-                    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", whiteState);
+                    await _hubContext.Clients.Client(connectionId).GameUpdate(whiteState);
                 }
 
                 foreach (var connectionId in session.RedConnections)
                 {
                     var redState = session.GetState(connectionId);
-                    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", redState);
+                    await _hubContext.Clients.Client(connectionId).GameUpdate(redState);
                 }
 
                 var spectatorState = session.GetState(null);
                 foreach (var spectatorId in session.SpectatorConnections)
                 {
-                    await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
+                    await _hubContext.Clients.Client(spectatorId).GameUpdate(spectatorState);
                 }
             }
 
@@ -580,7 +582,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
                 // Broadcast GameOver AFTER database is updated
                 var finalState = session.GetState();
-                await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
+                await _hubContext.Clients.Group(session.Id).GameOver(finalState);
 
                 // Remove from memory to prevent memory leak
                 _sessionManager.RemoveGame(session.Id);
@@ -668,40 +670,40 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         foreach (var connectionId in session.WhiteConnections)
         {
             var whiteState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", whiteState);
+            await _hubContext.Clients.Client(connectionId).GameUpdate(whiteState);
         }
 
         foreach (var connectionId in session.RedConnections)
         {
             var redState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", redState);
+            await _hubContext.Clients.Client(connectionId).GameUpdate(redState);
         }
 
         // Send updates to all spectators
         var spectatorState = session.GetState(null);
         foreach (var spectatorId in session.SpectatorConnections)
         {
-            await _hubContext.Clients.Client(spectatorId).SendAsync("GameUpdate", spectatorState);
+            await _hubContext.Clients.Client(spectatorId).GameUpdate(spectatorState);
         }
     }
 
     private async Task BroadcastGameOverAsync(GameSession session)
     {
         var finalState = session.GetState();
-        await _hubContext.Clients.Group(session.Id).SendAsync("GameOver", finalState);
+        await _hubContext.Clients.Group(session.Id).GameOver(finalState);
     }
 
     private async Task BroadcastMatchUpdateAsync(Match match, string gameId)
     {
-        await _hubContext.Clients.Group(gameId).SendAsync("MatchUpdate", new
+        await _hubContext.Clients.Group(gameId).MatchUpdate(new MatchUpdateDto
         {
-            matchId = match.MatchId,
-            player1Score = match.Player1Score,
-            player2Score = match.Player2Score,
-            targetScore = match.TargetScore,
-            isCrawfordGame = match.IsCrawfordGame,
-            matchComplete = match.Status == "Completed",
-            matchWinner = match.WinnerId
+            MatchId = match.MatchId,
+            Player1Score = match.Player1Score,
+            Player2Score = match.Player2Score,
+            TargetScore = match.TargetScore,
+            IsCrawfordGame = match.IsCrawfordGame,
+            MatchComplete = match.Status == "Completed",
+            MatchWinner = match.WinnerId
         });
     }
 }

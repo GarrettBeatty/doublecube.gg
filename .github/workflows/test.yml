@@ -32,6 +32,26 @@ jobs:
     - name: Run tests
       run: dotnet test --no-build --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
 
+    - name: Install TypeScript generator tool
+      run: dotnet tool install --global TypedSignalR.Client.TypeScript.Generator
+
+    - name: Verify generated TypeScript is up-to-date
+      run: |
+        cd Backgammon.WebClient/src/types
+        # Save hash of current generated files
+        find generated -type f -exec md5sum {} \; | sort > /tmp/before.md5
+        # Regenerate
+        dotnet tsrts --project ../../../Backgammon.Server/Backgammon.Server.csproj --output generated --asm
+        # Compare
+        find generated -type f -exec md5sum {} \; | sort > /tmp/after.md5
+        if ! diff -q /tmp/before.md5 /tmp/after.md5 > /dev/null; then
+          echo "ERROR: Generated TypeScript files are out of date!"
+          echo "Run 'npm run generate:signalr' in Backgammon.WebClient and commit the changes."
+          diff /tmp/before.md5 /tmp/after.md5
+          exit 1
+        fi
+        echo "Generated TypeScript files are up-to-date."
+
     - name: Publish test results
       uses: dorny/test-reporter@v1
       if: always()

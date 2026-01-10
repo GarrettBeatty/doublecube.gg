@@ -1,10 +1,12 @@
 using System.Text.Json.Serialization;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// User statistics - denormalized on User document for fast reads
 /// </summary>
+[TranspilationSource]
 public class UserStats
 {
     [JsonPropertyName("totalGames")]
