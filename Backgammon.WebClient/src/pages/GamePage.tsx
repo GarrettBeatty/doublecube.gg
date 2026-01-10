@@ -10,7 +10,6 @@ import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
 import { GameResultModal } from '@/components/modals/GameResultModal'
-import { DoublingCube } from '@/components/game/DoublingCube'
 import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
 import { DoubleOfferModal } from '@/components/modals/DoubleOfferModal'
 import { NotFound } from '@/components/NotFound'
@@ -314,9 +313,7 @@ export const GamePage: React.FC = () => {
                   <BoardSVG
                     gameState={currentGameState}
                     isSpectator={isSpectator}
-                    doublingCube={
-                      !isSpectator ? <DoublingCube onOfferDouble={handleOfferDouble} /> : undefined
-                    }
+                    onOfferDouble={!isSpectator ? handleOfferDouble : undefined}
                   />
                   <BoardOverlayControls
                     gameState={currentGameState}
