@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3.3" />
     <ProjectReference Include="..\Backgammon.Server\Backgammon.Server.csproj" />
     <ProjectReference Include="..\Backgammon.WebClient\Backgammon.WebClient.csproj" />
     <ProjectReference Include="..\Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj" IsAspireProjectResource="false" />
