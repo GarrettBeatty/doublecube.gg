@@ -1,8 +1,8 @@
 # Build stage (Alpine-based for smaller image size)
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 
-# Install Node.js and npm for Vite build
-RUN apk add --no-cache nodejs npm
+# Install Node.js and pnpm for Vite build
+RUN apk add --no-cache nodejs npm && npm install -g pnpm
 
 WORKDIR /src
 
