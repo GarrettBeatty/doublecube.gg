@@ -52,6 +52,7 @@ public class GameHub : Hub
     private readonly IFriendService _friendService;
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IAuthService _authService;
+    private readonly IDailyPuzzleService _dailyPuzzleService;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -74,7 +75,8 @@ public class GameHub : Hub
         IUserRepository userRepository,
         IFriendService friendService,
         ICorrespondenceGameService correspondenceGameService,
-        IAuthService authService)
+        IAuthService authService,
+        IDailyPuzzleService dailyPuzzleService)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -97,6 +99,7 @@ public class GameHub : Hub
         _friendService = friendService;
         _correspondenceGameService = correspondenceGameService;
         _authService = authService;
+        _dailyPuzzleService = dailyPuzzleService;
     }
 
     /// <summary>
@@ -1923,9 +1926,102 @@ public class GameHub : Hub
         }
     }
 
+    // ==================== Daily Puzzle Methods ====================
+
     /// <summary>
-    /// Generate a consistent anonymous display name from a player ID
+    /// Get today's daily puzzle.
     /// </summary>
+    /// <returns>The daily puzzle DTO, or null if no puzzle exists for today.</returns>
+    public async Task<DailyPuzzleDto?> GetDailyPuzzle()
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            return await _dailyPuzzleService.GetTodaysPuzzleAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting daily puzzle");
+            throw new HubException("Failed to get daily puzzle");
+        }
+    }
+
+    /// <summary>
+    /// Submit an answer to today's puzzle.
+    /// </summary>
+    /// <param name="moves">The moves the user played.</param>
+    /// <returns>The result of the puzzle submission.</returns>
+    public async Task<PuzzleResultDto> SubmitPuzzleAnswer(List<MoveDto> moves)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new HubException("Authentication required");
+            }
+
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            return await _dailyPuzzleService.SubmitAnswerAsync(userId, today, moves);
+        }
+        catch (HubException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error submitting puzzle answer");
+            throw new HubException("Failed to submit puzzle answer");
+        }
+    }
+
+    /// <summary>
+    /// Get user's puzzle streak information.
+    /// </summary>
+    /// <returns>The user's puzzle streak info.</returns>
+    public async Task<PuzzleStreakInfo> GetPuzzleStreak()
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                return new PuzzleStreakInfo();
+            }
+
+            return await _dailyPuzzleService.GetStreakInfoAsync(userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting puzzle streak");
+            throw new HubException("Failed to get puzzle streak");
+        }
+    }
+
+    /// <summary>
+    /// Get a historical puzzle by date.
+    /// </summary>
+    /// <param name="date">Date in yyyy-MM-dd format.</param>
+    /// <returns>The puzzle for the specified date, or null if not found.</returns>
+    public async Task<DailyPuzzleDto?> GetHistoricalPuzzle(string date)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            return await _dailyPuzzleService.GetPuzzleByDateAsync(date, userId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting historical puzzle for date {Date}", date);
+            throw new HubException("Failed to get historical puzzle");
+        }
+    }
+
+    /// <summary>
+    /// Generate a consistent anonymous display name from a player ID.
+    /// </summary>
+    /// <param name="playerId">The player ID to generate a name from.</param>
+    /// <returns>The generated anonymous display name.</returns>
     private static string GenerateAnonymousDisplayName(string playerId)
     {
         // Extract the random suffix (last part after final underscore)

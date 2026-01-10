@@ -187,6 +187,22 @@ builder.Services.AddSingleton<PositionEvaluatorFactory>();
 builder.Services.AddSingleton<AnalysisService>();
 // ========== END ANALYSIS CONFIGURATION ==========
 
+// ========== DAILY PUZZLE CONFIGURATION ==========
+// Configure puzzle settings
+builder.Services.Configure<Backgammon.Server.Configuration.PuzzleSettings>(
+    builder.Configuration.GetSection(Backgammon.Server.Configuration.PuzzleSettings.SectionName));
+
+// Register puzzle repository
+builder.Services.AddSingleton<IPuzzleRepository, Backgammon.Server.Services.DynamoDb.DynamoDbPuzzleRepository>();
+
+// Register puzzle services
+builder.Services.AddSingleton<RandomPositionGenerator>();
+builder.Services.AddSingleton<IDailyPuzzleService, DailyPuzzleService>();
+
+// Register puzzle generation background service
+builder.Services.AddHostedService<DailyPuzzleGenerationService>();
+// ========== END DAILY PUZZLE CONFIGURATION ==========
+
 // ELO rating service
 builder.Services.AddSingleton<IEloRatingService, EloRatingService>();
 
