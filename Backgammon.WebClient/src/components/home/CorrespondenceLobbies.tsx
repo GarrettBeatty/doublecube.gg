@@ -5,6 +5,7 @@ import { Clock, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { useSignalR } from '@/contexts/SignalRContext';
 import { HubMethods, HubEvents } from '@/types/signalr.types';
 import { authService } from '@/services/auth.service';
+import { CreateCorrespondenceMatchModal } from '@/components/modals/CreateCorrespondenceMatchModal';
 
 interface CorrespondenceLobby {
   matchId: string;
@@ -26,6 +27,7 @@ export function CorrespondenceLobbies() {
   const [lobbies, setLobbies] = useState<CorrespondenceLobby[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const fetchLobbies = useCallback(async () => {
     if (!isConnected) return;
@@ -88,9 +90,9 @@ export function CorrespondenceLobbies() {
   if (error) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <h3 className="text-lg font-semibold">Join a Game</h3>
-          <Button variant="ghost" size="icon" onClick={fetchLobbies}>
+          <Button variant="ghost" size="icon" onClick={fetchLobbies} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
@@ -108,9 +110,9 @@ export function CorrespondenceLobbies() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
         <h3 className="text-lg font-semibold">Join a Game</h3>
-        <Button variant="ghost" size="icon" onClick={fetchLobbies} disabled={isLoading}>
+        <Button variant="ghost" size="icon" onClick={fetchLobbies} disabled={isLoading} title="Refresh">
           <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
@@ -150,6 +152,15 @@ export function CorrespondenceLobbies() {
           ))}
         </div>
       )}
+
+      <Button className="w-full" variant="outline" onClick={() => setIsCreateModalOpen(true)}>
+        New Game
+      </Button>
+
+      <CreateCorrespondenceMatchModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+      />
     </div>
   );
 }

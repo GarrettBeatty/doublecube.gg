@@ -1,14 +1,17 @@
 // Type definitions for Home Page components
 
 export interface ActiveGame {
+  matchId: string
   gameId: string
   player1Name: string
   player2Name: string
   player1Rating?: number
   player2Rating?: number
   currentPlayer: 'White' | 'Red'
+  myColor: 'White' | 'Red'
+  isYourTurn: boolean
   matchScore?: string
-  matchLength?: string
+  matchLength?: number
   viewers?: number
   timeControl?: string
   cubeValue?: number

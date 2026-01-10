@@ -1,8 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, Search, Filter, Dice6 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Clock, User, Settings, Dice6 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -14,13 +13,16 @@ import { useToast } from "@/hooks/use-toast";
 import { mapMatchLobbyToLobbyGame } from "@/utils/mappers";
 import type { LobbyGame } from "@/types/home.types";
 
-export function GameLobby() {
+interface GameLobbyProps {
+  onCreateGame?: () => void;
+}
+
+export function GameLobby({ onCreateGame }: GameLobbyProps) {
   const { lobbies, isLoading } = useMatchLobbies();
   const { invoke } = useSignalR();
   const { toast } = useToast();
 
   const [showFilters, setShowFilters] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [ratingRange, setRatingRange] = useState([1200, 2400]);
   const [matchLengthFilter, setMatchLengthFilter] = useState("all");
   const [ratedFilter, setRatedFilter] = useState("all");
@@ -46,11 +48,6 @@ export function GameLobby() {
 
   // Apply client-side filtering
   const filteredLobbies = lobbyGames.filter((game) => {
-    // Search filter
-    if (searchQuery && !game.creatorUsername.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
-    }
-
     // Rating range filter
     if (game.creatorRating !== undefined) {
       if (game.creatorRating < ratingRange[0] || game.creatorRating > ratingRange[1]) {
@@ -101,30 +98,22 @@ export function GameLobby() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Game Lobby</CardTitle>
-        <CardDescription>Join an open game or create your own challenge</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div>
+          <CardTitle>Game Lobby</CardTitle>
+          <CardDescription>Join an open game or create your own</CardDescription>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setShowFilters(!showFilters)}
+          title="Filter games"
+          className={showFilters ? "bg-accent" : ""}
+        >
+          <Settings className="h-4 w-4" />
+        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search and Filter Bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search players..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filters
-          </Button>
-        </div>
 
         {/* Filter Panel */}
         {showFilters && (
@@ -198,7 +187,6 @@ export function GameLobby() {
                 setMatchLengthFilter("all");
                 setRatedFilter("all");
                 setCubeFilter("all");
-                setSearchQuery("");
               }}
             >
               Reset Filters
@@ -261,8 +249,8 @@ export function GameLobby() {
             ))}
           </div>
         )}
-        <Button className="w-full" variant="outline">
-          Create Custom Game
+        <Button className="w-full" variant="outline" onClick={onCreateGame}>
+          New Game
         </Button>
       </CardContent>
     </Card>

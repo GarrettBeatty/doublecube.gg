@@ -147,10 +147,6 @@ export function CorrespondenceGames() {
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Game
-          </Button>
         </div>
 
         {hasAnyGames ? (
@@ -217,6 +213,11 @@ export function CorrespondenceGames() {
             </CardContent>
           </Card>
         )}
+
+        <Button className="w-full" variant="outline" onClick={() => setIsCreateModalOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Game
+        </Button>
       </div>
 
       {/* Create Match Modal */}
