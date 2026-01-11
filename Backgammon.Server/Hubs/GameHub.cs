@@ -398,7 +398,7 @@ public class GameHub : Hub<IGameHubClient>
             var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
             if (session == null)
             {
-                await Clients.Caller.SendAsync("Error", "Not in a game");
+                await Clients.Caller.Error("Not in a game");
                 return;
             }
 
@@ -411,13 +411,13 @@ public class GameHub : Hub<IGameHubClient>
 
             if (!result.Success)
             {
-                await Clients.Caller.SendAsync("Error", result.ErrorMessage);
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error making combined move");
-            await Clients.Caller.SendAsync("Error", ex.Message);
+            await Clients.Caller.Error(ex.Message);
         }
     }
 
