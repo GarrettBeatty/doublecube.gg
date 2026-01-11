@@ -18,13 +18,13 @@ const BUTTON_COLORS: Record<
   danger: { bg: 'hsl(0 84.2% 60.2%)', text: 'hsl(0 0% 98%)' },
 }
 
-// Button icons based on type
-const BUTTON_ICONS: Record<ButtonConfig['type'], string> = {
-  roll: '🎲',
-  undo: '↩',
-  end: '✓',
-  double: '2×',
-  resign: '🏳',
+// Button labels based on type
+const BUTTON_LABELS: Record<ButtonConfig['type'], string> = {
+  roll: 'Roll',
+  undo: 'Undo',
+  end: 'End',
+  double: 'Double',
+  resign: 'Resign',
 }
 
 export const ActionButtons = memo(function ActionButtons({
@@ -86,8 +86,10 @@ export const ActionButtons = memo(function ActionButtons({
 
         const { x, y } = getButtonPosition(button, index)
         const colors = BUTTON_COLORS[button.variant || 'default']
-        const icon = BUTTON_ICONS[button.type]
+        const label = BUTTON_LABELS[button.type]
         const radius = getButtonRadius(button.type)
+        // Smaller font for smaller buttons
+        const fontSize = radius >= 40 ? 14 : 12
 
         return (
           <g
@@ -108,18 +110,18 @@ export const ActionButtons = memo(function ActionButtons({
                 transition: 'transform 0.1s',
               }}
             />
-            {/* Button icon/label */}
+            {/* Button label */}
             <text
               x={x}
               y={y}
               textAnchor="middle"
               dominantBaseline="middle"
-              fontSize={16}
+              fontSize={fontSize}
               fontWeight="bold"
               fill={colors.text}
               style={{ userSelect: 'none', pointerEvents: 'none' }}
             >
-              {icon}
+              {label}
             </text>
           </g>
         )
