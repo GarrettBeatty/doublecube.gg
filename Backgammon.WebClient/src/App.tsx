@@ -7,6 +7,7 @@ import { useSignalREvents } from './hooks/useSignalREvents'
 import { Layout } from './components/layout/Layout'
 import { LoginModal } from './components/modals/LoginModal'
 import { RegisterModal } from './components/modals/RegisterModal'
+import { CreateMatchModal } from './components/modals/CreateMatchModal'
 import { HomePage } from './pages/HomePage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -28,6 +29,7 @@ function SignalREventHandler() {
 function AppContent() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showRegisterModal, setShowRegisterModal] = useState(false)
+  const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
 
   // Initialize audio service and dark mode
   useEffect(() => {
@@ -53,12 +55,14 @@ function AppContent() {
     setShowLoginModal(true)
   }
 
-  // Game creation handlers - will be added to HomePage in Phase 3
+  const handleCreateLobbyClick = () => {
+    setShowCreateMatchModal(true)
+  }
 
   return (
     <>
       <SignalREventHandler />
-      <Layout onLoginClick={handleLoginClick} onSignupClick={handleSignupClick}>
+      <Layout onLoginClick={handleLoginClick} onSignupClick={handleSignupClick} onCreateLobbyClick={handleCreateLobbyClick}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/game/:gameId" element={<GamePage />} />
@@ -80,6 +84,12 @@ function AppContent() {
         isOpen={showRegisterModal}
         onClose={() => setShowRegisterModal(false)}
         onSwitchToLogin={handleSwitchToLogin}
+      />
+
+      <CreateMatchModal
+        isOpen={showCreateMatchModal}
+        onClose={() => setShowCreateMatchModal(false)}
+        defaultOpponentType="OpenLobby"
       />
 
       <Toaster />
