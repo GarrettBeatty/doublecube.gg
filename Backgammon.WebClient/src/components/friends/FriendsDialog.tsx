@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import {
   Dialog,
@@ -43,6 +43,8 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Friend[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (isOpen && isConnected) {
@@ -51,6 +53,47 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isConnected])
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Only search if query is at least 2 characters
+    if (searchQuery.trim().length >= 2) {
+      setIsSearching(true)
+      debounceTimerRef.current = setTimeout(async () => {
+        try {
+          const results = await hub?.searchPlayers(searchQuery)
+          setSearchResults(
+            (results || []).map((p) => ({
+              userId: p.userId,
+              username: p.username,
+              displayName: p.displayName,
+              status: 'Offline' as const,
+            }))
+          )
+          setShowSuggestions(true)
+        } catch (error) {
+          console.error('Failed to search players:', error)
+        } finally {
+          setIsSearching(false)
+        }
+      }, 300) // 300ms debounce
+    } else {
+      setSearchResults([])
+      setShowSuggestions(false)
+      setIsSearching(false)
+    }
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchQuery, hub])
 
   const loadFriends = async () => {
     try {
@@ -86,33 +129,6 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
     }
   }
 
-  const handleSearchFriends = async () => {
-    if (!searchQuery.trim()) return
-
-    setIsSearching(true)
-    try {
-      const results = await hub?.searchPlayers(searchQuery)
-      // Map PlayerSearchResultDto to local Friend type for display
-      setSearchResults(
-        (results || []).map((p) => ({
-          userId: p.userId,
-          username: p.username,
-          displayName: p.displayName,
-          status: 'Offline' as const,
-        }))
-      )
-    } catch (error) {
-      console.error('Failed to search players:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to search for players',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSearching(false)
-    }
-  }
-
   const handleSendFriendRequest = async (userId: string, username: string) => {
     try {
       await hub?.sendFriendRequest(userId)
@@ -122,6 +138,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
       })
       setSearchResults([])
       setSearchQuery('')
+      setShowSuggestions(false)
     } catch (error) {
       console.error('Failed to send friend request:', error)
       toast({
@@ -298,46 +315,63 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
           </TabsContent>
 
           <TabsContent value="add" className="space-y-4 mt-4">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search by username..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearchFriends()}
-              />
-              <Button onClick={handleSearchFriends} disabled={isSearching}>
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-            </div>
+            <div className="relative">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Start typing to search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => searchResults.length > 0 && setShowSuggestions(true)}
+                  className="pl-10"
+                />
+                {isSearching && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                )}
+              </div>
 
-            {searchResults.length > 0 && (
-              <div className="space-y-2">
-                {searchResults.map((user) => (
-                  <div
-                    key={user.userId}
-                    className="flex items-center justify-between p-3 border rounded-lg"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>{user.displayName.charAt(0).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-semibold">{user.displayName}</div>
-                        <div className="text-sm text-muted-foreground">@{user.username}</div>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
+              {/* Autocomplete suggestions dropdown */}
+              {showSuggestions && searchResults.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                  {searchResults.map((user) => (
+                    <div
+                      key={user.userId}
+                      className="flex items-center justify-between p-3 hover:bg-accent cursor-pointer transition-colors border-b last:border-b-0"
                       onClick={() => handleSendFriendRequest(user.userId, user.username)}
                     >
-                      <UserPlus className="h-4 w-4 mr-1" />
-                      Add Friend
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-sm">
+                            {user.displayName.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium text-sm">{user.displayName}</div>
+                          <div className="text-xs text-muted-foreground">@{user.username}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <UserPlus className="h-3 w-3" />
+                        <span>Add</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* No results message */}
+              {showSuggestions && searchQuery.trim().length >= 2 && searchResults.length === 0 && !isSearching && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-lg shadow-lg p-4 text-center text-sm text-muted-foreground">
+                  No users found matching "{searchQuery}"
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Type at least 2 characters to search. Click a user to send a friend request.
+            </p>
           </TabsContent>
         </Tabs>
       </DialogContent>

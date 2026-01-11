@@ -12,6 +12,7 @@ import { HomePage } from './pages/HomePage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { PlayersPage } from './pages/PlayersPage'
+import { FriendsPage } from './pages/FriendsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { DailyPuzzlePage } from './pages/DailyPuzzlePage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -68,6 +69,7 @@ function AppContent() {
           <Route path="/game/:gameId" element={<GamePage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/players" element={<PlayersPage />} />
+          <Route path="/friends" element={<FriendsPage />} />
           <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
           <Route path="/puzzle" element={<DailyPuzzlePage />} />
           <Route path="*" element={<NotFoundPage />} />
