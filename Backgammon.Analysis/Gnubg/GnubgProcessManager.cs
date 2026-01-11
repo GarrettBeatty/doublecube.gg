@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text;
 using Backgammon.Analysis.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Backgammon.Analysis.Gnubg;
 
@@ -10,13 +12,13 @@ namespace Backgammon.Analysis.Gnubg;
 public class GnubgProcessManager : IDisposable
 {
     private readonly GnubgSettings _settings;
-    private readonly Action<string>? _logger;
+    private readonly ILogger<GnubgProcessManager>? _logger;
     private readonly SemaphoreSlim _processLock;
     private bool _disposed;
 
-    public GnubgProcessManager(GnubgSettings settings, Action<string>? logger = null)
+    public GnubgProcessManager(IOptions<GnubgSettings> settings, ILogger<GnubgProcessManager>? logger = null)
     {
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger;
         _processLock = new SemaphoreSlim(1, 1); // Only one process at a time
     }
@@ -34,9 +36,9 @@ public class GnubgProcessManager : IDisposable
         {
             var fullCommand = string.Join(Environment.NewLine, commands) + Environment.NewLine + "quit" + Environment.NewLine;
 
-            if (_settings.VerboseLogging && _logger != null)
+            if (_settings.VerboseLogging)
             {
-                _logger($"Executing gnubg commands:\n{fullCommand}");
+                _logger?.LogDebug("Executing gnubg commands:\n{Commands}", fullCommand);
             }
 
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -89,14 +91,14 @@ public class GnubgProcessManager : IDisposable
             }
             catch (OperationCanceledException)
             {
-                _logger?.Invoke($"Gnubg process timed out after {_settings.TimeoutMs}ms, killing process");
+                _logger?.LogWarning("Gnubg process timed out after {TimeoutMs}ms, killing process", _settings.TimeoutMs);
                 try
                 {
                     process.Kill(true);
                 }
                 catch (Exception ex)
                 {
-                    _logger?.Invoke($"Failed to kill gnubg process: {ex.Message}");
+                    _logger?.LogError(ex, "Failed to kill gnubg process");
                 }
 
                 throw new TimeoutException($"Gnubg process timed out after {_settings.TimeoutMs}ms");
@@ -105,18 +107,18 @@ public class GnubgProcessManager : IDisposable
             var output = outputBuilder.ToString();
             var error = errorBuilder.ToString();
 
-            if (_settings.VerboseLogging && _logger != null)
+            if (_settings.VerboseLogging)
             {
-                _logger($"Gnubg output:\n{output}");
+                _logger?.LogDebug("Gnubg output:\n{Output}", output);
                 if (!string.IsNullOrWhiteSpace(error))
                 {
-                    _logger($"Gnubg error output:\n{error}");
+                    _logger?.LogDebug("Gnubg error output:\n{Error}", error);
                 }
             }
 
             if (process.ExitCode != 0)
             {
-                _logger?.Invoke($"Gnubg exited with code {process.ExitCode}. Error: {error}");
+                _logger?.LogWarning("Gnubg exited with code {ExitCode}. Error: {Error}", process.ExitCode, error);
             }
 
             if (string.IsNullOrWhiteSpace(output) && !string.IsNullOrWhiteSpace(error))
@@ -148,7 +150,7 @@ public class GnubgProcessManager : IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.Invoke($"Gnubg availability check failed: {ex.Message}");
+            _logger?.LogWarning(ex, "Gnubg availability check failed");
             return false;
         }
     }
@@ -168,9 +170,9 @@ public class GnubgProcessManager : IDisposable
             // Write SGF content to temporary file
             await File.WriteAllTextAsync(tempFile, sgfContent, ct);
 
-            if (_settings.VerboseLogging && _logger != null)
+            if (_settings.VerboseLogging)
             {
-                _logger($"Wrote SGF to temp file: {tempFile}");
+                _logger?.LogDebug("Wrote SGF to temp file: {TempFile}", tempFile);
             }
 
             // Prepend load position command
@@ -191,7 +193,7 @@ public class GnubgProcessManager : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger?.Invoke($"Failed to delete temp file {tempFile}: {ex.Message}");
+                    _logger?.LogWarning(ex, "Failed to delete temp file {TempFile}", tempFile);
                 }
             }
         }

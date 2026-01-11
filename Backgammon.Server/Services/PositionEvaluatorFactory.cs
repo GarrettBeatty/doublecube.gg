@@ -13,7 +13,7 @@ namespace Backgammon.Server.Services;
 public class PositionEvaluatorFactory : IDisposable
 {
     private readonly GnubgProcessManager _gnubgProcessManager;
-    private readonly GnubgSettings _gnubgSettings;
+    private readonly IOptions<GnubgSettings> _gnubgSettings;
     private readonly AnalysisSettings _analysisSettings;
     private readonly ILogger<GnubgEvaluator> _gnubgLogger;
     private readonly HeuristicEvaluator _heuristicEvaluator;
@@ -28,7 +28,7 @@ public class PositionEvaluatorFactory : IDisposable
         ILogger<GnubgEvaluator> gnubgLogger)
     {
         _gnubgProcessManager = gnubgProcessManager ?? throw new ArgumentNullException(nameof(gnubgProcessManager));
-        _gnubgSettings = gnubgSettings.Value ?? throw new ArgumentNullException(nameof(gnubgSettings));
+        _gnubgSettings = gnubgSettings ?? throw new ArgumentNullException(nameof(gnubgSettings));
         _analysisSettings = analysisSettings.Value ?? throw new ArgumentNullException(nameof(analysisSettings));
         _gnubgLogger = gnubgLogger ?? throw new ArgumentNullException(nameof(gnubgLogger));
         _heuristicEvaluator = new HeuristicEvaluator();
@@ -95,16 +95,16 @@ public class PositionEvaluatorFactory : IDisposable
                     {
                         _gnubgLogger.LogError(
                             "Gnubg not available at {Path}. Please ensure GNU Backgammon is installed and the path is configured correctly.",
-                            _gnubgSettings.ExecutablePath);
+                            _gnubgSettings.Value.ExecutablePath);
                         throw new InvalidOperationException(
-                            $"GNU Backgammon evaluator requested but not available at: {_gnubgSettings.ExecutablePath}. " +
+                            $"GNU Backgammon evaluator requested but not available at: {_gnubgSettings.Value.ExecutablePath}. " +
                             "Please install GNU Backgammon or use the Heuristic evaluator instead.");
                     }
 
                     _gnubgEvaluator = new GnubgEvaluator(
                         _gnubgProcessManager,
                         _gnubgSettings,
-                        msg => _gnubgLogger.LogDebug(msg));
+                        _gnubgLogger);
                 }
             }
         }

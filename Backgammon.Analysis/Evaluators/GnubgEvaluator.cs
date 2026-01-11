@@ -3,6 +3,8 @@ using Backgammon.Analysis.Gnubg;
 using Backgammon.Core;
 using Backgammon.Plugins.Abstractions;
 using Backgammon.Plugins.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Backgammon.Analysis.Evaluators;
 
@@ -13,15 +15,15 @@ public class GnubgEvaluator : IPositionEvaluator
 {
     private readonly GnubgProcessManager _processManager;
     private readonly GnubgSettings _settings;
-    private readonly Action<string>? _logger;
+    private readonly ILogger<GnubgEvaluator>? _logger;
 
     public GnubgEvaluator(
         GnubgProcessManager processManager,
-        GnubgSettings settings,
-        Action<string>? logger = null)
+        IOptions<GnubgSettings> settings,
+        ILogger<GnubgEvaluator>? logger = null)
     {
         _processManager = processManager ?? throw new ArgumentNullException(nameof(processManager));
-        _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
         _logger = logger;
     }
 
@@ -49,7 +51,7 @@ public class GnubgEvaluator : IPositionEvaluator
         {
             // Export position to SGF
             var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.Invoke($"Evaluating position with gnubg. SGF: {sgf}");
+            _logger?.LogDebug("Evaluating position with gnubg. SGF: {Sgf}", sgf);
 
             // Build gnubg commands
             var commands = GnubgCommandBuilder.BuildEvaluationCommand(_settings);
@@ -60,13 +62,13 @@ public class GnubgEvaluator : IPositionEvaluator
             // Parse output
             var evaluation = GnubgOutputParser.ParseEvaluation(output);
 
-            _logger?.Invoke($"Gnubg evaluation complete. Equity: {evaluation.Equity}");
+            _logger?.LogDebug("Gnubg evaluation complete. Equity: {Equity}", evaluation.Equity);
 
             return evaluation;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger?.Invoke($"Failed to evaluate position with gnubg: {ex.Message}");
+            _logger?.LogError(ex, "Failed to evaluate position with gnubg");
             throw new Exception("Gnubg evaluation failed. See inner exception for details.", ex);
         }
     }
@@ -80,7 +82,7 @@ public class GnubgEvaluator : IPositionEvaluator
         {
             // Export position to SGF
             var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.Invoke($"Finding best moves with gnubg. SGF: {sgf}");
+            _logger?.LogDebug("Finding best moves with gnubg. SGF: {Sgf}", sgf);
 
             // Get initial evaluation
             var initialEvaluation = await EvaluateAsync(engine, ct);
@@ -91,12 +93,12 @@ public class GnubgEvaluator : IPositionEvaluator
             // Execute gnubg with SGF file
             var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, ct);
 
-            _logger?.Invoke($"Gnubg hint output:\n{output}");
+            _logger?.LogDebug("Gnubg hint output:\n{Output}", output);
 
             // Parse move analysis
             var moveAnalyses = GnubgOutputParser.ParseMoveAnalysis(output);
 
-            _logger?.Invoke($"Parsed {moveAnalyses.Count} move analyses from gnubg output");
+            _logger?.LogDebug("Parsed {Count} move analyses from gnubg output", moveAnalyses.Count);
 
             // Convert to BestMovesAnalysis format
             var topMoves = new List<MoveSequenceEvaluation>();
@@ -129,7 +131,7 @@ public class GnubgEvaluator : IPositionEvaluator
                 topMoves.Add(sequence);
             }
 
-            _logger?.Invoke($"Gnubg found {topMoves.Count} best moves");
+            _logger?.LogDebug("Gnubg found {Count} best moves", topMoves.Count);
 
             return new BestMovesAnalysis
             {
@@ -140,7 +142,7 @@ public class GnubgEvaluator : IPositionEvaluator
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger?.Invoke($"Failed to find best moves with gnubg: {ex.Message}");
+            _logger?.LogError(ex, "Failed to find best moves with gnubg");
             throw new Exception("Gnubg move analysis failed. See inner exception for details.", ex);
         }
     }
@@ -154,7 +156,7 @@ public class GnubgEvaluator : IPositionEvaluator
         {
             // Export position to SGF
             var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.Invoke($"Evaluating cube decision with gnubg. SGF: {sgf}");
+            _logger?.LogDebug("Evaluating cube decision with gnubg. SGF: {Sgf}", sgf);
 
             // Build gnubg cube commands
             var commands = GnubgCommandBuilder.BuildCubeCommand(_settings);
@@ -165,13 +167,13 @@ public class GnubgEvaluator : IPositionEvaluator
             // Parse cube decision
             var decision = GnubgOutputParser.ParseCubeDecision(output);
 
-            _logger?.Invoke($"Gnubg cube decision: {decision.Recommendation}");
+            _logger?.LogDebug("Gnubg cube decision: {Recommendation}", decision.Recommendation);
 
             return decision;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger?.Invoke($"Failed to evaluate cube decision with gnubg: {ex.Message}");
+            _logger?.LogError(ex, "Failed to evaluate cube decision with gnubg");
             throw new Exception("Gnubg cube decision analysis failed. See inner exception for details.", ex);
         }
     }

@@ -36,22 +36,11 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGnubgEvaluator(this IServiceCollection services)
     {
-        // Register gnubg infrastructure with factory to extract settings from IOptions
-        services.AddSingleton<GnubgProcessManager>(sp =>
-        {
-            var settings = sp.GetRequiredService<IOptions<GnubgSettings>>().Value;
-            var logger = sp.GetRequiredService<ILogger<GnubgProcessManager>>();
-            return new GnubgProcessManager(settings, msg => logger.LogDebug(msg));
-        });
+        // Register gnubg infrastructure - DI resolves IOptions and ILogger automatically
+        services.AddSingleton<GnubgProcessManager>();
 
-        // Register the gnubg evaluator with factory
-        services.AddTransient<GnubgEvaluator>(sp =>
-        {
-            var processManager = sp.GetRequiredService<GnubgProcessManager>();
-            var settings = sp.GetRequiredService<IOptions<GnubgSettings>>().Value;
-            var logger = sp.GetRequiredService<ILogger<GnubgEvaluator>>();
-            return new GnubgEvaluator(processManager, settings, msg => logger.LogDebug(msg));
-        });
+        // Register the gnubg evaluator - DI resolves dependencies automatically
+        services.AddTransient<GnubgEvaluator>();
 
         // Register metadata for discovery by the registry
         services.AddSingleton(new Backgammon.Plugins.Registration.EvaluatorRegistration(
@@ -68,7 +57,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGnubgBot(this IServiceCollection services)
     {
-        // Register GnubgBot with factory - injects GnubgEvaluator as IPositionEvaluator
+        // Register GnubgBot - injects GnubgEvaluator as IPositionEvaluator
         services.AddTransient<GnubgBot>(sp =>
         {
             // Get the GnubgEvaluator and pass it as the IPositionEvaluator
