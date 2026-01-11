@@ -9,7 +9,7 @@ import {
 } from '@/types/game.types'
 import { PositionEvaluation, BestMovesAnalysis } from '@/types/analysis.types'
 
-interface MatchState {
+export interface MatchState {
   matchId: string
   player1Score: number
   player2Score: number
@@ -17,6 +17,7 @@ interface MatchState {
   isCrawfordGame: boolean
   matchComplete: boolean
   matchWinner: string | null
+  lastUpdatedAt?: string // ISO timestamp for staleness detection
 }
 
 interface DoublingCubeState {
@@ -94,7 +95,9 @@ interface GameStore {
   setIsAnalyzing: (analyzing: boolean) => void
   setHighlightedMoves: (moves: Move[]) => void
   clearAnalysis: () => void
-  setMatchState: (matchState: MatchState | null) => void
+  setMatchState: (
+    matchState: MatchState | null | ((prev: MatchState | null) => MatchState | null)
+  ) => void
   setShowGameResultModal: (show: boolean) => void
   setLastGameResult: (winner: CheckerColor | null, points: number) => void
   setDoublingCubeState: (state: Partial<DoublingCubeState>) => void
@@ -265,7 +268,13 @@ export const useGameStore = create<GameStore>((set) => ({
       highlightedMoves: [],
     }),
 
-  setMatchState: (matchState) => set({ matchState }),
+  setMatchState: (matchStateOrUpdater) =>
+    set((state) => ({
+      matchState:
+        typeof matchStateOrUpdater === 'function'
+          ? matchStateOrUpdater(state.matchState)
+          : matchStateOrUpdater,
+    })),
 
   setShowGameResultModal: (show) => set({ showGameResultModal: show }),
 

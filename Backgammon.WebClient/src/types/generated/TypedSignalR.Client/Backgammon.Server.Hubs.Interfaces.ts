@@ -275,6 +275,11 @@ export type IGameHub = {
     */
     submitPuzzleAnswer(moves: MoveDto[]): Promise<PuzzleResultDto>;
     /**
+    * Give up on today's puzzle and reveal the answer
+    * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.PuzzleResultDto>
+    */
+    giveUpPuzzle(): Promise<PuzzleResultDto>;
+    /**
     * Get user's puzzle streak information
     * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.PuzzleStreakInfo>
     */

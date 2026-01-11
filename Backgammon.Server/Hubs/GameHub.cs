@@ -1313,6 +1313,57 @@ public class GameHub : Hub<IGameHubClient>
     }
 
     /// <summary>
+    /// Get authoritative match state from server.
+    /// Used to sync client state on reconnection and detect stale data.
+    /// Returns match scores with a timestamp for staleness detection.
+    /// </summary>
+    /// <param name="matchId">The match ID to fetch state for</param>
+    /// <returns>MatchStateDto with current scores and timestamp</returns>
+    public async Task<MatchStateDto?> GetMatchState(string matchId)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var match = await _matchService.GetMatchAsync(matchId);
+
+            if (match == null)
+            {
+                _logger.LogWarning("GetMatchState: Match {MatchId} not found", matchId);
+                await Clients.Caller.Error("Match not found");
+                return null;
+            }
+
+            // Authorization: only participants can view match state
+            if (match.Player1Id != playerId && match.Player2Id != playerId)
+            {
+                _logger.LogWarning(
+                    "GetMatchState: Player {PlayerId} attempted to access match {MatchId} without authorization",
+                    playerId,
+                    matchId);
+                await Clients.Caller.Error("Access denied");
+                return null;
+            }
+
+            var matchState = MatchStateDto.FromMatch(match);
+
+            _logger.LogDebug(
+                "GetMatchState: Returning state for match {MatchId} - P1: {P1Score}, P2: {P2Score}, Updated: {UpdatedAt}",
+                matchId,
+                matchState.Player1Score,
+                matchState.Player2Score,
+                matchState.LastUpdatedAt);
+
+            return matchState;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting match state for {MatchId}", matchId);
+            await Clients.Caller.Error("Failed to get match state");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Get player's active matches
     /// </summary>
     public async Task GetMyMatches(string? status = null)

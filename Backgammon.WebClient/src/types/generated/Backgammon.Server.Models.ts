@@ -229,6 +229,12 @@ export type MoveDto = {
     dieValue: number;
     /** Transpiled from bool */
     isHit: boolean;
+    /** Transpiled from bool */
+    isCombinedMove: boolean;
+    /** Transpiled from int[]? */
+    diceUsed?: number[];
+    /** Transpiled from int[]? */
+    intermediatePoints?: number[];
 }
 
 /** Transpiled from Backgammon.Server.Models.MoveSequenceDto */

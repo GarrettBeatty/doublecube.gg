@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore, MatchState } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
+import { HubMethods, MatchStateDto } from '@/types/signalr.types'
 import { BoardSVG } from '@/components/game/BoardSVG'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
@@ -31,12 +31,14 @@ export const GamePage: React.FC = () => {
     resetGame,
     doublingCube,
     clearPendingDoubleOffer,
+    setMatchState,
   } = useGameStore()
   const [isLoading, setIsLoading] = useState(true)
   const [lastJoinedGameId, setLastJoinedGameId] = useState<string | null>(null)
   const [gameNotFound, setGameNotFound] = useState(false)
   const [showDoubleConfirmModal, setShowDoubleConfirmModal] = useState(false)
   const lastJoinedGameIdRef = useRef<string | null>(null)
+  const lastSyncedMatchIdRef = useRef<string | null>(null)
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -149,6 +151,137 @@ export const GamePage: React.FC = () => {
     // We only want to re-run when gameId or connection state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, isConnected, navigate, setCurrentGameId, invoke, resetGame])
+
+  // Sync match state from authoritative game state
+  // This ensures matchState never becomes stale when we have fresh game data
+  // Uses functional update to avoid matchState dependency and potential infinite loops
+  useEffect(() => {
+    if (
+      !currentGameState?.isMatchGame ||
+      currentGameState.player1Score === undefined ||
+      currentGameState.player2Score === undefined
+    ) {
+      return
+    }
+
+    // Extract values before closure to maintain type narrowing
+    const matchId = currentGameState.matchId || ''
+    const player1Score = currentGameState.player1Score
+    const player2Score = currentGameState.player2Score
+    const targetScore = currentGameState.targetScore || 0
+    const isCrawfordGame = currentGameState.isCrawfordGame || false
+
+    setMatchState((previousMatchState: MatchState | null): MatchState | null => {
+      // Check if we need to update matchState based on game state
+      const needsUpdate =
+        !previousMatchState ||
+        previousMatchState.player1Score !== player1Score ||
+        previousMatchState.player2Score !== player2Score ||
+        previousMatchState.isCrawfordGame !== isCrawfordGame
+
+      if (!needsUpdate) {
+        return previousMatchState
+      }
+
+      console.log('[GamePage] Syncing matchState from authoritative GameState')
+
+      return {
+        matchId,
+        player1Score,
+        player2Score,
+        targetScore,
+        isCrawfordGame,
+        // Preserve existing matchComplete/matchWinner (set via MatchUpdate events)
+        matchComplete: previousMatchState?.matchComplete || false,
+        matchWinner: previousMatchState?.matchWinner || null,
+        lastUpdatedAt: new Date().toISOString(),
+      }
+    })
+  }, [currentGameState, setMatchState])
+
+  // Extract matchId to use as a stable dependency value
+  const currentMatchId = currentGameState?.isMatchGame ? currentGameState.matchId : null
+
+  // Fetch authoritative match state from server on reconnection for match games
+  // Uses ref to track which matchId we've already synced to prevent redundant fetches
+  useEffect(() => {
+    const syncMatchState = async () => {
+      // Only sync if we have a match game and are connected
+      if (!isConnected || !currentMatchId) {
+        return
+      }
+
+      // Skip if we've already synced this matchId
+      if (lastSyncedMatchIdRef.current === currentMatchId) {
+        return
+      }
+
+      try {
+        console.log('[GamePage] Fetching authoritative match state for:', currentMatchId)
+        const serverMatchState: MatchStateDto | null = await invoke(
+          HubMethods.GetMatchState,
+          currentMatchId
+        )
+
+        if (serverMatchState) {
+          // Validate server timestamp
+          const serverTimestamp = Date.parse(serverMatchState.lastUpdatedAt)
+          if (Number.isNaN(serverTimestamp)) {
+            console.error(
+              '[GamePage] Invalid server match state timestamp:',
+              serverMatchState.lastUpdatedAt
+            )
+            return
+          }
+
+          // Use functional update to avoid matchState dependency
+          setMatchState(
+            (previousMatchState: MatchState | null): MatchState | null => {
+              // Validate local timestamp
+              let localTimestamp = 0
+              if (previousMatchState?.lastUpdatedAt) {
+                const parsedLocal = Date.parse(previousMatchState.lastUpdatedAt)
+                if (Number.isNaN(parsedLocal)) {
+                  console.warn(
+                    '[GamePage] Invalid local match state timestamp, treating as 0:',
+                    previousMatchState.lastUpdatedAt
+                  )
+                } else {
+                  localTimestamp = parsedLocal
+                }
+              }
+
+              // Only update if server data is newer than what we have
+              if (serverTimestamp > localTimestamp) {
+                console.log('[GamePage] Server match state is newer, updating local state')
+                return {
+                  matchId: serverMatchState.matchId,
+                  player1Score: serverMatchState.player1Score,
+                  player2Score: serverMatchState.player2Score,
+                  targetScore: serverMatchState.targetScore,
+                  isCrawfordGame: serverMatchState.isCrawfordGame,
+                  matchComplete: serverMatchState.matchComplete,
+                  matchWinner: serverMatchState.matchWinner,
+                  lastUpdatedAt: serverMatchState.lastUpdatedAt,
+                }
+              } else {
+                console.log('[GamePage] Local match state is up to date')
+                return previousMatchState
+              }
+            }
+          )
+
+          // Mark this matchId as synced
+          lastSyncedMatchIdRef.current = currentMatchId
+        }
+      } catch (error) {
+        console.error('[GamePage] Failed to fetch match state:', error)
+        // Non-critical error - game state already has match info
+      }
+    }
+
+    syncMatchState()
+  }, [isConnected, currentMatchId, invoke, setMatchState])
 
   // Doubling cube handlers
   const handleOfferDouble = () => {
