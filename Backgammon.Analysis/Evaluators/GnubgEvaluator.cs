@@ -1,8 +1,10 @@
 using Backgammon.Analysis.Configuration;
-using Backgammon.Analysis.Models;
+using Backgammon.Analysis.Gnubg;
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 
-namespace Backgammon.Analysis.Gnubg;
+namespace Backgammon.Analysis.Evaluators;
 
 /// <summary>
 /// Position evaluator using GNU Backgammon (gnubg)
@@ -24,30 +26,24 @@ public class GnubgEvaluator : IPositionEvaluator
     }
 
     /// <summary>
+    /// Unique identifier for this evaluator
+    /// </summary>
+    public string EvaluatorId => "gnubg";
+
+    /// <summary>
+    /// Human-friendly display name
+    /// </summary>
+    public string DisplayName => "GNU Backgammon";
+
+    /// <summary>
+    /// This evaluator requires the gnubg executable
+    /// </summary>
+    public bool RequiresExternalResources => true;
+
+    /// <summary>
     /// Evaluate a position using gnubg
     /// </summary>
-    public PositionEvaluation Evaluate(GameEngine engine)
-    {
-        return EvaluateAsync(engine).GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// Find best moves using gnubg
-    /// </summary>
-    public BestMovesAnalysis FindBestMoves(GameEngine engine)
-    {
-        return FindBestMovesAsync(engine).GetAwaiter().GetResult();
-    }
-
-    /// <summary>
-    /// Analyze the doubling cube decision for the current position
-    /// </summary>
-    public CubeDecision AnalyzeCubeDecision(GameEngine engine)
-    {
-        return AnalyzeCubeDecisionAsync(engine).GetAwaiter().GetResult();
-    }
-
-    private async Task<PositionEvaluation> EvaluateAsync(GameEngine engine)
+    public async Task<PositionEvaluation> EvaluateAsync(GameEngine engine, CancellationToken ct = default)
     {
         try
         {
@@ -59,7 +55,7 @@ public class GnubgEvaluator : IPositionEvaluator
             var commands = GnubgCommandBuilder.BuildEvaluationCommand(_settings);
 
             // Execute gnubg with SGF file
-            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, ct);
 
             // Parse output
             var evaluation = GnubgOutputParser.ParseEvaluation(output);
@@ -68,14 +64,17 @@ public class GnubgEvaluator : IPositionEvaluator
 
             return evaluation;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger?.Invoke($"Failed to evaluate position with gnubg: {ex.Message}");
             throw new Exception("Gnubg evaluation failed. See inner exception for details.", ex);
         }
     }
 
-    private async Task<BestMovesAnalysis> FindBestMovesAsync(GameEngine engine)
+    /// <summary>
+    /// Find best moves using gnubg
+    /// </summary>
+    public async Task<BestMovesAnalysis> FindBestMovesAsync(GameEngine engine, CancellationToken ct = default)
     {
         try
         {
@@ -84,13 +83,13 @@ public class GnubgEvaluator : IPositionEvaluator
             _logger?.Invoke($"Finding best moves with gnubg. SGF: {sgf}");
 
             // Get initial evaluation
-            var initialEvaluation = await EvaluateAsync(engine);
+            var initialEvaluation = await EvaluateAsync(engine, ct);
 
             // Build gnubg hint commands
             var commands = GnubgCommandBuilder.BuildHintCommand(_settings);
 
             // Execute gnubg with SGF file
-            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, ct);
 
             _logger?.Invoke($"Gnubg hint output:\n{output}");
 
@@ -139,14 +138,17 @@ public class GnubgEvaluator : IPositionEvaluator
                 TotalSequencesExplored = moveAnalyses.Count
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger?.Invoke($"Failed to find best moves with gnubg: {ex.Message}");
             throw new Exception("Gnubg move analysis failed. See inner exception for details.", ex);
         }
     }
 
-    private async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine)
+    /// <summary>
+    /// Analyze the doubling cube decision for the current position
+    /// </summary>
+    public async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default)
     {
         try
         {
@@ -158,7 +160,7 @@ public class GnubgEvaluator : IPositionEvaluator
             var commands = GnubgCommandBuilder.BuildCubeCommand(_settings);
 
             // Execute gnubg with SGF file
-            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, CancellationToken.None);
+            var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, ct);
 
             // Parse cube decision
             var decision = GnubgOutputParser.ParseCubeDecision(output);
@@ -167,7 +169,7 @@ public class GnubgEvaluator : IPositionEvaluator
 
             return decision;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger?.Invoke($"Failed to evaluate cube decision with gnubg: {ex.Message}");
             throw new Exception("Gnubg cube decision analysis failed. See inner exception for details.", ex);

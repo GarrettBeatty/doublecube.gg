@@ -1,4 +1,4 @@
-using Backgammon.Analysis;
+using Backgammon.Analysis.Evaluators;
 using Backgammon.Core;
 using Xunit;
 
@@ -7,7 +7,7 @@ namespace Backgammon.Tests.Analysis;
 public class HeuristicEvaluatorTests
 {
     [Fact]
-    public void Evaluate_OpeningPosition_ReturnsNearZeroEquity()
+    public async Task EvaluateAsync_OpeningPosition_ReturnsNearZeroEquity()
     {
         // Arrange
         var engine = new GameEngine();
@@ -16,7 +16,7 @@ public class HeuristicEvaluatorTests
         var evaluator = new HeuristicEvaluator();
 
         // Act
-        var evaluation = evaluator.Evaluate(engine);
+        var evaluation = await evaluator.EvaluateAsync(engine);
 
         // Assert
         Assert.InRange(evaluation.Equity, -0.5, 0.5); // Opening position should be roughly equal
@@ -26,7 +26,7 @@ public class HeuristicEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_PlayerAhead_ReturnsPositiveEquity()
+    public async Task EvaluateAsync_PlayerAhead_ReturnsPositiveEquity()
     {
         // Arrange
         var engine = new GameEngine();
@@ -39,7 +39,7 @@ public class HeuristicEvaluatorTests
         var evaluator = new HeuristicEvaluator();
 
         // Act
-        var evaluation = evaluator.Evaluate(engine);
+        var evaluation = await evaluator.EvaluateAsync(engine);
 
         // Assert
         Assert.True(evaluation.Equity > 0, "White should have positive equity with opponent behind");
@@ -47,7 +47,7 @@ public class HeuristicEvaluatorTests
     }
 
     [Fact]
-    public void FindBestMoves_WithDiceRolled_ReturnsValidMoveSequences()
+    public async Task FindBestMovesAsync_WithDiceRolled_ReturnsValidMoveSequences()
     {
         // Arrange
         var engine = new GameEngine();
@@ -59,7 +59,7 @@ public class HeuristicEvaluatorTests
         var evaluator = new HeuristicEvaluator();
 
         // Act
-        var analysis = evaluator.FindBestMoves(engine);
+        var analysis = await evaluator.FindBestMovesAsync(engine);
 
         // Assert
         Assert.NotNull(analysis);
@@ -70,7 +70,7 @@ public class HeuristicEvaluatorTests
     }
 
     [Fact]
-    public void FindBestMoves_NoDiceRolled_ReturnsEmptyAnalysis()
+    public async Task FindBestMovesAsync_NoDiceRolled_ReturnsEmptyAnalysis()
     {
         // Arrange
         var engine = new GameEngine();
@@ -79,7 +79,7 @@ public class HeuristicEvaluatorTests
         var evaluator = new HeuristicEvaluator();
 
         // Act
-        var analysis = evaluator.FindBestMoves(engine);
+        var analysis = await evaluator.FindBestMovesAsync(engine);
 
         // Assert
         Assert.Equal(0, analysis.TotalSequencesExplored);
@@ -87,7 +87,7 @@ public class HeuristicEvaluatorTests
     }
 
     [Fact]
-    public void Evaluate_CheckersOnBar_NegativeEquity()
+    public async Task EvaluateAsync_CheckersOnBar_NegativeEquity()
     {
         // Arrange
         var engine = new GameEngine();
@@ -100,7 +100,7 @@ public class HeuristicEvaluatorTests
         var evaluator = new HeuristicEvaluator();
 
         // Act
-        var evaluation = evaluator.Evaluate(engine);
+        var evaluation = await evaluator.EvaluateAsync(engine);
 
         // Assert
         Assert.True(evaluation.Equity < 0, "Having checkers on bar should result in negative equity");

@@ -1,6 +1,6 @@
-using Backgammon.Analysis;
-using Backgammon.Analysis.Models;
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 using Backgammon.Server.Configuration;
 using Backgammon.Server.Models;
 using Microsoft.Extensions.Logging;
@@ -196,7 +196,7 @@ public class DailyPuzzleService : IDailyPuzzleService
 
         // Get best moves using the configured evaluator
         var evaluator = _evaluatorFactory.GetEvaluator(_settings.EvaluatorType);
-        var analysis = evaluator.FindBestMoves(engine);
+        var analysis = await evaluator.FindBestMovesAsync(engine);
 
         if (analysis.TopMoves.Count == 0)
         {
