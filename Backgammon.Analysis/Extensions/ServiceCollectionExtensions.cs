@@ -1,4 +1,4 @@
-using Backgammon.Analysis.Bots;
+using Backgammon.AI.Bots;
 using Backgammon.Analysis.Configuration;
 using Backgammon.Analysis.Evaluators;
 using Backgammon.Analysis.Gnubg;
@@ -68,9 +68,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGnubgBot(this IServiceCollection services)
     {
-        // Register GnubgBot with factory (depends on GnubgEvaluator)
+        // Register GnubgBot with factory - injects GnubgEvaluator as IPositionEvaluator
         services.AddTransient<GnubgBot>(sp =>
         {
+            // Get the GnubgEvaluator and pass it as the IPositionEvaluator
             var evaluator = sp.GetRequiredService<GnubgEvaluator>();
             return new GnubgBot(evaluator);
         });

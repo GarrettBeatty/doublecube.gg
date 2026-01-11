@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Backgammon.AI\Backgammon.AI.csproj" />
     <ProjectReference Include="..\Backgammon.Core\Backgammon.Core.csproj" />
     <ProjectReference Include="..\Backgammon.Plugins\Backgammon.Plugins.csproj" />
   </ItemGroup>

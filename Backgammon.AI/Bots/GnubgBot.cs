@@ -1,7 +1,7 @@
-using Backgammon.Analysis.Evaluators;
+using Backgammon.Plugins.Abstractions;
 using Backgammon.Plugins.Base;
 
-namespace Backgammon.Analysis.Bots;
+namespace Backgammon.AI.Bots;
 
 /// <summary>
 /// Expert-level bot using GNU Backgammon for move selection.
@@ -9,7 +9,7 @@ namespace Backgammon.Analysis.Bots;
 /// </summary>
 public class GnubgBot : EvaluatorBackedBot
 {
-    public GnubgBot(GnubgEvaluator evaluator)
+    public GnubgBot(IPositionEvaluator evaluator)
         : base(evaluator)
     {
     }
