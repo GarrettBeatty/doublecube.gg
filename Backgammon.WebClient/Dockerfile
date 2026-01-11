@@ -17,6 +17,7 @@ COPY ["Backgammon.Server/Backgammon.Server.csproj", "Backgammon.Server/"]
 COPY ["Backgammon.Core/Backgammon.Core.csproj", "Backgammon.Core/"]
 COPY ["Backgammon.AI/Backgammon.AI.csproj", "Backgammon.AI/"]
 COPY ["Backgammon.Analysis/Backgammon.Analysis.csproj", "Backgammon.Analysis/"]
+COPY ["Backgammon.Plugins/Backgammon.Plugins.csproj", "Backgammon.Plugins/"]
 # Use BuildKit cache mount to cache NuGet packages across builds
 RUN --mount=type=cache,id=nuget-webclient,target=/root/.nuget/packages \
     dotnet restore "Backgammon.WebClient/Backgammon.WebClient.csproj" && \
