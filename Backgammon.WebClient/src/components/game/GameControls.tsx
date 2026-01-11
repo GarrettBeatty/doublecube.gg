@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
-import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
-import { HubMethods } from '@/types/signalr.types'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
 import { ChatPanel } from '@/components/game/ChatPanel'
 import { GameState } from '@/types/game.types'
-import { Dice1, RefreshCw, Flag, MessageCircle } from 'lucide-react'
+import { RefreshCw, Flag, MessageCircle } from 'lucide-react'
 
 interface GameControlsProps {
   gameState: GameState | null
@@ -17,25 +15,10 @@ export const GameControls: React.FC<GameControlsProps> = ({
   gameState,
   isSpectator = false,
 }) => {
-  const { invoke } = useSignalR()
   const { toggleBoardFlip, toggleChat, showChat, chatMessages } = useGameStore()
   const [showAbandonModal, setShowAbandonModal] = useState(false)
 
   if (!gameState) return null
-
-  const hasDiceRolled =
-    gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
-  // Use server-provided canDouble (checks: IsFull, !IsOpeningRoll, !IsCrawford, IsYourTurn, CubeOwnership)
-  // Also ensure dice haven't been rolled yet (can only double before rolling)
-  const canDouble = gameState.canDouble && !hasDiceRolled
-
-  const handleDouble = async () => {
-    try {
-      await invoke(HubMethods.OfferDouble)
-    } catch (error) {
-      console.error('Failed to offer double:', error)
-    }
-  }
 
   const hasUnreadMessages = !showChat && chatMessages.length > 0
 
@@ -64,21 +47,6 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
   return (
     <div className="space-y-2">
-      {/* Doubling Cube Button */}
-      {canDouble && (
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handleDouble}
-          className="w-full h-16 bg-yellow-500/10 hover:bg-yellow-500/20"
-        >
-          <div className="text-center">
-            <Dice1 className="h-6 w-6 mx-auto mb-1" />
-            <div className="text-sm">Double</div>
-          </div>
-        </Button>
-      )}
-
       {/* Utility Buttons */}
       <div className={`grid gap-2 ${showChatButton ? 'grid-cols-3' : gameState.isAnalysisMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
         <Button
