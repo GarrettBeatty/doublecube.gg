@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -137,46 +137,55 @@ export function GamesInPlay() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-muted-foreground">Loading games...</div>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div>
+            <CardTitle>My Games</CardTitle>
+            <CardDescription>Your active games</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center py-12">
+          <div className="text-muted-foreground">Loading games...</div>
+        </CardContent>
+      </Card>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-xl font-semibold">Games in Play</h2>
-        {totalYourTurn > 0 && (
-          <Badge variant="destructive" className="animate-pulse">
-            {totalYourTurn} your turn
-          </Badge>
-        )}
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <div className="flex items-center gap-2">
+          <CardTitle>My Games</CardTitle>
+          {totalYourTurn > 0 && (
+            <Badge variant="destructive" className="animate-pulse">
+              {totalYourTurn} your turn
+            </Badge>
+          )}
+        </div>
         <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh">
           <RefreshCw className="h-4 w-4" />
         </Button>
-      </div>
-
-      {sortedGames.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 gap-2">
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {sortedGames.length === 0 ? (
+          <div className="text-center py-8">
             <p className="text-muted-foreground">No active games</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground mt-2">
               Join a game from the Lobby or Correspondence tabs
             </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-2 gap-6">
-          {sortedGames.map((game) => (
-            <GameCard
-              key={game.gameId}
-              {...game}
-              onPlay={handlePlayGame}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-6">
+            {sortedGames.map((game) => (
+              <GameCard
+                key={game.gameId}
+                {...game}
+                onPlay={handlePlayGame}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

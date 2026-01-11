@@ -15,6 +15,7 @@ import { AnalysisPage } from './pages/AnalysisPage'
 import { DailyPuzzlePage } from './pages/DailyPuzzlePage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { Toaster } from './components/ui/toaster'
+import { FriendsWidget } from './components/FriendsWidget'
 import { audioService } from './services/audio.service'
 
 // Component that registers SignalR events
@@ -82,6 +83,7 @@ function AppContent() {
       />
 
       <Toaster />
+      <FriendsWidget />
     </>
   )
 }
