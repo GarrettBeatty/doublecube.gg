@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Backgammon.Analysis.Models;
 using Backgammon.Core;
+using Backgammon.Plugins.Models;
 
 namespace Backgammon.Analysis.Gnubg;
 

@@ -13,6 +13,7 @@
     <ProjectReference Include="..\Backgammon.Core\Backgammon.Core.csproj" />
     <ProjectReference Include="..\Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj" />
     <ProjectReference Include="..\Backgammon.Analysis\Backgammon.Analysis.csproj" />
+    <ProjectReference Include="..\Backgammon.Plugins\Backgammon.Plugins.csproj" />
   </ItemGroup>
 
   <ItemGroup>

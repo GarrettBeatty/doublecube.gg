@@ -1,7 +1,11 @@
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
+using Backgammon.AI.Extensions;
+using Backgammon.Analysis.Extensions;
 using Backgammon.Core;
+using Backgammon.Plugins.Extensions;
+using Backgammon.Plugins.Registration;
 using Backgammon.Server.Configuration;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
@@ -172,20 +176,27 @@ builder.Services.Configure<Backgammon.Analysis.Configuration.AnalysisSettings>(
 builder.Services.Configure<Backgammon.Analysis.Configuration.GnubgSettings>(
     builder.Configuration.GetSection(Backgammon.Analysis.Configuration.GnubgSettings.SectionName));
 
-// Register GnubgProcessManager as singleton
-builder.Services.AddSingleton<Backgammon.Analysis.Gnubg.GnubgProcessManager>(sp =>
-{
-    var settings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Backgammon.Analysis.Configuration.GnubgSettings>>().Value;
-    var logger = sp.GetRequiredService<ILogger<Backgammon.Analysis.Gnubg.GnubgProcessManager>>();
-    return new Backgammon.Analysis.Gnubg.GnubgProcessManager(settings, msg => logger.LogDebug(msg));
-});
-
 // Register PositionEvaluatorFactory for per-request evaluator selection
+// Note: GnubgProcessManager is registered by AddAnalysisPlugins() below
 builder.Services.AddSingleton<PositionEvaluatorFactory>();
 
 // Register AnalysisService (now uses factory for evaluator)
 builder.Services.AddSingleton<AnalysisService>();
 // ========== END ANALYSIS CONFIGURATION ==========
+
+// ========== PLUGIN SYSTEM CONFIGURATION ==========
+// Register the plugin system infrastructure
+builder.Services.AddBackgammonPlugins(builder.Configuration);
+
+// Register standard bots from AI package (Random, Greedy)
+builder.Services.AddStandardBots();
+
+// Register heuristic bot (uses heuristic evaluator)
+builder.Services.AddHeuristicBot();
+
+// Register analysis evaluators and bots (includes Gnubg if available)
+builder.Services.AddAnalysisPlugins(includeGnubg: true);
+// ========== END PLUGIN SYSTEM CONFIGURATION ==========
 
 // ========== DAILY PUZZLE CONFIGURATION ==========
 // Configure puzzle settings
@@ -453,6 +464,38 @@ app.MapGet("/api/bot-games", (IGameSessionManager sessionManager) =>
         .ToList();
 
     return botGames;
+}).RequireCors(selectedCorsPolicy);
+
+// Available bots endpoint - returns list of registered AI bots
+app.MapGet("/api/bots", (IPluginRegistry registry) =>
+{
+    var bots = registry.GetAvailableBots()
+        .Select(b => new
+        {
+            botId = b.BotId,
+            displayName = b.DisplayName,
+            description = b.Description,
+            estimatedElo = b.EstimatedElo,
+            requiresExternalResources = b.RequiresExternalResources
+        })
+        .ToList();
+
+    return bots;
+}).RequireCors(selectedCorsPolicy);
+
+// Available evaluators endpoint - returns list of registered position evaluators
+app.MapGet("/api/evaluators", (IPluginRegistry registry) =>
+{
+    var evaluators = registry.GetAvailableEvaluators()
+        .Select(e => new
+        {
+            evaluatorId = e.EvaluatorId,
+            displayName = e.DisplayName,
+            requiresExternalResources = e.RequiresExternalResources
+        })
+        .ToList();
+
+    return evaluators;
 }).RequireCors(selectedCorsPolicy);
 
 // Database statistics endpoint

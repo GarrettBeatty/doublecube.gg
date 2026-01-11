@@ -1,7 +1,8 @@
-using Backgammon.Analysis.Models;
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 
-namespace Backgammon.Analysis;
+namespace Backgammon.Analysis.Evaluators;
 
 /// <summary>
 /// Heuristic-based position evaluator for backgammon.
@@ -10,36 +11,51 @@ namespace Backgammon.Analysis;
 public class HeuristicEvaluator : IPositionEvaluator
 {
     /// <summary>
+    /// Unique identifier for this evaluator
+    /// </summary>
+    public string EvaluatorId => "heuristic";
+
+    /// <summary>
+    /// Human-friendly display name
+    /// </summary>
+    public string DisplayName => "Heuristic Evaluator";
+
+    /// <summary>
+    /// This evaluator does not require external resources
+    /// </summary>
+    public bool RequiresExternalResources => false;
+
+    /// <summary>
     /// Evaluate the current position
     /// </summary>
-    public PositionEvaluation Evaluate(GameEngine engine)
+    public Task<PositionEvaluation> EvaluateAsync(GameEngine engine, CancellationToken ct = default)
     {
         var features = ExtractFeatures(engine);
         var equity = CalculateEquity(features, engine);
 
-        return new PositionEvaluation
+        return Task.FromResult(new PositionEvaluation
         {
             Equity = equity,
             WinProbability = EstimateWinProbability(equity),
             GammonProbability = EstimateGammonProbability(features, equity),
             BackgammonProbability = EstimateBackgammonProbability(features),
             Features = features
-        };
+        });
     }
 
     /// <summary>
     /// Find the best move sequences
     /// </summary>
-    public BestMovesAnalysis FindBestMoves(GameEngine engine)
+    public Task<BestMovesAnalysis> FindBestMovesAsync(GameEngine engine, CancellationToken ct = default)
     {
         if (engine.RemainingMoves.Count == 0)
         {
-            return new BestMovesAnalysis
+            return Task.FromResult(new BestMovesAnalysis
             {
                 InitialEvaluation = Evaluate(engine),
                 TopMoves = new List<MoveSequenceEvaluation>(),
                 TotalSequencesExplored = 0
-            };
+            });
         }
 
         var initialEval = Evaluate(engine);
@@ -57,19 +73,19 @@ public class HeuristicEvaluator : IPositionEvaluator
             .Select(g => g.First())
             .ToList();
 
-        return new BestMovesAnalysis
+        return Task.FromResult(new BestMovesAnalysis
         {
             InitialEvaluation = initialEval,
             TopMoves = deduplicated.Take(5).ToList(),
             WorstValidMove = deduplicated.LastOrDefault(),
             TotalSequencesExplored = allSequences.Count
-        };
+        });
     }
 
     /// <summary>
     /// Analyze the doubling cube decision for the current position
     /// </summary>
-    public CubeDecision AnalyzeCubeDecision(GameEngine engine)
+    public Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default)
     {
         var evaluation = Evaluate(engine);
         var cubeValue = engine.DoublingCube.Value;
@@ -106,7 +122,7 @@ public class HeuristicEvaluator : IPositionEvaluator
             cubeValue,
             takePoint);
 
-        return new CubeDecision
+        return Task.FromResult(new CubeDecision
         {
             NoDoubleEquity = noDoubleEquity,
             DoubleTakeEquity = doubleTakeEquity,
@@ -114,6 +130,24 @@ public class HeuristicEvaluator : IPositionEvaluator
             Recommendation = recommendation,
             TakePoint = takePoint,
             Details = details
+        });
+    }
+
+    /// <summary>
+    /// Synchronous evaluation helper for internal use
+    /// </summary>
+    private PositionEvaluation Evaluate(GameEngine engine)
+    {
+        var features = ExtractFeatures(engine);
+        var equity = CalculateEquity(features, engine);
+
+        return new PositionEvaluation
+        {
+            Equity = equity,
+            WinProbability = EstimateWinProbability(equity),
+            GammonProbability = EstimateGammonProbability(features, equity),
+            BackgammonProbability = EstimateBackgammonProbability(features),
+            Features = features
         };
     }
 

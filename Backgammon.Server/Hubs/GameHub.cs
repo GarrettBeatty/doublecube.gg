@@ -1876,7 +1876,7 @@ public class GameHub : Hub<IGameHubClient>
             throw new HubException("Game not found");
         }
 
-        return await Task.Run(() => _analysisService.EvaluatePosition(session.Engine, evaluatorType));
+        return await _analysisService.EvaluatePositionAsync(session.Engine, evaluatorType);
     }
 
     /// <summary>
@@ -1897,7 +1897,7 @@ public class GameHub : Hub<IGameHubClient>
             throw new HubException("No dice rolled - cannot analyze moves");
         }
 
-        return await Task.Run(() => _analysisService.FindBestMoves(session.Engine, evaluatorType));
+        return await _analysisService.FindBestMovesAsync(session.Engine, evaluatorType);
     }
 
     // ==================== Correspondence Game Methods ====================

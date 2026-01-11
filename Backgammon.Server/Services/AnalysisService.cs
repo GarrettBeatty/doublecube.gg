@@ -1,6 +1,6 @@
-using Backgammon.Analysis;
-using Backgammon.Analysis.Models;
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 using Backgammon.Server.Models;
 using Microsoft.Extensions.Logging;
 
@@ -25,10 +25,14 @@ public class AnalysisService
     /// </summary>
     /// <param name="engine">Game engine to evaluate</param>
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg")</param>
-    public PositionEvaluationDto EvaluatePosition(GameEngine engine, string? evaluatorType = null)
+    /// <param name="ct">Cancellation token</param>
+    public async Task<PositionEvaluationDto> EvaluatePositionAsync(
+        GameEngine engine,
+        string? evaluatorType = null,
+        CancellationToken ct = default)
     {
         var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
-        var evaluation = evaluator.Evaluate(engine);
+        var evaluation = await evaluator.EvaluateAsync(engine, ct);
         return MapToDto(evaluation, evaluator);
     }
 
@@ -37,7 +41,11 @@ public class AnalysisService
     /// </summary>
     /// <param name="engine">Game engine to analyze</param>
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg")</param>
-    public BestMovesAnalysisDto FindBestMoves(GameEngine engine, string? evaluatorType = null)
+    /// <param name="ct">Cancellation token</param>
+    public async Task<BestMovesAnalysisDto> FindBestMovesAsync(
+        GameEngine engine,
+        string? evaluatorType = null,
+        CancellationToken ct = default)
     {
         try
         {
@@ -47,13 +55,13 @@ public class AnalysisService
                 engine.RemainingMoves.Count);
 
             var evaluator = _evaluatorFactory.GetEvaluator(evaluatorType);
-            var analysis = evaluator.FindBestMoves(engine);
+            var analysis = await evaluator.FindBestMovesAsync(engine, ct);
 
             _logger.LogInformation("Found {Count} best move sequences", analysis.TopMoves.Count);
 
             return MapToDto(analysis, evaluator);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(
                 ex,
@@ -64,33 +72,9 @@ public class AnalysisService
     }
 
     /// <summary>
-    /// Map PositionEvaluation to DTO
-    /// </summary>
-    private PositionEvaluationDto MapToDto(PositionEvaluation evaluation, IPositionEvaluator evaluator)
-    {
-        // Determine evaluator name from type
-        var evaluatorName = evaluator.GetType().Name switch
-        {
-            "GnubgEvaluator" => "GNU Backgammon",
-            "HeuristicEvaluator" => "Heuristic",
-            _ => "Unknown"
-        };
-
-        return new PositionEvaluationDto
-        {
-            Equity = evaluation.Equity,
-            WinProbability = evaluation.WinProbability,
-            GammonProbability = evaluation.GammonProbability,
-            BackgammonProbability = evaluation.BackgammonProbability,
-            Features = MapToDto(evaluation.Features),
-            EvaluatorName = evaluatorName
-        };
-    }
-
-    /// <summary>
     /// Map PositionFeatures to DTO
     /// </summary>
-    private PositionFeaturesDto MapToDto(PositionFeatures features)
+    private static PositionFeaturesDto MapToDto(PositionFeatures features)
     {
         return new PositionFeaturesDto
         {
@@ -112,22 +96,9 @@ public class AnalysisService
     }
 
     /// <summary>
-    /// Map BestMovesAnalysis to DTO
-    /// </summary>
-    private BestMovesAnalysisDto MapToDto(BestMovesAnalysis analysis, IPositionEvaluator evaluator)
-    {
-        return new BestMovesAnalysisDto
-        {
-            InitialEvaluation = MapToDto(analysis.InitialEvaluation, evaluator),
-            TopMoves = analysis.TopMoves.Select(MapToDto).ToList(),
-            TotalSequencesExplored = analysis.TotalSequencesExplored
-        };
-    }
-
-    /// <summary>
     /// Map MoveSequenceEvaluation to DTO
     /// </summary>
-    private MoveSequenceDto MapToDto(MoveSequenceEvaluation sequence)
+    private static MoveSequenceDto MapToDto(MoveSequenceEvaluation sequence)
     {
         return new MoveSequenceDto
         {
@@ -141,6 +112,35 @@ public class AnalysisService
             Notation = sequence.Notation,
             Equity = sequence.FinalEvaluation.Equity,
             EquityGain = sequence.EquityGain
+        };
+    }
+
+    /// <summary>
+    /// Map PositionEvaluation to DTO
+    /// </summary>
+    private PositionEvaluationDto MapToDto(PositionEvaluation evaluation, IPositionEvaluator evaluator)
+    {
+        return new PositionEvaluationDto
+        {
+            Equity = evaluation.Equity,
+            WinProbability = evaluation.WinProbability,
+            GammonProbability = evaluation.GammonProbability,
+            BackgammonProbability = evaluation.BackgammonProbability,
+            Features = MapToDto(evaluation.Features),
+            EvaluatorName = evaluator.DisplayName
+        };
+    }
+
+    /// <summary>
+    /// Map BestMovesAnalysis to DTO
+    /// </summary>
+    private BestMovesAnalysisDto MapToDto(BestMovesAnalysis analysis, IPositionEvaluator evaluator)
+    {
+        return new BestMovesAnalysisDto
+        {
+            InitialEvaluation = MapToDto(analysis.InitialEvaluation, evaluator),
+            TopMoves = analysis.TopMoves.Select(MapToDto).ToList(),
+            TotalSequencesExplored = analysis.TotalSequencesExplored
         };
     }
 }
