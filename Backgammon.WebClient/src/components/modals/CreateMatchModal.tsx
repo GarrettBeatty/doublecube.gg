@@ -30,6 +30,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [targetScore, setTargetScore] = useState<number>(1)
   const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
   const [isRated, setIsRated] = useState<boolean>(true)
+  const [aiType, setAiType] = useState<'greedy' | 'random'>('greedy')
   const [isCreating, setIsCreating] = useState(false)
   const isAuthenticated = authService.isAuthenticated()
 
@@ -40,6 +41,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       setTargetScore(1)
       setTimeControlType('None')
       setIsRated(true)
+      setAiType('greedy')
     }
   }, [isOpen, defaultOpponentType])
 
@@ -64,6 +66,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
         isRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
         isCorrespondence: false,
         timePerMoveDays: 0,
+        aiType: opponentType === 'AI' ? aiType : 'greedy', // Only relevant for AI matches
       }
       console.log('[CreateMatchModal] Invoking CreateMatch', config)
       // Always use the match system - single games are just matches with targetScore=1
@@ -120,6 +123,33 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
               </div>
             </RadioGroup>
           </div>
+
+          {/* AI Type - Only show for AI opponents */}
+          {opponentType === 'AI' && (
+            <div className="space-y-3">
+              <Label>AI Difficulty</Label>
+              <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random')}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="greedy" id="ai-greedy" />
+                  <Label htmlFor="ai-greedy" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Greedy Bot (Recommended)</span>
+                      <span className="text-sm text-muted-foreground">Strategic play: prioritizes hitting and bearing off</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="random" id="ai-random" />
+                  <Label htmlFor="ai-random" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Random Bot</span>
+                      <span className="text-sm text-muted-foreground">Makes random valid moves - good for practice</span>
+                    </div>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
 
           {/* Time Control */}
           <div className="space-y-3">

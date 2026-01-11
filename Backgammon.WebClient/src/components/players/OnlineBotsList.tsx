@@ -77,7 +77,8 @@ export const OnlineBotsList: React.FC<OnlineBotsListProps> = ({ bots, isLoading 
         timeControlType: 'None',
         isRated: false,
         isCorrespondence: false,
-        timePerMoveDays: 0
+        timePerMoveDays: 0,
+        aiType: botId
       })
       // The MatchCreated event handler will navigate to the game
     } catch (error) {

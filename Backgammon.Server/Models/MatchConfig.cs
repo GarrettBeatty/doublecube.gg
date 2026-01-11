@@ -40,6 +40,12 @@ public class MatchConfig
     public bool IsRated { get; set; } = true;
 
     /// <summary>
+    /// AI type for AI matches: "greedy" or "random" (defaults to "greedy")
+    /// Only used when OpponentType is "AI"
+    /// </summary>
+    public string AiType { get; set; } = "greedy";
+
+    /// <summary>
     /// Whether this is a correspondence (async) match
     /// </summary>
     public bool IsCorrespondence { get; set; }

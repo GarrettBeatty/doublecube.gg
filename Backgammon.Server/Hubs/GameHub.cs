@@ -1724,7 +1724,8 @@ public class GameHub : Hub<IGameHubClient>
                 config.DisplayName,
                 config.OpponentId,
                 timeControl,
-                config.IsRated);
+                config.IsRated,
+                config.AiType);
 
             // Send MatchCreated event with game ID
             await Clients.Caller.MatchCreated(new MatchCreatedDto

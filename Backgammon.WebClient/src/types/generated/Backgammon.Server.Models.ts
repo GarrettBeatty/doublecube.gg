@@ -253,6 +253,8 @@ export type MatchConfig = {
     timeControlType: string;
     /** Transpiled from bool */
     isRated: boolean;
+    /** Transpiled from string */
+    aiType: string;
     /** Transpiled from bool */
     isCorrespondence: boolean;
     /** Transpiled from int */
