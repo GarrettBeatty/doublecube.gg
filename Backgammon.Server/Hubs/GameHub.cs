@@ -737,6 +737,24 @@ public class GameHub : Hub<IGameHubClient>
             // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
             await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
+            // Update match scores if this is a match game
+            if (session.IsMatchGame && !string.IsNullOrEmpty(session.MatchId))
+            {
+                // Determine winner's player ID
+                var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
+
+                // Create game result - forfeit is a normal win
+                var gameResult = new GameResult(winnerPlayerId!, WinType.Normal, session.Engine.DoublingCube.Value)
+                {
+                    WinnerColor = winnerColor,
+                    MoveHistory = session.Engine.MoveHistory.ToList()
+                };
+
+                await _matchService.CompleteGameAsync(session.Id, gameResult);
+                _logger.LogInformation("Updated match {MatchId} scores after game {GameId} was abandoned", session.MatchId, session.Id);
+            }
+
             // Skip stats update for non-competitive games
             if (session.GameMode.ShouldTrackStats)
             {
