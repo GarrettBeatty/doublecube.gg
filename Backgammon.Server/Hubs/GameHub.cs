@@ -2184,6 +2184,217 @@ public class GameHub : Hub<IGameHubClient>
         }
     }
 
+    // ==================== Players Page Methods ====================
+
+    /// <summary>
+    /// Get the leaderboard with top players by rating.
+    /// </summary>
+    /// <param name="limit">Maximum number of players to return (default 50).</param>
+    /// <returns>List of leaderboard entries.</returns>
+    public async Task<List<LeaderboardEntryDto>> GetLeaderboard(int limit = 50)
+    {
+        try
+        {
+            var topPlayers = await _userRepository.GetTopPlayersByRatingAsync(limit);
+            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
+
+            var leaderboard = topPlayers.Select((user, index) => new LeaderboardEntryDto
+            {
+                Rank = index + 1,
+                UserId = user.UserId,
+                Username = user.Username,
+                DisplayName = user.DisplayName,
+                Rating = user.Rating,
+                TotalGames = user.Stats.TotalGames,
+                Wins = user.Stats.Wins,
+                Losses = user.Stats.Losses,
+                WinRate = user.Stats.TotalGames > 0
+                    ? Math.Round((double)user.Stats.Wins / user.Stats.TotalGames * 100, 1)
+                    : 0,
+                IsOnline = onlinePlayerIds.Contains(user.UserId)
+            }).ToList();
+
+            _logger.LogDebug("Retrieved leaderboard with {Count} players", leaderboard.Count);
+            return leaderboard;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting leaderboard");
+            throw new HubException("Failed to get leaderboard");
+        }
+    }
+
+    /// <summary>
+    /// Get list of currently online players.
+    /// </summary>
+    /// <returns>List of online players.</returns>
+    public async Task<List<OnlinePlayerDto>> GetOnlinePlayers()
+    {
+        try
+        {
+            var currentUserId = GetAuthenticatedUserId();
+            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToList();
+
+            if (!onlinePlayerIds.Any())
+            {
+                return new List<OnlinePlayerDto>();
+            }
+
+            var users = await _userRepository.GetUsersByIdsAsync(onlinePlayerIds);
+
+            // Get friends list for the current user to mark friends
+            var friends = new HashSet<string>();
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                var friendsList = await _friendService.GetFriendsAsync(currentUserId);
+                friends = friendsList.Select(f => f.UserId).ToHashSet();
+            }
+
+            var onlinePlayers = users
+                .Where(u => !u.IsAnonymous && u.UserId != currentUserId)
+                .Select(user =>
+                {
+                    // Check if user is in a game
+                    var playerGames = _sessionManager.GetPlayerGames(user.UserId);
+                    var activeGame = playerGames.FirstOrDefault(g => !g.Engine.GameOver);
+
+                    return new OnlinePlayerDto
+                    {
+                        UserId = user.UserId,
+                        Username = user.Username,
+                        DisplayName = user.DisplayName,
+                        Rating = user.Rating,
+                        Status = activeGame != null ? OnlinePlayerStatus.InGame : OnlinePlayerStatus.Available,
+                        CurrentGameId = activeGame?.Id,
+                        IsFriend = friends.Contains(user.UserId)
+                    };
+                })
+                .OrderByDescending(p => p.IsFriend)
+                .ThenByDescending(p => p.Rating)
+                .ToList();
+
+            _logger.LogDebug("Retrieved {Count} online players", onlinePlayers.Count);
+            return onlinePlayers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting online players");
+            throw new HubException("Failed to get online players");
+        }
+    }
+
+    /// <summary>
+    /// Get rating distribution statistics.
+    /// </summary>
+    /// <returns>Rating distribution data.</returns>
+    public async Task<RatingDistributionDto> GetRatingDistribution()
+    {
+        try
+        {
+            var currentUserId = GetAuthenticatedUserId();
+            var allRatings = await _userRepository.GetAllRatingsAsync();
+
+            if (!allRatings.Any())
+            {
+                return new RatingDistributionDto
+                {
+                    Buckets = new List<RatingBucketDto>(),
+                    TotalPlayers = 0,
+                    AverageRating = 0,
+                    MedianRating = 0
+                };
+            }
+
+            var sortedRatings = allRatings.OrderBy(r => r).ToList();
+            var totalPlayers = sortedRatings.Count;
+            var averageRating = sortedRatings.Average();
+            var medianRating = sortedRatings[totalPlayers / 2];
+
+            // Get current user's rating if authenticated
+            int? userRating = null;
+            double? userPercentile = null;
+            if (!string.IsNullOrEmpty(currentUserId))
+            {
+                var user = await _userRepository.GetByUserIdAsync(currentUserId);
+                if (user != null && user.RatedGamesCount > 0)
+                {
+                    userRating = user.Rating;
+                    var playersBelow = sortedRatings.Count(r => r < user.Rating);
+                    userPercentile = Math.Round((double)playersBelow / totalPlayers * 100, 1);
+                }
+            }
+
+            // Create buckets (100-point ranges)
+            var minRating = (sortedRatings.Min() / 100) * 100;
+            var maxRating = ((sortedRatings.Max() / 100) + 1) * 100;
+            var buckets = new List<RatingBucketDto>();
+
+            for (int bucketStart = minRating; bucketStart < maxRating; bucketStart += 100)
+            {
+                var bucketEnd = bucketStart + 100;
+                var count = sortedRatings.Count(r => r >= bucketStart && r < bucketEnd);
+                var isUserBucket = userRating.HasValue && userRating >= bucketStart && userRating < bucketEnd;
+
+                buckets.Add(new RatingBucketDto
+                {
+                    MinRating = bucketStart,
+                    MaxRating = bucketEnd,
+                    Label = $"{bucketStart}-{bucketEnd - 1}",
+                    Count = count,
+                    Percentage = Math.Round((double)count / totalPlayers * 100, 1),
+                    IsUserBucket = isUserBucket
+                });
+            }
+
+            return new RatingDistributionDto
+            {
+                Buckets = buckets,
+                UserRating = userRating,
+                UserPercentile = userPercentile,
+                TotalPlayers = totalPlayers,
+                AverageRating = Math.Round(averageRating, 1),
+                MedianRating = medianRating
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting rating distribution");
+            throw new HubException("Failed to get rating distribution");
+        }
+    }
+
+    /// <summary>
+    /// Get list of available AI bots.
+    /// </summary>
+    /// <returns>List of available bots.</returns>
+    public Task<List<BotInfoDto>> GetAvailableBots()
+    {
+        var bots = new List<BotInfoDto>
+        {
+            new BotInfoDto
+            {
+                Id = "random",
+                Name = "Random Bot",
+                Description = "Makes completely random moves. Great for beginners learning the game.",
+                Difficulty = 1,
+                IsAvailable = true,
+                Icon = "dice"
+            },
+            new BotInfoDto
+            {
+                Id = "greedy",
+                Name = "Greedy Bot",
+                Description = "Prioritizes hitting blots and bearing off. A solid intermediate challenge.",
+                Difficulty = 3,
+                IsAvailable = true,
+                Icon = "target"
+            }
+        };
+
+        _logger.LogDebug("Retrieved {Count} available bots", bots.Count);
+        return Task.FromResult(bots);
+    }
+
     /// <summary>
     /// Generate a consistent anonymous display name from a player ID.
     /// </summary>

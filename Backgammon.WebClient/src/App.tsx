@@ -11,6 +11,7 @@ import { CreateMatchModal } from './components/modals/CreateMatchModal'
 import { HomePage } from './pages/HomePage'
 import { GamePage } from './pages/GamePage'
 import { ProfilePage } from './pages/ProfilePage'
+import { PlayersPage } from './pages/PlayersPage'
 import { MatchResultsPage } from './pages/MatchResultsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { DailyPuzzlePage } from './pages/DailyPuzzlePage'
@@ -67,6 +68,7 @@ function AppContent() {
           <Route path="/" element={<HomePage />} />
           <Route path="/game/:gameId" element={<GamePage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
+          <Route path="/players" element={<PlayersPage />} />
           <Route path="/match-results/:matchId" element={<MatchResultsPage />} />
           <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
           <Route path="/puzzle" element={<DailyPuzzlePage />} />

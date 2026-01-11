@@ -388,4 +388,110 @@ public class DynamoDbUserRepository : IUserRepository
             return new List<User>();
         }
     }
+
+    public async Task<List<User>> GetTopPlayersByRatingAsync(int limit = 100)
+    {
+        try
+        {
+            var users = new List<User>();
+            string? lastEvaluatedKey = null;
+
+            do
+            {
+                var request = new ScanRequest
+                {
+                    TableName = _tableName,
+                    FilterExpression = "SK = :sk AND isAnonymous = :notAnon AND ratedGamesCount > :minGames",
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                    {
+                        [":sk"] = new AttributeValue { S = "PROFILE" },
+                        [":notAnon"] = new AttributeValue { BOOL = false },
+                        [":minGames"] = new AttributeValue { N = "0" }
+                    },
+                    ProjectionExpression = "userId, username, displayName, rating, ratedGamesCount, stats"
+                };
+
+                if (lastEvaluatedKey != null)
+                {
+                    request.ExclusiveStartKey = new Dictionary<string, AttributeValue>
+                    {
+                        ["PK"] = new AttributeValue { S = lastEvaluatedKey },
+                        ["SK"] = new AttributeValue { S = "PROFILE" }
+                    };
+                }
+
+                var response = await _dynamoDbClient.ScanAsync(request);
+                users.AddRange(response.Items.Select(DynamoDbHelpers.UnmarshalUser));
+
+                lastEvaluatedKey = response.LastEvaluatedKey?.GetValueOrDefault("PK")?.S;
+            }
+            while (lastEvaluatedKey != null);
+
+            // Sort by rating descending and take top N
+            return users
+                .OrderByDescending(u => u.Rating)
+                .ThenByDescending(u => u.Stats.TotalGames)
+                .Take(limit)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve top players by rating");
+            return new List<User>();
+        }
+    }
+
+    public async Task<List<int>> GetAllRatingsAsync()
+    {
+        try
+        {
+            var ratings = new List<int>();
+            string? lastEvaluatedKey = null;
+
+            do
+            {
+                var request = new ScanRequest
+                {
+                    TableName = _tableName,
+                    FilterExpression = "SK = :sk AND isAnonymous = :notAnon AND ratedGamesCount > :minGames",
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                    {
+                        [":sk"] = new AttributeValue { S = "PROFILE" },
+                        [":notAnon"] = new AttributeValue { BOOL = false },
+                        [":minGames"] = new AttributeValue { N = "0" }
+                    },
+                    ProjectionExpression = "rating"
+                };
+
+                if (lastEvaluatedKey != null)
+                {
+                    request.ExclusiveStartKey = new Dictionary<string, AttributeValue>
+                    {
+                        ["PK"] = new AttributeValue { S = lastEvaluatedKey },
+                        ["SK"] = new AttributeValue { S = "PROFILE" }
+                    };
+                }
+
+                var response = await _dynamoDbClient.ScanAsync(request);
+
+                foreach (var item in response.Items)
+                {
+                    if (item.TryGetValue("rating", out var ratingAttr) && int.TryParse(ratingAttr.N, out var rating))
+                    {
+                        ratings.Add(rating);
+                    }
+                }
+
+                lastEvaluatedKey = response.LastEvaluatedKey?.GetValueOrDefault("PK")?.S;
+            }
+            while (lastEvaluatedKey != null);
+
+            return ratings;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve all ratings");
+            return new List<int>();
+        }
+    }
 }

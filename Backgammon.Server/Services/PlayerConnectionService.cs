@@ -60,4 +60,14 @@ public class PlayerConnectionService : IPlayerConnectionService
     {
         return _connections.Count;
     }
+
+    public IEnumerable<string> GetAllConnectedPlayerIds()
+    {
+        return _connections.Keys.ToList();
+    }
+
+    public bool IsPlayerConnected(string playerId)
+    {
+        return _connections.ContainsKey(playerId);
+    }
 }
