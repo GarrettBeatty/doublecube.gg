@@ -13,6 +13,22 @@ export type BestMovesAnalysisDto = {
     totalSequencesExplored: number;
 }
 
+/** Transpiled from Backgammon.Server.Models.BotInfoDto */
+export type BotInfoDto = {
+    /** Transpiled from string */
+    id: string;
+    /** Transpiled from string */
+    name: string;
+    /** Transpiled from string */
+    description: string;
+    /** Transpiled from int */
+    difficulty: number;
+    /** Transpiled from bool */
+    isAvailable: boolean;
+    /** Transpiled from string */
+    icon: string;
+}
+
 /** Transpiled from Backgammon.Server.Models.DailyPuzzleDto */
 export type DailyPuzzleDto = {
     /** Transpiled from string */
@@ -199,6 +215,30 @@ export type GameSummaryDto = {
     winType?: string;
 }
 
+/** Transpiled from Backgammon.Server.Models.LeaderboardEntryDto */
+export type LeaderboardEntryDto = {
+    /** Transpiled from int */
+    rank: number;
+    /** Transpiled from string */
+    userId: string;
+    /** Transpiled from string */
+    username: string;
+    /** Transpiled from string */
+    displayName: string;
+    /** Transpiled from int */
+    rating: number;
+    /** Transpiled from int */
+    totalGames: number;
+    /** Transpiled from int */
+    wins: number;
+    /** Transpiled from int */
+    losses: number;
+    /** Transpiled from double */
+    winRate: number;
+    /** Transpiled from bool */
+    isOnline: boolean;
+}
+
 /** Transpiled from Backgammon.Server.Models.MatchConfig */
 export type MatchConfig = {
     /** Transpiled from string */
@@ -247,6 +287,31 @@ export type MoveSequenceDto = {
     equity: number;
     /** Transpiled from double */
     equityGain: number;
+}
+
+/** Transpiled from Backgammon.Server.Models.OnlinePlayerDto */
+export type OnlinePlayerDto = {
+    /** Transpiled from string */
+    userId: string;
+    /** Transpiled from string */
+    username: string;
+    /** Transpiled from string */
+    displayName: string;
+    /** Transpiled from int */
+    rating: number;
+    /** Transpiled from Backgammon.Server.Models.OnlinePlayerStatus */
+    status: OnlinePlayerStatus;
+    /** Transpiled from string? */
+    currentGameId?: string;
+    /** Transpiled from bool */
+    isFriend: boolean;
+}
+
+/** Transpiled from Backgammon.Server.Models.OnlinePlayerStatus */
+export enum OnlinePlayerStatus {
+    Available = 0,
+    InGame = 1,
+    LookingForMatch = 2,
 }
 
 /** Transpiled from Backgammon.Server.Models.PlayerProfileDto */
@@ -396,6 +461,38 @@ export type PuzzleStreakInfo = {
     totalSolved: number;
     /** Transpiled from int */
     totalAttempts: number;
+}
+
+/** Transpiled from Backgammon.Server.Models.RatingBucketDto */
+export type RatingBucketDto = {
+    /** Transpiled from int */
+    minRating: number;
+    /** Transpiled from int */
+    maxRating: number;
+    /** Transpiled from string */
+    label: string;
+    /** Transpiled from int */
+    count: number;
+    /** Transpiled from double */
+    percentage: number;
+    /** Transpiled from bool */
+    isUserBucket: boolean;
+}
+
+/** Transpiled from Backgammon.Server.Models.RatingDistributionDto */
+export type RatingDistributionDto = {
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.RatingBucketDto> */
+    buckets: RatingBucketDto[];
+    /** Transpiled from int */
+    userRating?: number;
+    /** Transpiled from double */
+    userPercentile?: number;
+    /** Transpiled from int */
+    totalPlayers: number;
+    /** Transpiled from double */
+    averageRating: number;
+    /** Transpiled from int */
+    medianRating: number;
 }
 
 /** Transpiled from Backgammon.Server.Models.RecentOpponentDto */
