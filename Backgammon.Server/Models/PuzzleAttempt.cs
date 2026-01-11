@@ -67,4 +67,10 @@ public class PuzzleAttempt
     /// </summary>
     [JsonPropertyName("solvedAt")]
     public DateTime? SolvedAt { get; set; }
+
+    /// <summary>
+    /// Whether the user gave up and revealed the answer
+    /// </summary>
+    [JsonPropertyName("gaveUp")]
+    public bool GaveUp { get; set; }
 }

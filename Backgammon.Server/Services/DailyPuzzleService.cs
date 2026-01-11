@@ -123,6 +123,54 @@ public class DailyPuzzleService : IDailyPuzzleService
     }
 
     /// <inheritdoc/>
+    public async Task<PuzzleResultDto> GiveUpPuzzleAsync(string userId, string puzzleDate)
+    {
+        var puzzle = await _puzzleRepository.GetPuzzleByDateAsync(puzzleDate);
+        if (puzzle == null)
+        {
+            throw new InvalidOperationException($"Puzzle not found for date {puzzleDate}");
+        }
+
+        // Get or create attempt record
+        var attempt = await _puzzleRepository.GetAttemptAsync(userId, puzzleDate)
+            ?? new PuzzleAttempt
+            {
+                UserId = userId,
+                PuzzleId = puzzle.PuzzleId,
+                PuzzleDate = puzzleDate,
+                CreatedAt = DateTime.UtcNow
+            };
+
+        // Mark as given up (counts as an incorrect attempt)
+        attempt.AttemptCount++;
+        attempt.IsCorrect = false;
+        attempt.GaveUp = true;
+        attempt.SubmittedMoves = new List<MoveDto>();
+        attempt.SubmittedNotation = "(gave up)";
+
+        await _puzzleRepository.SaveAttemptAsync(attempt);
+        await _puzzleRepository.IncrementAttemptCountAsync(puzzleDate);
+
+        // Reset streak since user gave up
+        var streakInfo = await _puzzleRepository.GetStreakInfoAsync(userId)
+            ?? new PuzzleStreakInfo { UserId = userId };
+        streakInfo.CurrentStreak = 0;
+        await _puzzleRepository.SaveStreakInfoAsync(streakInfo);
+
+        return new PuzzleResultDto
+        {
+            IsCorrect = false,
+            EquityLoss = 1.0, // Max equity loss for giving up
+            Feedback = "Here's the best move for this position.",
+            BestMoves = puzzle.BestMoves,
+            BestMovesNotation = puzzle.BestMovesNotation,
+            CurrentStreak = 0,
+            StreakBroken = true,
+            AttemptCount = attempt.AttemptCount
+        };
+    }
+
+    /// <inheritdoc/>
     public async Task<PuzzleStreakInfo> GetStreakInfoAsync(string userId)
     {
         var streakInfo = await _puzzleRepository.GetStreakInfoAsync(userId);

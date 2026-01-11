@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useCallback, useMemo } from 'react'
 import { DailyPuzzle } from '@/types/puzzle.types'
 import { usePuzzleStore } from '@/stores/puzzleStore'
 import { useBoardDrag, BOARD_CONFIG, BOARD_COLORS } from '@/hooks/useBoardDrag'
@@ -215,6 +215,34 @@ export function PuzzleBoard({ puzzle }: PuzzleBoardProps) {
     ? dragValidDestinations
     : clickValidDestinations
 
+  // Calculate which points have moveable pieces (for yellow source highlighting)
+  const moveableSources = useMemo(() => {
+    if (remainingDice.length === 0) return new Set<number>()
+
+    const sources = new Set<number>()
+    const currentPlayerColor = puzzle.currentPlayer
+    const onBar = currentPlayerColor === 'White' ? whiteOnBar : redOnBar
+
+    // If player has checkers on bar, only bar is a valid source
+    if (onBar > 0) {
+      if (getValidMovesFrom(0).length > 0) {
+        sources.add(0)
+      }
+      return sources
+    }
+
+    // Check each point for moveable checkers
+    for (const point of board) {
+      if (point.color === currentPlayerColor && point.count > 0) {
+        if (getValidMovesFrom(point.position).length > 0) {
+          sources.add(point.position)
+        }
+      }
+    }
+
+    return sources
+  }, [board, puzzle.currentPlayer, whiteOnBar, redOnBar, remainingDice.length, getValidMovesFrom])
+
   // Handle point click (for click-to-move fallback)
   const handlePointClick = (pointNum: number) => {
     // Ignore clicks while dragging
@@ -300,8 +328,14 @@ export function PuzzleBoard({ puzzle }: PuzzleBoardProps) {
       point.color !== puzzle.currentPlayer &&
       point.count === 1
 
-    // Determine fill color
+    // Check if this point is a moveable source
+    const isMoveableSource = moveableSources.has(pointNum)
+
+    // Determine fill color (priority: base < source < selected/dest/capture)
     let fillColor = isDark ? BOARD_COLORS.pointDark : BOARD_COLORS.pointLight
+    if (isMoveableSource && !isSelected && !isValidDest) {
+      fillColor = BOARD_COLORS.highlightSource // Yellow for moveable pieces
+    }
     if (isSelected) {
       fillColor = BOARD_COLORS.highlightSelected
     } else if (isCapture) {
@@ -420,8 +454,14 @@ export function PuzzleBoard({ puzzle }: PuzzleBoardProps) {
     const currentOnBar = currentPlayerColor === 'White' ? whiteOnBar : redOnBar
     const isBarSelected = selectedPoint === 0 || dragState.sourcePoint === 0
 
+    // Check if bar is a moveable source
+    const isBarMoveableSource = moveableSources.has(0)
+
     // Determine fill color
     let barFill = BOARD_COLORS.bar
+    if (isBarMoveableSource && !isBarSelected) {
+      barFill = BOARD_COLORS.highlightSource // Yellow for moveable bar
+    }
     if (isBarSelected) {
       barFill = BOARD_COLORS.highlightSelected
     }

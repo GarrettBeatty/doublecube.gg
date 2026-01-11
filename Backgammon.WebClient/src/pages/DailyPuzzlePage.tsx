@@ -5,7 +5,7 @@ import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Brain, ArrowLeft, RotateCcw, Check, X, Flame, Calendar } from 'lucide-react'
+import { Brain, ArrowLeft, RotateCcw, Check, X, Flame, Calendar, Eye } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { usePuzzleStore, formatMovesForSubmission } from '@/stores/puzzleStore'
 import { DailyPuzzle, PuzzleResult as PuzzleResultType, PuzzleStreakInfo } from '@/types/puzzle.types'
@@ -17,6 +17,9 @@ export const DailyPuzzlePage: React.FC = () => {
   const { invoke, isConnected } = useSignalR()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGivingUp, setIsGivingUp] = useState(false)
+  const [hasGivenUp, setHasGivenUp] = useState(false)
+  const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null)
 
   const {
     currentPuzzle,
@@ -115,6 +118,43 @@ export const DailyPuzzlePage: React.FC = () => {
   const handleReset = () => {
     clearMoves()
     setResult(null)
+  }
+
+  const handleGiveUp = async () => {
+    if (isGivingUp || hasGivenUp || currentPuzzle?.alreadySolved) return
+
+    setIsGivingUp(true)
+    try {
+      const puzzleResult = await invoke<PuzzleResultType>(HubMethods.GiveUpPuzzle)
+      if (!puzzleResult) {
+        throw new Error('No result returned')
+      }
+
+      setHasGivenUp(true)
+      setRevealedAnswer(puzzleResult.bestMovesNotation || null)
+
+      // Update streak info (giving up resets streak)
+      if (streakInfo) {
+        setStreakInfo({
+          ...streakInfo,
+          currentStreak: 0,
+        })
+      }
+
+      toast({
+        title: 'Answer Revealed',
+        description: 'Your streak has been reset.',
+      })
+    } catch (err) {
+      console.error('Failed to give up:', err)
+      toast({
+        title: 'Error',
+        description: 'Failed to reveal the answer',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsGivingUp(false)
+    }
   }
 
   const handleBack = () => {
@@ -326,24 +366,27 @@ export const DailyPuzzlePage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Best Move (shown after solving, hidden while practicing) */}
-            {currentPuzzle.alreadySolved &&
-              currentPuzzle.bestMovesNotation &&
-              remainingDice.length === 0 && (
-                <Card className="bg-green-500/10 border-green-500/30">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm text-green-400">Best Move</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="font-mono text-lg">{currentPuzzle.bestMovesNotation}</p>
-                  </CardContent>
-                </Card>
-              )}
+            {/* Best Move (shown after solving or giving up) */}
+            {((currentPuzzle.alreadySolved && currentPuzzle.bestMovesNotation && remainingDice.length === 0) ||
+              (hasGivenUp && revealedAnswer)) && (
+              <Card className={currentPuzzle.alreadySolved ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}>
+                <CardHeader className="pb-2">
+                  <CardTitle className={`text-sm ${currentPuzzle.alreadySolved ? 'text-green-400' : 'text-yellow-400'}`}>
+                    Best Move
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-mono text-lg">
+                    {currentPuzzle.bestMovesNotation || revealedAnswer}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Action buttons */}
             <Card>
               <CardContent className="p-4 space-y-3">
-                {!currentPuzzle.alreadySolved && (
+                {!currentPuzzle.alreadySolved && !hasGivenUp && (
                   <Button
                     className="w-full"
                     size="lg"
@@ -376,6 +419,19 @@ export const DailyPuzzlePage: React.FC = () => {
                     Reset
                   </Button>
                 </div>
+
+                {/* Show Answer button - only visible when puzzle is not solved and user hasn't given up */}
+                {!currentPuzzle.alreadySolved && !hasGivenUp && (
+                  <Button
+                    variant="ghost"
+                    className="w-full text-muted-foreground hover:text-foreground"
+                    onClick={handleGiveUp}
+                    disabled={isGivingUp}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    {isGivingUp ? 'Revealing...' : 'Show Answer'}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </div>

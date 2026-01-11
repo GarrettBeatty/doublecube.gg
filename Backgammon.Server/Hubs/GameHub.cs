@@ -2027,6 +2027,34 @@ public class GameHub : Hub<IGameHubClient>
     }
 
     /// <summary>
+    /// Give up on today's puzzle and reveal the answer.
+    /// </summary>
+    /// <returns>The result with the best moves revealed.</returns>
+    public async Task<PuzzleResultDto> GiveUpPuzzle()
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                throw new HubException("Authentication required");
+            }
+
+            var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            return await _dailyPuzzleService.GiveUpPuzzleAsync(userId, today);
+        }
+        catch (HubException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error giving up on puzzle");
+            throw new HubException("Failed to give up on puzzle");
+        }
+    }
+
+    /// <summary>
     /// Get user's puzzle streak information.
     /// </summary>
     /// <returns>The user's puzzle streak info.</returns>

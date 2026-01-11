@@ -261,6 +261,11 @@ public interface IGameHub
     Task<PuzzleResultDto> SubmitPuzzleAnswer(List<MoveDto> moves);
 
     /// <summary>
+    /// Give up on today's puzzle and reveal the answer
+    /// </summary>
+    Task<PuzzleResultDto> GiveUpPuzzle();
+
+    /// <summary>
     /// Get user's puzzle streak information
     /// </summary>
     Task<PuzzleStreakInfo> GetPuzzleStreak();
