@@ -275,6 +275,18 @@ public class CachedUserService : IUserRepository
         return _userRepository.GetUsersByIdsAsync(userIds);
     }
 
+    public Task<List<User>> GetTopPlayersByRatingAsync(int limit = 100)
+    {
+        // Leaderboard queries don't need caching - they're dynamic and updated frequently
+        return _userRepository.GetTopPlayersByRatingAsync(limit);
+    }
+
+    public Task<List<int>> GetAllRatingsAsync()
+    {
+        // Rating distribution queries don't need caching - they're aggregate stats
+        return _userRepository.GetAllRatingsAsync();
+    }
+
     /// <summary>
     /// Hash a cache key to avoid logging sensitive data.
     /// Returns a short hash that preserves diagnostic usefulness while protecting privacy.

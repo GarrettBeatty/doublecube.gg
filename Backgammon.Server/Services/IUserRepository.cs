@@ -66,4 +66,17 @@ public interface IUserRepository
     /// Get multiple users by their user IDs
     /// </summary>
     Task<List<User>> GetUsersByIdsAsync(IEnumerable<string> userIds);
+
+    /// <summary>
+    /// Get top players by rating for the leaderboard
+    /// </summary>
+    /// <param name="limit">Maximum number of players to return</param>
+    /// <returns>List of users sorted by rating descending</returns>
+    Task<List<User>> GetTopPlayersByRatingAsync(int limit = 100);
+
+    /// <summary>
+    /// Get all users' ratings for distribution calculation
+    /// </summary>
+    /// <returns>List of all user ratings</returns>
+    Task<List<int>> GetAllRatingsAsync();
 }

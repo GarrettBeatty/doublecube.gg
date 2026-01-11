@@ -25,4 +25,14 @@ public interface IPlayerConnectionService
     /// Get all tracked connections (for debugging)
     /// </summary>
     int GetConnectionCount();
+
+    /// <summary>
+    /// Get all currently connected player IDs
+    /// </summary>
+    IEnumerable<string> GetAllConnectedPlayerIds();
+
+    /// <summary>
+    /// Check if a player is currently connected
+    /// </summary>
+    bool IsPlayerConnected(string playerId);
 }
