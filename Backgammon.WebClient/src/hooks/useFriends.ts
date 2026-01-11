@@ -3,14 +3,14 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import type { Friend } from '../types/home.types'
 
 export const useFriends = () => {
-  const { invoke, isConnected, connection } = useSignalR()
+  const { hub, isConnected, connection } = useSignalR()
   const [friends, setFriends] = useState<Friend[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchFriends = async () => {
-      if (!isConnected) {
+      if (!isConnected || !hub) {
         setIsLoading(false)
         return
       }
@@ -19,13 +19,20 @@ export const useFriends = () => {
         setIsLoading(true)
         setError(null)
 
-        // Try to fetch friends from backend
-        const friendsList = await invoke<Friend[]>('GetFriends')
-        setFriends(friendsList || [])
+        // Fetch friends from backend
+        const friendsList = await hub.getFriends()
+        // Map FriendDto to local Friend type
+        setFriends(
+          (friendsList || []).map((f) => ({
+            userId: f.userId,
+            username: f.username,
+            displayName: f.displayName,
+            status: f.isOnline ? 'Online' : 'Offline',
+          }))
+        )
       } catch (err) {
         console.warn('GetFriends not fully implemented yet:', err)
         setError('Friends list temporarily unavailable')
-        // Empty array as fallback
         setFriends([])
       } finally {
         setIsLoading(false)
@@ -50,7 +57,7 @@ export const useFriends = () => {
     return () => {
       connection?.off('FriendStatusChanged', handleFriendStatusChange)
     }
-  }, [isConnected, invoke, connection])
+  }, [isConnected, hub, connection])
 
   return { friends, isLoading, error }
 }

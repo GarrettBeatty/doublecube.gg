@@ -2,7 +2,6 @@ import { memo, useMemo, useCallback } from 'react'
 import { GameState, CheckerColor, GameStatus } from '@/types/game.types'
 import { useGameStore } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import {
   UnifiedBoard,
   BoardPosition,
@@ -23,7 +22,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   isSpectator = false,
   onOfferDouble,
 }: GameBoardAdapterProps) {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const {
     selectedChecker,
     selectChecker,
@@ -170,7 +169,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       result.push({
         type: 'roll',
         label: 'Roll',
-        onClick: () => invoke(HubMethods.RollDice),
+        onClick: () => hub?.rollDice(),
         variant: 'default',
       })
     }
@@ -192,7 +191,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       result.push({
         type: 'undo',
         label: 'Undo',
-        onClick: () => invoke(HubMethods.UndoLastMove),
+        onClick: () => hub?.undoLastMove(),
         variant: 'default',
       })
     }
@@ -211,7 +210,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       result.push({
         type: 'end',
         label: 'End',
-        onClick: () => invoke(HubMethods.EndTurn),
+        onClick: () => hub?.endTurn(),
         variant: 'primary',
       })
     }
@@ -233,7 +232,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     isSpectator,
     isCustomDiceEnabled,
     doublingCube.canDouble,
-    invoke,
+    hub,
     onOfferDouble,
   ])
 
@@ -250,7 +249,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     async (from: number, to: number) => {
       // In free move mode, allow any move
       if (gameState.isAnalysisMode && isFreeMoveEnabled) {
-        await invoke(HubMethods.MakeMove, from, to)
+        await hub?.makeMove(from, to)
         selectChecker(null) // Clear selection after move
         return
       }
@@ -261,11 +260,11 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       )
 
       if (validMove) {
-        await invoke(HubMethods.MakeMove, from, to)
+        await hub?.makeMove(from, to)
       }
       selectChecker(null) // Clear selection after move attempt
     },
-    [gameState, isFreeMoveEnabled, invoke, selectChecker]
+    [gameState, isFreeMoveEnabled, hub, selectChecker]
   )
 
   // Get valid destinations for a point

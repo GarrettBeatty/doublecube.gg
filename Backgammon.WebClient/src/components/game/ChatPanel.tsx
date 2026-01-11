@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useGameStore } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 
 export const ChatPanel: React.FC = () => {
   const { chatMessages, toggleChat, showChat } = useGameStore()
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const [message, setMessage] = useState('')
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -28,7 +27,7 @@ export const ChatPanel: React.FC = () => {
     if (!message.trim()) return
 
     try {
-      await invoke(HubMethods.SendChatMessage, message)
+      await hub?.sendChatMessage(message)
       setMessage('')
     } catch (error) {
       console.error('Failed to send chat message:', error)

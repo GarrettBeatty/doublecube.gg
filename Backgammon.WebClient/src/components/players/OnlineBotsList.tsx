@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { Badge } from '@/components/ui/badge'
@@ -16,8 +15,7 @@ interface OnlineBotsListProps {
 }
 
 export const OnlineBotsList: React.FC<OnlineBotsListProps> = ({ bots, isLoading }) => {
-  const navigate = useNavigate()
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const { user } = useAuth()
   const { toast } = useToast()
   const [startingGame, setStartingGame] = useState<string | null>(null)
@@ -71,8 +69,8 @@ export const OnlineBotsList: React.FC<OnlineBotsListProps> = ({ bots, isLoading 
 
     setStartingGame(botId)
     try {
-      // Create an AI game match
-      const result = await invoke('CreateMatch', {
+      // Create an AI game match - navigation handled by MatchCreated event listener
+      await hub?.createMatch({
         opponentType: 'AI',
         targetScore: 1,
         displayName: user.username,
@@ -80,11 +78,8 @@ export const OnlineBotsList: React.FC<OnlineBotsListProps> = ({ bots, isLoading 
         isRated: false,
         isCorrespondence: false,
         timePerMoveDays: 0
-      }) as { gameId?: string } | null
-
-      if (result?.gameId) {
-        navigate(`/game/${result.gameId}`)
-      }
+      })
+      // The MatchCreated event handler will navigate to the game
     } catch (error) {
       console.error('Failed to start bot game:', error)
       toast({

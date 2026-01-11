@@ -180,7 +180,7 @@ export const usePuzzleStore = create<PuzzleStore>((set, get) => ({
 }))
 
 /**
- * Format moves as submission payload
+ * Format moves as submission payload (compatible with MoveDto)
  */
 export function formatMovesForSubmission(moves: PendingPuzzleMove[]): PuzzleMove[] {
   return moves.map((m) => ({
@@ -188,5 +188,6 @@ export function formatMovesForSubmission(moves: PendingPuzzleMove[]): PuzzleMove
     to: m.to,
     dieValue: m.dieValue,
     isHit: m.isHit,
+    isCombinedMove: false,
   }))
 }

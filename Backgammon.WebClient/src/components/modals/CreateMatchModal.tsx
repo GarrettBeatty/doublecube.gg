@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { authService } from '@/services/auth.service'
 import {
   Dialog,
@@ -26,7 +25,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   onClose,
   defaultOpponentType = 'AI',
 }) => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const [opponentType, setOpponentType] = useState<'AI' | 'OpenLobby'>(defaultOpponentType)
   const [targetScore, setTargetScore] = useState<number>(1)
   const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
@@ -58,15 +57,17 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       const canBeRated = isAuthenticated && opponentType !== 'AI'
 
       const config = {
-        OpponentType: opponentType,
-        TargetScore: targetScore,
-        DisplayName: authService.getDisplayName(),
-        TimeControlType: timeControlType,
-        IsRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
+        opponentType: opponentType,
+        targetScore: targetScore,
+        displayName: authService.getDisplayName(),
+        timeControlType: timeControlType,
+        isRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
+        isCorrespondence: false,
+        timePerMoveDays: 0,
       }
       console.log('[CreateMatchModal] Invoking CreateMatch', config)
       // Always use the match system - single games are just matches with targetScore=1
-      await invoke(HubMethods.CreateMatch, config)
+      await hub?.createMatch(config)
       console.log('[CreateMatchModal] CreateMatch completed')
       onClose()
     } catch (error) {

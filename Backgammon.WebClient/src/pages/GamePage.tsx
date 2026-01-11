@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore, MatchState } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods, MatchStateDto } from '@/types/signalr.types'
+import type { MatchStateDto } from '@/types/generated/Backgammon.Server.Models'
 import { GameBoardAdapter } from '@/components/board'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
@@ -22,7 +22,7 @@ import { Eye, BarChart3, Trophy, TrendingUp } from 'lucide-react'
 export const GamePage: React.FC = () => {
   const { gameId } = useParams<{ gameId: string }>()
   const navigate = useNavigate()
-  const { invoke, isConnected, connection } = useSignalR()
+  const { hub, isConnected, connection } = useSignalR()
 
   const {
     currentGameState,
@@ -69,7 +69,7 @@ export const GamePage: React.FC = () => {
     return () => {
       if (lastJoinedGameIdRef.current) {
         console.log('[GamePage] Component unmounting, leaving game:', lastJoinedGameIdRef.current)
-        invoke(HubMethods.LeaveGame).catch((err) => {
+        hub?.leaveGame().catch((err) => {
           console.error('[GamePage] Failed to leave game on unmount:', err)
         })
       }
@@ -101,7 +101,7 @@ export const GamePage: React.FC = () => {
       if (lastJoinedGameId && lastJoinedGameId !== gameId) {
         console.log('[GamePage] Leaving previous game:', lastJoinedGameId)
         try {
-          await invoke(HubMethods.LeaveGame)
+          await hub?.leaveGame()
         } catch (error) {
           console.error('[GamePage] Failed to leave previous game:', error)
           // Continue anyway - we want to join the new game
@@ -125,7 +125,7 @@ export const GamePage: React.FC = () => {
         console.log('[GamePage] Display Name:', displayName)
         console.log('[GamePage] Auth Token:', authService.getToken() ? 'Present' : 'Missing')
         console.log('[GamePage] =====================================')
-        await invoke(HubMethods.JoinGame, playerId, gameId)
+        await hub?.joinGame(playerId, gameId)
         // The GameStart or GameUpdate event will set the game state
         setIsLoading(false)
       } catch (error) {
@@ -142,7 +142,7 @@ export const GamePage: React.FC = () => {
       // Don't leave if lastJoinedGameId is just being set for the first time
       if (lastJoinedGameId && lastJoinedGameId !== gameId) {
         console.log('[GamePage] Cleaning up previous game:', lastJoinedGameId)
-        invoke(HubMethods.LeaveGame).catch((err) => {
+        hub?.leaveGame().catch((err) => {
           console.error('[GamePage] Failed to leave game on cleanup:', err)
         })
       }
@@ -150,7 +150,7 @@ export const GamePage: React.FC = () => {
     // Note: lastJoinedGameId is intentionally NOT in dependencies
     // We only want to re-run when gameId or connection state changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameId, isConnected, navigate, setCurrentGameId, invoke, resetGame])
+  }, [gameId, isConnected, navigate, setCurrentGameId, hub, resetGame])
 
   // Sync match state from authoritative game state
   // This ensures matchState never becomes stale when we have fresh game data
@@ -218,18 +218,18 @@ export const GamePage: React.FC = () => {
 
       try {
         console.log('[GamePage] Fetching authoritative match state for:', currentMatchId)
-        const serverMatchState: MatchStateDto | null = await invoke(
-          HubMethods.GetMatchState,
-          currentMatchId
-        )
+        const serverMatchState: MatchStateDto | null = await hub?.getMatchState(currentMatchId) ?? null
 
         if (serverMatchState) {
-          // Validate server timestamp
-          const serverTimestamp = Date.parse(serverMatchState.lastUpdatedAt)
+          // Validate server timestamp - handle both Date and string types
+          const lastUpdated = serverMatchState.lastUpdatedAt
+          const serverTimestamp = lastUpdated instanceof Date
+            ? lastUpdated.getTime()
+            : Date.parse(lastUpdated)
           if (Number.isNaN(serverTimestamp)) {
             console.error(
               '[GamePage] Invalid server match state timestamp:',
-              serverMatchState.lastUpdatedAt
+              lastUpdated
             )
             return
           }
@@ -254,6 +254,10 @@ export const GamePage: React.FC = () => {
               // Only update if server data is newer than what we have
               if (serverTimestamp > localTimestamp) {
                 console.log('[GamePage] Server match state is newer, updating local state')
+                // Convert Date to string and undefined to null for compatibility
+                const lastUpdatedStr = lastUpdated instanceof Date
+                  ? lastUpdated.toISOString()
+                  : lastUpdated
                 return {
                   matchId: serverMatchState.matchId,
                   player1Score: serverMatchState.player1Score,
@@ -261,8 +265,8 @@ export const GamePage: React.FC = () => {
                   targetScore: serverMatchState.targetScore,
                   isCrawfordGame: serverMatchState.isCrawfordGame,
                   matchComplete: serverMatchState.matchComplete,
-                  matchWinner: serverMatchState.matchWinner,
-                  lastUpdatedAt: serverMatchState.lastUpdatedAt,
+                  matchWinner: serverMatchState.matchWinner ?? null,
+                  lastUpdatedAt: lastUpdatedStr,
                 }
               } else {
                 console.log('[GamePage] Local match state is up to date')
@@ -281,7 +285,7 @@ export const GamePage: React.FC = () => {
     }
 
     syncMatchState()
-  }, [isConnected, currentMatchId, invoke, setMatchState])
+  }, [isConnected, currentMatchId, hub, setMatchState])
 
   // Doubling cube handlers
   const handleOfferDouble = () => {
@@ -290,7 +294,7 @@ export const GamePage: React.FC = () => {
 
   const handleConfirmDouble = async () => {
     try {
-      await invoke(HubMethods.OfferDouble)
+      await hub?.offerDouble()
       setShowDoubleConfirmModal(false)
     } catch (error) {
       console.error('[GamePage] Failed to offer double:', error)

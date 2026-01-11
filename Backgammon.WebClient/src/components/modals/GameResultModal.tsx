@@ -2,7 +2,6 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
-import { HubMethods } from '@/types/signalr.types'
 import { CheckerColor } from '@/types/game.types'
 import {
   Dialog,
@@ -18,7 +17,7 @@ import { Trophy, Target } from 'lucide-react'
 
 export const GameResultModal: React.FC = () => {
   const navigate = useNavigate()
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const {
     showGameResultModal,
     setShowGameResultModal,
@@ -34,7 +33,7 @@ export const GameResultModal: React.FC = () => {
 
     try {
       // Call server to start next game
-      await invoke(HubMethods.ContinueMatch, matchState.matchId)
+      await hub?.continueMatch(matchState.matchId)
       // Modal will be closed by MatchContinued event handler
     } catch (error) {
       console.error('Failed to continue match:', error)

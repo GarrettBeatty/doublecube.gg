@@ -1,16 +1,17 @@
-import { CheckerColor, OpponentType, MatchStatus } from './game.types'
+import { CheckerColor, OpponentType } from './game.types'
 
 export interface MatchLobby {
   matchId: string
   creatorPlayerId: string
-  creatorUsername: string | null
-  opponentType: OpponentType
+  creatorUsername: string
+  opponentType: string
   targetScore: number
-  status: MatchStatus
+  status: string
   opponentPlayerId: string | null
-  opponentUsername: string | null
+  opponentPlayerName: string | null
   createdAt: string
-  isCorrespondence?: boolean
+  isOpenLobby: boolean
+  isCorrespondence: boolean
   timePerMoveDays?: number
 }
 

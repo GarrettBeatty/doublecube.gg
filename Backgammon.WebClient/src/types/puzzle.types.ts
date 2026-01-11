@@ -8,6 +8,9 @@ export interface PuzzleMove {
   to: number
   dieValue: number
   isHit: boolean
+  isCombinedMove: boolean
+  diceUsed?: number[]
+  intermediatePoints?: number[]
 }
 
 /**
@@ -15,7 +18,7 @@ export interface PuzzleMove {
  */
 export interface PuzzlePointState {
   position: number
-  color: string | null
+  color?: string
   count: number
 }
 
@@ -72,6 +75,7 @@ export interface PendingPuzzleMove {
   to: number
   dieValue: number
   isHit: boolean
+  isCombinedMove?: boolean
 }
 
 /**
@@ -82,5 +86,28 @@ export function puzzleBoardToPoints(puzzleBoard: PuzzlePointState[]): Point[] {
     position: p.position,
     color: p.color === 'White' ? 0 : p.color === 'Red' ? 1 : null,
     count: p.count,
+  }))
+}
+
+/**
+ * Helper to convert PuzzleMove[] to MoveDto[] for API calls
+ */
+export function puzzleMovesToMoveDto(moves: PuzzleMove[]): Array<{
+  from: number
+  to: number
+  dieValue: number
+  isHit: boolean
+  isCombinedMove: boolean
+  diceUsed?: number[]
+  intermediatePoints?: number[]
+}> {
+  return moves.map((m) => ({
+    from: m.from,
+    to: m.to,
+    dieValue: m.dieValue,
+    isHit: m.isHit,
+    isCombinedMove: m.isCombinedMove ?? false,
+    diceUsed: m.diceUsed,
+    intermediatePoints: m.intermediatePoints,
   }))
 }

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Clock, User, RefreshCw, AlertCircle } from 'lucide-react';
 import { useSignalR } from '@/contexts/SignalRContext';
-import { HubMethods, HubEvents } from '@/types/signalr.types';
+import { HubEvents } from '@/types/signalr.types';
 import { authService } from '@/services/auth.service';
 import { CreateCorrespondenceMatchModal } from '@/components/modals/CreateCorrespondenceMatchModal';
 
@@ -15,16 +15,16 @@ interface CorrespondenceLobby {
   opponentType: string;
   targetScore: number;
   status: string;
-  opponentPlayerId: string | null;
-  opponentUsername: string | null;
+  opponentPlayerId?: string;
+  opponentUsername?: string;
   createdAt: string;
   isOpenLobby: boolean;
   isCorrespondence: boolean;
-  timePerMoveDays: number;
+  timePerMoveDays?: number;
 }
 
 export function CorrespondenceLobbies() {
-  const { invoke, isConnected, connection } = useSignalR();
+  const { hub, isConnected, connection } = useSignalR();
   const [lobbies, setLobbies] = useState<CorrespondenceLobby[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function CorrespondenceLobbies() {
       setError(null);
 
       // GetMatchLobbies with 'correspondence' filter returns only correspondence lobbies
-      const allLobbies = await invoke<CorrespondenceLobby[]>(HubMethods.GetMatchLobbies, 'correspondence');
+      const allLobbies = await hub?.getMatchLobbies('correspondence');
 
       // Get current player ID to filter out their own lobbies
       const currentPlayerId = authService.getOrCreatePlayerId();
@@ -54,7 +54,7 @@ export function CorrespondenceLobbies() {
     } finally {
       setIsLoading(false);
     }
-  }, [isConnected, invoke]);
+  }, [isConnected, hub]);
 
   useEffect(() => {
     fetchLobbies();
@@ -78,7 +78,7 @@ export function CorrespondenceLobbies() {
 
   const handleJoinLobby = async (matchId: string) => {
     try {
-      await invoke(HubMethods.JoinMatch, matchId);
+      await hub?.joinMatch(matchId);
       // SignalR will send MatchCreated event, navigate handled by event handler
       // Refresh lobbies to remove the joined lobby
       setTimeout(fetchLobbies, 500);
@@ -147,7 +147,7 @@ export function CorrespondenceLobbies() {
                     <div className="flex flex-wrap items-center gap-2 mt-1">
                       <Badge variant="secondary" className="text-xs flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {lobby.timePerMoveDays} day{lobby.timePerMoveDays > 1 ? 's' : ''}/move
+                        {lobby.timePerMoveDays ?? 3} day{(lobby.timePerMoveDays ?? 3) > 1 ? 's' : ''}/move
                       </Badge>
                       <Badge variant="outline" className="text-xs">
                         {lobby.targetScore}-point

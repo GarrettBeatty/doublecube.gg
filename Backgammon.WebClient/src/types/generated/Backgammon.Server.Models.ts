@@ -259,6 +259,32 @@ export type MatchConfig = {
     timePerMoveDays: number;
 }
 
+/** Transpiled from Backgammon.Server.Models.MatchStateDto */
+export type MatchStateDto = {
+    /** Transpiled from string */
+    matchId: string;
+    /** Transpiled from int */
+    player1Score: number;
+    /** Transpiled from int */
+    player2Score: number;
+    /** Transpiled from int */
+    targetScore: number;
+    /** Transpiled from bool */
+    isCrawfordGame: boolean;
+    /** Transpiled from bool */
+    matchComplete: boolean;
+    /** Transpiled from string? */
+    matchWinner?: string;
+    /** Transpiled from string */
+    player1Name: string;
+    /** Transpiled from string */
+    player2Name: string;
+    /** Transpiled from string? */
+    currentGameId?: string;
+    /** Transpiled from System.DateTime */
+    lastUpdatedAt: (Date | string);
+}
+
 /** Transpiled from Backgammon.Server.Models.MoveDto */
 export type MoveDto = {
     /** Transpiled from int */

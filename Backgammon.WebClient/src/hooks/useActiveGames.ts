@@ -1,16 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { ActiveGame } from '@/types/home.types'
 
 export const useActiveGames = () => {
-  const { invoke, isConnected, connection } = useSignalR()
+  const { hub, isConnected, connection } = useSignalR()
   const [games, setGames] = useState<ActiveGame[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchGames = useCallback(async () => {
-    if (!isConnected) {
+    if (!isConnected || !hub) {
       setIsLoading(false)
       return
     }
@@ -19,7 +18,7 @@ export const useActiveGames = () => {
       setIsLoading(true)
       setError(null)
 
-      const activeGames = await invoke<ActiveGame[]>(HubMethods.GetActiveGames, 10)
+      const activeGames = await hub.getActiveGames(10) as ActiveGame[] | undefined
       setGames(activeGames || [])
     } catch (err) {
       console.warn('GetActiveGames failed:', err)
@@ -28,7 +27,7 @@ export const useActiveGames = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [isConnected, invoke])
+  }, [isConnected, hub])
 
   useEffect(() => {
     fetchGames()

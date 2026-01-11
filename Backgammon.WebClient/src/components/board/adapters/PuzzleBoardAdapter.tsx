@@ -2,7 +2,6 @@ import { memo, useMemo, useCallback, useEffect, useState } from 'react'
 import { DailyPuzzle, PendingPuzzleMove, PuzzleMove } from '@/types/puzzle.types'
 import { usePuzzleStore } from '@/stores/puzzleStore'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import {
   UnifiedBoard,
   BoardPosition,
@@ -16,7 +15,7 @@ interface PuzzleBoardAdapterProps {
 export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
   puzzle,
 }: PuzzleBoardAdapterProps) {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const {
     selectedPoint,
     validDestinations,
@@ -102,7 +101,7 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
         const request = {
           boardState: puzzle.boardState.map((p) => ({
             position: p.position,
-            color: p.color,
+            color: p.color ?? undefined, // Convert null to undefined for DTO compatibility
             count: p.count,
           })),
           currentPlayer: puzzle.currentPlayer,
@@ -116,10 +115,11 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
             to: m.to,
             dieValue: m.dieValue,
             isHit: m.isHit,
+            isCombinedMove: m.isCombinedMove ?? false,
           })),
         }
 
-        const moves = await invoke<PuzzleMove[]>(HubMethods.GetPuzzleValidMoves, request)
+        const moves = await hub?.getPuzzleValidMoves(request)
         setServerValidMoves(moves ?? [])
       } catch (error) {
         console.error('Error fetching valid moves:', error)
@@ -128,7 +128,7 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
     }
 
     fetchValidMoves()
-  }, [puzzle, pendingMoves, remainingDice.length, invoke])
+  }, [puzzle, pendingMoves, remainingDice.length, hub])
 
   // Get valid moves from a point using server-validated moves
   const getValidMovesFrom = useCallback(

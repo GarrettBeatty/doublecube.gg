@@ -1,20 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Brain, ArrowLeft, RotateCcw, Check, X, Flame, Calendar, Eye } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { usePuzzleStore, formatMovesForSubmission } from '@/stores/puzzleStore'
-import { DailyPuzzle, PuzzleResult as PuzzleResultType, PuzzleStreakInfo } from '@/types/puzzle.types'
 import { PuzzleBoardAdapter } from '@/components/board'
 import { PuzzleResult } from '@/components/puzzle/PuzzleResult'
 
 export const DailyPuzzlePage: React.FC = () => {
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isGivingUp, setIsGivingUp] = useState(false)
@@ -44,17 +42,17 @@ export const DailyPuzzlePage: React.FC = () => {
   // Load puzzle on mount
   useEffect(() => {
     const loadPuzzle = async () => {
-      if (!isConnected) return
+      if (!isConnected || !hub) return
 
       setLoading(true)
       setError(null)
 
       try {
-        const puzzle = await invoke<DailyPuzzle>(HubMethods.GetDailyPuzzle)
+        const puzzle = await hub.getDailyPuzzle()
         setPuzzle(puzzle)
 
         // Also load streak info
-        const streak = await invoke<PuzzleStreakInfo>(HubMethods.GetPuzzleStreak)
+        const streak = await hub.getPuzzleStreak()
         setStreakInfo(streak)
       } catch (err) {
         console.error('Failed to load puzzle:', err)
@@ -70,15 +68,15 @@ export const DailyPuzzlePage: React.FC = () => {
     }
 
     loadPuzzle()
-  }, [isConnected, invoke, setPuzzle, setLoading, setError, setStreakInfo, toast])
+  }, [isConnected, hub, setPuzzle, setLoading, setError, setStreakInfo, toast])
 
   const handleSubmit = async () => {
-    if (!canSubmit() || isSubmitting) return
+    if (!canSubmit() || isSubmitting || !hub) return
 
     setIsSubmitting(true)
     try {
       const moves = formatMovesForSubmission(pendingMoves)
-      const puzzleResult = await invoke<PuzzleResultType>(HubMethods.SubmitPuzzleAnswer, moves)
+      const puzzleResult = await hub.submitPuzzleAnswer(moves)
       if (!puzzleResult) {
         throw new Error('No result returned')
       }
@@ -121,11 +119,11 @@ export const DailyPuzzlePage: React.FC = () => {
   }
 
   const handleGiveUp = async () => {
-    if (isGivingUp || hasGivenUp || currentPuzzle?.alreadySolved) return
+    if (isGivingUp || hasGivenUp || currentPuzzle?.alreadySolved || !hub) return
 
     setIsGivingUp(true)
     try {
-      const puzzleResult = await invoke<PuzzleResultType>(HubMethods.GiveUpPuzzle)
+      const puzzleResult = await hub.giveUpPuzzle()
       if (!puzzleResult) {
         throw new Error('No result returned')
       }

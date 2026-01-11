@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods, HubEvents } from '@/types/signalr.types'
+import { HubEvents } from '@/types/signalr.types'
 import {
   CorrespondenceGamesResponse,
   CorrespondenceGameDto,
@@ -10,7 +10,7 @@ import {
 import { authService } from '@/services/auth.service'
 
 export const useCorrespondenceGames = () => {
-  const { invoke, isConnected, connection } = useSignalR()
+  const { hub, isConnected, connection } = useSignalR()
   const [yourTurnGames, setYourTurnGames] = useState<CorrespondenceGameDto[]>([])
   const [waitingGames, setWaitingGames] = useState<CorrespondenceGameDto[]>([])
   const [myLobbies, setMyLobbies] = useState<CorrespondenceGameDto[]>([])
@@ -18,7 +18,7 @@ export const useCorrespondenceGames = () => {
   const [error, setError] = useState<string | null>(null)
 
   const fetchCorrespondenceGames = useCallback(async () => {
-    if (!isConnected) {
+    if (!isConnected || !hub) {
       setIsLoading(false)
       return
     }
@@ -27,9 +27,7 @@ export const useCorrespondenceGames = () => {
       setIsLoading(true)
       setError(null)
 
-      const response = await invoke<CorrespondenceGamesResponse>(
-        HubMethods.GetCorrespondenceGames
-      )
+      const response = await hub.getCorrespondenceGames() as CorrespondenceGamesResponse | undefined
 
       if (response) {
         console.log('[CorrespondenceGames] Fetched:', {
@@ -51,7 +49,7 @@ export const useCorrespondenceGames = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [isConnected, invoke])
+  }, [isConnected, hub])
 
   // Use ref to avoid re-registering event handlers
   const fetchRef = useRef(fetchCorrespondenceGames)
@@ -91,26 +89,27 @@ export const useCorrespondenceGames = () => {
       friendUserId?: string
       isRated?: boolean
     }) => {
-      if (!isConnected) {
+      if (!isConnected || !hub) {
         throw new Error('Not connected to server')
       }
 
       try {
-        await invoke(HubMethods.CreateCorrespondenceMatch, {
-          OpponentType: config.opponentType,
-          TargetScore: config.targetScore,
-          TimePerMoveDays: config.timePerMoveDays,
-          OpponentId: config.friendUserId,
-          IsCorrespondence: true,
-          IsRated: config.isRated ?? true,
-          DisplayName: authService.getDisplayName(),
+        await hub.createCorrespondenceMatch({
+          opponentType: config.opponentType,
+          targetScore: config.targetScore,
+          timePerMoveDays: config.timePerMoveDays,
+          opponentId: config.friendUserId,
+          isCorrespondence: true,
+          isRated: config.isRated ?? true,
+          displayName: authService.getDisplayName(),
+          timeControlType: 'None',
         })
       } catch (err) {
         console.error('Error creating correspondence match:', err)
         throw err
       }
     },
-    [isConnected, invoke]
+    [isConnected, hub]
   )
 
   const refresh = useCallback(() => {

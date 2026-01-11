@@ -52,7 +52,7 @@ interface PlayerProfile {
 export const ProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>()
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const { user } = useAuth()
   const { stats: userStats, isLoading: userStatsLoading } = useUserStats()
 
@@ -80,9 +80,30 @@ export const ProfilePage: React.FC = () => {
     setIsLoading(true)
     setNotFound(false)
     try {
-      const profileData = await invoke('GetPlayerProfile', username)
+      const profileData = await hub?.getPlayerProfile(username)
       if (profileData) {
-        setProfile(profileData)
+        // Map PlayerProfileDto to local PlayerProfile type
+        setProfile({
+          ...profileData,
+          createdAt: typeof profileData.createdAt === 'string'
+            ? profileData.createdAt
+            : profileData.createdAt.toISOString(),
+          friends: profileData.friends?.map((f) => ({
+            userId: f.userId,
+            username: f.username,
+            displayName: f.displayName,
+            status: f.isOnline ? 'Online' : 'Offline',
+          })),
+          recentGames: profileData.recentGames?.map((g) => ({
+            gameId: g.gameId,
+            opponentName: g.opponentUsername,
+            result: g.won ? 'won' as const : 'lost' as const,
+            pointsScored: g.stakes,
+            datePlayed: typeof g.completedAt === 'string'
+              ? g.completedAt
+              : g.completedAt.toISOString(),
+          })),
+        })
       } else {
         setNotFound(true)
       }

@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,7 +27,7 @@ import {
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
   const { sgf } = useParams<{ sgf?: string }>()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const { toast } = useToast()
   const {
     currentGameState,
@@ -69,7 +68,7 @@ export const AnalysisPage: React.FC = () => {
       hasCreatedGame.current = true
       try {
         console.log('[AnalysisPage] Creating analysis game...')
-        await invoke(HubMethods.CreateAnalysisGame)
+        await hub?.createAnalysisGame()
         console.log('[AnalysisPage] Analysis game created')
       } catch (error) {
         console.error('[AnalysisPage] Failed to create analysis game:', error)
@@ -84,7 +83,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     createAnalysisGame()
-  }, [isConnected, invoke, toast, isCreating])
+  }, [isConnected, hub, toast, isCreating])
 
   // Update the current game ID when game state arrives
   useEffect(() => {
@@ -119,7 +118,7 @@ export const AnalysisPage: React.FC = () => {
         console.log('[AnalysisPage] Importing position from URL:', decodedSgf)
         lastImportedSgf.current = decodedSgf
         lastExportedSgf.current = decodedSgf // Also track as exported to prevent immediate re-export
-        await invoke(HubMethods.ImportPosition, decodedSgf)
+        await hub?.importPosition(decodedSgf)
       } catch (error) {
         console.error('[AnalysisPage] Failed to import position from URL:', error)
         toast({
@@ -133,7 +132,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     importFromUrl()
-  }, [sgf, currentGameState, invoke, toast])
+  }, [sgf, currentGameState, hub, toast])
 
   // Update URL when position changes (but don't trigger if we just imported)
   useEffect(() => {
@@ -144,7 +143,7 @@ export const AnalysisPage: React.FC = () => {
 
       try {
         // Export current position to SGF
-        const exportedSgf = (await invoke(HubMethods.ExportPosition)) as string
+        const exportedSgf = (await hub?.exportPosition()) as string
         if (exportedSgf) {
           // Skip if we already exported this exact SGF (prevents duplicate exports on GameUpdate)
           if (exportedSgf === lastExportedSgf.current) {
@@ -172,13 +171,13 @@ export const AnalysisPage: React.FC = () => {
     }
 
     updateUrl()
-  }, [currentGameState, invoke, navigate, sgf])
+  }, [currentGameState, hub, navigate, sgf])
 
   // Cleanup when leaving the page
   useEffect(() => {
     return () => {
       console.log('[AnalysisPage] Component unmounting, leaving game and resetting state')
-      invoke(HubMethods.LeaveGame).catch((err) => {
+      hub?.leaveGame().catch((err) => {
         console.error('[AnalysisPage] Failed to leave game on unmount:', err)
       })
       resetGame()
@@ -215,7 +214,7 @@ export const AnalysisPage: React.FC = () => {
       for (let i = 0; i < moves.length; i++) {
         const move = moves[i]
         console.log(`[AnalysisPage] Executing move ${i + 1}/${moves.length}: ${move.from}/${move.to}`)
-        await invoke(HubMethods.MakeMove, move.from, move.to)
+        await hub?.makeMove(move.from, move.to)
       }
       console.log('[AnalysisPage] All moves executed successfully')
     } catch (error) {
@@ -260,8 +259,7 @@ export const AnalysisPage: React.FC = () => {
       isAnalyzingRef.current = true
       setIsAnalyzing(true)
       try {
-        const evaluation = (await invoke(
-          HubMethods.AnalyzePosition,
+        const evaluation = (await hub?.analyzePosition(
           currentGameState.gameId,
           evaluatorType
         )) as PositionEvaluation | null
@@ -279,8 +277,7 @@ export const AnalysisPage: React.FC = () => {
           currentGameState.dice.length > 0 &&
           currentGameState.dice.some((die) => die > 0)
         ) {
-          const analysis = (await invoke(
-            HubMethods.FindBestMoves,
+          const analysis = (await hub?.findBestMoves(
             currentGameState.gameId,
             evaluatorType
           )) as BestMovesAnalysis | null
@@ -308,7 +305,7 @@ export const AnalysisPage: React.FC = () => {
     analyzePosition()
     // Zustand setters (setCurrentEvaluation, setBestMoves, setIsAnalyzing) are stable and don't need to be in deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentGameState, invoke, evaluatorType])
+  }, [currentGameState, hub, evaluatorType])
 
   if (!isConnected || !currentGameState) {
     return (

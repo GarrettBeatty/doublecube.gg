@@ -1,61 +1,7 @@
 import { GameState, CheckerColor } from './game.types'
 
-// SignalR Hub method names (client → server)
-export const HubMethods = {
-  // Game actions
-  CreateGame: 'CreateGame',
-  CreateAiGame: 'CreateAiGame',
-  JoinGame: 'JoinGame',
-  GetGameState: 'GetGameState',
-  SpectateGame: 'SpectateGame',
-  RollDice: 'RollDice',
-  MakeMove: 'MakeMove',
-  MakeCombinedMove: 'MakeCombinedMove',
-  EndTurn: 'EndTurn',
-  UndoLastMove: 'UndoLastMove',
-  OfferDouble: 'OfferDouble',
-  AcceptDouble: 'AcceptDouble',
-  DeclineDouble: 'DeclineDouble',
-  AbandonGame: 'AbandonGame',
-  LeaveGame: 'LeaveGame',
-
-  // Match actions
-  CreateMatch: 'CreateMatch',
-  JoinMatch: 'JoinMatch',
-  ContinueMatch: 'ContinueMatch',
-  GetMatchStatus: 'GetMatchStatus',
-  GetMatchState: 'GetMatchState',
-  GetMatchLobbies: 'GetMatchLobbies',
-  GetActiveGames: 'GetActiveGames',
-
-  // Correspondence actions
-  GetCorrespondenceGames: 'GetCorrespondenceGames',
-  CreateCorrespondenceMatch: 'CreateCorrespondenceMatch',
-  NotifyCorrespondenceTurnComplete: 'NotifyCorrespondenceTurnComplete',
-
-  // Chat
-  SendChatMessage: 'SendChatMessage',
-
-  // Analysis mode
-  CreateAnalysisGame: 'CreateAnalysisGame',
-  ImportPosition: 'ImportPosition',
-  ExportPosition: 'ExportPosition',
-  SetDice: 'SetDice',
-  MoveCheckerDirectly: 'MoveCheckerDirectly',
-  SetCurrentPlayer: 'SetCurrentPlayer',
-  AnalyzePosition: 'AnalyzePosition',
-  FindBestMoves: 'FindBestMoves',
-
-  // Daily Puzzle
-  GetDailyPuzzle: 'GetDailyPuzzle',
-  SubmitPuzzleAnswer: 'SubmitPuzzleAnswer',
-  GiveUpPuzzle: 'GiveUpPuzzle',
-  GetPuzzleStreak: 'GetPuzzleStreak',
-  GetHistoricalPuzzle: 'GetHistoricalPuzzle',
-  GetPuzzleValidMoves: 'GetPuzzleValidMoves',
-} as const
-
 // SignalR event names (server → client)
+// Note: Hub methods are now accessed via the typed hub proxy (see SignalRContext.tsx)
 export const HubEvents = {
   GameUpdate: 'GameUpdate',
   GameStart: 'GameStart',
@@ -206,17 +152,5 @@ export interface MatchCompletedEvent {
   }
 }
 
-// Match state DTO (from server's GetMatchState method)
-export interface MatchStateDto {
-  matchId: string
-  player1Score: number
-  player2Score: number
-  targetScore: number
-  isCrawfordGame: boolean
-  matchComplete: boolean
-  matchWinner: string | null
-  player1Name: string
-  player2Name: string
-  currentGameId: string | null
-  lastUpdatedAt: string // ISO date string for staleness detection
-}
+// Note: MatchStateDto is now imported from generated types
+// (see @/types/generated/Backgammon.Server.Models)
