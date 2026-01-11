@@ -26,6 +26,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   const { invoke } = useSignalR()
   const {
     selectedChecker,
+    selectChecker,
     validSources,
     isBoardFlipped,
     isFreeMoveEnabled,
@@ -236,12 +237,21 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     onOfferDouble,
   ])
 
+  // Handle checker selection (for highlighting during drag)
+  const handleCheckerSelect = useCallback(
+    (point: number) => {
+      selectChecker({ point })
+    },
+    [selectChecker]
+  )
+
   // Handle move attempt
   const handleMoveAttempt = useCallback(
     async (from: number, to: number) => {
       // In free move mode, allow any move
       if (gameState.isAnalysisMode && isFreeMoveEnabled) {
         await invoke(HubMethods.MakeMove, from, to)
+        selectChecker(null) // Clear selection after move
         return
       }
 
@@ -253,8 +263,9 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       if (validMove) {
         await invoke(HubMethods.MakeMove, from, to)
       }
+      selectChecker(null) // Clear selection after move attempt
     },
-    [gameState, isFreeMoveEnabled, invoke]
+    [gameState, isFreeMoveEnabled, invoke, selectChecker]
   )
 
   // Get valid destinations for a point
@@ -301,6 +312,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
         onMoveAttempt: handleMoveAttempt,
         getValidDestinations,
         isDraggable,
+        onCheckerSelect: handleCheckerSelect,
       }}
       dice={diceState}
       buttons={buttons}

@@ -86,6 +86,11 @@ export function BoardProvider({
         ghostColor: color,
       })
 
+      // Notify parent of checker selection for highlighting
+      if (interaction?.onCheckerSelect) {
+        interaction.onCheckerSelect(point)
+      }
+
       // Set up move and end handlers
       const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
         if (!svgRef.current) return

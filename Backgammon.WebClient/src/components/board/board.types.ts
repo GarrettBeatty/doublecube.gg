@@ -38,7 +38,7 @@ export interface DragState {
 }
 
 export interface InteractionCallbacks {
-  onCheckerSelect?: (point: number, color: 'white' | 'red') => void
+  onCheckerSelect?: (point: number) => void
   onMoveAttempt?: (from: number, to: number) => void
   onPointClick?: (point: number) => void
   getValidDestinations?: (from: number) => number[]
