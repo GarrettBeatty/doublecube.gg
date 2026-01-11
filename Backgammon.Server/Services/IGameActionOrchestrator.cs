@@ -20,6 +20,22 @@ public interface IGameActionOrchestrator
     Task<ActionResult> MakeMoveAsync(GameSession session, string connectionId, int from, int to);
 
     /// <summary>
+    /// Execute a combined move (using 2+ dice) atomically through intermediate points.
+    /// Either all moves succeed or none are applied (rollback on failure).
+    /// </summary>
+    /// <param name="session">The game session</param>
+    /// <param name="connectionId">The player's connection ID</param>
+    /// <param name="from">Starting point</param>
+    /// <param name="to">Final destination point</param>
+    /// <param name="intermediatePoints">Points the checker passes through before reaching final destination</param>
+    Task<ActionResult> MakeCombinedMoveAsync(
+        GameSession session,
+        string connectionId,
+        int from,
+        int to,
+        int[] intermediatePoints);
+
+    /// <summary>
     /// End the current player's turn
     /// </summary>
     Task<ActionResult> EndTurnAsync(GameSession session, string connectionId);

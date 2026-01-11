@@ -53,6 +53,7 @@ const COLORS = {
   highlightSelected: 'hsla(142.1 76.2% 36.3% / 0.7)',  // Success/green for selected
   highlightDest: 'hsla(221.2 83.2% 53.3% / 0.6)',      // Primary/blue for destinations
   highlightCapture: 'hsla(0 84.2% 60.2% / 0.6)',       // Destructive/red for captures
+  highlightCombined: 'hsla(280 70% 50% / 0.6)',        // Purple for combined moves (using 2+ dice)
   highlightAnalysis: 'hsla(142.1 76.2% 36.3% / 0.5)',  // Green for suggested moves
   textLight: 'hsla(0 0% 98% / 0.5)',       // Light text
   textDark: 'hsla(0 0% 9% / 0.7)',         // Dark text
@@ -155,12 +156,14 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
     source: number | null
     destinations: number[]
     captures: number[]
+    combinedDestinations: number[]
     analysisMoves: Array<{ from: number; to: number }>
   }>({
     sources: [],
     source: null,
     destinations: [],
     captures: [],
+    combinedDestinations: [],
     analysisMoves: [],
   })
 
@@ -256,19 +259,25 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
     (sourcePoint: number) => {
       // No highlights in analysis mode with free movement enabled
       if (gameState?.isAnalysisMode && isFreeMoveEnabled) {
-        return { destinations: [], captures: [] }
+        return { destinations: [], captures: [], combinedDestinations: [] }
       }
 
-      if (!gameState?.validMoves) return { destinations: [], captures: [] }
+      if (!gameState?.validMoves) return { destinations: [], captures: [], combinedDestinations: [] }
 
       const movesFromPoint = gameState.validMoves.filter(
         (move) => move.from === sourcePoint
       )
 
+      // Separate single moves from combined moves
+      const singleMoves = movesFromPoint.filter((move) => !move.isCombinedMove)
+      const combinedMoves = movesFromPoint.filter((move) => move.isCombinedMove)
+
       const destinations: number[] = []
       const captures: number[] = []
+      const combinedDestinations: number[] = []
 
-      movesFromPoint.forEach((move) => {
+      // Process single moves
+      singleMoves.forEach((move) => {
         if (!destinations.includes(move.to) && !captures.includes(move.to)) {
           // Check if this is a capture by looking at the destination point
           const destPoint = gameState.board[move.to - 1]
@@ -287,7 +296,20 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
         }
       })
 
-      return { destinations, captures }
+      // Process combined moves: captures go to captures list, others to combinedDestinations
+      combinedMoves.forEach((move) => {
+        if (move.isHit) {
+          if (!captures.includes(move.to)) {
+            captures.push(move.to)
+          }
+        } else {
+          if (!combinedDestinations.includes(move.to) && !captures.includes(move.to)) {
+            combinedDestinations.push(move.to)
+          }
+        }
+      })
+
+      return { destinations, captures, combinedDestinations }
     },
     [gameState, isFreeMoveEnabled]
   )
@@ -357,6 +379,14 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       const point = pointsGroupRef.current!.querySelector(`.point-${pointNum}`)
       if (point) {
         point.setAttribute('fill', COLORS.highlightCapture)
+      }
+    })
+
+    // Highlight combined move destinations (using 2+ dice) in purple
+    highlightedPoints.combinedDestinations.forEach((pointNum) => {
+      const point = pointsGroupRef.current!.querySelector(`.point-${pointNum}`)
+      if (point) {
+        point.setAttribute('fill', COLORS.highlightCombined)
       }
     })
 
@@ -565,6 +595,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
         source: null,
         destinations: [],
         captures: [],
+        combinedDestinations: [],
       }))
 
       // Reset drag state
@@ -589,7 +620,23 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
           if (gameState?.isAnalysisMode && isFreeMoveEnabled) {
             await invoke(HubMethods.MoveCheckerDirectly, sourcePoint, targetPoint)
           } else {
-            await invoke(HubMethods.MakeMove, sourcePoint, targetPoint)
+            // Check if this is a combined move (using 2+ dice)
+            const combinedMove = gameState?.validMoves?.find(
+              (m) => m.from === sourcePoint && m.to === targetPoint && m.isCombinedMove
+            )
+
+            if (combinedMove && combinedMove.intermediatePoints) {
+              // Execute combined move atomically via backend
+              await invoke(
+                HubMethods.MakeCombinedMove,
+                sourcePoint,
+                targetPoint,
+                combinedMove.intermediatePoints
+              )
+            } else {
+              // Single die move
+              await invoke(HubMethods.MakeMove, sourcePoint, targetPoint)
+            }
           }
         } catch (error) {
           console.error('Failed to execute move:', error)
@@ -667,12 +714,13 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
       }
 
       // Set highlights for valid destinations
-      const { destinations, captures } = getValidDestinationsForPoint(pointNum)
+      const { destinations, captures, combinedDestinations } = getValidDestinationsForPoint(pointNum)
       setHighlightedPoints((prev) => ({
         ...prev,
         source: pointNum,
         destinations,
         captures,
+        combinedDestinations,
       }))
 
       // Add global listeners

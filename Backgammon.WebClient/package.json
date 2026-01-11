@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run lint && tsc && vite build",
+    "build": "eslint . --max-warnings 0 && tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "generate:signalr": "dotnet tsrts --project ../Backgammon.Server/Backgammon.Server.csproj --output src/types/generated --asm"

@@ -377,6 +377,20 @@ public class GameSession
             DieValue = Math.Abs(m.To - m.From),
             IsHit = WillHit(m)
         }).ToList();
+
+        // Calculate and add combined moves (moves using 2+ dice)
+        if (Engine.RemainingMoves.Count >= 2 && Engine.CurrentPlayer != null)
+        {
+            var singleMoveDestinations = new HashSet<int>(validMoves.Select(m => m.To));
+            var sourcePoints = validMoves.Select(m => m.From).Distinct();
+
+            foreach (var sourcePoint in sourcePoints)
+            {
+                var combinedMoves = CalculateCombinedMoves(sourcePoint, singleMoveDestinations);
+                state.ValidMoves.AddRange(combinedMoves);
+            }
+        }
+
         state.HasValidMoves = validMoves.Count > 0;
 
         if (Engine.Winner != null)
@@ -481,6 +495,170 @@ public class GameSession
         }
 
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
+    }
+
+    /// <summary>
+    /// Calculates all combined moves (using 2+ dice) from a given source point.
+    /// </summary>
+    private List<MoveDto> CalculateCombinedMoves(int sourcePoint, HashSet<int> singleMoveDestinations)
+    {
+        var results = new List<MoveDto>();
+
+        if (Engine.CurrentPlayer == null)
+        {
+            return results;
+        }
+
+        // Don't calculate combined moves if checker is on bar (must enter one at a time)
+        if (sourcePoint == 0)
+        {
+            return results;
+        }
+
+        var remainingDice = new List<int>(Engine.RemainingMoves);
+        var direction = Engine.CurrentPlayer.GetDirection();
+        var playerColor = Engine.CurrentPlayer.Color;
+
+        // Track visited destinations to avoid duplicates
+        var visitedDestinations = new HashSet<int>();
+
+        // Recursive exploration
+        FindCombinedPaths(
+            sourcePoint,
+            sourcePoint,
+            remainingDice,
+            new List<int>(),
+            new List<int>(),
+            direction,
+            playerColor,
+            singleMoveDestinations,
+            visitedDestinations,
+            results);
+
+        return results;
+    }
+
+    private void FindCombinedPaths(
+        int originalSource,
+        int currentPoint,
+        List<int> remainingDice,
+        List<int> pathSoFar,
+        List<int> diceUsedSoFar,
+        int direction,
+        CheckerColor playerColor,
+        HashSet<int> singleMoveDestinations,
+        HashSet<int> visitedDestinations,
+        List<MoveDto> results)
+    {
+        // Try each distinct die value
+        foreach (var die in remainingDice.Distinct().ToList())
+        {
+            int nextPoint = currentPoint + (direction * die);
+
+            // Check if this is a valid landing spot
+            bool isValidLanding = false;
+            bool isBearOff = false;
+
+            if (nextPoint >= 1 && nextPoint <= 24)
+            {
+                // Normal board point - check if open
+                var point = Engine.Board.GetPoint(nextPoint);
+                isValidLanding = point.IsOpen(playerColor);
+            }
+            else if (playerColor == CheckerColor.White && nextPoint <= 0)
+            {
+                // White bearing off (moving toward 0)
+                isBearOff = true;
+                isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
+                    Engine.CurrentPlayer!,
+                    Engine.CurrentPlayer.CheckersOnBar);
+                nextPoint = 0; // Normalize to bear-off point
+            }
+            else if (playerColor == CheckerColor.Red && nextPoint >= 25)
+            {
+                // Red bearing off (moving toward 25)
+                isBearOff = true;
+                isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
+                    Engine.CurrentPlayer!,
+                    Engine.CurrentPlayer.CheckersOnBar);
+                nextPoint = 25; // Normalize to bear-off point
+            }
+
+            if (!isValidLanding)
+            {
+                continue;
+            }
+
+            // Create new path and dice lists
+            var newPath = new List<int>(pathSoFar);
+            if (!isBearOff)
+            {
+                newPath.Add(nextPoint);
+            }
+
+            var newDiceUsed = new List<int>(diceUsedSoFar) { die };
+
+            // Remove used die from remaining
+            var newRemainingDice = new List<int>(remainingDice);
+            newRemainingDice.Remove(die);
+
+            // If we've used 2+ dice, this is a combined move
+            if (newDiceUsed.Count >= 2)
+            {
+                int finalDestination = isBearOff ? nextPoint : newPath.Last();
+
+                // Only add if not already reachable with single die and not already visited
+                if (!singleMoveDestinations.Contains(finalDestination) &&
+                    !visitedDestinations.Contains(finalDestination))
+                {
+                    visitedDestinations.Add(finalDestination);
+
+                    // Check if final destination is a capture
+                    bool isHit = false;
+                    if (!isBearOff && finalDestination >= 1 && finalDestination <= 24)
+                    {
+                        var destPoint = Engine.Board.GetPoint(finalDestination);
+                        isHit = destPoint.Color != null &&
+                                destPoint.Color != playerColor &&
+                                destPoint.Count == 1;
+                    }
+
+                    // Build intermediate points (all points except final)
+                    var intermediatePoints = newPath.Take(newPath.Count - 1).ToArray();
+                    if (isBearOff)
+                    {
+                        intermediatePoints = newPath.ToArray();
+                    }
+
+                    results.Add(new MoveDto
+                    {
+                        From = originalSource,
+                        To = finalDestination,
+                        DieValue = newDiceUsed.Sum(),
+                        IsHit = isHit,
+                        IsCombinedMove = true,
+                        DiceUsed = newDiceUsed.ToArray(),
+                        IntermediatePoints = intermediatePoints.Length > 0 ? intermediatePoints : null
+                    });
+                }
+            }
+
+            // Continue exploring if more dice remain (for doubles)
+            if (newRemainingDice.Count > 0 && !isBearOff)
+            {
+                FindCombinedPaths(
+                    originalSource,
+                    nextPoint,
+                    newRemainingDice,
+                    newPath,
+                    newDiceUsed,
+                    direction,
+                    playerColor,
+                    singleMoveDestinations,
+                    visitedDestinations,
+                    results);
+            }
+        }
     }
 
     private int CalculatePipCount(CheckerColor color)
