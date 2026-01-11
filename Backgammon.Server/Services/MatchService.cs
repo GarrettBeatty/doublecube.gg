@@ -41,7 +41,8 @@ public class MatchService : IMatchService
         string? player1DisplayName = null,
         string? player2Id = null,
         TimeControlConfig? timeControl = null,
-        bool isRated = true)
+        bool isRated = true,
+        string aiType = "greedy")
     {
         try
         {
@@ -93,10 +94,10 @@ public class MatchService : IMatchService
             // Handle opponent based on type
             if (opponentType == "AI")
             {
-                // Generate AI player ID
-                var aiPlayerId = _aiMoveService.GenerateAiPlayerId();
+                // Generate AI player ID with specified AI type
+                var aiPlayerId = _aiMoveService.GenerateAiPlayerId(aiType);
                 match.Player2Id = aiPlayerId;
-                match.Player2Name = "Computer";
+                match.Player2Name = GetAiDisplayName(aiType);
                 match.Status = "InProgress";  // AI matches start immediately
                 match.IsOpenLobby = false;
                 match.IsRated = false; // AI matches are always unrated
@@ -524,5 +525,20 @@ public class MatchService : IMatchService
             _logger.LogError(ex, "Failed to join match {MatchId}", matchId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Gets a user-friendly display name for an AI type.
+    /// </summary>
+    /// <param name="aiType">The AI type ("greedy" or "random")</param>
+    /// <returns>A display name for the AI</returns>
+    private static string GetAiDisplayName(string aiType)
+    {
+        return aiType.ToLowerInvariant() switch
+        {
+            "random" => "Random Bot",
+            "greedy" => "Greedy Bot",
+            _ => "Computer"
+        };
     }
 }

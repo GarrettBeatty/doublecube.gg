@@ -20,6 +20,7 @@ public interface IMatchService
     /// <param name="player2Id">Optional player 2 ID (for Friend matches)</param>
     /// <param name="timeControl">Optional time control configuration</param>
     /// <param name="isRated">Whether the match affects player ratings (defaults to true, AI matches always unrated)</param>
+    /// <param name="aiType">AI type for AI matches: "greedy" or "random" (defaults to "greedy")</param>
     /// <returns>Tuple of created Match and first ServerGame</returns>
     Task<(Match Match, ServerGame FirstGame)> CreateMatchAsync(
         string player1Id,
@@ -28,7 +29,8 @@ public interface IMatchService
         string? player1DisplayName = null,
         string? player2Id = null,
         TimeControlConfig? timeControl = null,
-        bool isRated = true);
+        bool isRated = true,
+        string aiType = "greedy");
 
     /// <summary>
     /// Get a match by ID

@@ -103,6 +103,7 @@ export const useCorrespondenceGames = () => {
           isRated: config.isRated ?? true,
           displayName: authService.getDisplayName(),
           timeControlType: 'None',
+          aiType: 'greedy', // Not used for correspondence games
         })
       } catch (err) {
         console.error('Error creating correspondence match:', err)
