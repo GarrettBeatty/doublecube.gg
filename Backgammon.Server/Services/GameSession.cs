@@ -381,12 +381,14 @@ public class GameSession
         // Calculate and add combined moves (moves using 2+ dice)
         if (Engine.RemainingMoves.Count >= 2 && Engine.CurrentPlayer != null)
         {
-            var singleMoveDestinations = new HashSet<int>(validMoves.Select(m => m.To));
             var sourcePoints = validMoves.Select(m => m.From).Distinct();
 
             foreach (var sourcePoint in sourcePoints)
             {
-                var combinedMoves = CalculateCombinedMoves(sourcePoint, singleMoveDestinations);
+                // Only exclude destinations reachable from THIS source point with a single die
+                var singleMoveDestinationsFromSource = new HashSet<int>(
+                    validMoves.Where(m => m.From == sourcePoint).Select(m => m.To));
+                var combinedMoves = CalculateCombinedMoves(sourcePoint, singleMoveDestinationsFromSource);
                 state.ValidMoves.AddRange(combinedMoves);
             }
         }
