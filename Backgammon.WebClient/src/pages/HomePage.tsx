@@ -13,10 +13,6 @@ import { GameLobby } from '@/components/home/GameLobby'
 import { DailyPuzzlePreview } from '@/components/home/DailyPuzzlePreview'
 import { CorrespondenceLobbies } from '@/components/home/CorrespondenceLobbies'
 import { GamesInPlay } from '@/components/home/GamesInPlay'
-import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
-import { ActivityFeed } from '@/components/home/ActivityFeed'
-import { RecentOpponents } from '@/components/home/RecentOpponents'
-import { QuickPlayHero } from '@/components/home/QuickPlayHero'
 import { Footer } from '@/components/home/Footer'
 
 // Import modals

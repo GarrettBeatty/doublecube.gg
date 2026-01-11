@@ -439,15 +439,20 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
 
       // Check bar
       if (x >= CONFIG.barX! && x <= CONFIG.barX! + CONFIG.barWidth) {
+        console.log('[getPointAtPosition] Returning BAR (0)', { x, barX: CONFIG.barX, barEnd: CONFIG.barX! + CONFIG.barWidth })
         return 0 // Bar
       }
 
       // Check bear-off (align with visual bear-off box position)
-      // White bears off to 0 (moves 24→1), Red bears off to 25 (moves 1→24)
+      // White bears off to 0, Red bears off to 25
       const bearoffStartX = CONFIG.barX! + CONFIG.barWidth + 6 * CONFIG.pointWidth
       if (x >= bearoffStartX) {
-        return gameState?.currentPlayer === CheckerColor.White ? 0 : 25
+        const bearOffPoint = gameState?.currentPlayer === CheckerColor.White ? 0 : 25
+        console.log('[getPointAtPosition] Returning BEAR OFF', { x, bearoffStartX, bearOffPoint, currentPlayer: gameState?.currentPlayer })
+        return bearOffPoint
       }
+
+      console.log('[getPointAtPosition] Checking points', { x, y, isBoardFlipped, bearoffStartX })
 
       // Check points
       const isTop = y < CONFIG.viewBox.height / 2
@@ -578,6 +583,7 @@ const BoardSVGComponent: React.FC<BoardSVGProps> = ({ gameState, isSpectator = f
         targetPoint !== sourcePoint &&
         sourcePoint !== null
       ) {
+        console.log('[handleDragEnd] Executing move', { sourcePoint, targetPoint, isAnalysisMode: gameState?.isAnalysisMode, isFreeMoveEnabled })
         try {
           // Use direct move for analysis mode with free movement enabled
           if (gameState?.isAnalysisMode && isFreeMoveEnabled) {
