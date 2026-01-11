@@ -385,6 +385,43 @@ public class GameHub : Hub<IGameHubClient>
     }
 
     /// <summary>
+    /// Execute a combined move (using 2+ dice) atomically through intermediate points.
+    /// Either all moves succeed or none are applied.
+    /// </summary>
+    /// <param name="from">Starting point</param>
+    /// <param name="to">Final destination point</param>
+    /// <param name="intermediatePoints">Points the checker passes through</param>
+    public async Task MakeCombinedMove(int from, int to, int[] intermediatePoints)
+    {
+        try
+        {
+            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+            if (session == null)
+            {
+                await Clients.Caller.Error("Not in a game");
+                return;
+            }
+
+            var result = await _gameActionOrchestrator.MakeCombinedMoveAsync(
+                session,
+                Context.ConnectionId,
+                from,
+                to,
+                intermediatePoints);
+
+            if (!result.Success)
+            {
+                await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error making combined move");
+            await Clients.Caller.Error(ex.Message);
+        }
+    }
+
+    /// <summary>
     /// End current turn and switch to opponent
     /// </summary>
     public async Task EndTurn()

@@ -411,6 +411,165 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         return ActionResult.Ok();
     }
 
+    public async Task<ActionResult> MakeCombinedMoveAsync(
+        GameSession session,
+        string connectionId,
+        int from,
+        int to,
+        int[] intermediatePoints)
+    {
+        _logger.LogInformation(
+            "MakeCombinedMove request: Game={GameId}, Connection={ConnectionId}, From={From}, To={To}, Intermediates=[{Intermediates}]",
+            session.Id,
+            connectionId,
+            from,
+            to,
+            string.Join(",", intermediatePoints));
+
+        if (!session.IsPlayerTurn(connectionId))
+        {
+            _logger.LogWarning(
+                "Combined move rejected: Not player's turn. Game={GameId}",
+                session.Id);
+            return ActionResult.Error("Not your turn");
+        }
+
+        if (session.Engine.HasCurrentPlayerTimedOut())
+        {
+            return ActionResult.Error("You have run out of time");
+        }
+
+        // Build full path: from -> intermediate[0] -> intermediate[1] -> ... -> to
+        var fullPath = new List<int> { from };
+        fullPath.AddRange(intermediatePoints);
+        fullPath.Add(to);
+
+        // Acquire lock for the entire combined move operation
+        await session.GameActionLock.WaitAsync();
+        int movesExecuted = 0;
+
+        try
+        {
+            // Execute each step in the path
+            for (int i = 0; i < fullPath.Count - 1; i++)
+            {
+                int stepFrom = fullPath[i];
+                int stepTo = fullPath[i + 1];
+
+                var validMoves = session.Engine.GetValidMoves();
+                var matchingMove = validMoves.FirstOrDefault(m => m.From == stepFrom && m.To == stepTo);
+
+                if (matchingMove == null)
+                {
+                    _logger.LogWarning(
+                        "Combined move failed at step {Step}: No valid move {From}->{To}. Game={GameId}",
+                        i + 1,
+                        stepFrom,
+                        stepTo,
+                        session.Id);
+
+                    // Rollback all previously executed moves
+                    for (int j = 0; j < movesExecuted; j++)
+                    {
+                        session.Engine.UndoLastMove();
+                    }
+
+                    return ActionResult.Error($"Invalid combined move - step {stepFrom}->{stepTo} not valid");
+                }
+
+                if (!session.Engine.IsValidMove(matchingMove))
+                {
+                    _logger.LogWarning(
+                        "Combined move failed at step {Step}: IsValidMove returned false. Game={GameId}",
+                        i + 1,
+                        session.Id);
+
+                    // Rollback
+                    for (int j = 0; j < movesExecuted; j++)
+                    {
+                        session.Engine.UndoLastMove();
+                    }
+
+                    return ActionResult.Error($"Invalid combined move - step {stepFrom}->{stepTo} validation failed");
+                }
+
+                if (!session.Engine.ExecuteMove(matchingMove))
+                {
+                    _logger.LogWarning(
+                        "Combined move failed at step {Step}: ExecuteMove returned false. Game={GameId}",
+                        i + 1,
+                        session.Id);
+
+                    // Rollback
+                    for (int j = 0; j < movesExecuted; j++)
+                    {
+                        session.Engine.UndoLastMove();
+                    }
+
+                    return ActionResult.Error($"Invalid combined move - step {stepFrom}->{stepTo} execution failed");
+                }
+
+                movesExecuted++;
+                _logger.LogDebug(
+                    "Combined move step {Step} executed: {From}->{To}, DieUsed={Die}",
+                    i + 1,
+                    stepFrom,
+                    stepTo,
+                    matchingMove.DieValue);
+            }
+
+            _logger.LogInformation(
+                "Combined move completed: Game={GameId}, Path=[{Path}], TotalMoves={Moves}",
+                session.Id,
+                string.Join("->", fullPath),
+                movesExecuted);
+
+            session.UpdateActivity();
+        }
+        finally
+        {
+            session.GameActionLock.Release();
+        }
+
+        // Broadcast and save
+        await BroadcastGameUpdateAsync(session);
+        await SaveGameStateAsync(session);
+
+        // Check if game is over (same logic as MakeMoveAsync)
+        if (session.Engine.Winner != null)
+        {
+            var stakes = session.Engine.GetGameResult();
+
+            await HandleMatchGameCompletion(session);
+
+            if (session.GameMode.ShouldPersist)
+            {
+                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+            }
+
+            if (session.GameMode.ShouldTrackStats)
+            {
+                var game = GameEngineMapper.ToGame(session);
+                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
+            }
+            else
+            {
+                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
+            }
+
+            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
+
+            await BroadcastGameOverAsync(session);
+
+            _sessionManager.RemoveGame(session.Id);
+            _logger.LogInformation("Removed completed game {GameId} from memory", session.Id);
+
+            return ActionResult.GameOver();
+        }
+
+        return ActionResult.Ok();
+    }
+
     public async Task<ActionResult> EndTurnAsync(GameSession session, string connectionId)
     {
         if (!session.IsPlayerTurn(connectionId))
