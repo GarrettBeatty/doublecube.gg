@@ -463,6 +463,26 @@ export type PuzzleStreakInfo = {
     totalAttempts: number;
 }
 
+/** Transpiled from Backgammon.Server.Models.PuzzleValidMovesRequest */
+export type PuzzleValidMovesRequest = {
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.PointStateDto> */
+    boardState: PointStateDto[];
+    /** Transpiled from string */
+    currentPlayer: string;
+    /** Transpiled from int[] */
+    dice: number[];
+    /** Transpiled from int */
+    whiteCheckersOnBar: number;
+    /** Transpiled from int */
+    redCheckersOnBar: number;
+    /** Transpiled from int */
+    whiteBornOff: number;
+    /** Transpiled from int */
+    redBornOff: number;
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.MoveDto> */
+    pendingMoves: MoveDto[];
+}
+
 /** Transpiled from Backgammon.Server.Models.RatingBucketDto */
 export type RatingBucketDto = {
     /** Transpiled from int */

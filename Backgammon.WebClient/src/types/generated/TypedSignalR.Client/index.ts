@@ -4,7 +4,7 @@
 // @ts-nocheck
 import type { HubConnection, IStreamResult, Subject } from '@microsoft/signalr';
 import type { IGameHub, IGameHubClient } from './Backgammon.Server.Hubs.Interfaces';
-import type { MoveDto, MatchConfig, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, GameState } from '../Backgammon.Server.Models';
+import type { MoveDto, MatchConfig, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, GameState } from '../Backgammon.Server.Models';
 import type { MatchLobbyDto, ActiveGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
@@ -272,6 +272,10 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly getHistoricalPuzzle = async (date: string): Promise<DailyPuzzleDto> => {
         return await this.connection.invoke("GetHistoricalPuzzle", date);
+    }
+
+    public readonly getPuzzleValidMoves = async (request: PuzzleValidMovesRequest): Promise<MoveDto[]> => {
+        return await this.connection.invoke("GetPuzzleValidMoves", request);
     }
 }
 
