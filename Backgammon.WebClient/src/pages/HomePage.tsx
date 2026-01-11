@@ -17,6 +17,7 @@ import { FeaturedTournaments } from '@/components/home/FeaturedTournaments'
 import { ActivityFeed } from '@/components/home/ActivityFeed'
 import { RecentOpponents } from '@/components/home/RecentOpponents'
 import { QuickPlayHero } from '@/components/home/QuickPlayHero'
+import { Footer } from '@/components/home/Footer'
 
 // Import modals
 import { CreateMatchModal } from '@/components/modals/CreateMatchModal'
@@ -139,6 +140,8 @@ export function HomePage() {
 
         </div>
       </main>
+
+      <Footer />
 
       {/* Modals */}
       <CreateMatchModal
