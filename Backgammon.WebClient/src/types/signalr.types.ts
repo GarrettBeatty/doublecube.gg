@@ -52,6 +52,7 @@ export const HubMethods = {
   GiveUpPuzzle: 'GiveUpPuzzle',
   GetPuzzleStreak: 'GetPuzzleStreak',
   GetHistoricalPuzzle: 'GetHistoricalPuzzle',
+  GetPuzzleValidMoves: 'GetPuzzleValidMoves',
 } as const
 
 // SignalR event names (server → client)

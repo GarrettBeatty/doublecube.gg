@@ -16,25 +16,7 @@ const newsItems: NewsItem[] = [
       </>
     ),
     timeAgo: '1 week ago',
-  },
-  {
-    id: '2',
-    content: (
-      <>
-        GM Magnus Carlsen is the 2025 World Blitz Champion and GM Bibisara Assaubayeva is the 2025 Women's World Blitz Champion! Read our final recap and check out our player interviews by IM Laura Unuk on YouTube.
-      </>
-    ),
-    timeAgo: '1 week ago',
-  },
-  {
-    id: '3',
-    content: (
-      <>
-        After the first day of the FIDE World Blitz Championships 2025, GM Arjun Erigaisi, GM Maxime Vachier-Lagrave, and GM Fabiano Caruana are in shared first on 10/13, while in the Women's tournament, IM Eline Roebers is in the sole lead with 8.5/10! Read our Day 1 recap and check out our player interviews on YouTube.
-      </>
-    ),
-    timeAgo: '2 weeks ago',
-  },
+  }
 ]
 
 const footerLinks = {

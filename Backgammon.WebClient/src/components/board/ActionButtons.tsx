@@ -39,7 +39,21 @@ export const ActionButtons = memo(function ActionButtons({
   // Button positions
   const leftSideX = BOARD_CONFIG.viewBox.width * 0.2216
   const rightSideX = BOARD_CONFIG.viewBox.width * 0.7265
-  const buttonRadius = 25
+
+  // Get radius based on button type (original: Roll/End = 40, Undo/Double = 32)
+  const getButtonRadius = (type: ButtonConfig['type']): number => {
+    switch (type) {
+      case 'roll':
+      case 'end':
+        return 40
+      case 'undo':
+      case 'double':
+      case 'resign':
+        return 32
+      default:
+        return 25
+    }
+  }
 
   // Counter-rotate if board is flipped
   const transform = isFlipped
@@ -47,16 +61,17 @@ export const ActionButtons = memo(function ActionButtons({
     : undefined
 
   // Position buttons based on their type
+  // Original layout: Roll/End on RIGHT, Undo/Double on LEFT (mutually exclusive pairs)
   const getButtonPosition = (button: ButtonConfig, index: number) => {
     switch (button.type) {
       case 'roll':
-        return { x: leftSideX, y: centerY }
-      case 'double':
-        return { x: leftSideX, y: centerY - 60 }
-      case 'undo':
-        return { x: rightSideX, y: centerY - 30 }
+        return { x: rightSideX, y: centerY }
       case 'end':
-        return { x: rightSideX, y: centerY + 30 }
+        return { x: rightSideX, y: centerY }
+      case 'double':
+        return { x: leftSideX, y: centerY }
+      case 'undo':
+        return { x: leftSideX, y: centerY }
       case 'resign':
         return { x: leftSideX, y: centerY + 60 }
       default:
@@ -72,6 +87,7 @@ export const ActionButtons = memo(function ActionButtons({
         const { x, y } = getButtonPosition(button, index)
         const colors = BUTTON_COLORS[button.variant || 'default']
         const icon = BUTTON_ICONS[button.type]
+        const radius = getButtonRadius(button.type)
 
         return (
           <g
@@ -83,7 +99,7 @@ export const ActionButtons = memo(function ActionButtons({
             <circle
               cx={x}
               cy={y}
-              r={buttonRadius}
+              r={radius}
               fill={colors.bg}
               stroke="rgba(0,0,0,0.1)"
               strokeWidth={2}

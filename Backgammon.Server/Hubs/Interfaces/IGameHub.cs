@@ -274,4 +274,9 @@ public interface IGameHub
     /// Get a historical puzzle by date
     /// </summary>
     Task<DailyPuzzleDto?> GetHistoricalPuzzle(string date);
+
+    /// <summary>
+    /// Get valid moves for a puzzle position with pending moves applied.
+    /// </summary>
+    Task<List<MoveDto>> GetPuzzleValidMoves(PuzzleValidMovesRequest request);
 }

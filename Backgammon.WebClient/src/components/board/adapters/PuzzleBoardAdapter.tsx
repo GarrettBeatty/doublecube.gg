@@ -1,6 +1,8 @@
-import { memo, useMemo, useCallback } from 'react'
-import { DailyPuzzle, PendingPuzzleMove } from '@/types/puzzle.types'
+import { memo, useMemo, useCallback, useEffect, useState } from 'react'
+import { DailyPuzzle, PendingPuzzleMove, PuzzleMove } from '@/types/puzzle.types'
 import { usePuzzleStore } from '@/stores/puzzleStore'
+import { useSignalR } from '@/contexts/SignalRContext'
+import { HubMethods } from '@/types/signalr.types'
 import {
   UnifiedBoard,
   BoardPosition,
@@ -14,6 +16,7 @@ interface PuzzleBoardAdapterProps {
 export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
   puzzle,
 }: PuzzleBoardAdapterProps) {
+  const { invoke } = useSignalR()
   const {
     selectedPoint,
     validDestinations,
@@ -23,6 +26,9 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
     setSelectedPoint,
     setValidDestinations,
   } = usePuzzleStore()
+
+  // Store server-validated moves
+  const [serverValidMoves, setServerValidMoves] = useState<PuzzleMove[]>([])
 
   // Apply pending moves to get current board state
   const position = useMemo<BoardPosition>(() => {
@@ -84,99 +90,64 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
     }
   }, [puzzle, pendingMoves])
 
-  // Calculate valid moves from a point
+  // Fetch valid moves from server when position/dice/pendingMoves change
+  useEffect(() => {
+    const fetchValidMoves = async () => {
+      if (remainingDice.length === 0) {
+        setServerValidMoves([])
+        return
+      }
+
+      try {
+        const request = {
+          boardState: puzzle.boardState.map((p) => ({
+            position: p.position,
+            color: p.color,
+            count: p.count,
+          })),
+          currentPlayer: puzzle.currentPlayer,
+          dice: puzzle.dice,
+          whiteCheckersOnBar: puzzle.whiteCheckersOnBar,
+          redCheckersOnBar: puzzle.redCheckersOnBar,
+          whiteBornOff: puzzle.whiteBornOff,
+          redBornOff: puzzle.redBornOff,
+          pendingMoves: pendingMoves.map((m) => ({
+            from: m.from,
+            to: m.to,
+            dieValue: m.dieValue,
+            isHit: m.isHit,
+          })),
+        }
+
+        const moves = await invoke<PuzzleMove[]>(HubMethods.GetPuzzleValidMoves, request)
+        setServerValidMoves(moves ?? [])
+      } catch (error) {
+        console.error('Error fetching valid moves:', error)
+        setServerValidMoves([])
+      }
+    }
+
+    fetchValidMoves()
+  }, [puzzle, pendingMoves, remainingDice.length, invoke])
+
+  // Get valid moves from a point using server-validated moves
   const getValidMovesFrom = useCallback(
     (from: number): number[] => {
-      if (remainingDice.length === 0) return []
-
-      const dests: number[] = []
-      const movingColor = puzzle.currentPlayer.toLowerCase() as 'white' | 'red'
-      const direction = movingColor === 'white' ? -1 : 1
-
-      // Check if player has checkers on bar
-      const onBar = movingColor === 'white' ? position.whiteOnBar : position.redOnBar
-      if (onBar > 0 && from !== 0) {
-        return [] // Must move from bar first
-      }
-
-      for (const die of remainingDice) {
-        let to: number
-
-        if (from === 0) {
-          // Coming from bar
-          to = movingColor === 'white' ? 25 - die : die
-        } else {
-          to = from + direction * die
-        }
-
-        // Check if destination is valid
-        if (to >= 1 && to <= 24) {
-          const destPoint = position.points.find((p) => p.position === to)
-          if (destPoint) {
-            if (
-              destPoint.color === null ||
-              destPoint.color === movingColor ||
-              (destPoint.color !== movingColor && destPoint.count === 1)
-            ) {
-              if (!dests.includes(to)) dests.push(to)
-            }
-          }
-        }
-
-        // Check bear off
-        const canBearOff = () => {
-          if (movingColor === 'white') {
-            if (position.whiteOnBar > 0) return false
-            for (const point of position.points) {
-              if (point.color === 'white' && point.position > 6) return false
-            }
-            return true
-          } else {
-            if (position.redOnBar > 0) return false
-            for (const point of position.points) {
-              if (point.color === 'red' && point.position < 19) return false
-            }
-            return true
-          }
-        }
-
-        if (movingColor === 'white' && to <= 0 && canBearOff()) {
-          if (!dests.includes(0)) dests.push(0)
-        } else if (movingColor === 'red' && to >= 25 && canBearOff()) {
-          if (!dests.includes(25)) dests.push(25)
-        }
-      }
-
-      return dests
+      return serverValidMoves
+        .filter((m) => m.from === from)
+        .map((m) => m.to)
     },
-    [puzzle.currentPlayer, remainingDice, position]
+    [serverValidMoves]
   )
 
-  // Find all moveable sources
+  // Find all moveable sources from server-validated moves
   const moveableSources = useMemo(() => {
     const sources = new Set<number>()
-    const movingColor = puzzle.currentPlayer.toLowerCase() as 'white' | 'red'
-
-    // Check bar first
-    const onBar = movingColor === 'white' ? position.whiteOnBar : position.redOnBar
-    if (onBar > 0) {
-      if (getValidMovesFrom(0).length > 0) {
-        sources.add(0)
-      }
-      return sources // Must move from bar first
+    for (const move of serverValidMoves) {
+      sources.add(move.from)
     }
-
-    // Check all points
-    for (const point of position.points) {
-      if (point.color === movingColor && point.count > 0) {
-        if (getValidMovesFrom(point.position).length > 0) {
-          sources.add(point.position)
-        }
-      }
-    }
-
     return sources
-  }, [position, puzzle.currentPlayer, getValidMovesFrom])
+  }, [serverValidMoves])
 
   // Build highlights
   const highlights = useMemo<PointHighlight[]>(() => {
@@ -235,33 +206,23 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
 
       // If clicking on a valid destination, make the move
       if (selectedPoint !== null && validDestinations.includes(point)) {
-        const distance = selectedPoint === 0
-          ? (movingColor === 'white' ? 25 - point : point)
-          : Math.abs(point - selectedPoint)
+        // Find the matching move from server-validated moves
+        const validMove = serverValidMoves.find(
+          (m) => m.from === selectedPoint && m.to === point
+        )
 
-        // Find which die value to use
-        let dieValue = distance
-        if (!remainingDice.includes(dieValue)) {
-          // For bearing off, might use a larger die
-          dieValue = remainingDice.find((d) => d >= distance) ?? distance
+        if (validMove) {
+          const move: PendingPuzzleMove = {
+            from: validMove.from,
+            to: validMove.to,
+            dieValue: validMove.dieValue,
+            isHit: validMove.isHit,
+          }
+
+          addMove(move)
+          setSelectedPoint(null)
+          setValidDestinations([])
         }
-
-        const isHit =
-          pointData &&
-          pointData.color !== null &&
-          pointData.color !== movingColor &&
-          pointData.count === 1
-
-        const move: PendingPuzzleMove = {
-          from: selectedPoint,
-          to: point,
-          dieValue,
-          isHit: isHit ?? false,
-        }
-
-        addMove(move)
-        setSelectedPoint(null)
-        setValidDestinations([])
       }
     },
     [
@@ -269,7 +230,7 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
       position,
       selectedPoint,
       validDestinations,
-      remainingDice,
+      serverValidMoves,
       getValidMovesFrom,
       addMove,
       setSelectedPoint,
@@ -280,36 +241,23 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
   // Handle move attempt from drag
   const handleMoveAttempt = useCallback(
     (from: number, to: number) => {
-      const validDests = getValidMovesFrom(from)
-      if (!validDests.includes(to)) return
+      // Find the matching move from server-validated moves
+      const validMove = serverValidMoves.find(
+        (m) => m.from === from && m.to === to
+      )
 
-      const movingColor = puzzle.currentPlayer.toLowerCase() as 'white' | 'red'
-      const destPoint = position.points.find((p) => p.position === to)
-      const distance = from === 0
-        ? (movingColor === 'white' ? 25 - to : to)
-        : Math.abs(to - from)
+      if (validMove) {
+        const move: PendingPuzzleMove = {
+          from: validMove.from,
+          to: validMove.to,
+          dieValue: validMove.dieValue,
+          isHit: validMove.isHit,
+        }
 
-      let dieValue = distance
-      if (!remainingDice.includes(dieValue)) {
-        dieValue = remainingDice.find((d) => d >= distance) ?? distance
+        addMove(move)
       }
-
-      const isHit =
-        destPoint &&
-        destPoint.color !== null &&
-        destPoint.color !== movingColor &&
-        destPoint.count === 1
-
-      const move: PendingPuzzleMove = {
-        from,
-        to,
-        dieValue,
-        isHit: isHit ?? false,
-      }
-
-      addMove(move)
     },
-    [puzzle.currentPlayer, position.points, remainingDice, getValidMovesFrom, addMove]
+    [serverValidMoves, addMove]
   )
 
   // Check if a point is draggable

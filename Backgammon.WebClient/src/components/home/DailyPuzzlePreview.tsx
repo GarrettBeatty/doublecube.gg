@@ -6,7 +6,7 @@ import { Flame, Check, Loader2 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods } from '@/types/signalr.types'
 import { DailyPuzzle, PuzzleStreakInfo } from '@/types/puzzle.types'
-import { MiniBoardPreview } from './MiniBoardPreview'
+import { MiniBoardAdapter } from '@/components/board'
 import { MiniPoint } from '@/types/home.types'
 
 export function DailyPuzzlePreview() {
@@ -80,7 +80,7 @@ export function DailyPuzzlePreview() {
       <CardContent className="p-0">
         {/* Mini Board Preview */}
         <div className="flex justify-center bg-muted/30 p-3">
-          <MiniBoardPreview
+          <MiniBoardAdapter
             board={boardToMiniPoints(puzzle)}
             whiteOnBar={puzzle.whiteCheckersOnBar}
             redOnBar={puzzle.redCheckersOnBar}

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore, MatchState } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { HubMethods, MatchStateDto } from '@/types/signalr.types'
-import { BoardSVG } from '@/components/game/BoardSVG'
+import { GameBoardAdapter } from '@/components/board'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
@@ -449,7 +449,7 @@ export const GamePage: React.FC = () => {
 
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <BoardSVG
+                  <GameBoardAdapter
                     gameState={currentGameState}
                     isSpectator={isSpectator}
                     onOfferDouble={!isSpectator ? handleOfferDouble : undefined}

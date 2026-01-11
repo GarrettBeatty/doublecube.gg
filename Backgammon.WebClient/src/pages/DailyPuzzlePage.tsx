@@ -9,7 +9,7 @@ import { Brain, ArrowLeft, RotateCcw, Check, X, Flame, Calendar, Eye } from 'luc
 import { useToast } from '@/hooks/use-toast'
 import { usePuzzleStore, formatMovesForSubmission } from '@/stores/puzzleStore'
 import { DailyPuzzle, PuzzleResult as PuzzleResultType, PuzzleStreakInfo } from '@/types/puzzle.types'
-import { PuzzleBoard } from '@/components/puzzle/PuzzleBoard'
+import { PuzzleBoardAdapter } from '@/components/board'
 import { PuzzleResult } from '@/components/puzzle/PuzzleResult'
 
 export const DailyPuzzlePage: React.FC = () => {
@@ -292,7 +292,7 @@ export const DailyPuzzlePage: React.FC = () => {
           <div className="space-y-3">
             <Card>
               <CardContent className="p-2">
-                <PuzzleBoard puzzle={currentPuzzle} />
+                <PuzzleBoardAdapter puzzle={currentPuzzle} />
               </CardContent>
             </Card>
           </div>

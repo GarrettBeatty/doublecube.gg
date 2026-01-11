@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { BarChart3 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useGameStore } from '@/stores/gameStore'
-import { BoardSVG } from '@/components/game/BoardSVG'
+import { GameBoardAdapter } from '@/components/board'
 import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
@@ -407,7 +407,7 @@ export const AnalysisPage: React.FC = () => {
               <CardContent className="p-2 relative">
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <BoardSVG gameState={currentGameState} />
+                  <GameBoardAdapter gameState={currentGameState} />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={false}

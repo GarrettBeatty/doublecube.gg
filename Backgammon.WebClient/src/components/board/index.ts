@@ -24,7 +24,6 @@ export { DoublingCubeDisplay } from './DoublingCubeDisplay'
 export {
   GameBoardAdapter,
   PuzzleBoardAdapter,
-  AnalysisBoardAdapter,
   MiniBoardAdapter,
 } from './adapters'
 

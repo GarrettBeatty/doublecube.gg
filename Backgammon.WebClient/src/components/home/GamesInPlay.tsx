@@ -5,7 +5,7 @@ import { RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useActiveGames } from '@/hooks/useActiveGames'
 import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
-import { MiniBoardPreview } from './MiniBoardPreview'
+import { MiniBoardAdapter } from '@/components/board'
 import { MiniPoint } from '@/types/home.types'
 
 interface GameCardProps {
@@ -45,7 +45,7 @@ function GameCard({
       onClick={() => onPlay(gameId)}
     >
       {/* Mini Board Preview */}
-      <MiniBoardPreview
+      <MiniBoardAdapter
         board={board}
         whiteOnBar={whiteOnBar}
         redOnBar={redOnBar}

@@ -2184,6 +2184,111 @@ public class GameHub : Hub<IGameHubClient>
         }
     }
 
+    /// <summary>
+    /// Get valid moves for a puzzle position with pending moves applied.
+    /// Creates a temporary GameEngine, applies the position and pending moves,
+    /// then returns valid moves using the engine's rules.
+    /// </summary>
+    /// <param name="request">The puzzle position with pending moves.</param>
+    /// <returns>List of valid moves from the current position.</returns>
+    public Task<List<MoveDto>> GetPuzzleValidMoves(PuzzleValidMovesRequest request)
+    {
+        try
+        {
+            var engine = new GameEngine();
+
+            // Clear board first
+            for (int i = 1; i <= 24; i++)
+            {
+                engine.Board.GetPoint(i).Checkers.Clear();
+            }
+
+            engine.WhitePlayer.CheckersOnBar = 0;
+            engine.WhitePlayer.CheckersBornOff = 0;
+            engine.RedPlayer.CheckersOnBar = 0;
+            engine.RedPlayer.CheckersBornOff = 0;
+
+            // Apply board state
+            foreach (var pointState in request.BoardState)
+            {
+                if (pointState.Count > 0 && !string.IsNullOrEmpty(pointState.Color))
+                {
+                    var color = pointState.Color.Equals("White", StringComparison.OrdinalIgnoreCase)
+                        ? CheckerColor.White
+                        : CheckerColor.Red;
+                    var point = engine.Board.GetPoint(pointState.Position);
+                    for (int i = 0; i < pointState.Count; i++)
+                    {
+                        point.AddChecker(color);
+                    }
+                }
+            }
+
+            // Apply bar and bear-off counts
+            engine.WhitePlayer.CheckersOnBar = request.WhiteCheckersOnBar;
+            engine.RedPlayer.CheckersOnBar = request.RedCheckersOnBar;
+            engine.WhitePlayer.CheckersBornOff = request.WhiteBornOff;
+            engine.RedPlayer.CheckersBornOff = request.RedBornOff;
+
+            // Set current player
+            var currentPlayer = request.CurrentPlayer.Equals("White", StringComparison.OrdinalIgnoreCase)
+                ? CheckerColor.White
+                : CheckerColor.Red;
+            engine.SetCurrentPlayer(currentPlayer);
+
+            // Set dice and remaining moves
+            if (request.Dice.Length >= 2)
+            {
+                engine.Dice.SetDice(request.Dice[0], request.Dice[1]);
+            }
+
+            // Build remaining moves: start with full dice values
+            var remainingDice = new List<int>(engine.Dice.GetMoves());
+
+            // Remove dice used by pending moves
+            foreach (var pendingMove in request.PendingMoves)
+            {
+                // Remove the die value used
+                var dieIndex = remainingDice.IndexOf(pendingMove.DieValue);
+                if (dieIndex >= 0)
+                {
+                    remainingDice.RemoveAt(dieIndex);
+                }
+            }
+
+            engine.RemainingMoves.Clear();
+            engine.RemainingMoves.AddRange(remainingDice);
+
+            // Mark game as started
+            engine.SetGameStarted(true);
+
+            // Apply pending moves to board state
+            foreach (var pendingMove in request.PendingMoves)
+            {
+                ApplyPendingMoveToBoard(engine, pendingMove, currentPlayer);
+            }
+
+            // Get valid moves from the engine
+            var validMoves = engine.GetValidMoves();
+
+            // Convert to DTOs
+            var moveDtos = validMoves.Select(m => new MoveDto
+            {
+                From = m.From,
+                To = m.To,
+                DieValue = m.DieValue,
+                IsHit = m.IsHit
+            }).ToList();
+
+            return Task.FromResult(moveDtos);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting puzzle valid moves");
+            throw new HubException("Failed to get puzzle valid moves");
+        }
+    }
+
     // ==================== Players Page Methods ====================
 
     /// <summary>
@@ -2406,6 +2511,71 @@ public class GameHub : Hub<IGameHubClient>
         var parts = playerId.Split('_');
         var suffix = parts.Length > 0 ? parts[^1] : "unknown";
         return $"Anonymous-{suffix[..Math.Min(6, suffix.Length)]}";
+    }
+
+    /// <summary>
+    /// Apply a pending puzzle move to the board state.
+    /// </summary>
+    private static void ApplyPendingMoveToBoard(GameEngine engine, MoveDto move, CheckerColor movingColor)
+    {
+        var opponent = movingColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
+
+        // Remove from source
+        if (move.From == 0)
+        {
+            // From bar
+            if (movingColor == CheckerColor.White)
+            {
+                engine.WhitePlayer.CheckersOnBar--;
+            }
+            else
+            {
+                engine.RedPlayer.CheckersOnBar--;
+            }
+        }
+        else
+        {
+            var sourcePoint = engine.Board.GetPoint(move.From);
+            if (sourcePoint.Count > 0)
+            {
+                sourcePoint.RemoveChecker();
+            }
+        }
+
+        // Handle destination
+        if (move.To == 0 || move.To == 25)
+        {
+            // Bear off
+            if (movingColor == CheckerColor.White)
+            {
+                engine.WhitePlayer.CheckersBornOff++;
+            }
+            else
+            {
+                engine.RedPlayer.CheckersBornOff++;
+            }
+        }
+        else
+        {
+            var destPoint = engine.Board.GetPoint(move.To);
+
+            // Handle hit
+            if (move.IsHit && destPoint.Count == 1 && destPoint.Color == opponent)
+            {
+                destPoint.RemoveChecker();
+                if (opponent == CheckerColor.White)
+                {
+                    engine.WhitePlayer.CheckersOnBar++;
+                }
+                else
+                {
+                    engine.RedPlayer.CheckersOnBar++;
+                }
+            }
+
+            // Add checker to destination
+            destPoint.AddChecker(movingColor);
+        }
     }
 
     private string? GetAuthenticatedUserId()
