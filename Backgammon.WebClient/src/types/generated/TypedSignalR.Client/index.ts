@@ -262,6 +262,10 @@ class IGameHub_HubProxy implements IGameHub {
         return await this.connection.invoke("SubmitPuzzleAnswer", moves);
     }
 
+    public readonly giveUpPuzzle = async (): Promise<PuzzleResultDto> => {
+        return await this.connection.invoke("GiveUpPuzzle");
+    }
+
     public readonly getPuzzleStreak = async (): Promise<PuzzleStreakInfo> => {
         return await this.connection.invoke("GetPuzzleStreak");
     }
