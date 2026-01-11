@@ -20,30 +20,19 @@ const newsItems: NewsItem[] = [
 ]
 
 const footerLinks = {
-  primary: [
-    { label: 'Donate', href: '#' },
-    { label: 'Become a Patron', href: '#' },
-    { label: 'Swag Store', href: '#' },
-  ],
   about: [
-    { label: 'About', href: '#' },
-    { label: 'FAQ', href: '#' },
-    { label: 'Contact', href: '#' },
-    { label: 'Mobile App', href: '#' },
+    { label: 'About', href: '/about' },
+    { label: 'FAQ', href: '/faq' },
+    { label: 'Contact', href: '/contact' },
+    { label: 'Mobile App', href: '/mobile-app' },
   ],
   legal: [
-    { label: 'Terms of Service', href: '#' },
-    { label: 'Privacy', href: '#' },
-    { label: 'Source Code', href: '#' },
-    { label: 'Ads', href: '#' },
+    { label: 'Terms of Service', href: '/terms-of-service' },
+    { label: 'Privacy', href: '/privacy' },
+    { label: 'Source Code', href: 'https://github.com/GarrettBeatty/doublecube.gg' },
   ],
   social: [
-    { label: 'Mastodon', href: '#' },
-    { label: 'GitHub', href: '#' },
-    { label: 'Discord', href: '#' },
-    { label: 'Bluesky', href: '#' },
-    { label: 'YouTube', href: '#' },
-    { label: 'Twitch', href: '#' },
+    { label: 'GitHub', href: 'https://github.com/GarrettBeatty/doublecube.gg' }
   ],
 }
 
@@ -80,23 +69,6 @@ export function Footer() {
 
         {/* Links Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
-          {/* Primary Links */}
-          <div>
-            <h4 className="font-semibold mb-3">Support</h4>
-            <ul className="space-y-2">
-              {footerLinks.primary.map((link) => (
-                <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
           {/* About Links */}
           <div>
             <h4 className="font-semibold mb-3">About</h4>
