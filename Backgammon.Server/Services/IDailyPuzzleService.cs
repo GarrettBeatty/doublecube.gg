@@ -24,6 +24,12 @@ public interface IDailyPuzzleService
     Task<PuzzleResultDto> SubmitAnswerAsync(string userId, string puzzleDate, List<MoveDto> moves);
 
     /// <summary>
+    /// Give up on a puzzle and reveal the answer.
+    /// Does not count as solving and breaks streak.
+    /// </summary>
+    Task<PuzzleResultDto> GiveUpPuzzleAsync(string userId, string puzzleDate);
+
+    /// <summary>
     /// Get user's streak information.
     /// </summary>
     Task<PuzzleStreakInfo> GetStreakInfoAsync(string userId);

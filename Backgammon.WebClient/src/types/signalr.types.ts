@@ -47,6 +47,7 @@ export const HubMethods = {
   // Daily Puzzle
   GetDailyPuzzle: 'GetDailyPuzzle',
   SubmitPuzzleAnswer: 'SubmitPuzzleAnswer',
+  GiveUpPuzzle: 'GiveUpPuzzle',
   GetPuzzleStreak: 'GetPuzzleStreak',
   GetHistoricalPuzzle: 'GetHistoricalPuzzle',
 } as const
