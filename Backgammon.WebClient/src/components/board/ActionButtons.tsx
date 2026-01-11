@@ -1,0 +1,113 @@
+import { memo } from 'react'
+import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { ButtonConfig } from './board.types'
+
+interface ActionButtonsProps {
+  buttons: ButtonConfig[]
+  isFlipped?: boolean
+}
+
+// Button colors based on variant
+const BUTTON_COLORS: Record<
+  NonNullable<ButtonConfig['variant']>,
+  { bg: string; text: string }
+> = {
+  default: { bg: 'hsl(0 0% 98%)', text: 'hsl(0 0% 9%)' },
+  primary: { bg: 'hsl(221.2 83.2% 53.3%)', text: 'hsl(0 0% 98%)' },
+  warning: { bg: 'hsl(47.9 95.8% 53.1%)', text: 'hsl(0 0% 9%)' },
+  danger: { bg: 'hsl(0 84.2% 60.2%)', text: 'hsl(0 0% 98%)' },
+}
+
+// Button icons based on type
+const BUTTON_ICONS: Record<ButtonConfig['type'], string> = {
+  roll: '🎲',
+  undo: '↩',
+  end: '✓',
+  double: '2×',
+  resign: '🏳',
+}
+
+export const ActionButtons = memo(function ActionButtons({
+  buttons,
+  isFlipped = false,
+}: ActionButtonsProps) {
+  if (!buttons || buttons.length === 0) return null
+
+  const centerX = BOARD_CONFIG.viewBox.width / 2
+  const centerY = BOARD_CONFIG.viewBox.height / 2
+
+  // Button positions
+  const leftSideX = BOARD_CONFIG.viewBox.width * 0.2216
+  const rightSideX = BOARD_CONFIG.viewBox.width * 0.7265
+  const buttonRadius = 25
+
+  // Counter-rotate if board is flipped
+  const transform = isFlipped
+    ? `rotate(180 ${centerX} ${centerY})`
+    : undefined
+
+  // Position buttons based on their type
+  const getButtonPosition = (button: ButtonConfig, index: number) => {
+    switch (button.type) {
+      case 'roll':
+        return { x: leftSideX, y: centerY }
+      case 'double':
+        return { x: leftSideX, y: centerY - 60 }
+      case 'undo':
+        return { x: rightSideX, y: centerY - 30 }
+      case 'end':
+        return { x: rightSideX, y: centerY + 30 }
+      case 'resign':
+        return { x: leftSideX, y: centerY + 60 }
+      default:
+        return { x: centerX, y: centerY + index * 60 }
+    }
+  }
+
+  return (
+    <g id="action-buttons" transform={transform}>
+      {buttons.map((button, index) => {
+        if (button.disabled) return null
+
+        const { x, y } = getButtonPosition(button, index)
+        const colors = BUTTON_COLORS[button.variant || 'default']
+        const icon = BUTTON_ICONS[button.type]
+
+        return (
+          <g
+            key={button.type}
+            style={{ cursor: 'pointer' }}
+            onClick={button.onClick}
+          >
+            {/* Button circle */}
+            <circle
+              cx={x}
+              cy={y}
+              r={buttonRadius}
+              fill={colors.bg}
+              stroke="rgba(0,0,0,0.1)"
+              strokeWidth={2}
+              style={{
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
+                transition: 'transform 0.1s',
+              }}
+            />
+            {/* Button icon/label */}
+            <text
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={16}
+              fontWeight="bold"
+              fill={colors.text}
+              style={{ userSelect: 'none', pointerEvents: 'none' }}
+            >
+              {icon}
+            </text>
+          </g>
+        )
+      })}
+    </g>
+  )
+})
