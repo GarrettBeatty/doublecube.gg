@@ -268,4 +268,95 @@ public class CombinedMovesTests
         Assert.NotNull(combinedBearOff.DiceUsed);
         Assert.Equal(2, combinedBearOff.DiceUsed.Length);
     }
+
+    [Fact]
+    public void CombinedMoves_BearingOff_ShouldNotAllowWhenHigherPointsOccupied()
+    {
+        // Arrange - Bug scenario: dice 6,2 with checkers on points 1-5
+        // Combined move 3→1→off should NOT be valid because:
+        // - After 3→1, highest point is still 5
+        // - Bearing off from 1 with die 6 (6 > 1) requires 1 to be highest point
+        // - Since 5 is occupied, 1 is not the highest point
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board and set up scenario
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put White checkers on points 1-5 (similar to screenshot scenario)
+        session.Engine.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(2).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(2).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(3).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(4).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(5).AddChecker(CheckerColor.White);
+
+        // Set White as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Set dice to 6-2 (the scenario in the bug report)
+        session.Engine.Dice.SetDice(6, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Should NOT have combined bear-off from point 3 to 0
+        // Because after 3→1, highest point is still 5, so can't bear off from 1 with die 6
+        var invalidCombinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 3 && m.To == 0);
+
+        Assert.Null(invalidCombinedBearOff);
+
+        // However, valid single moves should still exist:
+        // - 5→off with die 6 (can bear off from 5 when 5 is highest and die > 5)
+        var validBearOff = state.ValidMoves.FirstOrDefault(m =>
+            !m.IsCombinedMove && m.From == 5 && m.To == 0);
+        Assert.NotNull(validBearOff);
+    }
+
+    [Fact]
+    public void CombinedMoves_BearingOff_ShouldAllowWhenHighestPointMovedAway()
+    {
+        // Arrange - If the original source IS the highest point and has only 1 checker,
+        // then after moving, the next point becomes the effective highest
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board and set up scenario
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put only 2 White checkers: one on point 4 and one on point 2
+        session.Engine.Board.GetPoint(4).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(2).AddChecker(CheckerColor.White);
+
+        // Set White as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Set dice to 3-2 (neither can bear off from 4 directly since 3<4 and 2<4)
+        session.Engine.Dice.SetDice(3, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined move 4→2→off SHOULD be valid because:
+        // - Move 4→2 with die 2
+        // - After this, original source (4) is empty, so effective highest is now 2
+        // - Bear off from 2 with die 3 is valid because 3 > 2 and 2 is now the highest point
+        // Note: Bear-off destination (0) is NOT reachable with single die from 4
+        var validCombinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 4 && m.To == 0);
+
+        Assert.NotNull(validCombinedBearOff);
+    }
 }

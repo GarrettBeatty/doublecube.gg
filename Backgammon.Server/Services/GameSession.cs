@@ -574,6 +574,15 @@ public class GameSession
                 isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
                     Engine.CurrentPlayer!,
                     Engine.CurrentPlayer.CheckersOnBar);
+
+                // Additional check: if die > currentPoint, must be bearing off from highest point
+                // Account for the checker having moved from originalSource
+                if (isValidLanding && die > currentPoint)
+                {
+                    int effectiveHighest = GetEffectiveHighestPoint(playerColor, originalSource);
+                    isValidLanding = currentPoint == effectiveHighest;
+                }
+
                 nextPoint = 0; // Normalize to bear-off point
             }
             else if (playerColor == CheckerColor.Red && nextPoint >= 25)
@@ -583,6 +592,16 @@ public class GameSession
                 isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
                     Engine.CurrentPlayer!,
                     Engine.CurrentPlayer.CheckersOnBar);
+
+                // Additional check: if die > normalized point (25 - currentPoint), must be bearing off from highest
+                // Account for the checker having moved from originalSource
+                int normalizedPoint = 25 - currentPoint;
+                if (isValidLanding && die > normalizedPoint)
+                {
+                    int effectiveHighest = GetEffectiveHighestPoint(playerColor, originalSource);
+                    isValidLanding = currentPoint == effectiveHighest;
+                }
+
                 nextPoint = 25; // Normalize to bear-off point
             }
 
@@ -661,6 +680,58 @@ public class GameSession
                     results);
             }
         }
+    }
+
+    /// <summary>
+    /// Gets the effective highest point for bearing off, accounting for a checker
+    /// having moved from the original source (which may now be empty).
+    /// </summary>
+    private int GetEffectiveHighestPoint(CheckerColor playerColor, int originalSource)
+    {
+        var sourcePoint = Engine.Board.GetPoint(originalSource);
+
+        // If the original source has more than 1 checker, it's still occupied after the move
+        if (sourcePoint.Color == playerColor && sourcePoint.Count > 1)
+        {
+            return Engine.Board.GetHighestPoint(playerColor);
+        }
+
+        // Original source will be empty (or already empty), find highest excluding it
+        if (playerColor == CheckerColor.White)
+        {
+            for (int i = 6; i >= 1; i--)
+            {
+                if (i == originalSource)
+                {
+                    continue;
+                }
+
+                var point = Engine.Board.GetPoint(i);
+                if (point.Color == playerColor && point.Count > 0)
+                {
+                    return i;
+                }
+            }
+        }
+        else
+        {
+            for (int i = 24; i >= 19; i--)
+            {
+                if (i == originalSource)
+                {
+                    continue;
+                }
+
+                var point = Engine.Board.GetPoint(i);
+                if (point.Color == playerColor && point.Count > 0)
+                {
+                    return i;
+                }
+            }
+        }
+
+        // No other checkers on higher points, the current point is effectively the highest
+        return originalSource;
     }
 
     private int CalculatePipCount(CheckerColor color)
