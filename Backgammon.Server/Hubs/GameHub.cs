@@ -1292,7 +1292,7 @@ public class GameHub : Hub<IGameHubClient>
             if (match == null)
             {
                 _logger.LogWarning("GetMatchState: Match {MatchId} not found", matchId);
-                await Clients.Caller.SendAsync("Error", "Match not found");
+                await Clients.Caller.Error("Match not found");
                 return null;
             }
 
@@ -1303,7 +1303,7 @@ public class GameHub : Hub<IGameHubClient>
                     "GetMatchState: Player {PlayerId} attempted to access match {MatchId} without authorization",
                     playerId,
                     matchId);
-                await Clients.Caller.SendAsync("Error", "Access denied");
+                await Clients.Caller.Error("Access denied");
                 return null;
             }
 
@@ -1321,7 +1321,7 @@ public class GameHub : Hub<IGameHubClient>
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting match state for {MatchId}", matchId);
-            await Clients.Caller.SendAsync("Error", "Failed to get match state");
+            await Clients.Caller.Error("Failed to get match state");
             return null;
         }
     }
