@@ -117,6 +117,11 @@ public interface IGameHub
     Task GetMatchStatus(string matchId);
 
     /// <summary>
+    /// Get match state with score and Crawford info
+    /// </summary>
+    Task<MatchStateDto?> GetMatchState(string matchId);
+
+    /// <summary>
     /// Get player's matches, optionally filtered by status
     /// </summary>
     Task GetMyMatches(string? status);
@@ -274,4 +279,31 @@ public interface IGameHub
     /// Get a historical puzzle by date
     /// </summary>
     Task<DailyPuzzleDto?> GetHistoricalPuzzle(string date);
+
+    /// <summary>
+    /// Get valid moves for a puzzle position with pending moves applied.
+    /// </summary>
+    Task<List<MoveDto>> GetPuzzleValidMoves(PuzzleValidMovesRequest request);
+
+    // ==================== Leaderboard & Players ====================
+
+    /// <summary>
+    /// Get the leaderboard with top rated players
+    /// </summary>
+    Task<List<LeaderboardEntryDto>> GetLeaderboard(int limit);
+
+    /// <summary>
+    /// Get online players
+    /// </summary>
+    Task<List<OnlinePlayerDto>> GetOnlinePlayers();
+
+    /// <summary>
+    /// Get rating distribution statistics
+    /// </summary>
+    Task<RatingDistributionDto> GetRatingDistribution();
+
+    /// <summary>
+    /// Get available bots to play against
+    /// </summary>
+    Task<List<BotInfoDto>> GetAvailableBots();
 }

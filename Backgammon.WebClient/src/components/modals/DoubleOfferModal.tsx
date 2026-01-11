@@ -1,6 +1,5 @@
 import React from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import {
   Dialog,
   DialogContent,
@@ -26,11 +25,11 @@ export const DoubleOfferModal: React.FC<DoubleOfferModalProps> = ({
   currentStakes,
   newStakes,
 }) => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
 
   const handleAccept = async () => {
     try {
-      await invoke(HubMethods.AcceptDouble)
+      await hub?.acceptDouble()
       onClose()
     } catch (error) {
       console.error('Failed to accept double:', error)
@@ -39,7 +38,7 @@ export const DoubleOfferModal: React.FC<DoubleOfferModalProps> = ({
 
   const handleDecline = async () => {
     try {
-      await invoke(HubMethods.DeclineDouble)
+      await hub?.declineDouble()
       onClose()
     } catch (error) {
       console.error('Failed to decline double:', error)

@@ -4,14 +4,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Flame, Check, Loader2 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { DailyPuzzle, PuzzleStreakInfo } from '@/types/puzzle.types'
-import { MiniBoardPreview } from './MiniBoardPreview'
+import { MiniBoardAdapter } from '@/components/board'
 import { MiniPoint } from '@/types/home.types'
 
 export function DailyPuzzlePreview() {
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const [puzzle, setPuzzle] = useState<DailyPuzzle | null>(null)
   const [streak, setStreak] = useState<PuzzleStreakInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -22,11 +21,11 @@ export function DailyPuzzlePreview() {
 
       try {
         const [puzzleData, streakData] = await Promise.all([
-          invoke<DailyPuzzle>(HubMethods.GetDailyPuzzle),
-          invoke<PuzzleStreakInfo>(HubMethods.GetPuzzleStreak),
+          hub?.getDailyPuzzle(),
+          hub?.getPuzzleStreak(),
         ])
-        setPuzzle(puzzleData)
-        setStreak(streakData)
+        setPuzzle(puzzleData ?? null)
+        setStreak(streakData ?? null)
       } catch (err) {
         console.error('Failed to load puzzle preview:', err)
       } finally {
@@ -35,7 +34,7 @@ export function DailyPuzzlePreview() {
     }
 
     loadPuzzlePreview()
-  }, [isConnected, invoke])
+  }, [isConnected, hub])
 
   const handleClick = () => {
     navigate('/puzzle')
@@ -45,7 +44,7 @@ export function DailyPuzzlePreview() {
   const boardToMiniPoints = (puzzle: DailyPuzzle): MiniPoint[] => {
     return puzzle.boardState.map(p => ({
       position: p.position,
-      color: p.color as 'White' | 'Red' | null,
+      color: (p.color === 'White' || p.color === 'Red') ? p.color : null,
       count: p.count,
     }))
   }
@@ -80,7 +79,7 @@ export function DailyPuzzlePreview() {
       <CardContent className="p-0">
         {/* Mini Board Preview */}
         <div className="flex justify-center bg-muted/30 p-3">
-          <MiniBoardPreview
+          <MiniBoardAdapter
             board={boardToMiniPoints(puzzle)}
             whiteOnBar={puzzle.whiteCheckersOnBar}
             redOnBar={puzzle.redCheckersOnBar}

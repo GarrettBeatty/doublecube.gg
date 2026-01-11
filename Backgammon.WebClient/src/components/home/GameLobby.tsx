@@ -19,7 +19,7 @@ interface GameLobbyProps {
 
 export function GameLobby({ onCreateGame }: GameLobbyProps) {
   const { lobbies, isLoading } = useMatchLobbies();
-  const { invoke } = useSignalR();
+  const { hub } = useSignalR();
   const { toast } = useToast();
 
   const [showFilters, setShowFilters] = useState(false);
@@ -30,7 +30,7 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
 
   const handleJoinLobby = async (matchId: string) => {
     try {
-      await invoke('JoinMatch', matchId);
+      await hub?.joinMatch(matchId);
       // Navigation happens via MatchGameStarting event in useSignalREvents
     } catch (error) {
       console.error('Failed to join lobby:', error);

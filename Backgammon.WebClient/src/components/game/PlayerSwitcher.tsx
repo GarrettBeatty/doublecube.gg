@@ -1,8 +1,8 @@
 import { CheckerColor } from '@/types/game.types'
+import { CheckerColorDto } from '@/types/generated/Backgammon.Server.Models.SignalR'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { Users } from 'lucide-react'
 
 interface PlayerSwitcherProps {
@@ -10,12 +10,14 @@ interface PlayerSwitcherProps {
 }
 
 export const PlayerSwitcher: React.FC<PlayerSwitcherProps> = ({ currentPlayer }) => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
 
   const handleSwitch = async (color: CheckerColor) => {
     if (color === currentPlayer) return
     try {
-      await invoke(HubMethods.SetCurrentPlayer, color)
+      // Convert local CheckerColor to CheckerColorDto for the hub call
+      const colorDto = color === CheckerColor.White ? CheckerColorDto.White : CheckerColorDto.Red
+      await hub?.setCurrentPlayer(colorDto)
     } catch (error) {
       console.error('Failed to switch player:', error)
     }

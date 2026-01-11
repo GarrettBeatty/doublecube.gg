@@ -1,3 +1,5 @@
+using Tapper;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace Backgammon.Server.Models;
 /// Used to provide authoritative match scores from the server,
 /// addressing the trust boundary issue where client-side state may be stale.
 /// </summary>
+[TranspilationSource]
 public class MatchStateDto
 {
     /// <summary>

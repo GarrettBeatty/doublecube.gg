@@ -11,12 +11,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Brain, Trophy, Flame, Check, Loader2 } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { DailyPuzzle as DailyPuzzleType, PuzzleStreakInfo } from '@/types/puzzle.types'
 
 export function DailyPuzzle() {
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const [puzzle, setPuzzle] = useState<DailyPuzzleType | null>(null)
   const [streak, setStreak] = useState<PuzzleStreakInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -27,11 +26,11 @@ export function DailyPuzzle() {
 
       try {
         const [puzzleData, streakData] = await Promise.all([
-          invoke<DailyPuzzleType>(HubMethods.GetDailyPuzzle),
-          invoke<PuzzleStreakInfo>(HubMethods.GetPuzzleStreak),
+          hub?.getDailyPuzzle(),
+          hub?.getPuzzleStreak(),
         ])
-        setPuzzle(puzzleData)
-        setStreak(streakData)
+        setPuzzle(puzzleData ?? null)
+        setStreak(streakData ?? null)
       } catch (err) {
         console.error('Failed to load puzzle preview:', err)
       } finally {
@@ -40,7 +39,7 @@ export function DailyPuzzle() {
     }
 
     loadPuzzlePreview()
-  }, [isConnected, invoke])
+  }, [isConnected, hub])
 
   const handleSolvePuzzle = () => {
     navigate('/puzzle')

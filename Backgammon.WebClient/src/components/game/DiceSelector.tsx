@@ -4,18 +4,17 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dices } from 'lucide-react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { useToast } from '@/hooks/use-toast'
 
 export const DiceSelector: React.FC = () => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const { toast } = useToast()
   const [die1, setDie1] = useState<string>('1')
   const [die2, setDie2] = useState<string>('1')
 
   const handleSetDice = async () => {
     try {
-      await invoke(HubMethods.SetDice, parseInt(die1), parseInt(die2))
+      await hub?.setDice(parseInt(die1), parseInt(die2))
     } catch (error) {
       console.error('Failed to set dice:', error)
       toast({

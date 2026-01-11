@@ -1,6 +1,5 @@
 import React from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import {
   Dialog,
   DialogContent,
@@ -21,11 +20,11 @@ export const AbandonConfirmModal: React.FC<AbandonConfirmModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
 
   const handleConfirm = async () => {
     try {
-      await invoke(HubMethods.AbandonGame)
+      await hub?.abandonGame()
       onClose()
     } catch (error) {
       console.error('Failed to abandon game:', error)

@@ -35,7 +35,7 @@ interface FriendsDialogProps {
 }
 
 export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose }) => {
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const { toast } = useToast()
 
   const [friends, setFriends] = useState<Friend[]>([])
@@ -54,8 +54,16 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const loadFriends = async () => {
     try {
-      const friendsList = await invoke('GetFriends')
-      setFriends(friendsList || [])
+      const friendsList = await hub?.getFriends()
+      // Map FriendDto to local Friend type
+      setFriends(
+        (friendsList || []).map((f) => ({
+          userId: f.userId,
+          username: f.username,
+          displayName: f.displayName,
+          status: f.isOnline ? 'Online' : 'Offline' as const,
+        }))
+      )
     } catch (error) {
       console.error('Failed to load friends:', error)
     }
@@ -63,8 +71,16 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const loadFriendRequests = async () => {
     try {
-      const requests = await invoke('GetFriendRequests')
-      setPendingRequests(requests || [])
+      const requests = await hub?.getFriendRequests()
+      // Map FriendDto to local FriendRequest type
+      setPendingRequests(
+        (requests || []).map((f) => ({
+          userId: f.userId,
+          username: f.username,
+          displayName: f.displayName,
+          requestedAt: new Date().toISOString(), // FriendDto doesn't have requestedAt
+        }))
+      )
     } catch (error) {
       console.error('Failed to load friend requests:', error)
     }
@@ -75,8 +91,16 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
     setIsSearching(true)
     try {
-      const results = await invoke('SearchPlayers', searchQuery)
-      setSearchResults(results || [])
+      const results = await hub?.searchPlayers(searchQuery)
+      // Map PlayerSearchResultDto to local Friend type for display
+      setSearchResults(
+        (results || []).map((p) => ({
+          userId: p.userId,
+          username: p.username,
+          displayName: p.displayName,
+          status: 'Offline' as const,
+        }))
+      )
     } catch (error) {
       console.error('Failed to search players:', error)
       toast({
@@ -91,7 +115,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const handleSendFriendRequest = async (userId: string, username: string) => {
     try {
-      await invoke('SendFriendRequest', userId)
+      await hub?.sendFriendRequest(userId)
       toast({
         title: 'Friend request sent',
         description: `Sent friend request to ${username}`,
@@ -110,7 +134,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const handleAcceptRequest = async (userId: string, username: string) => {
     try {
-      await invoke('AcceptFriendRequest', userId)
+      await hub?.acceptFriendRequest(userId)
       toast({
         title: 'Friend request accepted',
         description: `You are now friends with ${username}`,
@@ -129,7 +153,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const handleDeclineRequest = async (userId: string) => {
     try {
-      await invoke('DeclineFriendRequest', userId)
+      await hub?.declineFriendRequest(userId)
       toast({
         title: 'Friend request declined',
       })
@@ -146,7 +170,7 @@ export const FriendsDialog: React.FC<FriendsDialogProps> = ({ isOpen, onClose })
 
   const handleRemoveFriend = async (userId: string, username: string) => {
     try {
-      await invoke('RemoveFriend', userId)
+      await hub?.removeFriend(userId)
       toast({
         title: 'Friend removed',
         description: `Removed ${username} from your friends list`,

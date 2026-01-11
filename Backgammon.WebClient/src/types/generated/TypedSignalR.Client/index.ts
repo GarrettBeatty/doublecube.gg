@@ -4,7 +4,7 @@
 // @ts-nocheck
 import type { HubConnection, IStreamResult, Subject } from '@microsoft/signalr';
 import type { IGameHub, IGameHubClient } from './Backgammon.Server.Hubs.Interfaces';
-import type { MoveDto, MatchConfig, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, GameState } from '../Backgammon.Server.Models';
+import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
 import type { MatchLobbyDto, ActiveGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
@@ -158,6 +158,10 @@ class IGameHub_HubProxy implements IGameHub {
         return await this.connection.invoke("GetMatchStatus", matchId);
     }
 
+    public readonly getMatchState = async (matchId: string): Promise<MatchStateDto> => {
+        return await this.connection.invoke("GetMatchState", matchId);
+    }
+
     public readonly getMyMatches = async (status: string): Promise<void> => {
         return await this.connection.invoke("GetMyMatches", status);
     }
@@ -272,6 +276,26 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly getHistoricalPuzzle = async (date: string): Promise<DailyPuzzleDto> => {
         return await this.connection.invoke("GetHistoricalPuzzle", date);
+    }
+
+    public readonly getPuzzleValidMoves = async (request: PuzzleValidMovesRequest): Promise<MoveDto[]> => {
+        return await this.connection.invoke("GetPuzzleValidMoves", request);
+    }
+
+    public readonly getLeaderboard = async (limit: number): Promise<LeaderboardEntryDto[]> => {
+        return await this.connection.invoke("GetLeaderboard", limit);
+    }
+
+    public readonly getOnlinePlayers = async (): Promise<OnlinePlayerDto[]> => {
+        return await this.connection.invoke("GetOnlinePlayers");
+    }
+
+    public readonly getRatingDistribution = async (): Promise<RatingDistributionDto> => {
+        return await this.connection.invoke("GetRatingDistribution");
+    }
+
+    public readonly getAvailableBots = async (): Promise<BotInfoDto[]> => {
+        return await this.connection.invoke("GetAvailableBots");
     }
 }
 

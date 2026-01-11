@@ -18,7 +18,7 @@ import type {
 
 export const PlayersPage: React.FC = () => {
   const navigate = useNavigate()
-  const { invoke, isConnected } = useSignalR()
+  const { hub, isConnected } = useSignalR()
   const [activeTab, setActiveTab] = useState('online')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -31,10 +31,10 @@ export const PlayersPage: React.FC = () => {
     setIsLoading(true)
     try {
       const [online, leaders, distribution, botList] = await Promise.all([
-        invoke('GetOnlinePlayers') as Promise<OnlinePlayerDto[] | null>,
-        invoke('GetLeaderboard', 50) as Promise<LeaderboardEntryDto[] | null>,
-        invoke('GetRatingDistribution') as Promise<RatingDistributionDto | null>,
-        invoke('GetAvailableBots') as Promise<BotInfoDto[] | null>
+        hub?.getOnlinePlayers() as Promise<OnlinePlayerDto[] | null>,
+        hub?.getLeaderboard(50) as Promise<LeaderboardEntryDto[] | null>,
+        hub?.getRatingDistribution() as Promise<RatingDistributionDto | null>,
+        hub?.getAvailableBots() as Promise<BotInfoDto[] | null>
       ])
       setOnlinePlayers(online || [])
       setLeaderboard(leaders || [])
@@ -45,7 +45,7 @@ export const PlayersPage: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [invoke])
+  }, [hub])
 
   useEffect(() => {
     if (isConnected) {

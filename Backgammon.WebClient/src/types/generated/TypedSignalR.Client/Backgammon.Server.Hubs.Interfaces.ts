@@ -3,7 +3,7 @@
 /* tslint:disable */
 // @ts-nocheck
 import type { IStreamResult, Subject } from '@microsoft/signalr';
-import type { MoveDto, MatchConfig, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, GameState } from '../Backgammon.Server.Models';
+import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
 import type { MatchLobbyDto, ActiveGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
@@ -117,6 +117,12 @@ export type IGameHub = {
     * @returns Transpiled from System.Threading.Tasks.Task
     */
     getMatchStatus(matchId: string): Promise<void>;
+    /**
+    * Get match state with score and Crawford info
+    * @param matchId Transpiled from string
+    * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.MatchStateDto?>
+    */
+    getMatchState(matchId: string): Promise<MatchStateDto>;
     /**
     * Get player's matches, optionally filtered by status
     * @param status Transpiled from string?
@@ -290,6 +296,33 @@ export type IGameHub = {
     * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.DailyPuzzleDto?>
     */
     getHistoricalPuzzle(date: string): Promise<DailyPuzzleDto>;
+    /**
+    * Get valid moves for a puzzle position with pending moves applied.
+    * @param request Transpiled from Backgammon.Server.Models.PuzzleValidMovesRequest
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.MoveDto>>
+    */
+    getPuzzleValidMoves(request: PuzzleValidMovesRequest): Promise<MoveDto[]>;
+    /**
+    * Get the leaderboard with top rated players
+    * @param limit Transpiled from int
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.LeaderboardEntryDto>>
+    */
+    getLeaderboard(limit: number): Promise<LeaderboardEntryDto[]>;
+    /**
+    * Get online players
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.OnlinePlayerDto>>
+    */
+    getOnlinePlayers(): Promise<OnlinePlayerDto[]>;
+    /**
+    * Get rating distribution statistics
+    * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.RatingDistributionDto>
+    */
+    getRatingDistribution(): Promise<RatingDistributionDto>;
+    /**
+    * Get available bots to play against
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.BotInfoDto>>
+    */
+    getAvailableBots(): Promise<BotInfoDto[]>;
 }
 
 /**

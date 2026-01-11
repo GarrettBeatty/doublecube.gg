@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useSignalR } from '@/contexts/SignalRContext'
-import { HubMethods } from '@/types/signalr.types'
 import { useToast } from '@/hooks/use-toast'
 import { useGameStore } from '@/stores/gameStore'
 
 export const PositionControls: React.FC = () => {
-  const { invoke } = useSignalR()
+  const { hub } = useSignalR()
   const { toast } = useToast()
   const { currentGameState } = useGameStore()
   const [sgfText, setSgfText] = useState('')
@@ -20,7 +19,7 @@ export const PositionControls: React.FC = () => {
       if (!currentGameState || isImporting) return
 
       try {
-        const base64Sgf = (await invoke(HubMethods.ExportPosition)) as string
+        const base64Sgf = (await hub?.exportPosition()) as string
         const sgf = atob(base64Sgf)
 
         // Only update if SGF actually changed
@@ -34,7 +33,7 @@ export const PositionControls: React.FC = () => {
     }
 
     fetchSgf()
-  }, [currentGameState, invoke, isImporting])
+  }, [currentGameState, hub, isImporting])
 
   const handleBlur = async () => {
     // If text hasn't changed, nothing to do
@@ -49,7 +48,7 @@ export const PositionControls: React.FC = () => {
     // Import the new position
     setIsImporting(true)
     try {
-      await invoke(HubMethods.ImportPosition, sgfText.trim())
+      await hub?.importPosition(sgfText.trim())
       toast({
         title: 'Success',
         description: 'Position imported',

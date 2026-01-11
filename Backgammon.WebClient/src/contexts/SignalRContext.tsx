@@ -1,15 +1,17 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react'
 import { HubConnection } from '@microsoft/signalr'
 import { signalRService } from '@/services/signalr.service'
 import { ConnectionState } from '@/types/signalr.types'
 import { useAuth } from './AuthContext'
+import { getHubProxyFactory } from '@/types/generated/TypedSignalR.Client'
+import type { IGameHub } from '@/types/generated/TypedSignalR.Client/Backgammon.Server.Hubs.Interfaces'
 
 interface SignalRContextType {
   connection: HubConnection | null
   connectionState: ConnectionState
   isConnected: boolean
-  invoke: <T = void>(methodName: string, ...args: unknown[]) => Promise<T | null>
+  hub: IGameHub | null
 }
 
 const SignalRContext = createContext<SignalRContextType | undefined>(undefined)
@@ -32,6 +34,14 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
   const [connectionState, setConnectionState] = useState<ConnectionState>(
     ConnectionState.Disconnected
   )
+
+  // Create typed hub proxy when connection is available
+  const hub = useMemo<IGameHub | null>(() => {
+    if (!connection || connectionState !== ConnectionState.Connected) {
+      return null
+    }
+    return getHubProxyFactory('IGameHub').createHubProxy(connection)
+  }, [connection, connectionState])
 
   useEffect(() => {
     // CRITICAL: Wait for authentication to complete before connecting to SignalR
@@ -86,23 +96,11 @@ export const SignalRProvider: React.FC<SignalRProviderProps> = ({ children }) =>
     }
   }, [authReady]) // Re-run when auth becomes ready
 
-  const invoke = async <T = void,>(
-    methodName: string,
-    ...args: unknown[]
-  ): Promise<T | null> => {
-    try {
-      return await signalRService.invoke<T>(methodName, ...args)
-    } catch (error) {
-      console.error(`[SignalRContext] Failed to invoke ${methodName}:`, error)
-      throw error
-    }
-  }
-
   const value: SignalRContextType = {
     connection,
     connectionState,
     isConnected: connectionState === ConnectionState.Connected,
-    invoke,
+    hub,
   }
 
   return <SignalRContext.Provider value={value}>{children}</SignalRContext.Provider>

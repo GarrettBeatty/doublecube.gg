@@ -259,6 +259,32 @@ export type MatchConfig = {
     timePerMoveDays: number;
 }
 
+/** Transpiled from Backgammon.Server.Models.MatchStateDto */
+export type MatchStateDto = {
+    /** Transpiled from string */
+    matchId: string;
+    /** Transpiled from int */
+    player1Score: number;
+    /** Transpiled from int */
+    player2Score: number;
+    /** Transpiled from int */
+    targetScore: number;
+    /** Transpiled from bool */
+    isCrawfordGame: boolean;
+    /** Transpiled from bool */
+    matchComplete: boolean;
+    /** Transpiled from string? */
+    matchWinner?: string;
+    /** Transpiled from string */
+    player1Name: string;
+    /** Transpiled from string */
+    player2Name: string;
+    /** Transpiled from string? */
+    currentGameId?: string;
+    /** Transpiled from System.DateTime */
+    lastUpdatedAt: (Date | string);
+}
+
 /** Transpiled from Backgammon.Server.Models.MoveDto */
 export type MoveDto = {
     /** Transpiled from int */
@@ -461,6 +487,26 @@ export type PuzzleStreakInfo = {
     totalSolved: number;
     /** Transpiled from int */
     totalAttempts: number;
+}
+
+/** Transpiled from Backgammon.Server.Models.PuzzleValidMovesRequest */
+export type PuzzleValidMovesRequest = {
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.PointStateDto> */
+    boardState: PointStateDto[];
+    /** Transpiled from string */
+    currentPlayer: string;
+    /** Transpiled from int[] */
+    dice: number[];
+    /** Transpiled from int */
+    whiteCheckersOnBar: number;
+    /** Transpiled from int */
+    redCheckersOnBar: number;
+    /** Transpiled from int */
+    whiteBornOff: number;
+    /** Transpiled from int */
+    redBornOff: number;
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.MoveDto> */
+    pendingMoves: MoveDto[];
 }
 
 /** Transpiled from Backgammon.Server.Models.RatingBucketDto */
