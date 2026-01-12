@@ -167,12 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-2">
               {/* Connection Indicator */}
               {getConnectionBadge()}
-
-              {/* Settings Icon */}
-              <Button variant="ghost" size="icon" title="Settings" onClick={handleSettingsClick}>
-                <Settings className="h-5 w-5" />
-              </Button>
-
+              
               {/* Auth Section */}
               {!isAuthenticated ? (
                 <>
