@@ -268,38 +268,6 @@ public partial class GameHub : Hub<IGameHubClient>
         return claimDisplayName;
     }
 
-    /// <summary>
-    /// Gets the authenticated player ID from JWT claims.
-    /// Never falls back to client-provided IDs for security reasons.
-    /// </summary>
-    /// <param name="clientProvidedId">Legacy parameter - ignored for security. Use only authenticated ID.</param>
-    /// <returns>The authenticated user ID from JWT</returns>
-    /// <exception cref="HubException">Thrown if no authenticated user found</exception>
-    private string GetEffectivePlayerId(string clientProvidedId)
-    {
-        var authenticatedUserId = GetAuthenticatedUserId();
-
-        // Security: Never use client-provided IDs - always require server-validated JWT ID
-        if (string.IsNullOrEmpty(authenticatedUserId))
-        {
-            _logger.LogWarning(
-                "GetEffectivePlayerId called without authenticated user. Client attempted to use ID: {ClientId}",
-                clientProvidedId);
-            throw new HubException("Authentication required. Player ID must come from valid JWT.");
-        }
-
-        // Log if client tried to spoof a different ID
-        if (!string.IsNullOrEmpty(clientProvidedId) && clientProvidedId != authenticatedUserId)
-        {
-            _logger.LogWarning(
-                "Client attempted to use different player ID. JWT ID: {JwtId}, Attempted ID: {AttemptedId}",
-                authenticatedUserId,
-                clientProvidedId);
-        }
-
-        return authenticatedUserId;
-    }
-
     private async Task HandleDisconnection(string connectionId)
     {
         try

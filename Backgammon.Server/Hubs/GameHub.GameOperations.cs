@@ -17,18 +17,22 @@ namespace Backgammon.Server.Hubs;
 /// </summary>
 public partial class GameHub
 {
-    public async Task JoinGame(string playerId, string? gameId = null)
+    public async Task JoinGame(string? gameId = null)
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var effectivePlayerId = GetEffectivePlayerId(playerId);
-            var displayName = GetEffectiveDisplayNameAsync(effectivePlayerId);
+            var playerId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(playerId))
+            {
+                throw new HubException("Authentication required");
+            }
+
+            var displayName = GetEffectiveDisplayNameAsync(playerId);
 
             _logger.LogInformation("========== JoinGame Request ==========");
             _logger.LogInformation("Connection ID: {ConnectionId}", connectionId);
-            _logger.LogInformation("Player ID (from client): {PlayerId}", playerId);
-            _logger.LogInformation("Effective Player ID: {EffectivePlayerId}", effectivePlayerId);
+            _logger.LogInformation("Player ID: {PlayerId}", playerId);
             _logger.LogInformation("Display Name (resolved): {DisplayName}", displayName ?? "null");
             _logger.LogInformation("Game ID: {GameId}", gameId ?? "null");
             _logger.LogInformation("======================================");
@@ -39,7 +43,7 @@ public partial class GameHub
                 return;
             }
 
-            await _gameService.JoinGameAsync(connectionId, effectivePlayerId, displayName, gameId);
+            await _gameService.JoinGameAsync(connectionId, playerId, displayName, gameId);
         }
         catch (Exception ex)
         {
@@ -145,16 +149,20 @@ public partial class GameHub
     /// Create a new game against an AI opponent.
     /// The human player is always White (moves first).
     /// </summary>
-    /// <param name="playerId">The human player's persistent ID</param>
-    public async Task CreateAiGame(string playerId)
+    public async Task CreateAiGame()
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var effectivePlayerId = GetEffectivePlayerId(playerId);
+            var playerId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(playerId))
+            {
+                throw new HubException("Authentication required");
+            }
+
             var displayName = GetAuthenticatedDisplayName();
 
-            await _gameService.CreateAiGameAsync(connectionId, effectivePlayerId, displayName);
+            await _gameService.CreateAiGameAsync(connectionId, playerId, displayName);
         }
         catch (Exception ex)
         {
@@ -670,8 +678,11 @@ public partial class GameHub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Remove from player connections tracking
-        var playerId = GetEffectivePlayerId(Context.ConnectionId);
-        _playerConnectionService.RemoveConnection(playerId);
+        var playerId = GetAuthenticatedUserId();
+        if (!string.IsNullOrEmpty(playerId))
+        {
+            _playerConnectionService.RemoveConnection(playerId);
+        }
 
         // Clean up chat rate limit history
         _chatService.CleanupConnection(Context.ConnectionId);
