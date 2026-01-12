@@ -454,6 +454,25 @@ public class GameSession
         }
     }
 
+    /// <summary>
+    /// Finds a combined move (using 2+ dice) that matches the given from/to coordinates.
+    /// Returns null if no combined move matches.
+    /// </summary>
+    public MoveDto? FindCombinedMove(int from, int to)
+    {
+        if (Engine.RemainingMoves.Count < 2 || Engine.CurrentPlayer == null)
+        {
+            return null;
+        }
+
+        var validMoves = Engine.GetValidMoves();
+        var singleMoveDestinationsFromSource = new HashSet<int>(
+            validMoves.Where(m => m.From == from).Select(m => m.To));
+
+        var combinedMoves = CalculateCombinedMoves(from, singleMoveDestinationsFromSource);
+        return combinedMoves.FirstOrDefault(m => m.From == from && m.To == to);
+    }
+
     private string GenerateFriendlyName(string playerId)
     {
         if (playerId.Length >= 4)
