@@ -22,6 +22,7 @@ import { ContactPage } from './pages/ContactPage'
 import { MobileAppPage } from './pages/MobileAppPage'
 import { TermsOfServicePage } from './pages/TermsOfServicePage'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { Toaster } from './components/ui/toaster'
 import { FriendsWidget } from './components/FriendsWidget'
 import { audioService } from './services/audio.service'
@@ -84,6 +85,7 @@ function AppContent() {
           <Route path="/mobile-app" element={<MobileAppPage />} />
           <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Layout>

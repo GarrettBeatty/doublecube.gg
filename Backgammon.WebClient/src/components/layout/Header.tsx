@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ConnectionState } from '@/types/signalr.types'
-import { Gamepad2, Trophy, Users, Settings, Wrench, ChevronDown, BarChart3, Upload, Search, UserPlus } from 'lucide-react'
+import { Gamepad2, Trophy, Users, Settings, Wrench, ChevronDown, BarChart3, Upload, Search, UserPlus, User } from 'lucide-react'
 import { ImportGameModal } from '@/components/modals/ImportGameModal'
 
 interface HeaderProps {
@@ -45,6 +45,10 @@ export const Header: React.FC<HeaderProps> = ({
   const handleLogout = () => {
     logout()
     navigate('/')
+  }
+
+  const handleSettingsClick = () => {
+    navigate('/settings')
   }
 
   const handleImportGame = (gameData: string) => {
@@ -165,7 +169,7 @@ export const Header: React.FC<HeaderProps> = ({
               {getConnectionBadge()}
 
               {/* Settings Icon */}
-              <Button variant="ghost" size="icon" title="Settings (coming soon)">
+              <Button variant="ghost" size="icon" title="Settings" onClick={handleSettingsClick}>
                 <Settings className="h-5 w-5" />
               </Button>
 
@@ -189,7 +193,12 @@ export const Header: React.FC<HeaderProps> = ({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={handleProfileClick}>
+                      <User className="h-4 w-4 mr-2" />
                       Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleSettingsClick}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout}>
                       Logout
