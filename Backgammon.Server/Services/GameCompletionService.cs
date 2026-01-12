@@ -170,8 +170,17 @@ public class GameCompletionService : IGameCompletionService
             }
 
             // Add player connections from completed game
-            // Add Player 1 (White) connections first
-            foreach (var connectionId in completedSession.WhiteConnections.ToList())
+            // Map player IDs to their connections from the completed session (by player ID, not color)
+            var player1Connections = completedSession.WhitePlayerId == match.Player1Id
+                ? completedSession.WhiteConnections
+                : completedSession.RedConnections;
+
+            var player2Connections = completedSession.WhitePlayerId == match.Player2Id
+                ? completedSession.WhiteConnections
+                : completedSession.RedConnections;
+
+            // Add Player 1 connections to new session
+            foreach (var connectionId in player1Connections.ToList())
             {
                 if (await IsConnectionActiveAsync(connectionId))
                 {
@@ -179,8 +188,8 @@ public class GameCompletionService : IGameCompletionService
                 }
             }
 
-            // Add Player 2 (Red) connections
-            foreach (var connectionId in completedSession.RedConnections.ToList())
+            // Add Player 2 connections to new session
+            foreach (var connectionId in player2Connections.ToList())
             {
                 if (await IsConnectionActiveAsync(connectionId))
                 {
@@ -188,9 +197,8 @@ public class GameCompletionService : IGameCompletionService
                 }
             }
 
-            // Initialize game engine
+            // Initialize game engine (but don't roll dice - players will do opening roll)
             session.Engine.StartNewGame();
-            session.Engine.RollDice();
 
             // Broadcast the new game to connected clients
             await _broadcastService.BroadcastMatchGameStartingAsync(match, nextGame.GameId);

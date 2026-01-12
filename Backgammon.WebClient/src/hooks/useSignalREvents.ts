@@ -53,7 +53,9 @@ export const useSignalREvents = () => {
       setIsSpectator(true)
       setCurrentGameId(gameState.gameId)
       prevGameStateRef.current = gameState
-      navigateRef.current(`/game/${gameState.gameId}`)
+      if (gameState.matchId) {
+        navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`)
+      }
     })
 
     // GameUpdate - Board state changes
@@ -69,7 +71,7 @@ export const useSignalREvents = () => {
 
       // Check if update is for the current game we're viewing
       const currentPath = window.location.pathname
-      const isOnGamePage = currentPath.startsWith('/game/')
+      const isOnGamePage = currentPath.includes('/game/')
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
 
       // If we're on a different game page, ignore this update (it's from an old game)
@@ -138,7 +140,7 @@ export const useSignalREvents = () => {
 
       // Check if we're on a game page and if it's for a different game
       const currentPath = window.location.pathname
-      const isOnGamePage = currentPath.startsWith('/game/')
+      const isOnGamePage = currentPath.includes('/game/')
       const isOnAnalysisPage = currentPath.startsWith('/analysis')
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
 
@@ -153,8 +155,8 @@ export const useSignalREvents = () => {
       prevGameStateRef.current = gameState
 
       // Only navigate if we're not already on a game page or analysis page
-      if (!isOnGamePage && !isOnAnalysisPage) {
-        navigateRef.current(`/game/${gameState.gameId}`)
+      if (!isOnGamePage && !isOnAnalysisPage && gameState.matchId) {
+        navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`)
       }
     })
 
@@ -188,10 +190,11 @@ export const useSignalREvents = () => {
     )
 
     // WaitingForOpponent - Game created, waiting for opponent
+    // Note: This is for legacy non-match games - matches use MatchCreated event
     connection.on(HubEvents.WaitingForOpponent, (gameId: string) => {
       console.log('[SignalR] WaitingForOpponent', gameId)
       setCurrentGameId(gameId)
-      navigateRef.current(`/game/${gameId}`)
+      // Legacy: non-match games don't have matchId, skip navigation
     })
 
     // OpponentJoined
@@ -270,7 +273,7 @@ export const useSignalREvents = () => {
       console.log('[SignalR] MatchCreated', { matchId: data.matchId, gameId: data.gameId, opponentType: data.opponentType })
       setCurrentGameId(data.gameId)
       // Navigate to game page immediately - game handles waiting state
-      navigateRef.current(`/game/${data.gameId}`, { replace: true })
+      navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`, { replace: true })
     })
 
     // OpponentJoinedMatch - Opponent joined the match
@@ -318,21 +321,21 @@ export const useSignalREvents = () => {
 
       // Check if we're already on a game page for this match
       const currentPath = window.location.pathname
-      const isOnGamePage = currentPath.startsWith('/game/')
+      const isOnGamePage = currentPath.startsWith('/match/')
 
       if (isOnGamePage) {
         // If on a game page, force navigation to the new game
-        navigateRef.current(`/game/${data.gameId}`, { replace: true })
+        navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`, { replace: true })
       } else {
         // If not on a game page, navigate normally
-        navigateRef.current(`/game/${data.gameId}`)
+        navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`)
       }
     })
 
     // TimeUpdate - Server broadcasts updated time state every second
     connection.on(HubEvents.TimeUpdate, (timeUpdate: TimeUpdateDto) => {
       const currentPath = window.location.pathname
-      const isOnGamePage = currentPath.startsWith('/game/')
+      const isOnGamePage = currentPath.includes('/game/')
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
 
       // Ignore time updates for games we're not viewing
@@ -404,7 +407,7 @@ export const useSignalREvents = () => {
 
       // Navigate to new game
       setCurrentGameId(data.gameId)
-      navigateRef.current(`/game/${data.gameId}`, { replace: true })
+      navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`, { replace: true })
     })
 
     // Cleanup on unmount
