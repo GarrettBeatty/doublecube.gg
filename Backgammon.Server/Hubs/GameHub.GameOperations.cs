@@ -22,12 +22,7 @@ public partial class GameHub
         try
         {
             var connectionId = Context.ConnectionId;
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var displayName = GetEffectiveDisplayNameAsync(playerId);
 
             _logger.LogInformation("========== JoinGame Request ==========");
@@ -154,12 +149,7 @@ public partial class GameHub
         try
         {
             var connectionId = Context.ConnectionId;
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var displayName = GetAuthenticatedDisplayName();
 
             await _gameService.CreateAiGameAsync(connectionId, playerId, displayName);
@@ -678,6 +668,7 @@ public partial class GameHub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Remove from player connections tracking
+        // Note: User might disconnect before authenticating, so null check is needed here
         var playerId = GetAuthenticatedUserId();
         if (!string.IsNullOrEmpty(playerId))
         {

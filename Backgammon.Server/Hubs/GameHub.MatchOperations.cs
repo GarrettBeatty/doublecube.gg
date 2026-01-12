@@ -32,11 +32,7 @@ public partial class GameHub
                 return;
             }
 
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
 
             if (playerId != match.Player1Id && playerId != match.Player2Id)
             {
@@ -101,12 +97,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var match = await _matchService.GetMatchAsync(matchId);
             if (match == null)
             {
@@ -159,12 +150,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var match = await _matchService.GetMatchAsync(matchId);
 
             if (match == null)
@@ -211,12 +197,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var match = await _matchService.GetMatchAsync(matchId);
 
             if (match == null)
@@ -299,12 +280,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var matches = await _matchService.GetPlayerMatchesAsync(playerId, status);
 
             var matchList = matches.Select(m => new MatchSummaryDto
@@ -381,12 +357,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var matches = await _matchService.GetPlayerMatchesAsync(playerId, "Completed");
 
             var recentGames = matches.Take(limit).Select(m =>
@@ -430,12 +401,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var matches = await _matchService.GetPlayerMatchesAsync(playerId, "InProgress");
 
             var activeGames = matches.Take(limit).Select(m =>
@@ -540,11 +506,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
 
             // Get all completed matches for the player
             var matches = await _matchService.GetPlayerMatchesAsync(playerId, "Completed");
@@ -648,11 +610,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
 
             // Parse time control type
             Core.TimeControlConfig? timeControl = null;
@@ -757,12 +715,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var displayName = GetAuthenticatedDisplayName();
 
             // Track this player's connection

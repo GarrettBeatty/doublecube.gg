@@ -39,6 +39,9 @@ var signalRBuilder = builder.Services.AddSignalR(options =>
     options.KeepAliveInterval = TimeSpan.FromSeconds(20);      // Send keepalive pings every 20s
     options.HandshakeTimeout = TimeSpan.FromSeconds(30);       // Keep at 30s
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+
+    // Add authentication filter - automatically enforces auth on all hub methods
+    options.AddFilter<Backgammon.Server.Hubs.Filters.AuthenticationHubFilter>();
 });
 
 // Add Redis backplane for scaling across multiple server instances

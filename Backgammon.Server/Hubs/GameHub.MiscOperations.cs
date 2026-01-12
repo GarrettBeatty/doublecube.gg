@@ -23,12 +23,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
-
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var response = await _correspondenceGameService.GetAllCorrespondenceGamesAsync(playerId);
 
             _logger.LogInformation(
@@ -53,11 +48,7 @@ public partial class GameHub
     {
         try
         {
-            var playerId = GetAuthenticatedUserId();
-            if (string.IsNullOrEmpty(playerId))
-            {
-                throw new HubException("Authentication required");
-            }
+            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
 
             // Validate correspondence-specific settings
             if (!config.IsCorrespondence)
