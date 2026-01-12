@@ -140,8 +140,8 @@ export function GamesInPlay() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <div>
-            <CardTitle>My Games</CardTitle>
-            <CardDescription>Your active games</CardDescription>
+            <CardTitle>Active Games</CardTitle>
+            <CardDescription>Your ongoing matches and games</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-12">
@@ -155,7 +155,7 @@ export function GamesInPlay() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
-          <CardTitle>My Games</CardTitle>
+          <CardTitle>Active Games</CardTitle>
           {totalYourTurn > 0 && (
             <Badge variant="destructive" className="animate-pulse">
               {totalYourTurn} your turn

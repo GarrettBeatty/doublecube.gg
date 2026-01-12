@@ -497,11 +497,11 @@ public class GameHub : Hub<IGameHubClient>
             }
 
             // Notify opponent of the double offer
-            var opponentConnectionId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
-                ? session.RedConnectionId
-                : session.WhiteConnectionId;
+            var opponentConnections = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
+                ? session.RedConnections
+                : session.WhiteConnections;
 
-            if (opponentConnectionId != null && !string.IsNullOrEmpty(opponentConnectionId))
+            if (opponentConnections.Any())
             {
                 await _gameService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
             }

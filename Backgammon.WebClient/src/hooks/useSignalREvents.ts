@@ -258,10 +258,52 @@ export const useSignalREvents = () => {
 
     // MatchGameStarting - Match game starting, navigate to game
     connection.on(HubEvents.MatchGameStarting, (data: MatchGameStartingEvent) => {
-      console.log('[SignalR] MatchGameStarting', { matchId: data.matchId, gameId: data.gameId })
+      console.log('[SignalR] MatchGameStarting', {
+        matchId: data.matchId,
+        gameId: data.gameId,
+        gameNumber: data.gameNumber,
+        score: `${data.currentScore.player1}-${data.currentScore.player2}`,
+        isCrawford: data.isCrawfordGame
+      })
+
+      // Update game state with the new game
+      // Add missing fields to match the GameState interface
+      const now = new Date().toISOString()
+      const gameState = {
+        ...data.state,
+        createdAt: now,
+        updatedAt: now,
+      } as unknown as GameState
+      setGameState(gameState)
       setCurrentGameId(data.gameId)
-      // Force navigation even if on same route
-      navigateRef.current(`/game/${data.gameId}`, { replace: true })
+      prevGameStateRef.current = gameState
+
+      // Update match state
+      setMatchState({
+        matchId: data.matchId,
+        player1Score: data.currentScore.player1,
+        player2Score: data.currentScore.player2,
+        targetScore: data.state.targetScore || 0,
+        isCrawfordGame: data.isCrawfordGame,
+        matchComplete: false,
+        matchWinner: null as string | null,
+        lastUpdatedAt: new Date().toISOString(),
+      })
+
+      // Close any open game result modal
+      setShowGameResultModal(false)
+
+      // Check if we're already on a game page for this match
+      const currentPath = window.location.pathname
+      const isOnGamePage = currentPath.startsWith('/game/')
+
+      if (isOnGamePage) {
+        // If on a game page, force navigation to the new game
+        navigateRef.current(`/game/${data.gameId}`, { replace: true })
+      } else {
+        // If not on a game page, navigate normally
+        navigateRef.current(`/game/${data.gameId}`)
+      }
     })
 
     // TimeUpdate - Server broadcasts updated time state every second
@@ -313,7 +355,7 @@ export const useSignalREvents = () => {
         targetScore: data.targetScore,
         isCrawfordGame: data.isCrawfordGame,
         matchComplete: data.matchComplete,
-        matchWinner: data.matchWinner,
+        matchWinner: data.matchWinner ?? null,
         lastUpdatedAt: new Date().toISOString(),
       })
     })

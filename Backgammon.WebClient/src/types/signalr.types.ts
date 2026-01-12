@@ -1,4 +1,15 @@
 import { GameState, CheckerColor } from './game.types'
+import {
+  MatchGameStartingDto,
+  MatchCreatedDto,
+  OpponentJoinedMatchDto,
+  MatchUpdateDto,
+  MatchContinuedDto,
+  MatchGameCompletedDto,
+  MatchCompletedDto,
+  TimeUpdateDto,
+  PlayerTimedOutDto,
+} from './generated/Backgammon.Server.Models.SignalR'
 
 // SignalR event names (server → client)
 // Note: Hub methods are now accessed via the typed hub proxy (see SignalRContext.tsx)
@@ -74,83 +85,19 @@ export enum ConnectionState {
   Failed = 'Failed',
 }
 
-// Match event data types
+// Event data types - Aliases to auto-generated DTOs
+// Note: All event data types are now imported from auto-generated types
+// We keep the "Event" suffix for backwards compatibility in the codebase
+
+export type MatchCreatedEvent = MatchCreatedDto
+export type OpponentJoinedMatchEvent = OpponentJoinedMatchDto
+export type MatchGameStartingEvent = MatchGameStartingDto
+export type MatchUpdateEvent = MatchUpdateDto
+export type MatchContinuedEvent = MatchContinuedDto
+export type MatchGameCompletedEvent = MatchGameCompletedDto
+export type MatchCompletedEvent = MatchCompletedDto
+export type TimeUpdateEvent = TimeUpdateDto
+export type TimeoutEvent = PlayerTimedOutDto
+
+// Legacy type for backwards compatibility
 export type OpponentTypeString = 'AI' | 'OpenLobby' | 'Friend'
-
-export interface MatchCreatedEvent {
-  matchId: string
-  gameId: string
-  targetScore: number
-  opponentType: OpponentTypeString
-  player1Id: string
-  player2Id: string | null
-  player1Name: string
-  player2Name: string | null
-}
-
-export interface OpponentJoinedMatchEvent {
-  matchId: string
-  player2Id: string
-  player2Name: string
-}
-
-// Time control event data types
-export interface TimeUpdateEvent {
-  gameId: string
-  whiteReserveSeconds: number
-  redReserveSeconds: number
-  whiteIsInDelay: boolean
-  redIsInDelay: boolean
-  whiteDelayRemaining: number
-  redDelayRemaining: number
-}
-
-export interface TimeoutEvent {
-  gameId: string
-  timedOutPlayer: string
-  winner: string
-}
-
-// Match event data types
-export interface MatchGameStartingEvent {
-  matchId: string
-  gameId: string
-}
-
-export interface MatchUpdateEvent {
-  matchId: string
-  player1Score: number
-  player2Score: number
-  targetScore: number
-  isCrawfordGame: boolean
-  matchComplete: boolean
-  matchWinner: string | null
-}
-
-export interface MatchContinuedEvent {
-  matchId: string
-  gameId: string
-  player1Score: number
-  player2Score: number
-  targetScore: number
-  isCrawfordGame: boolean
-}
-
-export interface MatchGameCompletedEvent {
-  matchId: string
-  gameId: string
-  winner: string
-  points: number
-}
-
-export interface MatchCompletedEvent {
-  matchId: string
-  winner: string
-  finalScore: {
-    player1: number
-    player2: number
-  }
-}
-
-// Note: MatchStateDto is now imported from generated types
-// (see @/types/generated/Backgammon.Server.Models)

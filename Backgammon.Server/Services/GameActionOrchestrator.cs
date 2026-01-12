@@ -815,11 +815,135 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             if (match != null)
             {
                 await BroadcastMatchUpdateAsync(match, session.Id);
+
+                // Auto-start next game if match is not complete
+                if (!match.CoreMatch.IsMatchComplete())
+                {
+                    await StartNextGameInMatch(match, session);
+                }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling match game completion");
+        }
+    }
+
+    private async Task StartNextGameInMatch(Match match, GameSession completedSession)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Auto-starting next game for match {MatchId}. Current score: {P1Score}-{P2Score}",
+                match.MatchId,
+                match.Player1Score,
+                match.Player2Score);
+
+            // Start the next game
+            var nextGame = await _matchService.StartNextGameAsync(match.MatchId);
+
+            // Create game session
+            var session = _sessionManager.CreateGame(nextGame.GameId);
+            session.IsMatchGame = true;
+            session.MatchId = match.MatchId;
+
+            // Add player connections (AddPlayer will set WhitePlayerId and RedPlayerId)
+            // Add Player 1 (White) connections first
+            foreach (var connectionId in completedSession.WhiteConnections.ToList())
+            {
+                if (await IsConnectionActive(connectionId))
+                {
+                    session.AddPlayer(match.Player1Id, connectionId);
+                }
+            }
+
+            // Add Player 2 (Red) connections
+            foreach (var connectionId in completedSession.RedConnections.ToList())
+            {
+                if (await IsConnectionActive(connectionId))
+                {
+                    session.AddPlayer(match.Player2Id, connectionId);
+                }
+            }
+
+            // Set player names from match
+            session.WhitePlayerName = match.Player1Name;
+            session.RedPlayerName = match.Player2Name;
+
+            // Initialize game engine
+            session.Engine.StartNewGame();
+            session.Engine.RollDice();
+
+            // Broadcast the new game to connected clients
+            await BroadcastMatchGameStartingAsync(match, nextGame.GameId);
+
+            _logger.LogInformation(
+                "Started next game {GameId} for match {MatchId}",
+                nextGame.GameId,
+                match.MatchId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to auto-start next game for match {MatchId}", match.MatchId);
+            // Don't throw - failing to auto-start shouldn't crash the completion flow
+            // Client can still manually call ContinueMatch()
+        }
+    }
+
+    private async Task<bool> IsConnectionActive(string connectionId)
+    {
+        try
+        {
+            // Check if connection still exists in SignalR
+            var client = _hubContext.Clients.Client(connectionId);
+            return client != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task BroadcastMatchGameStartingAsync(Match match, string newGameId)
+    {
+        try
+        {
+            var session = _sessionManager.GetSession(newGameId);
+            if (session == null)
+            {
+                _logger.LogWarning("Cannot broadcast game starting - session {GameId} not found", newGameId);
+                return;
+            }
+
+            // Send to all connected players
+            foreach (var connectionId in session.WhiteConnections.Concat(session.RedConnections))
+            {
+                var state = session.GetState(connectionId);
+                var dto = new MatchGameStartingDto
+                {
+                    MatchId = match.MatchId,
+                    GameId = newGameId,
+                    GameNumber = match.TotalGamesPlayed + 1,
+                    CurrentScore = new MatchScoreDto
+                    {
+                        Player1 = match.Player1Score,
+                        Player2 = match.Player2Score
+                    },
+                    IsCrawfordGame = match.IsCrawfordGame,
+                    State = state
+                };
+
+                await _hubContext.Clients.Client(connectionId).MatchGameStarting(dto);
+            }
+
+            _logger.LogInformation(
+                "Broadcasted MatchGameStarting for game {GameId} in match {MatchId}",
+                newGameId,
+                match.MatchId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error broadcasting match game starting");
         }
     }
 

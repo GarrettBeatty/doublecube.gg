@@ -260,7 +260,7 @@ public class CombinedMovesTests
         // Assert - Combined bear-off from point 5 to 0 (via intermediate point 2 or 3)
         // Path: 5 -> 2 (using 3) -> 0 (using 2), or 5 -> 3 (using 2) -> 0 (using 3)
         var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
-            m.IsCombinedMove && m.From == 5 && m.To == 0);
+            m.IsCombinedMove && m.From == 5 && m.To == 25);
 
         Assert.NotNull(combinedBearOff);
         Assert.True(combinedBearOff.IsCombinedMove);
@@ -309,14 +309,14 @@ public class CombinedMovesTests
         // Assert - Should NOT have combined bear-off from point 3 to 0
         // Because after 3→1, highest point is still 5, so can't bear off from 1 with die 6
         var invalidCombinedBearOff = state.ValidMoves.FirstOrDefault(m =>
-            m.IsCombinedMove && m.From == 3 && m.To == 0);
+            m.IsCombinedMove && m.From == 3 && m.To == 25);
 
         Assert.Null(invalidCombinedBearOff);
 
         // However, valid single moves should still exist:
         // - 5→off with die 6 (can bear off from 5 when 5 is highest and die > 5)
         var validBearOff = state.ValidMoves.FirstOrDefault(m =>
-            !m.IsCombinedMove && m.From == 5 && m.To == 0);
+            !m.IsCombinedMove && m.From == 5 && m.To == 25);
         Assert.NotNull(validBearOff);
     }
 
@@ -355,7 +355,7 @@ public class CombinedMovesTests
         // - Bear off from 2 with die 3 is valid because 3 > 2 and 2 is now the highest point
         // Note: Bear-off destination (0) is NOT reachable with single die from 4
         var validCombinedBearOff = state.ValidMoves.FirstOrDefault(m =>
-            m.IsCombinedMove && m.From == 4 && m.To == 0);
+            m.IsCombinedMove && m.From == 4 && m.To == 25);
 
         Assert.NotNull(validCombinedBearOff);
     }

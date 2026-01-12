@@ -909,7 +909,7 @@ public class GameEngine
                 {
                     foreach (var die in RemainingMoves.Distinct())
                     {
-                        var move = new Move(pos, CurrentPlayer.Color == CheckerColor.White ? 0 : 25, die);
+                        var move = new Move(pos, 25, die);
                         if (IsValidMove(move))
                         {
                             validMoves.Add(move);

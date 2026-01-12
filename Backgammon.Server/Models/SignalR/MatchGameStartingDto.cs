@@ -1,3 +1,4 @@
+using Backgammon.Server.Services;
 using Tapper;
 
 namespace Backgammon.Server.Models.SignalR;
@@ -11,4 +12,12 @@ public class MatchGameStartingDto
     public string MatchId { get; set; } = string.Empty;
 
     public string GameId { get; set; } = string.Empty;
+
+    public int GameNumber { get; set; }
+
+    public MatchScoreDto CurrentScore { get; set; } = new();
+
+    public bool IsCrawfordGame { get; set; }
+
+    public GameState State { get; set; } = new();
 }

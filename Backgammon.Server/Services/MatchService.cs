@@ -359,6 +359,8 @@ public class MatchService : IMatchService
             {
                 match.WinnerId = match.CoreMatch.GetWinnerId();
                 match.DurationSeconds = (int)(DateTime.UtcNow - match.CreatedAt).TotalSeconds;
+                match.Status = "Completed";
+                match.CompletedAt = DateTime.UtcNow;
 
                 _logger.LogInformation(
                     "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",

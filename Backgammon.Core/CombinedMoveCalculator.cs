@@ -104,7 +104,7 @@ internal class CombinedMoveCalculator
                     isValidLanding = currentPoint == effectiveHighest;
                 }
 
-                nextPoint = 0; // Normalize to bear-off point
+                nextPoint = 25; // Normalize to bear-off point
             }
             else if (playerColor == CheckerColor.Red && nextPoint >= 25)
             {

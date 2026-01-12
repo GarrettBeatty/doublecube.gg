@@ -43,7 +43,7 @@ public class GameEngineEdgeCasesTests
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
         var validMoves = game.GetValidMoves();
-        Assert.DoesNotContain(validMoves, m => m.To == 0);
+        Assert.DoesNotContain(validMoves, m => m.To == 25);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class GameEngineEdgeCasesTests
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
         var validMoves = game.GetValidMoves();
-        Assert.Contains(validMoves, m => m.From == 6 && m.To == 0 && m.DieValue == 6);
+        Assert.Contains(validMoves, m => m.From == 6 && m.To == 25 && m.DieValue == 6);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class GameEngineEdgeCasesTests
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
         var validMoves = game.GetValidMoves();
         // Should allow both bearing off and moving to point 5
-        Assert.Contains(validMoves, m => m.From == 6 && m.To == 0 && m.DieValue == 6);
+        Assert.Contains(validMoves, m => m.From == 6 && m.To == 25 && m.DieValue == 6);
         Assert.Contains(validMoves, m => m.From == 6 && m.To == 5 && m.DieValue == 1);
     }
 
@@ -251,7 +251,7 @@ public class GameEngineEdgeCasesTests
         game.RemainingMoves.Clear();
         game.RemainingMoves.AddRange(game.Dice.GetMoves());
         var validMoves = game.GetValidMoves();
-        Assert.Contains(validMoves, m => m.From == 1 && m.To == 0);
+        Assert.Contains(validMoves, m => m.From == 1 && m.To == 25);
     }
 
     [Fact]
