@@ -167,4 +167,10 @@ public class User
     /// </summary>
     [JsonPropertyName("friendsListPrivacy")]
     public ProfilePrivacyLevel FriendsListPrivacy { get; set; } = ProfilePrivacyLevel.Public;
+
+    /// <summary>
+    /// Selected board theme ID (null = default theme)
+    /// </summary>
+    [JsonPropertyName("selectedThemeId")]
+    public string? SelectedThemeId { get; set; }
 }

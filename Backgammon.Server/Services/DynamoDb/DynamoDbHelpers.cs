@@ -161,6 +161,12 @@ public static class DynamoDbHelpers
             item["bannedUntil"] = new AttributeValue { S = user.BannedUntil.Value.ToString("O") };
         }
 
+        // Selected board theme
+        if (!string.IsNullOrEmpty(user.SelectedThemeId))
+        {
+            item["selectedThemeId"] = new AttributeValue { S = user.SelectedThemeId };
+        }
+
         return item;
     }
 
@@ -198,6 +204,9 @@ public static class DynamoDbHelpers
         user.PeakRating = GetInt(item, "peakRating", User.DefaultStartingRating);
         user.RatedGamesCount = GetInt(item, "ratedGamesCount", 0);
         user.RatingLastUpdatedAt = GetNullableDateTime(item, "ratingLastUpdatedAt");
+
+        // Selected board theme
+        user.SelectedThemeId = GetStringOrNull(item, "selectedThemeId");
 
         return user;
     }
@@ -716,5 +725,149 @@ public static class DynamoDbHelpers
             ["createdAt"] = new AttributeValue { S = createdAt.ToString("O") },
             ["entityType"] = new AttributeValue { S = "PLAYER_MATCH" }
         };
+    }
+
+    // Marshal ThemeColors to AttributeValue
+    public static AttributeValue MarshalThemeColors(ThemeColors colors)
+    {
+        return new AttributeValue
+        {
+            M = new Dictionary<string, AttributeValue>
+            {
+                ["boardBackground"] = new AttributeValue { S = colors.BoardBackground },
+                ["boardBorder"] = new AttributeValue { S = colors.BoardBorder },
+                ["bar"] = new AttributeValue { S = colors.Bar },
+                ["bearoff"] = new AttributeValue { S = colors.Bearoff },
+                ["pointLight"] = new AttributeValue { S = colors.PointLight },
+                ["pointDark"] = new AttributeValue { S = colors.PointDark },
+                ["checkerWhite"] = new AttributeValue { S = colors.CheckerWhite },
+                ["checkerWhiteStroke"] = new AttributeValue { S = colors.CheckerWhiteStroke },
+                ["checkerRed"] = new AttributeValue { S = colors.CheckerRed },
+                ["checkerRedStroke"] = new AttributeValue { S = colors.CheckerRedStroke },
+                ["diceBackground"] = new AttributeValue { S = colors.DiceBackground },
+                ["diceDots"] = new AttributeValue { S = colors.DiceDots },
+                ["doublingCubeBackground"] = new AttributeValue { S = colors.DoublingCubeBackground },
+                ["doublingCubeStroke"] = new AttributeValue { S = colors.DoublingCubeStroke },
+                ["doublingCubeText"] = new AttributeValue { S = colors.DoublingCubeText },
+                ["highlightSource"] = new AttributeValue { S = colors.HighlightSource },
+                ["highlightSelected"] = new AttributeValue { S = colors.HighlightSelected },
+                ["highlightDest"] = new AttributeValue { S = colors.HighlightDest },
+                ["highlightCapture"] = new AttributeValue { S = colors.HighlightCapture },
+                ["highlightAnalysis"] = new AttributeValue { S = colors.HighlightAnalysis },
+                ["textLight"] = new AttributeValue { S = colors.TextLight },
+                ["textDark"] = new AttributeValue { S = colors.TextDark }
+            }
+        };
+    }
+
+    // Unmarshal ThemeColors from AttributeValue
+    public static ThemeColors UnmarshalThemeColors(Dictionary<string, AttributeValue> colorsMap)
+    {
+        return new ThemeColors
+        {
+            BoardBackground = GetStringOrNull(colorsMap, "boardBackground") ?? "hsl(0 0% 14%)",
+            BoardBorder = GetStringOrNull(colorsMap, "boardBorder") ?? "hsl(0 0% 22%)",
+            Bar = GetStringOrNull(colorsMap, "bar") ?? "hsl(0 0% 11%)",
+            Bearoff = GetStringOrNull(colorsMap, "bearoff") ?? "hsl(0 0% 11%)",
+            PointLight = GetStringOrNull(colorsMap, "pointLight") ?? "hsl(0 0% 32%)",
+            PointDark = GetStringOrNull(colorsMap, "pointDark") ?? "hsl(0 0% 20%)",
+            CheckerWhite = GetStringOrNull(colorsMap, "checkerWhite") ?? "hsl(0 0% 98%)",
+            CheckerWhiteStroke = GetStringOrNull(colorsMap, "checkerWhiteStroke") ?? "hsl(0 0% 72%)",
+            CheckerRed = GetStringOrNull(colorsMap, "checkerRed") ?? "hsl(0 84.2% 60.2%)",
+            CheckerRedStroke = GetStringOrNull(colorsMap, "checkerRedStroke") ?? "hsl(0 72.2% 50.6%)",
+            DiceBackground = GetStringOrNull(colorsMap, "diceBackground") ?? "white",
+            DiceDots = GetStringOrNull(colorsMap, "diceDots") ?? "hsl(0 0% 9%)",
+            DoublingCubeBackground = GetStringOrNull(colorsMap, "doublingCubeBackground") ?? "#fbbf24",
+            DoublingCubeStroke = GetStringOrNull(colorsMap, "doublingCubeStroke") ?? "#f59e0b",
+            DoublingCubeText = GetStringOrNull(colorsMap, "doublingCubeText") ?? "#111827",
+            HighlightSource = GetStringOrNull(colorsMap, "highlightSource") ?? "hsla(47.9 95.8% 53.1% / 0.6)",
+            HighlightSelected = GetStringOrNull(colorsMap, "highlightSelected") ?? "hsla(142.1 76.2% 36.3% / 0.7)",
+            HighlightDest = GetStringOrNull(colorsMap, "highlightDest") ?? "hsla(221.2 83.2% 53.3% / 0.6)",
+            HighlightCapture = GetStringOrNull(colorsMap, "highlightCapture") ?? "hsla(0 84.2% 60.2% / 0.6)",
+            HighlightAnalysis = GetStringOrNull(colorsMap, "highlightAnalysis") ?? "hsla(142.1 76.2% 36.3% / 0.5)",
+            TextLight = GetStringOrNull(colorsMap, "textLight") ?? "hsla(0 0% 98% / 0.5)",
+            TextDark = GetStringOrNull(colorsMap, "textDark") ?? "hsla(0 0% 9% / 0.7)"
+        };
+    }
+
+    // Marshal BoardTheme to DynamoDB item
+    public static Dictionary<string, AttributeValue> MarshalBoardTheme(BoardTheme theme)
+    {
+        var item = new Dictionary<string, AttributeValue>
+        {
+            ["PK"] = new AttributeValue { S = $"THEME#{theme.ThemeId}" },
+            ["SK"] = new AttributeValue { S = "METADATA" },
+            ["themeId"] = new AttributeValue { S = theme.ThemeId },
+            ["name"] = new AttributeValue { S = theme.Name },
+            ["description"] = new AttributeValue { S = theme.Description },
+            ["authorId"] = new AttributeValue { S = theme.AuthorId },
+            ["authorUsername"] = new AttributeValue { S = theme.AuthorUsername },
+            ["visibility"] = new AttributeValue { S = theme.Visibility.ToString() },
+            ["isDefault"] = new AttributeValue { BOOL = theme.IsDefault },
+            ["createdAt"] = new AttributeValue { S = theme.CreatedAt.ToString("O") },
+            ["updatedAt"] = new AttributeValue { S = theme.UpdatedAt.ToString("O") },
+            ["usageCount"] = new AttributeValue { N = theme.UsageCount.ToString() },
+            ["likeCount"] = new AttributeValue { N = theme.LikeCount.ToString() },
+            ["colors"] = MarshalThemeColors(theme.Colors),
+            ["entityType"] = new AttributeValue { S = "THEME" }
+        };
+
+        // GSI1 for author's themes (newest first)
+        item["GSI1PK"] = new AttributeValue { S = $"USER#{theme.AuthorId}" };
+        var reversedTimestamp = (DateTime.MaxValue.Ticks - theme.CreatedAt.Ticks).ToString("D19");
+        item["GSI1SK"] = new AttributeValue { S = $"THEME#{reversedTimestamp}" };
+
+        // GSI3 for public themes sorted by usage count
+        if (theme.Visibility == ThemeVisibility.Public)
+        {
+            item["GSI3PK"] = new AttributeValue { S = "PUBLIC_THEMES" };
+            // Sort by usage count (padded for proper string sorting) then by theme ID for consistency
+            var paddedUsageCount = theme.UsageCount.ToString("D10");
+            item["GSI3SK"] = new AttributeValue { S = $"{paddedUsageCount}#{theme.ThemeId}" };
+        }
+
+        // Optional thumbnail URL
+        if (!string.IsNullOrEmpty(theme.ThumbnailUrl))
+        {
+            item["thumbnailUrl"] = new AttributeValue { S = theme.ThumbnailUrl };
+        }
+
+        return item;
+    }
+
+    // Unmarshal BoardTheme from DynamoDB item
+    public static BoardTheme UnmarshalBoardTheme(Dictionary<string, AttributeValue> item)
+    {
+        var theme = new BoardTheme
+        {
+            ThemeId = item["themeId"].S,
+            Name = item["name"].S,
+            Description = GetStringOrNull(item, "description") ?? string.Empty,
+            AuthorId = item["authorId"].S,
+            AuthorUsername = GetStringOrNull(item, "authorUsername") ?? "Unknown",
+            IsDefault = GetBool(item, "isDefault"),
+            CreatedAt = GetDateTime(item, "createdAt"),
+            UpdatedAt = GetDateTime(item, "updatedAt"),
+            UsageCount = GetInt(item, "usageCount"),
+            LikeCount = GetInt(item, "likeCount"),
+            ThumbnailUrl = GetStringOrNull(item, "thumbnailUrl")
+        };
+
+        // Parse visibility enum
+        if (item.TryGetValue("visibility", out var visibilityValue) && !string.IsNullOrEmpty(visibilityValue.S))
+        {
+            if (Enum.TryParse<ThemeVisibility>(visibilityValue.S, out var visibility))
+            {
+                theme.Visibility = visibility;
+            }
+        }
+
+        // Unmarshal colors
+        if (item.TryGetValue("colors", out var colorsValue) && colorsValue.M != null)
+        {
+            theme.Colors = UnmarshalThemeColors(colorsValue.M);
+        }
+
+        return theme;
     }
 }

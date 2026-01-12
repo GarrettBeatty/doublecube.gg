@@ -281,6 +281,7 @@ export const PuzzleBoardAdapter = memo(function PuzzleBoardAdapter({
         getValidDestinations: getValidMovesFrom,
         isDraggable,
         onPointClick: handlePointClick,
+        onCheckerSelect: handlePointClick,
       }}
     />
   )

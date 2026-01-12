@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 import { DoublingCubeState } from './board.types'
 
 interface DoublingCubeDisplayProps {
@@ -11,6 +12,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
   cube,
   isFlipped = false,
 }: DoublingCubeDisplayProps) {
+  const colors = useThemeColors()
   const cubeX = BOARD_CONFIG.viewBox.width - BOARD_CONFIG.padding - 35
   const cubeSize = 50
   const centerY = BOARD_CONFIG.viewBox.height / 2
@@ -36,10 +38,6 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
     ? `rotate(180 ${BOARD_CONFIG.viewBox.width / 2} ${centerY})`
     : undefined
 
-  // Cube colors
-  const fillColor = '#fbbf24' // yellow-400
-  const strokeColor = '#f59e0b' // yellow-600
-
   return (
     <g id="doubling-cube" transform={transform}>
       {/* Shadow */}
@@ -60,8 +58,8 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
         width={cubeSize}
         height={cubeSize}
         rx={8}
-        fill={fillColor}
-        stroke={strokeColor}
+        fill={colors.doublingCubeBackground}
+        stroke={colors.doublingCubeStroke}
         strokeWidth={2}
       />
 
@@ -73,7 +71,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
         dominantBaseline="middle"
         fontSize={28}
         fontWeight="bold"
-        fill="#111827"
+        fill={colors.doublingCubeText}
         style={{ userSelect: 'none', pointerEvents: 'none' }}
       >
         {cube.value}

@@ -14,8 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Settings, Volume2, VolumeX, Bell, Moon, Sun, Shield, User } from 'lucide-react'
+import { Settings, Volume2, VolumeX, Bell, Moon, Sun, Shield, User, Palette } from 'lucide-react'
 import { audioService } from '@/services/audio.service'
+import { ThemeBrowser } from '@/components/themes/ThemeBrowser'
+import { ThemePreviewBoard } from '@/components/themes/ThemePreviewBoard'
+import { useThemeStore, useThemeColors } from '@/stores/themeStore'
 
 interface UserSettings {
   soundEnabled: boolean
@@ -62,6 +65,9 @@ export const SettingsPage: React.FC = () => {
   const { user, isAuthenticated } = useAuth()
   const [settings, setSettings] = useState<UserSettings>(loadSettings)
   const [hasChanges, setHasChanges] = useState(false)
+  const [themeBrowserOpen, setThemeBrowserOpen] = useState(false)
+  const { currentTheme } = useThemeStore()
+  const themeColors = useThemeColors()
 
   // Sync audio service with settings on mount
   useEffect(() => {
@@ -302,6 +308,53 @@ export const SettingsPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* Board Theme Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="h-5 w-5" />
+                Board Theme
+              </CardTitle>
+              <CardDescription>
+                Customize your game board appearance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Current Theme</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {currentTheme?.name || 'Classic (Default)'}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={() => setThemeBrowserOpen(true)}
+                >
+                  Browse Themes
+                </Button>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                <div className="flex justify-center p-4 bg-muted/50 rounded-lg">
+                  <ThemePreviewBoard
+                    colors={themeColors}
+                    width={280}
+                    height={140}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <ThemeBrowser
+            open={themeBrowserOpen}
+            onOpenChange={setThemeBrowserOpen}
+          />
 
           {/* Notification Settings */}
           <Card>

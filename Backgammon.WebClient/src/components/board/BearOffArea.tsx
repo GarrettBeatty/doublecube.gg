@@ -1,16 +1,7 @@
-import { memo } from 'react'
-import { BOARD_CONFIG, BOARD_COLORS } from '@/lib/boardConstants'
+import { memo, useMemo } from 'react'
+import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 import { HighlightType } from './board.types'
-
-// Highlight colors mapping
-const HIGHLIGHT_COLORS: Record<HighlightType, string> = {
-  source: BOARD_COLORS.highlightSource,
-  selected: BOARD_COLORS.highlightSelected,
-  destination: BOARD_COLORS.highlightDest,
-  capture: BOARD_COLORS.highlightCapture,
-  combined: 'hsla(280 70% 50% / 0.6)',
-  analysis: BOARD_COLORS.highlightAnalysis,
-}
 
 interface BearOffAreaProps {
   whiteBornOff: number
@@ -25,14 +16,28 @@ export const BearOffArea = memo(function BearOffArea({
   highlight,
   onClick,
 }: BearOffAreaProps) {
+  const themeColors = useThemeColors()
   const bearoffWidth = BOARD_CONFIG.bearoffWidth
   const bearoffX = BOARD_CONFIG.barX + BOARD_CONFIG.barWidth + 6 * BOARD_CONFIG.pointWidth
   const padding = BOARD_CONFIG.padding
   const viewBoxHeight = BOARD_CONFIG.viewBox.height
   const centerX = bearoffX + bearoffWidth / 2
 
+  // Build highlight colors from theme
+  const highlightColors: Record<HighlightType, string> = useMemo(
+    () => ({
+      source: themeColors.highlightSource,
+      selected: themeColors.highlightSelected,
+      destination: themeColors.highlightDest,
+      capture: themeColors.highlightCapture,
+      combined: 'hsla(280 70% 50% / 0.6)',
+      analysis: themeColors.highlightAnalysis,
+    }),
+    [themeColors]
+  )
+
   // Fill color
-  const fillColor = highlight ? HIGHLIGHT_COLORS[highlight] : BOARD_COLORS.bearoff
+  const fillColor = highlight ? highlightColors[highlight] : themeColors.bearoff
 
   // Checker dimensions for born-off display
   const checkerWidth = bearoffWidth - 10
@@ -49,12 +54,10 @@ export const BearOffArea = memo(function BearOffArea({
     if (count === 0) return null
 
     const visibleCount = Math.min(count, maxVisible)
-    const fillColor =
-      color === 'white' ? BOARD_COLORS.checkerWhite : BOARD_COLORS.checkerRed
+    const checkerFillColor =
+      color === 'white' ? themeColors.checkerWhite : themeColors.checkerRed
     const strokeColor =
-      color === 'white'
-        ? BOARD_COLORS.checkerWhiteStroke
-        : BOARD_COLORS.checkerRedStroke
+      color === 'white' ? themeColors.checkerWhiteStroke : themeColors.checkerRedStroke
 
     return (
       <g>
@@ -65,7 +68,7 @@ export const BearOffArea = memo(function BearOffArea({
             y={startY + i * (checkerHeight + 2) * direction}
             width={checkerWidth}
             height={checkerHeight}
-            fill={fillColor}
+            fill={checkerFillColor}
             stroke={strokeColor}
             strokeWidth={1}
             rx={2}

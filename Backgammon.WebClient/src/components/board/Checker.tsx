@@ -1,5 +1,6 @@
 import { memo } from 'react'
-import { BOARD_CONFIG, BOARD_COLORS } from '@/lib/boardConstants'
+import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 
 interface CheckerProps {
   cx: number
@@ -18,12 +19,11 @@ export const Checker = memo(function Checker({
   isDraggable = false,
   onDragStart,
 }: CheckerProps) {
+  const colors = useThemeColors()
   const fillColor =
-    color === 'white' ? BOARD_COLORS.checkerWhite : BOARD_COLORS.checkerRed
+    color === 'white' ? colors.checkerWhite : colors.checkerRed
   const strokeColor =
-    color === 'white'
-      ? BOARD_COLORS.checkerWhiteStroke
-      : BOARD_COLORS.checkerRedStroke
+    color === 'white' ? colors.checkerWhiteStroke : colors.checkerRedStroke
 
   return (
     <circle
@@ -31,7 +31,7 @@ export const Checker = memo(function Checker({
       cy={cy}
       r={BOARD_CONFIG.checkerRadius}
       fill={fillColor}
-      stroke={isSelected ? BOARD_COLORS.highlightSelected : strokeColor}
+      stroke={isSelected ? colors.highlightSelected : strokeColor}
       strokeWidth={isSelected ? 4 : 2}
       style={{ cursor: isDraggable ? 'grab' : 'default' }}
       onMouseDown={isDraggable ? onDragStart : undefined}

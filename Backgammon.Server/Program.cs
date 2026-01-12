@@ -139,6 +139,7 @@ builder.Services.AddSingleton<IUserRepository>(sp =>
 });
 builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
 builder.Services.AddSingleton<IMatchRepository, Backgammon.Server.Services.DynamoDb.DynamoDbMatchRepository>();
+builder.Services.AddSingleton<IThemeRepository, Backgammon.Server.Services.DynamoDb.DynamoDbThemeRepository>();
 
 // User and authentication services
 builder.Services.AddSingleton<IAuthService, AuthService>();
@@ -321,6 +322,12 @@ var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
 var gameRepository = app.Services.GetRequiredService<IGameRepository>();
 await sessionManager.LoadActiveGamesAsync(gameRepository);
 Console.WriteLine("=== Game loading complete ===\n");
+
+// Seed default themes
+Console.WriteLine("=== Seeding default themes ===");
+var themeRepository = app.Services.GetRequiredService<IThemeRepository>();
+await DefaultThemeSeeder.SeedDefaultThemesAsync(themeRepository);
+Console.WriteLine("=== Theme seeding complete ===\n");
 
 // MUST be first - CORS middleware needs to run before Aspire endpoints
 // Use Production CORS policy in production environment, AllowAll otherwise
@@ -849,6 +856,247 @@ app.MapPost("/api/friends/invite/{friendUserId}/game/{gameId}", async (string fr
     var (success, error) = await friendService.InviteFriendToGameAsync(userId, friendUserId, gameId);
     return success ? Results.Ok() : Results.BadRequest(new { error });
 }).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// ==================== THEME ENDPOINTS ====================
+
+// Get public themes (paginated)
+app.MapGet("/api/themes", async (IThemeRepository themeRepository, int limit = 50, string? cursor = null) =>
+{
+    var (themes, nextCursor) = await themeRepository.GetPublicThemesAsync(limit, cursor);
+    return Results.Ok(new { themes, nextCursor });
+}).RequireCors(selectedCorsPolicy);
+
+// Get default themes
+app.MapGet("/api/themes/defaults", async (IThemeRepository themeRepository) =>
+{
+    var themes = await themeRepository.GetDefaultThemesAsync();
+    return Results.Ok(themes);
+}).RequireCors(selectedCorsPolicy);
+
+// Get theme by ID
+app.MapGet("/api/themes/{themeId}", async (string themeId, IThemeRepository themeRepository) =>
+{
+    var theme = await themeRepository.GetByIdAsync(themeId);
+    if (theme == null)
+    {
+        return Results.NotFound(new { error = "Theme not found" });
+    }
+
+    return Results.Ok(theme);
+}).RequireCors(selectedCorsPolicy);
+
+// Get current user's created themes (requires auth)
+app.MapGet("/api/themes/my", async (HttpContext context, IThemeRepository themeRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var themes = await themeRepository.GetThemesByAuthorAsync(userId);
+    return Results.Ok(themes);
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Create new theme (requires auth)
+app.MapPost("/api/themes", async (Backgammon.Server.Models.BoardTheme theme, HttpContext context, IThemeRepository themeRepository, IUserRepository userRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await userRepository.GetByUserIdAsync(userId);
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    theme.ThemeId = Guid.NewGuid().ToString();
+    theme.AuthorId = userId;
+    theme.AuthorUsername = user.Username;
+    theme.IsDefault = false;
+    theme.CreatedAt = DateTime.UtcNow;
+    theme.UpdatedAt = DateTime.UtcNow;
+    theme.UsageCount = 0;
+    theme.LikeCount = 0;
+
+    await themeRepository.CreateThemeAsync(theme);
+    return Results.Created($"/api/themes/{theme.ThemeId}", theme);
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Update theme (requires auth, author only)
+app.MapPut("/api/themes/{themeId}", async (string themeId, Backgammon.Server.Models.BoardTheme updatedTheme, HttpContext context, IThemeRepository themeRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var existingTheme = await themeRepository.GetByIdAsync(themeId);
+    if (existingTheme == null)
+    {
+        return Results.NotFound(new { error = "Theme not found" });
+    }
+
+    if (existingTheme.AuthorId != userId)
+    {
+        return Results.Forbid();
+    }
+
+    if (existingTheme.IsDefault)
+    {
+        return Results.BadRequest(new { error = "Cannot modify default themes" });
+    }
+
+    existingTheme.Name = updatedTheme.Name;
+    existingTheme.Description = updatedTheme.Description;
+    existingTheme.Visibility = updatedTheme.Visibility;
+    existingTheme.Colors = updatedTheme.Colors;
+    existingTheme.UpdatedAt = DateTime.UtcNow;
+
+    await themeRepository.UpdateThemeAsync(existingTheme);
+    return Results.Ok(existingTheme);
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Delete theme (requires auth, author only)
+app.MapDelete("/api/themes/{themeId}", async (string themeId, HttpContext context, IThemeRepository themeRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var theme = await themeRepository.GetByIdAsync(themeId);
+    if (theme == null)
+    {
+        return Results.NotFound(new { error = "Theme not found" });
+    }
+
+    if (theme.AuthorId != userId)
+    {
+        return Results.Forbid();
+    }
+
+    if (theme.IsDefault)
+    {
+        return Results.BadRequest(new { error = "Cannot delete default themes" });
+    }
+
+    await themeRepository.DeleteThemeAsync(themeId);
+    return Results.Ok();
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Like a theme (requires auth)
+app.MapPost("/api/themes/{themeId}/like", async (string themeId, HttpContext context, IThemeRepository themeRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var theme = await themeRepository.GetByIdAsync(themeId);
+    if (theme == null)
+    {
+        return Results.NotFound(new { error = "Theme not found" });
+    }
+
+    await themeRepository.LikeThemeAsync(themeId, userId);
+    return Results.Ok();
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Unlike a theme (requires auth)
+app.MapDelete("/api/themes/{themeId}/like", async (string themeId, HttpContext context, IThemeRepository themeRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    await themeRepository.UnlikeThemeAsync(themeId, userId);
+    return Results.Ok();
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Get user's theme preference (requires auth)
+app.MapGet("/api/themes/preference", async (HttpContext context, IUserRepository userRepository) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await userRepository.GetByUserIdAsync(userId);
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    return Results.Ok(new { selectedThemeId = user.SelectedThemeId });
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Set user's theme preference (requires auth)
+app.MapPut("/api/themes/preference", async (HttpContext context, IUserRepository userRepository, IThemeRepository themeRepository, string? themeId) =>
+{
+    var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+
+    var user = await userRepository.GetByUserIdAsync(userId);
+    if (user == null)
+    {
+        return Results.Unauthorized();
+    }
+
+    // Validate theme exists if provided
+    if (!string.IsNullOrEmpty(themeId))
+    {
+        var theme = await themeRepository.GetByIdAsync(themeId);
+        if (theme == null)
+        {
+            return Results.NotFound(new { error = "Theme not found" });
+        }
+
+        // Track usage count changes
+        if (!string.IsNullOrEmpty(user.SelectedThemeId) && user.SelectedThemeId != themeId)
+        {
+            await themeRepository.DecrementUsageCountAsync(user.SelectedThemeId);
+        }
+
+        if (user.SelectedThemeId != themeId)
+        {
+            await themeRepository.IncrementUsageCountAsync(themeId);
+        }
+    }
+    else if (!string.IsNullOrEmpty(user.SelectedThemeId))
+    {
+        // Switching to default (null theme)
+        await themeRepository.DecrementUsageCountAsync(user.SelectedThemeId);
+    }
+
+    user.SelectedThemeId = themeId;
+    await userRepository.UpdateUserAsync(user);
+    return Results.Ok(new { selectedThemeId = themeId });
+}).RequireAuthorization().RequireCors(selectedCorsPolicy);
+
+// Search themes
+app.MapGet("/api/themes/search", async (string q, IThemeRepository themeRepository) =>
+{
+    if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+    {
+        return Results.BadRequest(new { error = "Search query must be at least 2 characters" });
+    }
+
+    var themes = await themeRepository.SearchThemesAsync(q);
+    return Results.Ok(themes);
+}).RequireCors(selectedCorsPolicy);
 
 // Cleanup background service for inactive games
 var cleanupTask = Task.Run(async () =>

@@ -1,18 +1,9 @@
-import { memo } from 'react'
-import { BOARD_CONFIG, BOARD_COLORS, POINT_COORDS } from '@/lib/boardConstants'
+import { memo, useMemo } from 'react'
+import { BOARD_CONFIG, POINT_COORDS } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 import { PointTriangle } from './PointTriangle'
 import { CheckerStack } from './CheckerStack'
 import { HighlightType } from './board.types'
-
-// Highlight colors mapping
-const HIGHLIGHT_COLORS: Record<HighlightType, string> = {
-  source: BOARD_COLORS.highlightSource,
-  selected: BOARD_COLORS.highlightSelected,
-  destination: BOARD_COLORS.highlightDest,
-  capture: BOARD_COLORS.highlightCapture,
-  combined: 'hsla(280 70% 50% / 0.6)', // Purple for combined moves
-  analysis: BOARD_COLORS.highlightAnalysis,
-}
 
 interface PointProps {
   pointNum: number
@@ -35,6 +26,21 @@ export const Point = memo(function Point({
   onClick,
   onCheckerDragStart,
 }: PointProps) {
+  const themeColors = useThemeColors()
+
+  // Build highlight colors from theme - must be called before any conditional returns
+  const highlightColors: Record<HighlightType, string> = useMemo(
+    () => ({
+      source: themeColors.highlightSource,
+      selected: themeColors.highlightSelected,
+      destination: themeColors.highlightDest,
+      capture: themeColors.highlightCapture,
+      combined: 'hsla(280 70% 50% / 0.6)', // Purple for combined moves
+      analysis: themeColors.highlightAnalysis,
+    }),
+    [themeColors]
+  )
+
   const coords = POINT_COORDS[pointNum]
   if (!coords) return null
 
@@ -43,8 +49,8 @@ export const Point = memo(function Point({
 
   // Determine fill color
   const baseFillColor =
-    pointNum % 2 === 0 ? BOARD_COLORS.pointLight : BOARD_COLORS.pointDark
-  const fillColor = highlight ? HIGHLIGHT_COLORS[highlight] : baseFillColor
+    pointNum % 2 === 0 ? themeColors.pointLight : themeColors.pointDark
+  const fillColor = highlight ? highlightColors[highlight] : baseFillColor
 
   // Center X of the point
   const centerX = x + BOARD_CONFIG.pointWidth / 2
@@ -79,7 +85,7 @@ export const Point = memo(function Point({
           x={centerX}
           y={isTop ? y - 8 : y + 15}
           textAnchor="middle"
-          fill={BOARD_COLORS.textLight}
+          fill={themeColors.textLight}
           fontSize={12}
           style={{ pointerEvents: 'none' }}
         >

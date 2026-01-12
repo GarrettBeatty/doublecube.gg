@@ -19,8 +19,9 @@ export const BOARD_CONFIG = {
   },
 } as const
 
-// Color palette - matching shadcn default theme (neutral grays)
-// Note: Not using `as const` to allow reassignment of color values in components
+// Color palette - default theme colors
+// These are exported for backward compatibility. Components should use useThemeColors() hook instead.
+// @deprecated Use useThemeColors() from '@/stores/themeStore' for theme-aware colors
 export const BOARD_COLORS: Record<string, string> = {
   boardBackground: 'hsl(0 0% 14%)',
   boardBorder: 'hsl(0 0% 22%)',
@@ -32,6 +33,11 @@ export const BOARD_COLORS: Record<string, string> = {
   checkerWhiteStroke: 'hsl(0 0% 72%)',
   checkerRed: 'hsl(0 84.2% 60.2%)',
   checkerRedStroke: 'hsl(0 72.2% 50.6%)',
+  diceBackground: 'white',
+  diceDots: 'hsl(0 0% 9%)',
+  doublingCubeBackground: '#fbbf24',
+  doublingCubeStroke: '#f59e0b',
+  doublingCubeText: '#111827',
   highlightSource: 'hsla(47.9 95.8% 53.1% / 0.6)',
   highlightSelected: 'hsla(142.1 76.2% 36.3% / 0.7)',
   highlightDest: 'hsla(221.2 83.2% 53.3% / 0.6)',

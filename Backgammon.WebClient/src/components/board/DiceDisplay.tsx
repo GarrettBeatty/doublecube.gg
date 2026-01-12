@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 import { DiceState } from './board.types'
 
 interface DiceDisplayProps {
@@ -13,6 +14,7 @@ export const DiceDisplay = memo(function DiceDisplay({
   isFlipped = false,
   statusText,
 }: DiceDisplayProps) {
+  const colors = useThemeColors()
   const barCenterX = BOARD_CONFIG.barX + BOARD_CONFIG.barWidth / 2
   const centerY = BOARD_CONFIG.viewBox.height / 2
   const diceSize = 36
@@ -46,7 +48,7 @@ export const DiceDisplay = memo(function DiceDisplay({
               width={diceSize}
               height={diceSize}
               rx={4}
-              fill="white"
+              fill={colors.diceBackground}
               style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }}
             />
             {/* Dice value */}
@@ -55,7 +57,7 @@ export const DiceDisplay = memo(function DiceDisplay({
               y={y + diceSize / 2}
               textAnchor="middle"
               dominantBaseline="middle"
-              fill="hsl(0 0% 9%)"
+              fill={colors.diceDots}
               fontSize={20}
               fontWeight="bold"
             >
@@ -72,7 +74,7 @@ export const DiceDisplay = memo(function DiceDisplay({
           y={startY + totalHeight + 12}
           textAnchor="middle"
           dominantBaseline="hanging"
-          fill="white"
+          fill={colors.textLight}
           fontSize={10}
           fontWeight="bold"
         >

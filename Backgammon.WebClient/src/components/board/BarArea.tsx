@@ -1,17 +1,8 @@
-import { memo } from 'react'
-import { BOARD_CONFIG, BOARD_COLORS } from '@/lib/boardConstants'
+import { memo, useMemo } from 'react'
+import { BOARD_CONFIG } from '@/lib/boardConstants'
+import { useThemeColors } from '@/stores/themeStore'
 import { CheckerStack } from './CheckerStack'
 import { HighlightType } from './board.types'
-
-// Highlight colors mapping
-const HIGHLIGHT_COLORS: Record<HighlightType, string> = {
-  source: BOARD_COLORS.highlightSource,
-  selected: BOARD_COLORS.highlightSelected,
-  destination: BOARD_COLORS.highlightDest,
-  capture: BOARD_COLORS.highlightCapture,
-  combined: 'hsla(280 70% 50% / 0.6)',
-  analysis: BOARD_COLORS.highlightAnalysis,
-}
 
 interface BarAreaProps {
   whiteOnBar: number
@@ -34,14 +25,28 @@ export const BarArea = memo(function BarArea({
   onRedDragStart,
   onClick,
 }: BarAreaProps) {
+  const themeColors = useThemeColors()
   const barX = BOARD_CONFIG.barX
   const barWidth = BOARD_CONFIG.barWidth
   const barCenterX = barX + barWidth / 2
   const padding = BOARD_CONFIG.padding
   const viewBoxHeight = BOARD_CONFIG.viewBox.height
 
+  // Build highlight colors from theme
+  const highlightColors: Record<HighlightType, string> = useMemo(
+    () => ({
+      source: themeColors.highlightSource,
+      selected: themeColors.highlightSelected,
+      destination: themeColors.highlightDest,
+      capture: themeColors.highlightCapture,
+      combined: 'hsla(280 70% 50% / 0.6)',
+      analysis: themeColors.highlightAnalysis,
+    }),
+    [themeColors]
+  )
+
   // Bar fill color
-  const fillColor = highlight ? HIGHLIGHT_COLORS[highlight] : BOARD_COLORS.bar
+  const fillColor = highlight ? highlightColors[highlight] : themeColors.bar
 
   // White checkers start from top, Red from bottom
   const whiteStartY = padding
