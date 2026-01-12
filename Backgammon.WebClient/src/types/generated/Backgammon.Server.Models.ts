@@ -152,8 +152,6 @@ export type GameState = {
     isRated: boolean;
     /** Transpiled from string? */
     matchId?: string;
-    /** Transpiled from bool */
-    isMatchGame: boolean;
     /** Transpiled from int */
     targetScore?: number;
     /** Transpiled from int */

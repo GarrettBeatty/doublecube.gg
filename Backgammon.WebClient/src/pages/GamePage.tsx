@@ -155,7 +155,7 @@ export const GamePage: React.FC = () => {
   // Uses functional update to avoid matchState dependency and potential infinite loops
   useEffect(() => {
     if (
-      !currentGameState?.isMatchGame ||
+      !currentGameState?.matchId ||
       currentGameState.player1Score === undefined ||
       currentGameState.player2Score === undefined
     ) {
@@ -198,7 +198,7 @@ export const GamePage: React.FC = () => {
   }, [currentGameState, setMatchState])
 
   // Extract matchId to use as a stable dependency value
-  const currentMatchId = currentGameState?.isMatchGame ? currentGameState.matchId : null
+  const currentMatchId = currentGameState?.matchId || null
 
   // Fetch authoritative match state from server on reconnection for match games
   // Uses ref to track which matchId we've already synced to prevent redundant fetches
@@ -390,7 +390,7 @@ export const GamePage: React.FC = () => {
               />
             )}
 
-            {currentGameState.isMatchGame &&
+            {currentGameState.matchId &&
               currentGameState.targetScore &&
               currentGameState.player1Score !== undefined &&
               currentGameState.player2Score !== undefined && (

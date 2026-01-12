@@ -59,7 +59,7 @@ export const GameResultModal: React.FC = () => {
   if (!currentGameState) return null
 
   // Determine if this is a match game with valid match state
-  const isMatchGame = currentGameState.isMatchGame && matchState
+  const isMatchGame = currentGameState.matchId && matchState
 
   const isWinner = lastGameWinner === myColor
   const winnerName =

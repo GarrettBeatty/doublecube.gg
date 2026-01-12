@@ -102,7 +102,6 @@ export interface GameState {
   redRatingChange?: number
   winner: CheckerColor | null
   matchId?: string
-  isMatchGame?: boolean
   targetScore?: number
   player1Score?: number
   player2Score?: number
