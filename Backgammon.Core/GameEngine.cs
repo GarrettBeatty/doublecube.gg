@@ -136,204 +136,59 @@ public class GameEngine
     }
 
     /// <summary>
-    /// Execute a move
+    /// Execute a move (single or combined).
     /// </summary>
     public bool ExecuteMove(Move move)
     {
-        if (!IsValidMove(move))
+        // Handle combined moves by executing each step
+        if (move.IsCombined)
         {
-            return false;
+            return ExecuteCombinedMoveInternal(move);
         }
 
-        // Capture state BEFORE executing (for undo)
-        move.OpponentCheckersOnBarBefore = GetOpponent().CheckersOnBar;
-        move.CurrentPlayerBornOffBefore = CurrentPlayer.CheckersBornOff;
-
-        // Handle entering from bar
-        if (move.From == 0)
-        {
-            CurrentPlayer.CheckersOnBar--;
-
-            var destPoint = Board.GetPoint(move.To);
-            if (destPoint.IsBlot && destPoint.Color != CurrentPlayer.Color)
-            {
-                // Hit opponent's blot
-                var opponent = GetOpponent();
-                destPoint.RemoveChecker();
-                opponent.CheckersOnBar++;
-                move.IsHit = true;
-            }
-
-            destPoint.AddChecker(CurrentPlayer.Color);
-        }
-
-        // Handle bearing off
-        else if (move.IsBearOff)
-        {
-            var fromPoint = Board.GetPoint(move.From);
-            fromPoint.RemoveChecker();
-            CurrentPlayer.CheckersBornOff++;
-        }
-
-        // Normal move
-        else
-        {
-            var fromPoint = Board.GetPoint(move.From);
-            var toPoint = Board.GetPoint(move.To);
-
-            fromPoint.RemoveChecker();
-
-            if (toPoint.IsBlot && toPoint.Color != CurrentPlayer.Color)
-            {
-                // Hit opponent's blot
-                var opponent = GetOpponent();
-                toPoint.RemoveChecker();
-                opponent.CheckersOnBar++;
-                move.IsHit = true;
-            }
-
-            toPoint.AddChecker(CurrentPlayer.Color);
-        }
-
-        // Remove the used die from remaining moves
-        RemainingMoves.Remove(move.DieValue);
-
-        // Track move in per-turn history
-        MoveHistory.Add(move);
-
-        // Track move in current turn snapshot for game history
-        if (_currentTurn != null)
-        {
-            // Create a copy of the move to avoid reference issues
-            var moveCopy = new Move(move.From, move.To, move.DieValue)
-            {
-                IsHit = move.IsHit,
-                OpponentCheckersOnBarBefore = move.OpponentCheckersOnBarBefore,
-                CurrentPlayerBornOffBefore = move.CurrentPlayerBornOffBefore
-            };
-            _currentTurn.Moves.Add(moveCopy);
-        }
-
-        // Check for win condition
-        if (CurrentPlayer.CheckersBornOff == 15)
-        {
-            GameOver = true;
-            Winner = CurrentPlayer;
-        }
-
-        return true;
+        return ExecuteSingleMoveInternal(move);
     }
 
     /// <summary>
-    /// Validate if a move is legal
+    /// Validate if a move is legal (single or combined).
     /// </summary>
     public bool IsValidMove(Move move)
     {
-        // Must have this die value available
-        if (!RemainingMoves.Contains(move.DieValue))
+        if (move.IsCombined)
         {
-            return false;
+            return IsValidCombinedMoveInternal(move);
         }
 
-        // If checkers on bar, must enter first
-        if (CurrentPlayer.CheckersOnBar > 0 && move.From != 0)
-        {
-            return false;
-        }
-
-        // Entering from bar
-        if (move.From == 0)
-        {
-            if (CurrentPlayer.CheckersOnBar == 0)
-            {
-                return false;
-            }
-
-            var destPoint = Board.GetPoint(move.To);
-            return destPoint.IsOpen(CurrentPlayer.Color);
-        }
-
-        // Bearing off
-        if (move.IsBearOff)
-        {
-            return CanBearOff(move.From, move.DieValue);
-        }
-
-        // Normal move
-        var fromPoint = Board.GetPoint(move.From);
-        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-        {
-            return false;
-        }
-
-        var toPoint = Board.GetPoint(move.To);
-        return toPoint.IsOpen(CurrentPlayer.Color);
+        return IsValidSingleMoveInternal(move);
     }
 
     /// <summary>
-    /// Get all valid moves for the current state
+    /// Get all valid moves for the current state.
     /// </summary>
-    public List<Move> GetValidMoves()
+    /// <param name="includeCombined">If true, includes combined multi-dice moves. Default is true.</param>
+    /// <returns>List of valid moves.</returns>
+    public List<Move> GetValidMoves(bool includeCombined = true)
     {
-        var validMoves = new List<Move>();
+        var validMoves = GetSingleDieMovesInternal();
 
-        // If checkers on bar, must enter
-        if (CurrentPlayer.CheckersOnBar > 0)
+        // Add combined moves if requested and possible
+        if (includeCombined && RemainingMoves.Count >= 2 && CurrentPlayer.CheckersOnBar == 0)
         {
-            foreach (var die in RemainingMoves.Distinct())
-            {
-                int entryPoint = CurrentPlayer.Color == CheckerColor.White ? 25 - die : die;
-                var move = new Move(0, entryPoint, die);
-                if (IsValidMove(move))
-                {
-                    validMoves.Add(move);
-                }
-            }
+            var calculator = new CombinedMoveCalculator(Board, CurrentPlayer, RemainingMoves);
 
-            return validMoves;
-        }
+            // Build a map of single-die destinations by source point
+            var singleDestinationsBySource = validMoves
+                .GroupBy(m => m.From)
+                .ToDictionary(g => g.Key, g => g.Select(m => m.To).ToHashSet());
 
-        // Check bearing off
-        if (Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
-        {
-            var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
-            for (int pos = homeStart; pos <= homeEnd; pos++)
+            // Calculate combined moves for each source point
+            // Materialize the list first to avoid collection modification during iteration
+            var sourcePoints = validMoves.Select(m => m.From).Distinct().ToList();
+            foreach (var sourcePoint in sourcePoints)
             {
-                var point = Board.GetPoint(pos);
-                if (point.Color == CurrentPlayer.Color && point.Count > 0)
-                {
-                    foreach (var die in RemainingMoves.Distinct())
-                    {
-                        var move = new Move(pos, CurrentPlayer.Color == CheckerColor.White ? 0 : 25, die);
-                        if (IsValidMove(move))
-                        {
-                            validMoves.Add(move);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Normal moves
-        for (int from = 1; from <= 24; from++)
-        {
-            var fromPoint = Board.GetPoint(from);
-            if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var die in RemainingMoves.Distinct())
-            {
-                int to = from + (CurrentPlayer.GetDirection() * die);
-                if (to >= 1 && to <= 24)
-                {
-                    var move = new Move(from, to, die);
-                    if (IsValidMove(move))
-                    {
-                        validMoves.Add(move);
-                    }
-                }
+                var singleDestinations = singleDestinationsBySource.GetValueOrDefault(sourcePoint, new HashSet<int>());
+                var combinedMoves = calculator.Calculate(sourcePoint, singleDestinations);
+                validMoves.AddRange(combinedMoves);
             }
         }
 
@@ -818,5 +673,275 @@ public class GameEngine
         }
 
         return false;
+    }
+
+    private bool ExecuteSingleMoveInternal(Move move)
+    {
+        if (!IsValidSingleMoveInternal(move))
+        {
+            return false;
+        }
+
+        // Capture state BEFORE executing (for undo)
+        move.OpponentCheckersOnBarBefore = GetOpponent().CheckersOnBar;
+        move.CurrentPlayerBornOffBefore = CurrentPlayer.CheckersBornOff;
+
+        // Handle entering from bar
+        if (move.From == 0)
+        {
+            CurrentPlayer.CheckersOnBar--;
+
+            var destPoint = Board.GetPoint(move.To);
+            if (destPoint.IsBlot && destPoint.Color != CurrentPlayer.Color)
+            {
+                // Hit opponent's blot
+                var opponent = GetOpponent();
+                destPoint.RemoveChecker();
+                opponent.CheckersOnBar++;
+                move.IsHit = true;
+            }
+
+            destPoint.AddChecker(CurrentPlayer.Color);
+        }
+
+        // Handle bearing off
+        else if (move.IsBearOff)
+        {
+            var fromPoint = Board.GetPoint(move.From);
+            fromPoint.RemoveChecker();
+            CurrentPlayer.CheckersBornOff++;
+        }
+
+        // Normal move
+        else
+        {
+            var fromPoint = Board.GetPoint(move.From);
+            var toPoint = Board.GetPoint(move.To);
+
+            fromPoint.RemoveChecker();
+
+            if (toPoint.IsBlot && toPoint.Color != CurrentPlayer.Color)
+            {
+                // Hit opponent's blot
+                var opponent = GetOpponent();
+                toPoint.RemoveChecker();
+                opponent.CheckersOnBar++;
+                move.IsHit = true;
+            }
+
+            toPoint.AddChecker(CurrentPlayer.Color);
+        }
+
+        // Remove the used die from remaining moves
+        RemainingMoves.Remove(move.DieValue);
+
+        // Track move in per-turn history
+        MoveHistory.Add(move);
+
+        // Track move in current turn snapshot for game history
+        if (_currentTurn != null)
+        {
+            // Create a copy of the move to avoid reference issues
+            var moveCopy = new Move(move.From, move.To, move.DieValue)
+            {
+                IsHit = move.IsHit,
+                OpponentCheckersOnBarBefore = move.OpponentCheckersOnBarBefore,
+                CurrentPlayerBornOffBefore = move.CurrentPlayerBornOffBefore
+            };
+            _currentTurn.Moves.Add(moveCopy);
+        }
+
+        // Check for win condition
+        if (CurrentPlayer.CheckersBornOff == 15)
+        {
+            GameOver = true;
+            Winner = CurrentPlayer;
+        }
+
+        return true;
+    }
+
+    private bool ExecuteCombinedMoveInternal(Move combinedMove)
+    {
+        if (combinedMove.DiceUsed == null || combinedMove.DiceUsed.Length < 2)
+        {
+            return false;
+        }
+
+        // Build the full path: from -> intermediates -> to
+        var fullPath = new List<int> { combinedMove.From };
+        if (combinedMove.IntermediatePoints != null)
+        {
+            fullPath.AddRange(combinedMove.IntermediatePoints);
+        }
+
+        fullPath.Add(combinedMove.To);
+
+        // Execute each step
+        var executedCount = 0;
+        for (int i = 0; i < combinedMove.DiceUsed.Length; i++)
+        {
+            var stepFrom = fullPath[i];
+            var stepTo = fullPath[i + 1];
+            var dieValue = combinedMove.DiceUsed[i];
+
+            var stepMove = new Move(stepFrom, stepTo, dieValue);
+
+            if (!ExecuteSingleMoveInternal(stepMove))
+            {
+                // Rollback all executed steps
+                while (executedCount > 0)
+                {
+                    UndoLastMove();
+                    executedCount--;
+                }
+
+                return false;
+            }
+
+            executedCount++;
+        }
+
+        return true;
+    }
+
+    private bool IsValidSingleMoveInternal(Move move)
+    {
+        // Must have this die value available
+        if (!RemainingMoves.Contains(move.DieValue))
+        {
+            return false;
+        }
+
+        // If checkers on bar, must enter first
+        if (CurrentPlayer.CheckersOnBar > 0 && move.From != 0)
+        {
+            return false;
+        }
+
+        // Entering from bar
+        if (move.From == 0)
+        {
+            if (CurrentPlayer.CheckersOnBar == 0)
+            {
+                return false;
+            }
+
+            var destPoint = Board.GetPoint(move.To);
+            return destPoint.IsOpen(CurrentPlayer.Color);
+        }
+
+        // Bearing off
+        if (move.IsBearOff)
+        {
+            return CanBearOff(move.From, move.DieValue);
+        }
+
+        // Normal move
+        var fromPoint = Board.GetPoint(move.From);
+        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+        {
+            return false;
+        }
+
+        var toPoint = Board.GetPoint(move.To);
+        return toPoint.IsOpen(CurrentPlayer.Color);
+    }
+
+    private bool IsValidCombinedMoveInternal(Move combinedMove)
+    {
+        if (combinedMove.DiceUsed == null || combinedMove.DiceUsed.Length < 2)
+        {
+            return false;
+        }
+
+        // Check all required dice are available
+        var availableDice = new List<int>(RemainingMoves);
+        foreach (var die in combinedMove.DiceUsed)
+        {
+            if (!availableDice.Contains(die))
+            {
+                return false;
+            }
+
+            availableDice.Remove(die);
+        }
+
+        // Validate by simulating execution (this recalculates combined moves to verify path is valid)
+        var calculator = new CombinedMoveCalculator(Board, CurrentPlayer, RemainingMoves);
+        var singleDestinations = GetSingleDieMovesInternal()
+            .Where(m => m.From == combinedMove.From)
+            .Select(m => m.To)
+            .ToHashSet();
+
+        var validCombinedMoves = calculator.Calculate(combinedMove.From, singleDestinations);
+        return validCombinedMoves.Any(m => m.From == combinedMove.From && m.To == combinedMove.To);
+    }
+
+    private List<Move> GetSingleDieMovesInternal()
+    {
+        var validMoves = new List<Move>();
+
+        // If checkers on bar, must enter
+        if (CurrentPlayer.CheckersOnBar > 0)
+        {
+            foreach (var die in RemainingMoves.Distinct())
+            {
+                int entryPoint = CurrentPlayer.Color == CheckerColor.White ? 25 - die : die;
+                var move = new Move(0, entryPoint, die);
+                if (IsValidMove(move))
+                {
+                    validMoves.Add(move);
+                }
+            }
+
+            return validMoves;
+        }
+
+        // Check bearing off
+        if (Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
+        {
+            var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
+            for (int pos = homeStart; pos <= homeEnd; pos++)
+            {
+                var point = Board.GetPoint(pos);
+                if (point.Color == CurrentPlayer.Color && point.Count > 0)
+                {
+                    foreach (var die in RemainingMoves.Distinct())
+                    {
+                        var move = new Move(pos, CurrentPlayer.Color == CheckerColor.White ? 0 : 25, die);
+                        if (IsValidMove(move))
+                        {
+                            validMoves.Add(move);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Normal moves
+        for (int from = 1; from <= 24; from++)
+        {
+            var fromPoint = Board.GetPoint(from);
+            if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
+            {
+                continue;
+            }
+
+            foreach (var die in RemainingMoves.Distinct())
+            {
+                int to = from + (CurrentPlayer.GetDirection() * die);
+                if (to >= 1 && to <= 24)
+                {
+                    var move = new Move(from, to, die);
+                    if (IsValidMove(move))
+                    {
+                        validMoves.Add(move);
+                    }
+                }
+            }
+        }
+
+        return validMoves;
     }
 }

@@ -367,31 +367,19 @@ public class GameSession
             Console.WriteLine($"[TIME DEBUG]   RedDelayRemaining: {state.RedDelayRemaining}");
         }
 
-        // Get valid moves for current player
+        // Get valid moves for current player (including combined moves from Core)
         // Always populate ValidMoves to ensure client has complete state
-        var validMoves = Engine.GetValidMoves();
+        var validMoves = Engine.GetValidMoves(includeCombined: true);
         state.ValidMoves = validMoves.Select(m => new MoveDto
         {
             From = m.From,
             To = m.To,
-            DieValue = Math.Abs(m.To - m.From),
-            IsHit = WillHit(m)
+            DieValue = m.DieValue,
+            IsHit = m.IsHit || WillHit(m),
+            IsCombinedMove = m.IsCombined,
+            DiceUsed = m.DiceUsed,
+            IntermediatePoints = m.IntermediatePoints
         }).ToList();
-
-        // Calculate and add combined moves (moves using 2+ dice)
-        if (Engine.RemainingMoves.Count >= 2 && Engine.CurrentPlayer != null)
-        {
-            var sourcePoints = validMoves.Select(m => m.From).Distinct();
-
-            foreach (var sourcePoint in sourcePoints)
-            {
-                // Only exclude destinations reachable from THIS source point with a single die
-                var singleMoveDestinationsFromSource = new HashSet<int>(
-                    validMoves.Where(m => m.From == sourcePoint).Select(m => m.To));
-                var combinedMoves = CalculateCombinedMoves(sourcePoint, singleMoveDestinationsFromSource);
-                state.ValidMoves.AddRange(combinedMoves);
-            }
-        }
 
         state.HasValidMoves = validMoves.Count > 0;
 
@@ -454,25 +442,6 @@ public class GameSession
         }
     }
 
-    /// <summary>
-    /// Finds a combined move (using 2+ dice) that matches the given from/to coordinates.
-    /// Returns null if no combined move matches.
-    /// </summary>
-    public MoveDto? FindCombinedMove(int from, int to)
-    {
-        if (Engine.RemainingMoves.Count < 2 || Engine.CurrentPlayer == null)
-        {
-            return null;
-        }
-
-        var validMoves = Engine.GetValidMoves();
-        var singleMoveDestinationsFromSource = new HashSet<int>(
-            validMoves.Where(m => m.From == from).Select(m => m.To));
-
-        var combinedMoves = CalculateCombinedMoves(from, singleMoveDestinationsFromSource);
-        return combinedMoves.FirstOrDefault(m => m.From == from && m.To == to);
-    }
-
     private string GenerateFriendlyName(string playerId)
     {
         if (playerId.Length >= 4)
@@ -516,241 +485,6 @@ public class GameSession
         }
 
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
-    }
-
-    /// <summary>
-    /// Calculates all combined moves (using 2+ dice) from a given source point.
-    /// </summary>
-    private List<MoveDto> CalculateCombinedMoves(int sourcePoint, HashSet<int> singleMoveDestinations)
-    {
-        var results = new List<MoveDto>();
-
-        if (Engine.CurrentPlayer == null)
-        {
-            return results;
-        }
-
-        // Don't calculate combined moves if checker is on bar (must enter one at a time)
-        if (sourcePoint == 0)
-        {
-            return results;
-        }
-
-        var remainingDice = new List<int>(Engine.RemainingMoves);
-        var direction = Engine.CurrentPlayer.GetDirection();
-        var playerColor = Engine.CurrentPlayer.Color;
-
-        // Track visited destinations to avoid duplicates
-        var visitedDestinations = new HashSet<int>();
-
-        // Recursive exploration
-        FindCombinedPaths(
-            sourcePoint,
-            sourcePoint,
-            remainingDice,
-            new List<int>(),
-            new List<int>(),
-            direction,
-            playerColor,
-            singleMoveDestinations,
-            visitedDestinations,
-            results);
-
-        return results;
-    }
-
-    private void FindCombinedPaths(
-        int originalSource,
-        int currentPoint,
-        List<int> remainingDice,
-        List<int> pathSoFar,
-        List<int> diceUsedSoFar,
-        int direction,
-        CheckerColor playerColor,
-        HashSet<int> singleMoveDestinations,
-        HashSet<int> visitedDestinations,
-        List<MoveDto> results)
-    {
-        // Try each distinct die value
-        foreach (var die in remainingDice.Distinct().ToList())
-        {
-            int nextPoint = currentPoint + (direction * die);
-
-            // Check if this is a valid landing spot
-            bool isValidLanding = false;
-            bool isBearOff = false;
-
-            if (nextPoint >= 1 && nextPoint <= 24)
-            {
-                // Normal board point - check if open
-                var point = Engine.Board.GetPoint(nextPoint);
-                isValidLanding = point.IsOpen(playerColor);
-            }
-            else if (playerColor == CheckerColor.White && nextPoint <= 0)
-            {
-                // White bearing off (moving toward 0)
-                isBearOff = true;
-                isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
-                    Engine.CurrentPlayer!,
-                    Engine.CurrentPlayer.CheckersOnBar);
-
-                // Additional check: if die > currentPoint, must be bearing off from highest point
-                // Account for the checker having moved from originalSource
-                if (isValidLanding && die > currentPoint)
-                {
-                    int effectiveHighest = GetEffectiveHighestPoint(playerColor, originalSource);
-                    isValidLanding = currentPoint == effectiveHighest;
-                }
-
-                nextPoint = 0; // Normalize to bear-off point
-            }
-            else if (playerColor == CheckerColor.Red && nextPoint >= 25)
-            {
-                // Red bearing off (moving toward 25)
-                isBearOff = true;
-                isValidLanding = Engine.Board.AreAllCheckersInHomeBoard(
-                    Engine.CurrentPlayer!,
-                    Engine.CurrentPlayer.CheckersOnBar);
-
-                // Additional check: if die > normalized point (25 - currentPoint), must be bearing off from highest
-                // Account for the checker having moved from originalSource
-                int normalizedPoint = 25 - currentPoint;
-                if (isValidLanding && die > normalizedPoint)
-                {
-                    int effectiveHighest = GetEffectiveHighestPoint(playerColor, originalSource);
-                    isValidLanding = currentPoint == effectiveHighest;
-                }
-
-                nextPoint = 25; // Normalize to bear-off point
-            }
-
-            if (!isValidLanding)
-            {
-                continue;
-            }
-
-            // Create new path and dice lists
-            var newPath = new List<int>(pathSoFar);
-            if (!isBearOff)
-            {
-                newPath.Add(nextPoint);
-            }
-
-            var newDiceUsed = new List<int>(diceUsedSoFar) { die };
-
-            // Remove used die from remaining
-            var newRemainingDice = new List<int>(remainingDice);
-            newRemainingDice.Remove(die);
-
-            // If we've used 2+ dice, this is a combined move
-            if (newDiceUsed.Count >= 2)
-            {
-                int finalDestination = isBearOff ? nextPoint : newPath.Last();
-
-                // Only add if not already reachable with single die and not already visited
-                if (!singleMoveDestinations.Contains(finalDestination) &&
-                    !visitedDestinations.Contains(finalDestination))
-                {
-                    visitedDestinations.Add(finalDestination);
-
-                    // Check if final destination is a capture
-                    bool isHit = false;
-                    if (!isBearOff && finalDestination >= 1 && finalDestination <= 24)
-                    {
-                        var destPoint = Engine.Board.GetPoint(finalDestination);
-                        isHit = destPoint.Color != null &&
-                                destPoint.Color != playerColor &&
-                                destPoint.Count == 1;
-                    }
-
-                    // Build intermediate points (all points except final)
-                    var intermediatePoints = newPath.Take(newPath.Count - 1).ToArray();
-                    if (isBearOff)
-                    {
-                        intermediatePoints = newPath.ToArray();
-                    }
-
-                    results.Add(new MoveDto
-                    {
-                        From = originalSource,
-                        To = finalDestination,
-                        DieValue = newDiceUsed.Sum(),
-                        IsHit = isHit,
-                        IsCombinedMove = true,
-                        DiceUsed = newDiceUsed.ToArray(),
-                        IntermediatePoints = intermediatePoints.Length > 0 ? intermediatePoints : null
-                    });
-                }
-            }
-
-            // Continue exploring if more dice remain (for doubles)
-            if (newRemainingDice.Count > 0 && !isBearOff)
-            {
-                FindCombinedPaths(
-                    originalSource,
-                    nextPoint,
-                    newRemainingDice,
-                    newPath,
-                    newDiceUsed,
-                    direction,
-                    playerColor,
-                    singleMoveDestinations,
-                    visitedDestinations,
-                    results);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets the effective highest point for bearing off, accounting for a checker
-    /// having moved from the original source (which may now be empty).
-    /// </summary>
-    private int GetEffectiveHighestPoint(CheckerColor playerColor, int originalSource)
-    {
-        var sourcePoint = Engine.Board.GetPoint(originalSource);
-
-        // If the original source has more than 1 checker, it's still occupied after the move
-        if (sourcePoint.Color == playerColor && sourcePoint.Count > 1)
-        {
-            return Engine.Board.GetHighestPoint(playerColor);
-        }
-
-        // Original source will be empty (or already empty), find highest excluding it
-        if (playerColor == CheckerColor.White)
-        {
-            for (int i = 6; i >= 1; i--)
-            {
-                if (i == originalSource)
-                {
-                    continue;
-                }
-
-                var point = Engine.Board.GetPoint(i);
-                if (point.Color == playerColor && point.Count > 0)
-                {
-                    return i;
-                }
-            }
-        }
-        else
-        {
-            for (int i = 24; i >= 19; i--)
-            {
-                if (i == originalSource)
-                {
-                    continue;
-                }
-
-                var point = Engine.Board.GetPoint(i);
-                if (point.Color == playerColor && point.Count > 0)
-                {
-                    return i;
-                }
-            }
-        }
-
-        // No other checkers on higher points, the current point is effectively the highest
-        return originalSource;
     }
 
     private int CalculatePipCount(CheckerColor color)

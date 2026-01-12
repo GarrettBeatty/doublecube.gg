@@ -186,7 +186,7 @@ public class MatchService : IMatchService
             if (opponentType == "AI")
             {
                 session.AddPlayer(match.Player2Id!, string.Empty); // Empty connection for AI
-                session.SetPlayerName(match.Player2Id!, "Computer");
+                session.SetPlayerName(match.Player2Id!, match.Player2Name ?? "Computer");
             }
 
             _logger.LogInformation(

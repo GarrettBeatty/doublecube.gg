@@ -314,85 +314,54 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 session.Engine.Dice.Die1,
                 session.Engine.Dice.Die2);
 
-            // Find the correct die value from valid moves (calculated server-side)
-            var validMoves = session.Engine.GetValidMoves();
+            // Find the correct move from valid moves (includes both single and combined moves)
+            var validMoves = session.Engine.GetValidMoves(includeCombined: true);
             var matchingMove = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
 
             if (matchingMove == null)
             {
-                // Check if this is a combined move (using 2+ dice)
-                var combinedMove = session.FindCombinedMove(from, to);
-                if (combinedMove != null)
-                {
-                    _logger.LogDebug(
-                        "Found combined move: {From}->{To}, DiceUsed=[{DiceUsed}], IntermediatePoints=[{Intermediates}]",
-                        from,
-                        to,
-                        string.Join(",", combinedMove.DiceUsed ?? Array.Empty<int>()),
-                        string.Join(",", combinedMove.IntermediatePoints ?? Array.Empty<int>()));
+                // Security: Log detailed info about rejected move attempt
+                _logger.LogWarning(
+                    "Move rejected: No valid move. Game={GameId}, From={From}, To={To}, ValidMoves=[{ValidMoves}]",
+                    session.Id,
+                    from,
+                    to,
+                    string.Join("; ", validMoves.Select(m => $"{m.From}->{m.To}{(m.IsCombined ? "*" : string.Empty)}")));
+                return ActionResult.Error("Invalid move - no matching valid move");
+            }
 
-                    // Execute the combined move as a sequence of individual moves
-                    var executionResult = ExecuteCombinedMove(session, combinedMove);
-                    if (!executionResult.Success)
-                    {
-                        return executionResult;
-                    }
-
-                    _logger.LogInformation(
-                        "Combined move executed: Game={GameId}, Move={From}->{To}, DiceUsed=[{DiceUsed}]",
-                        session.Id,
-                        from,
-                        to,
-                        string.Join(",", combinedMove.DiceUsed ?? Array.Empty<int>()));
-
-                    session.UpdateActivity();
-                }
-                else
-                {
-                    // Security: Log detailed info about rejected move attempt
-                    _logger.LogWarning(
-                        "Move rejected: No valid move. Game={GameId}, From={From}, To={To}, ValidMoves=[{ValidMoves}]",
-                        session.Id,
-                        from,
-                        to,
-                        string.Join("; ", validMoves.Select(m => $"{m.From}->{m.To}")));
-                    return ActionResult.Error("Invalid move - no matching valid move");
-                }
+            if (matchingMove.IsCombined)
+            {
+                _logger.LogDebug(
+                    "Found combined move: {From}->{To}, DiceUsed=[{DiceUsed}]",
+                    from,
+                    to,
+                    string.Join(",", matchingMove.DiceUsed ?? Array.Empty<int>()));
             }
             else
             {
                 _logger.LogDebug("Found valid move with die value: {DieValue}", matchingMove.DieValue);
+            }
 
-                var isValid = session.Engine.IsValidMove(matchingMove);
-                if (!isValid)
-                {
-                    _logger.LogWarning(
-                        "Move rejected: IsValidMove returned false. Game={GameId}, Move={From}->{To}",
-                        session.Id,
-                        from,
-                        to);
-                    return ActionResult.Error("Invalid move");
-                }
-
-                if (!session.Engine.ExecuteMove(matchingMove))
-                {
-                    _logger.LogWarning(
-                        "Move rejected: ExecuteMove returned false. Game={GameId}, Move={From}->{To}",
-                        session.Id,
-                        from,
-                        to);
-                    return ActionResult.Error("Invalid move");
-                }
-
-                _logger.LogInformation(
-                    "Move executed: Game={GameId}, Move={From}->{To}, DieUsed={Die}",
+            if (!session.Engine.ExecuteMove(matchingMove))
+            {
+                _logger.LogWarning(
+                    "Move rejected: ExecuteMove returned false. Game={GameId}, Move={From}->{To}",
                     session.Id,
                     from,
-                    to,
-                    matchingMove.DieValue);
-
-                session.UpdateActivity();
+                    to);
+                return ActionResult.Error("Invalid move");
             }
+
+            _logger.LogInformation(
+                "Move executed: Game={GameId}, Move={From}->{To}, DieUsed={Die}{Combined}",
+                session.Id,
+                from,
+                to,
+                matchingMove.DieValue,
+                matchingMove.IsCombined ? " (combined)" : string.Empty);
+
+            session.UpdateActivity();
         }
         finally
         {
@@ -896,68 +865,5 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             MatchComplete = match.Status == "Completed",
             MatchWinner = match.WinnerId
         });
-    }
-
-    /// <summary>
-    /// Executes a combined move by performing each intermediate step in sequence.
-    /// </summary>
-    private ActionResult ExecuteCombinedMove(GameSession session, MoveDto combinedMove)
-    {
-        if (combinedMove.DiceUsed == null || combinedMove.DiceUsed.Length < 2)
-        {
-            _logger.LogWarning("Combined move missing DiceUsed array");
-            return ActionResult.Error("Invalid combined move");
-        }
-
-        // Build the full path: from -> intermediates -> to
-        var fullPath = new List<int> { combinedMove.From };
-        if (combinedMove.IntermediatePoints != null)
-        {
-            fullPath.AddRange(combinedMove.IntermediatePoints);
-        }
-
-        fullPath.Add(combinedMove.To);
-
-        // Execute each step of the combined move
-        for (int i = 0; i < combinedMove.DiceUsed.Length; i++)
-        {
-            var stepFrom = fullPath[i];
-            var stepTo = fullPath[i + 1];
-            var dieValue = combinedMove.DiceUsed[i];
-
-            // Get current valid moves and find the matching one
-            var validMoves = session.Engine.GetValidMoves();
-            var stepMove = validMoves.FirstOrDefault(m => m.From == stepFrom && m.To == stepTo);
-
-            if (stepMove == null)
-            {
-                _logger.LogWarning(
-                    "Combined move step failed: no valid move from {From} to {To} using die {Die}. ValidMoves=[{ValidMoves}]",
-                    stepFrom,
-                    stepTo,
-                    dieValue,
-                    string.Join("; ", validMoves.Select(m => $"{m.From}->{m.To}")));
-                return ActionResult.Error("Combined move step invalid");
-            }
-
-            if (!session.Engine.ExecuteMove(stepMove))
-            {
-                _logger.LogWarning(
-                    "Combined move step failed to execute: {From} to {To}",
-                    stepFrom,
-                    stepTo);
-                return ActionResult.Error("Combined move execution failed");
-            }
-
-            _logger.LogDebug(
-                "Combined move step {Step}/{Total}: {From}->{To} (die {Die})",
-                i + 1,
-                combinedMove.DiceUsed.Length,
-                stepFrom,
-                stepTo,
-                dieValue);
-        }
-
-        return ActionResult.Ok();
     }
 }
