@@ -16,6 +16,12 @@ import { FriendsPage } from './pages/FriendsPage'
 import { AnalysisPage } from './pages/AnalysisPage'
 import { DailyPuzzlePage } from './pages/DailyPuzzlePage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { AboutPage } from './pages/AboutPage'
+import { FAQPage } from './pages/FAQPage'
+import { ContactPage } from './pages/ContactPage'
+import { MobileAppPage } from './pages/MobileAppPage'
+import { TermsOfServicePage } from './pages/TermsOfServicePage'
+import { PrivacyPage } from './pages/PrivacyPage'
 import { Toaster } from './components/ui/toaster'
 import { FriendsWidget } from './components/FriendsWidget'
 import { audioService } from './services/audio.service'
@@ -72,6 +78,12 @@ function AppContent() {
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
           <Route path="/puzzle" element={<DailyPuzzlePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/mobile-app" element={<MobileAppPage />} />
+          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Layout>
