@@ -20,7 +20,7 @@ import { authService } from '@/services/auth.service'
 import { Eye, BarChart3, Trophy, TrendingUp } from 'lucide-react'
 
 export const GamePage: React.FC = () => {
-  const { gameId } = useParams<{ gameId: string }>()
+  const { matchId, gameId } = useParams<{ matchId: string; gameId: string }>()
   const navigate = useNavigate()
   const { hub, isConnected, connection } = useSignalR()
 
@@ -80,7 +80,7 @@ export const GamePage: React.FC = () => {
 
   useEffect(() => {
     const joinGame = async () => {
-      if (!gameId) {
+      if (!gameId || !matchId) {
         navigate('/')
         return
       }

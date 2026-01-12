@@ -10,6 +10,7 @@ import { RegisterModal } from './components/modals/RegisterModal'
 import { CreateMatchModal } from './components/modals/CreateMatchModal'
 import { HomePage } from './pages/HomePage'
 import { GamePage } from './pages/GamePage'
+import { MatchResultsPage } from './pages/MatchResultsPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { PlayersPage } from './pages/PlayersPage'
 import { FriendsPage } from './pages/FriendsPage'
@@ -73,7 +74,8 @@ function AppContent() {
       <Layout onLoginClick={handleLoginClick} onSignupClick={handleSignupClick} onCreateLobbyClick={handleCreateLobbyClick}>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/game/:gameId" element={<GamePage />} />
+          <Route path="/match/:matchId/game/:gameId" element={<GamePage />} />
+          <Route path="/match/:matchId/results" element={<MatchResultsPage />} />
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/friends" element={<FriendsPage />} />

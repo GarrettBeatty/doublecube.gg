@@ -1,12 +1,12 @@
 import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { CheckerColor } from '@/types/game.types'
+import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { cn } from '@/lib/utils'
 
 interface PlayerCardProps {
   playerName: string
-  username: string | null
+  username?: string
   color: CheckerColor
   isYourTurn: boolean
   isYou: boolean

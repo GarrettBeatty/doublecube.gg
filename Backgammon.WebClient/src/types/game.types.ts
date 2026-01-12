@@ -72,7 +72,7 @@ export interface GameState {
   gameId: string
   status: GameStatus
   currentPlayer: CheckerColor
-  yourColor: CheckerColor
+  yourColor?: CheckerColor
   isYourTurn: boolean
   dice: number[]
   remainingMoves: Move[]
@@ -101,8 +101,6 @@ export interface GameState {
   whiteRatingChange?: number
   redRatingChange?: number
   winner: CheckerColor | null
-  createdAt: string
-  updatedAt: string
   matchId?: string
   isMatchGame?: boolean
   targetScore?: number

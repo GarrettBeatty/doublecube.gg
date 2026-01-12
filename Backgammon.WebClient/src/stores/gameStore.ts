@@ -1,7 +1,7 @@
 import { create } from 'zustand'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import {
-  GameState,
-  CheckerColor,
   SelectedChecker,
   Destination,
   ChatMessage,
@@ -182,13 +182,21 @@ export const useGameStore = create<GameStore>((set) => ({
         dice: state.dice,
       })
 
+      // Parse doublingCubeOwner from string to CheckerColor enum
+      let cubeOwner: CheckerColor | null = null
+      if (state.doublingCubeOwner === 'White') {
+        cubeOwner = CheckerColor.White
+      } else if (state.doublingCubeOwner === 'Red') {
+        cubeOwner = CheckerColor.Red
+      }
+
       return {
         currentGameState: state,
         isAnalysisMode: state.isAnalysisMode,
         validSources,
         doublingCube: {
           value: state.doublingCubeValue,
-          owner: state.doublingCubeOwner,
+          owner: cubeOwner,
           canDouble: state.canDouble,
           pendingOffer: prevState.doublingCube.pendingOffer,
           pendingResponse: prevState.doublingCube.pendingResponse,

@@ -10,6 +10,7 @@ import { MiniPoint } from '@/types/home.types'
 
 interface GameCardProps {
   gameId: string
+  matchId: string
   opponentName: string
   isYourTurn: boolean
   board?: MiniPoint[]
@@ -20,11 +21,12 @@ interface GameCardProps {
   dice?: number[]
   cubeValue?: number
   cubeOwner?: 'White' | 'Red' | 'Center'
-  onPlay: (gameId: string) => void
+  onPlay: (gameId: string, matchId: string) => void
 }
 
 function GameCard({
   gameId,
+  matchId,
   opponentName,
   isYourTurn,
   board,
@@ -42,7 +44,7 @@ function GameCard({
       className={`cursor-pointer transition-all hover:scale-[1.02] ${
         isYourTurn ? 'ring-2 ring-green-500 rounded-lg' : ''
       }`}
-      onClick={() => onPlay(gameId)}
+      onClick={() => onPlay(gameId, matchId)}
     >
       {/* Mini Board Preview */}
       <MiniBoardAdapter
@@ -75,8 +77,8 @@ export function GamesInPlay() {
   const { games: liveGames, isLoading: liveLoading, refresh: refreshLive, yourTurnCount: liveYourTurn } = useActiveGames()
   const { yourTurnGames, waitingGames, isLoading: corrLoading, refresh: refreshCorr, totalYourTurn: corrYourTurn } = useCorrespondenceGames()
 
-  const handlePlayGame = (gameId: string) => {
-    navigate(`/game/${gameId}`)
+  const handlePlayGame = (gameId: string, matchId: string) => {
+    navigate(`/match/${matchId}/game/${gameId}`)
   }
 
   const handleRefresh = () => {
@@ -93,6 +95,7 @@ export function GamesInPlay() {
   // Build unified list with board data
   type UnifiedGame = {
     gameId: string
+    matchId: string
     opponentName: string
     isYourTurn: boolean
     board?: MiniPoint[]
@@ -109,6 +112,7 @@ export function GamesInPlay() {
     // Live games (with board state)
     ...liveGames.map(g => ({
       gameId: g.gameId,
+      matchId: g.matchId,
       opponentName: g.myColor === 'White' ? g.player2Name : g.player1Name,
       isYourTurn: g.isYourTurn,
       board: g.board,
@@ -123,6 +127,7 @@ export function GamesInPlay() {
     // Correspondence games
     ...allCorrespondenceGames.map(g => ({
       gameId: g.gameId,
+      matchId: g.matchId,
       opponentName: g.opponentName,
       isYourTurn: g.isYourTurn,
     })),

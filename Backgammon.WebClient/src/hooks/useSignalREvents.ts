@@ -4,7 +4,8 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
 import { audioService } from '@/services/audio.service'
 import { useToast } from '@/hooks/use-toast'
-import { GameState, CheckerColor } from '@/types/game.types'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { HubEvents } from '@/types/signalr.types'
 import {
   MatchCreatedDto,
@@ -179,7 +180,7 @@ export const useSignalREvents = () => {
           : gameState.winType === 'Backgammon' ? 3 * (gameState.doublingCubeValue || 1)
           : (gameState.doublingCubeValue || 1)
 
-        setLastGameResult(gameState.winner, points)
+        setLastGameResult(gameState.winner ?? null, points)
 
         // Show result modal for all game types
         setShowGameResultModal(true)

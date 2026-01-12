@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { useRecentGames } from "@/hooks/useRecentGames";
 import { formatDistanceToNow } from "date-fns";
 
 export function RecentGames() {
+  const navigate = useNavigate();
   const { games, isLoading } = useRecentGames(5);
 
   const formatDate = (dateString: string) => {
@@ -95,7 +97,11 @@ export function RecentGames() {
                   </Badge>
                 )}
               </div>
-              <Button size="sm" variant="outline">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate(`/match/${game.matchId}/results`)}
+              >
                 <Eye className="h-4 w-4 mr-1" />
                 Review
               </Button>

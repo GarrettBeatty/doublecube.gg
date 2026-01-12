@@ -190,6 +190,89 @@ public partial class GameHub
     }
 
     /// <summary>
+    /// Get complete match results including all games
+    /// </summary>
+    public async Task<MatchResultsDto?> GetMatchResults(string matchId)
+    {
+        try
+        {
+            var playerId = GetEffectivePlayerId(Context.ConnectionId);
+            var match = await _matchService.GetMatchAsync(matchId);
+
+            if (match == null)
+            {
+                _logger.LogWarning("GetMatchResults: Match {MatchId} not found", matchId);
+                await Clients.Caller.Error("Match not found");
+                return null;
+            }
+
+            // Authorization: only participants can view match results
+            if (match.Player1Id != playerId && match.Player2Id != playerId)
+            {
+                _logger.LogWarning(
+                    "GetMatchResults: Player {PlayerId} attempted to access match {MatchId} without authorization",
+                    playerId,
+                    matchId);
+                await Clients.Caller.Error("Access denied");
+                return null;
+            }
+
+            // Build game history from match
+            var games = match.CoreMatch.Games.Select((g, index) => new MatchGameDto
+            {
+                GameId = g.GameId,
+                GameNumber = index + 1,
+                Winner = g.Winner,
+                Points = g.Stakes,
+                IsGamemon = g.WinType == WinType.Gammon,
+                IsBackgammon = g.WinType == WinType.Backgammon,
+                IsCrawfordGame = g.IsCrawfordGame,
+                CompletedAt = null // Core.Game doesn't track this, could add if needed
+            }).ToList();
+
+            var winnerId = match.CoreMatch.GetWinnerId();
+
+            var results = new MatchResultsDto
+            {
+                MatchId = match.MatchId,
+                WinnerUserId = match.WinnerId,
+                WinnerUsername = winnerId == match.Player1Id
+                    ? match.Player1Name
+                    : match.Player2Name,
+                LoserUsername = winnerId == match.Player1Id
+                    ? match.Player2Name
+                    : match.Player1Name,
+                FinalScore = new MatchScoreDto
+                {
+                    Player1 = match.Player1Score,
+                    Player2 = match.Player2Score
+                },
+                TargetScore = match.TargetScore,
+                Games = games,
+                TotalGames = games.Count,
+                Duration = match.CompletedAt.HasValue
+                    ? (match.CompletedAt.Value - match.CreatedAt).ToString()
+                    : "N/A",
+                CompletedAt = match.CompletedAt
+            };
+
+            _logger.LogInformation(
+                "GetMatchResults: Returning results for match {MatchId} - Winner: {Winner}, Games: {TotalGames}",
+                matchId,
+                results.WinnerUsername,
+                results.TotalGames);
+
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting match results for {MatchId}", matchId);
+            await Clients.Caller.Error("Failed to get match results");
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Get player's active matches
     /// </summary>
     public async Task GetMyMatches(string? status = null)

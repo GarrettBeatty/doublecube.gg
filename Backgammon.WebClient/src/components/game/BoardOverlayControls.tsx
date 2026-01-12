@@ -1,5 +1,6 @@
 import React from 'react'
-import { GameState, CheckerColor } from '@/types/game.types'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { CheckerColor } from '@/types/generated/Backgammon.Core'
 
 interface BoardOverlayControlsProps {
   gameState: GameState

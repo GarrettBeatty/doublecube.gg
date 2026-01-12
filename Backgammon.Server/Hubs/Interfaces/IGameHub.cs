@@ -122,6 +122,11 @@ public interface IGameHub
     Task<MatchStateDto?> GetMatchState(string matchId);
 
     /// <summary>
+    /// Get complete match results including all games
+    /// </summary>
+    Task<MatchResultsDto?> GetMatchResults(string matchId);
+
+    /// <summary>
     /// Get player's matches, optionally filtered by status
     /// </summary>
     Task GetMyMatches(string? status);

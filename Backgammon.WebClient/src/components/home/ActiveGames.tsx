@@ -11,7 +11,7 @@ function GameCard({
   onPlay,
 }: {
   game: ActiveGame
-  onPlay: (gameId: string) => void
+  onPlay: (gameId: string, matchId: string) => void
 }) {
   const opponentName = game.myColor === 'White' ? game.player2Name : game.player1Name
   const opponentRating = game.myColor === 'White' ? game.player2Rating : game.player1Rating
@@ -60,7 +60,7 @@ function GameCard({
         size="sm"
         variant={game.isYourTurn ? 'default' : 'outline'}
         className={game.isYourTurn ? 'bg-green-600 hover:bg-green-700' : ''}
-        onClick={() => onPlay(game.gameId)}
+        onClick={() => onPlay(game.gameId, game.matchId)}
       >
         {game.isYourTurn ? 'Play' : 'View'}
       </Button>
@@ -72,8 +72,8 @@ export function ActiveGames() {
   const navigate = useNavigate()
   const { games, isLoading, error, refresh, yourTurnCount } = useActiveGames()
 
-  const handlePlayGame = (gameId: string) => {
-    navigate(`/game/${gameId}`)
+  const handlePlayGame = (gameId: string, matchId: string) => {
+    navigate(`/match/${matchId}/game/${gameId}`)
   }
 
   if (isLoading) {

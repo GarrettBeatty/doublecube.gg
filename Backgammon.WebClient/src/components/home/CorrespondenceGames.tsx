@@ -35,7 +35,7 @@ function GameCard({
 }: {
   game: CorrespondenceGameDto;
   isYourTurn: boolean;
-  onPlay: (gameId: string) => void;
+  onPlay: (gameId: string, matchId: string) => void;
 }) {
   const isUrgent = isYourTurn && game.timeRemaining && game.timeRemaining.includes(".") && parseInt(game.timeRemaining.split(".")[0]) <= 1;
 
@@ -76,7 +76,7 @@ function GameCard({
         size="sm"
         variant={isYourTurn ? "default" : "outline"}
         className={isYourTurn ? "bg-green-600 hover:bg-green-700" : ""}
-        onClick={() => onPlay(game.gameId)}
+        onClick={() => onPlay(game.gameId, game.matchId)}
       >
         {isYourTurn ? "Play" : "View"}
       </Button>
@@ -97,8 +97,8 @@ export function CorrespondenceGames() {
   } = useCorrespondenceGames();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const handlePlayGame = (gameId: string) => {
-    navigate(`/game/${gameId}`);
+  const handlePlayGame = (gameId: string, matchId: string) => {
+    navigate(`/match/${matchId}/game/${gameId}`);
   };
 
   if (isLoading) {
@@ -184,7 +184,7 @@ export function CorrespondenceGames() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handlePlayGame(item.gameId)}
+                      onClick={() => handlePlayGame(item.gameId, item.matchId)}
                     >
                       View
                     </Button>

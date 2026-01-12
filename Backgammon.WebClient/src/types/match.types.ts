@@ -28,18 +28,18 @@ export interface MatchGame {
 
 export interface MatchResults {
   matchId: string
-  winner: CheckerColor | null
+  winnerUserId: string | null
   winnerUsername: string | null
   loserUsername: string | null
   finalScore: {
-    white: number
-    red: number
+    player1: number
+    player2: number
   }
   targetScore: number
   games: MatchGame[]
   totalGames: number
   duration: string
-  completedAt: string
+  completedAt: Date | null
 }
 
 export interface CreateMatchRequest {

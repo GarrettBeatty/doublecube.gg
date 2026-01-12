@@ -1,5 +1,7 @@
 import { memo, useMemo, useCallback } from 'react'
-import { GameState, CheckerColor, GameStatus } from '@/types/game.types'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { GameStatus } from '@/types/generated/Backgammon.Server.Models'
+import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { useGameStore } from '@/stores/gameStore'
 import { useSignalR } from '@/contexts/SignalRContext'
 import {
@@ -121,7 +123,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     }
     return {
       values: gameState.dice,
-      remainingMoves: gameState.remainingMoves?.map((m) => m.dieValue) ?? [],
+      remainingMoves: gameState.remainingMoves ?? [],
     }
   }, [gameState.dice, gameState.remainingMoves])
 

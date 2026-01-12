@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
 import { useGameStore } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
 import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
 import { ChatPanel } from '@/components/game/ChatPanel'
-import { GameState } from '@/types/game.types'
 import { RefreshCw, Flag, MessageCircle } from 'lucide-react'
 
 interface GameControlsProps {
