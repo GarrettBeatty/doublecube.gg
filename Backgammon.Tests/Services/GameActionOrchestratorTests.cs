@@ -14,45 +14,34 @@ public class GameActionOrchestratorTests
 {
     private readonly Mock<IGameRepository> _mockGameRepository;
     private readonly Mock<IAiMoveService> _mockAiMoveService;
-    private readonly Mock<IPlayerStatsService> _mockPlayerStatsService;
-    private readonly Mock<IMatchService> _mockMatchService;
     private readonly Mock<IGameSessionManager> _mockSessionManager;
-    private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
-    private readonly Mock<ILogger<GameActionOrchestrator>> _mockLogger;
-    private readonly Mock<ICorrespondenceGameService> _mockCorrespondenceGameService;
+    private readonly Mock<IGameBroadcastService> _mockBroadcastService;
+    private readonly Mock<IGameCompletionService> _mockCompletionService;
     private readonly Mock<IMatchRepository> _mockMatchRepository;
+    private readonly Mock<ICorrespondenceGameService> _mockCorrespondenceGameService;
+    private readonly Mock<ILogger<GameActionOrchestrator>> _mockLogger;
     private readonly GameActionOrchestrator _orchestrator;
 
     public GameActionOrchestratorTests()
     {
         _mockGameRepository = new Mock<IGameRepository>();
         _mockAiMoveService = new Mock<IAiMoveService>();
-        _mockPlayerStatsService = new Mock<IPlayerStatsService>();
-        _mockMatchService = new Mock<IMatchService>();
         _mockSessionManager = new Mock<IGameSessionManager>();
-        _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
-        _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
-        _mockCorrespondenceGameService = new Mock<ICorrespondenceGameService>();
+        _mockBroadcastService = new Mock<IGameBroadcastService>();
+        _mockCompletionService = new Mock<IGameCompletionService>();
         _mockMatchRepository = new Mock<IMatchRepository>();
-
-        // Set up HubContext mock chain for broadcasting
-        var mockClients = new Mock<IHubClients<IGameHubClient>>();
-        var mockGameHubClient = new Mock<IGameHubClient>();
-
-        _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockGameHubClient.Object);
-        mockClients.Setup(c => c.Group(It.IsAny<string>())).Returns(mockGameHubClient.Object);
+        _mockCorrespondenceGameService = new Mock<ICorrespondenceGameService>();
+        _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
 
         _orchestrator = new GameActionOrchestrator(
             _mockGameRepository.Object,
             _mockAiMoveService.Object,
-            _mockPlayerStatsService.Object,
-            _mockMatchService.Object,
             _mockSessionManager.Object,
-            _mockHubContext.Object,
-            _mockLogger.Object,
+            _mockBroadcastService.Object,
+            _mockCompletionService.Object,
+            _mockMatchRepository.Object,
             _mockCorrespondenceGameService.Object,
-            _mockMatchRepository.Object);
+            _mockLogger.Object);
     }
 
     [Fact]
@@ -456,10 +445,7 @@ public class GameActionOrchestratorTests
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
 
-        var mockClients = new Mock<IHubClients<IGameHubClient>>();
-        var mockClient = new Mock<IGameHubClient>();
-        _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
-        mockClients.Setup(c => c.Client(It.IsAny<string>())).Returns(mockClient.Object);
+        // Broadcast service is now mocked, no need for HubContext setup
 
         _mockAiMoveService
             .Setup(s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>()))
@@ -486,8 +472,7 @@ public class GameActionOrchestratorTests
         session.AddPlayer("human-player", "conn-123");
         session.Engine.StartNewGame();
 
-        var mockClients = new Mock<IHubClients<IGameHubClient>>();
-        _mockHubContext.Setup(h => h.Clients).Returns(mockClients.Object);
+        // Broadcast service is now mocked, no need for HubContext setup
 
         _mockAiMoveService
             .Setup(s => s.ExecuteAiTurnAsync(It.IsAny<GameSession>(), It.IsAny<string>(), It.IsAny<Func<Task>>()))

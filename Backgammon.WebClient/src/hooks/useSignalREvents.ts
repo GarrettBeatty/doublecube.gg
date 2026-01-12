@@ -5,16 +5,16 @@ import { useGameStore } from '@/stores/gameStore'
 import { audioService } from '@/services/audio.service'
 import { useToast } from '@/hooks/use-toast'
 import { GameState, CheckerColor } from '@/types/game.types'
+import { HubEvents } from '@/types/signalr.types'
 import {
-  HubEvents,
-  MatchCreatedEvent,
-  MatchGameStartingEvent,
-  MatchUpdateEvent,
-  MatchContinuedEvent,
-  OpponentJoinedMatchEvent,
-  TimeUpdateEvent,
-  TimeoutEvent,
-} from '@/types/signalr.types'
+  MatchCreatedDto,
+  MatchGameStartingDto,
+  MatchUpdateDto,
+  MatchContinuedDto,
+  OpponentJoinedMatchDto,
+  TimeUpdateDto,
+  PlayerTimedOutDto,
+} from '@/types/generated/Backgammon.Server.Models.SignalR'
 
 export const useSignalREvents = () => {
   const navigate = useNavigate()
@@ -80,25 +80,42 @@ export const useSignalREvents = () => {
       // Detect and play sounds BEFORE updating state
       const prevState = prevGameStateRef.current
       if (prevState) {
-        // Turn change detection
-        if (prevState.currentPlayer !== gameState.currentPlayer) {
+        // Dice roll detection - check if dice went from no values to having values
+        const prevHasDice = prevState.dice && prevState.dice.length > 0 && prevState.dice.some((d) => d > 0)
+        const nowHasDice = gameState.dice && gameState.dice.length > 0 && gameState.dice.some((d) => d > 0)
+        if (!prevHasDice && nowHasDice) {
+          audioService.playSound('dice-roll')
+        }
+
+        // Turn change detection - only play sound when it becomes YOUR turn
+        const wasPrevYourTurn = prevState.isYourTurn
+        const isNowYourTurn = gameState.isYourTurn
+        if (!wasPrevYourTurn && isNowYourTurn) {
           audioService.playSound('turn-change')
         }
 
-        // Move detection (simplified - could be enhanced)
+        // Move detection - detect when a move was made by checking if remainingMoves decreased
         const prevBornOff =
           prevState.whiteBornOff + prevState.redBornOff
         const newBornOff = gameState.whiteBornOff + gameState.redBornOff
         const prevBar =
           prevState.whiteCheckersOnBar + prevState.redCheckersOnBar
         const newBar = gameState.whiteCheckersOnBar + gameState.redCheckersOnBar
+        const prevRemainingCount = prevState.remainingMoves?.length ?? 0
+        const newRemainingCount = gameState.remainingMoves?.length ?? 0
 
-        if (newBornOff > prevBornOff) {
-          audioService.playSound('bear-off')
-        } else if (newBar > prevBar) {
-          audioService.playSound('checker-hit')
-        } else if (prevBornOff !== newBornOff || prevBar !== newBar) {
-          audioService.playSound('checker-move')
+        // Detect what type of move occurred (only if remainingMoves decreased, meaning a move was made)
+        if (prevRemainingCount > newRemainingCount && prevRemainingCount > 0) {
+          if (newBornOff > prevBornOff) {
+            // Checker was born off
+            audioService.playSound('bear-off')
+          } else if (newBar > prevBar) {
+            // Checker was hit (sent to bar)
+            audioService.playSound('checker-hit')
+          } else {
+            // Regular move
+            audioService.playSound('checker-move')
+          }
         }
       }
 
@@ -143,11 +160,11 @@ export const useSignalREvents = () => {
     // GameOver - Game completed
     connection.on(
       HubEvents.GameOver,
-      (winner: CheckerColor, points: number, gameState: GameState) => {
-        console.log('[SignalR] GameOver', { winner, points })
+      (gameState: GameState) => {
+        console.log('[SignalR] GameOver', { winner: gameState.winner, winType: gameState.winType })
 
         // Play win/loss sound
-        if (gameState.yourColor === winner) {
+        if (gameState.yourColor === gameState.winner) {
           audioService.playSound('game-won')
         } else {
           audioService.playSound('game-lost')
@@ -157,7 +174,12 @@ export const useSignalREvents = () => {
         prevGameStateRef.current = gameState
 
         // Store game result for modal display
-        setLastGameResult(winner, points)
+        // Calculate points from win type and cube value
+        const points = gameState.winType === 'Gammon' ? 2 * (gameState.doublingCubeValue || 1)
+          : gameState.winType === 'Backgammon' ? 3 * (gameState.doublingCubeValue || 1)
+          : (gameState.doublingCubeValue || 1)
+
+        setLastGameResult(gameState.winner, points)
 
         // Show result modal for all game types
         setShowGameResultModal(true)
@@ -243,7 +265,7 @@ export const useSignalREvents = () => {
     })
 
     // MatchCreated - Match and first game created, navigate to game page
-    connection.on(HubEvents.MatchCreated, (data: MatchCreatedEvent) => {
+    connection.on(HubEvents.MatchCreated, (data: MatchCreatedDto) => {
       console.log('[SignalR] MatchCreated', { matchId: data.matchId, gameId: data.gameId, opponentType: data.opponentType })
       setCurrentGameId(data.gameId)
       // Navigate to game page immediately - game handles waiting state
@@ -251,13 +273,13 @@ export const useSignalREvents = () => {
     })
 
     // OpponentJoinedMatch - Opponent joined the match
-    connection.on(HubEvents.OpponentJoinedMatch, (data: OpponentJoinedMatchEvent) => {
+    connection.on(HubEvents.OpponentJoinedMatch, (data: OpponentJoinedMatchDto) => {
       console.log('[SignalR] OpponentJoinedMatch', { matchId: data.matchId, player2Name: data.player2Name })
       // Game page will receive WaitingForOpponent → GameStart flow
     })
 
     // MatchGameStarting - Match game starting, navigate to game
-    connection.on(HubEvents.MatchGameStarting, (data: MatchGameStartingEvent) => {
+    connection.on(HubEvents.MatchGameStarting, (data: MatchGameStartingDto) => {
       console.log('[SignalR] MatchGameStarting', {
         matchId: data.matchId,
         gameId: data.gameId,
@@ -307,7 +329,7 @@ export const useSignalREvents = () => {
     })
 
     // TimeUpdate - Server broadcasts updated time state every second
-    connection.on(HubEvents.TimeUpdate, (timeUpdate: TimeUpdateEvent) => {
+    connection.on(HubEvents.TimeUpdate, (timeUpdate: TimeUpdateDto) => {
       const currentPath = window.location.pathname
       const isOnGamePage = currentPath.startsWith('/game/')
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
@@ -329,7 +351,7 @@ export const useSignalREvents = () => {
     })
 
     // PlayerTimedOut - Player ran out of time and lost
-    connection.on(HubEvents.PlayerTimedOut, (timeoutEvent: TimeoutEvent) => {
+    connection.on(HubEvents.PlayerTimedOut, (timeoutEvent: PlayerTimedOutDto) => {
       console.log('[SignalR] PlayerTimedOut', timeoutEvent)
 
       // Show toast notification about timeout
@@ -343,7 +365,7 @@ export const useSignalREvents = () => {
     })
 
     // MatchUpdate - Match score/state updated
-    connection.on(HubEvents.MatchUpdate, (data: MatchUpdateEvent) => {
+    connection.on(HubEvents.MatchUpdate, (data: MatchUpdateDto) => {
       console.log('[SignalR] MatchUpdate', data)
 
       // Include current timestamp when receiving updates
@@ -361,7 +383,7 @@ export const useSignalREvents = () => {
     })
 
     // MatchContinued - Next game in match started
-    connection.on(HubEvents.MatchContinued, (data: MatchContinuedEvent) => {
+    connection.on(HubEvents.MatchContinued, (data: MatchContinuedDto) => {
       console.log('[SignalR] MatchContinued', data)
 
       // Update match state with timestamp

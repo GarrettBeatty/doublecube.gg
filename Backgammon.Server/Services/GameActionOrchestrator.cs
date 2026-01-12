@@ -18,34 +18,31 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 {
     private readonly IGameRepository _gameRepository;
     private readonly IAiMoveService _aiMoveService;
-    private readonly IPlayerStatsService _playerStatsService;
-    private readonly IMatchService _matchService;
     private readonly IGameSessionManager _sessionManager;
-    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
-    private readonly ILogger<GameActionOrchestrator> _logger;
-    private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly IGameBroadcastService _broadcastService;
+    private readonly IGameCompletionService _completionService;
     private readonly IMatchRepository _matchRepository;
+    private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly ILogger<GameActionOrchestrator> _logger;
 
     public GameActionOrchestrator(
         IGameRepository gameRepository,
         IAiMoveService aiMoveService,
-        IPlayerStatsService playerStatsService,
-        IMatchService matchService,
         IGameSessionManager sessionManager,
-        IHubContext<GameHub, IGameHubClient> hubContext,
-        ILogger<GameActionOrchestrator> logger,
+        IGameBroadcastService broadcastService,
+        IGameCompletionService completionService,
+        IMatchRepository matchRepository,
         ICorrespondenceGameService correspondenceGameService,
-        IMatchRepository matchRepository)
+        ILogger<GameActionOrchestrator> logger)
     {
         _gameRepository = gameRepository;
         _aiMoveService = aiMoveService;
-        _playerStatsService = playerStatsService;
-        _matchService = matchService;
         _sessionManager = sessionManager;
-        _hubContext = hubContext;
-        _logger = logger;
-        _correspondenceGameService = correspondenceGameService;
+        _broadcastService = broadcastService;
+        _completionService = completionService;
         _matchRepository = matchRepository;
+        _correspondenceGameService = correspondenceGameService;
+        _logger = logger;
     }
 
     public async Task<ActionResult> RollDiceAsync(GameSession session, string connectionId)
@@ -131,8 +128,8 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     // Start timer for first player's turn
                     session.Engine.StartTurnTimer();
 
-                    // Start broadcasting time updates (only after opening roll completes)
-                    session.StartTimeUpdates(_hubContext);
+                    // TODO: Move time update broadcasting to a dedicated service
+                    // Time updates currently handled separately from refactored services
 
                     // For correspondence games, update turn tracking with the actual first player
                     var firstPlayerId = GetCurrentPlayerId(session);
@@ -164,7 +161,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                             session.Id);
 
                         // Broadcast current state first, then trigger AI
-                        await BroadcastGameUpdateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
                         await SaveGameStateAsync(session);
 
                         BackgroundTaskHelper.FireAndForget(
@@ -180,7 +177,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     else
                     {
                         // Human won opening roll - broadcast timer state immediately
-                        await BroadcastGameUpdateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
                         await SaveGameStateAsync(session);
                     }
                 }
@@ -196,7 +193,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                         _logger.LogInformation("AI (White) needs to roll opening die in game {GameId}", session.Id);
 
                         // Broadcast current state first
-                        await BroadcastGameUpdateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
                         await SaveGameStateAsync(session);
 
                         // Trigger AI opening roll
@@ -217,7 +214,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                         _logger.LogInformation("AI (Red) needs to roll opening die in game {GameId}", session.Id);
 
                         // Broadcast current state first
-                        await BroadcastGameUpdateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
                         await SaveGameStateAsync(session);
 
                         // Trigger AI opening roll
@@ -236,7 +233,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             }
 
             // Broadcast and save
-            await BroadcastGameUpdateAsync(session);
+            await _broadcastService.BroadcastGameUpdateAsync(session);
             await SaveGameStateAsync(session);
 
             return ActionResult.Ok();
@@ -273,7 +270,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.Engine.Dice.Die2);
 
         // Broadcast and save
-        await BroadcastGameUpdateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
         await SaveGameStateAsync(session);
 
         return ActionResult.Ok();
@@ -369,43 +366,13 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         }
 
         // Broadcast and save
-        await BroadcastGameUpdateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
         await SaveGameStateAsync(session);
 
         // Check if game is over
         if (session.Engine.Winner != null)
         {
-            var stakes = session.Engine.GetGameResult();
-
-            // Handle match game completion if this is a match game
-            await HandleMatchGameCompletion(session);
-
-            // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
-            // Skip for analysis mode
-            if (session.GameMode.ShouldPersist)
-            {
-                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-            }
-
-            if (session.GameMode.ShouldTrackStats)
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-            }
-            else
-            {
-                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
-            }
-
-            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-
-            // Broadcast GameOver AFTER database is updated
-            await BroadcastGameOverAsync(session);
-
-            // Remove from memory to prevent memory leak
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Removed completed game {GameId} from memory", session.Id);
-
+            await _completionService.HandleGameCompletionAsync(session);
             return ActionResult.GameOver();
         }
 
@@ -533,38 +500,13 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         }
 
         // Broadcast and save
-        await BroadcastGameUpdateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
         await SaveGameStateAsync(session);
 
         // Check if game is over (same logic as MakeMoveAsync)
         if (session.Engine.Winner != null)
         {
-            var stakes = session.Engine.GetGameResult();
-
-            await HandleMatchGameCompletion(session);
-
-            if (session.GameMode.ShouldPersist)
-            {
-                await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-            }
-
-            if (session.GameMode.ShouldTrackStats)
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-            }
-            else
-            {
-                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
-            }
-
-            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-
-            await BroadcastGameOverAsync(session);
-
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Removed completed game {GameId} from memory", session.Id);
-
+            await _completionService.HandleGameCompletionAsync(session);
             return ActionResult.GameOver();
         }
 
@@ -605,7 +547,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         session.UpdateActivity();
 
         // Broadcast and save
-        await BroadcastGameUpdateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
         await SaveGameStateAsync(session);
 
         _logger.LogInformation(
@@ -678,7 +620,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         session.UpdateActivity();
 
         // Broadcast and save
-        await BroadcastGameUpdateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
         await SaveGameStateAsync(session);
 
         _logger.LogInformation(
@@ -693,60 +635,16 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     {
         try
         {
-            async Task BroadcastUpdate()
-            {
-                foreach (var connectionId in session.WhiteConnections)
-                {
-                    var whiteState = session.GetState(connectionId);
-                    await _hubContext.Clients.Client(connectionId).GameUpdate(whiteState);
-                }
-
-                foreach (var connectionId in session.RedConnections)
-                {
-                    var redState = session.GetState(connectionId);
-                    await _hubContext.Clients.Client(connectionId).GameUpdate(redState);
-                }
-
-                var spectatorState = session.GetState(null);
-                foreach (var spectatorId in session.SpectatorConnections)
-                {
-                    await _hubContext.Clients.Client(spectatorId).GameUpdate(spectatorState);
-                }
-            }
+            // Use broadcast service for updates
+            async Task BroadcastUpdate() => await _broadcastService.BroadcastGameUpdateAsync(session);
 
             await _aiMoveService.ExecuteAiTurnAsync(session, aiPlayerId, BroadcastUpdate);
             await SaveGameStateAsync(session);
 
+            // Handle game completion if there's a winner
             if (session.Engine.Winner != null)
             {
-                var stakes = session.Engine.GetGameResult();
-
-                // Update game status and stats BEFORE broadcasting GameOver (prevents race condition)
-                // Skip for analysis mode
-                if (session.GameMode.ShouldPersist)
-                {
-                    await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-                }
-
-                if (session.GameMode.ShouldTrackStats)
-                {
-                    var game = GameEngineMapper.ToGame(session);
-                    await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                }
-
-                _logger.LogInformation(
-                    "AI game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id,
-                    session.Engine.Winner.Name,
-                    stakes);
-
-                // Broadcast GameOver AFTER database is updated
-                var finalState = session.GetState();
-                await _hubContext.Clients.Group(session.Id).GameOver(finalState);
-
-                // Remove from memory to prevent memory leak
-                _sessionManager.RemoveGame(session.Id);
-                _logger.LogInformation("Removed completed AI game {GameId} from memory", session.Id);
+                await _completionService.HandleGameCompletionAsync(session);
             }
         }
         catch (Exception ex)
@@ -786,208 +684,5 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         return session.Engine.CurrentPlayer.Color == CheckerColor.White
             ? session.WhitePlayerId
             : session.RedPlayerId;
-    }
-
-    private async Task HandleMatchGameCompletion(GameSession session)
-    {
-        if (!session.IsMatchGame || string.IsNullOrEmpty(session.MatchId))
-        {
-            return;
-        }
-
-        try
-        {
-            var winnerColor = session.Engine.Winner?.Color;
-            if (winnerColor == null)
-            {
-                return;
-            }
-
-            var winnerId = winnerColor == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
-            var winType = session.Engine.DetermineWinType();
-            var stakes = session.Engine.GetGameResult();
-
-            var result = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
-
-            await _matchService.CompleteGameAsync(session.Id, result);
-
-            var match = await _matchService.GetMatchAsync(session.MatchId);
-            if (match != null)
-            {
-                await BroadcastMatchUpdateAsync(match, session.Id);
-
-                // Auto-start next game if match is not complete
-                if (!match.CoreMatch.IsMatchComplete())
-                {
-                    await StartNextGameInMatch(match, session);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error handling match game completion");
-        }
-    }
-
-    private async Task StartNextGameInMatch(Match match, GameSession completedSession)
-    {
-        try
-        {
-            _logger.LogInformation(
-                "Auto-starting next game for match {MatchId}. Current score: {P1Score}-{P2Score}",
-                match.MatchId,
-                match.Player1Score,
-                match.Player2Score);
-
-            // Start the next game
-            var nextGame = await _matchService.StartNextGameAsync(match.MatchId);
-
-            // Create game session
-            var session = _sessionManager.CreateGame(nextGame.GameId);
-            session.IsMatchGame = true;
-            session.MatchId = match.MatchId;
-
-            // Add player connections (AddPlayer will set WhitePlayerId and RedPlayerId)
-            // Add Player 1 (White) connections first
-            foreach (var connectionId in completedSession.WhiteConnections.ToList())
-            {
-                if (await IsConnectionActive(connectionId))
-                {
-                    session.AddPlayer(match.Player1Id, connectionId);
-                }
-            }
-
-            // Add Player 2 (Red) connections
-            foreach (var connectionId in completedSession.RedConnections.ToList())
-            {
-                if (await IsConnectionActive(connectionId))
-                {
-                    session.AddPlayer(match.Player2Id, connectionId);
-                }
-            }
-
-            // Set player names from match
-            session.WhitePlayerName = match.Player1Name;
-            session.RedPlayerName = match.Player2Name;
-
-            // Initialize game engine
-            session.Engine.StartNewGame();
-            session.Engine.RollDice();
-
-            // Broadcast the new game to connected clients
-            await BroadcastMatchGameStartingAsync(match, nextGame.GameId);
-
-            _logger.LogInformation(
-                "Started next game {GameId} for match {MatchId}",
-                nextGame.GameId,
-                match.MatchId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to auto-start next game for match {MatchId}", match.MatchId);
-            // Don't throw - failing to auto-start shouldn't crash the completion flow
-            // Client can still manually call ContinueMatch()
-        }
-    }
-
-    private async Task<bool> IsConnectionActive(string connectionId)
-    {
-        try
-        {
-            // Check if connection still exists in SignalR
-            var client = _hubContext.Clients.Client(connectionId);
-            return client != null;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private async Task BroadcastMatchGameStartingAsync(Match match, string newGameId)
-    {
-        try
-        {
-            var session = _sessionManager.GetSession(newGameId);
-            if (session == null)
-            {
-                _logger.LogWarning("Cannot broadcast game starting - session {GameId} not found", newGameId);
-                return;
-            }
-
-            // Send to all connected players
-            foreach (var connectionId in session.WhiteConnections.Concat(session.RedConnections))
-            {
-                var state = session.GetState(connectionId);
-                var dto = new MatchGameStartingDto
-                {
-                    MatchId = match.MatchId,
-                    GameId = newGameId,
-                    GameNumber = match.TotalGamesPlayed + 1,
-                    CurrentScore = new MatchScoreDto
-                    {
-                        Player1 = match.Player1Score,
-                        Player2 = match.Player2Score
-                    },
-                    IsCrawfordGame = match.IsCrawfordGame,
-                    State = state
-                };
-
-                await _hubContext.Clients.Client(connectionId).MatchGameStarting(dto);
-            }
-
-            _logger.LogInformation(
-                "Broadcasted MatchGameStarting for game {GameId} in match {MatchId}",
-                newGameId,
-                match.MatchId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error broadcasting match game starting");
-        }
-    }
-
-    // Helper methods for broadcasting (inlined from GameService to avoid circular dependency)
-    private async Task BroadcastGameUpdateAsync(GameSession session)
-    {
-        // Send personalized state to each player connection
-        foreach (var connectionId in session.WhiteConnections)
-        {
-            var whiteState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).GameUpdate(whiteState);
-        }
-
-        foreach (var connectionId in session.RedConnections)
-        {
-            var redState = session.GetState(connectionId);
-            await _hubContext.Clients.Client(connectionId).GameUpdate(redState);
-        }
-
-        // Send updates to all spectators
-        var spectatorState = session.GetState(null);
-        foreach (var spectatorId in session.SpectatorConnections)
-        {
-            await _hubContext.Clients.Client(spectatorId).GameUpdate(spectatorState);
-        }
-    }
-
-    private async Task BroadcastGameOverAsync(GameSession session)
-    {
-        var finalState = session.GetState();
-        await _hubContext.Clients.Group(session.Id).GameOver(finalState);
-    }
-
-    private async Task BroadcastMatchUpdateAsync(Match match, string gameId)
-    {
-        await _hubContext.Clients.Group(gameId).MatchUpdate(new MatchUpdateDto
-        {
-            MatchId = match.MatchId,
-            Player1Score = match.Player1Score,
-            Player2Score = match.Player2Score,
-            TargetScore = match.TargetScore,
-            IsCrawfordGame = match.IsCrawfordGame,
-            MatchComplete = match.Status == "Completed",
-            MatchWinner = match.WinnerId
-        });
     }
 }

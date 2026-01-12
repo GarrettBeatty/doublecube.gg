@@ -139,6 +139,11 @@ class AudioService {
     console.log('[AudioService] Initialization complete')
   }
 
+  // Volume multipliers for specific sounds (0.0 to 1.0)
+  private readonly SOUND_VOLUMES: Partial<Record<SoundName, number>> = {
+    'turn-change': 0.4, // Lower volume for your turn notification
+  }
+
   /**
    * Play a sound effect
    */
@@ -169,8 +174,9 @@ class AudioService {
         audio.currentTime = 0
       }
 
-      // Set volume and play
-      audio.volume = this.masterVolume
+      // Set volume with optional per-sound multiplier
+      const volumeMultiplier = this.SOUND_VOLUMES[soundName] ?? 1.0
+      audio.volume = this.masterVolume * volumeMultiplier
       const playPromise = audio.play()
 
       // Handle autoplay errors gracefully

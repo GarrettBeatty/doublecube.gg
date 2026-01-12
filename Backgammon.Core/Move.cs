@@ -6,6 +6,7 @@ namespace Backgammon.Core;
 public class Move
 {
     /// <summary>
+    /// Initializes a new instance of the <see cref="Move"/> class.
     /// Creates a single-die move.
     /// </summary>
     public Move(int from, int to, int dieValue, bool isHit = false)
@@ -17,6 +18,7 @@ public class Move
     }
 
     /// <summary>
+    /// Initializes a new instance of the <see cref="Move"/> class.
     /// Creates a combined move using multiple dice.
     /// </summary>
     /// <param name="from">Starting point.</param>

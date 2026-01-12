@@ -63,6 +63,7 @@ else
 }
 
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
+builder.Services.AddSingleton<IGameSessionFactory, GameSessionFactory>();
 
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();
@@ -165,7 +166,12 @@ builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
 builder.Services.AddSingleton<IGameService, GameService>();  // Consolidated GameCreationService + GameStateService
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
+
+// Game action orchestration - refactored into focused services
+builder.Services.AddSingleton<IGameBroadcastService, GameBroadcastService>();
+builder.Services.AddSingleton<IGameCompletionService, GameCompletionService>();
 builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>();
+
 builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
 builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
 builder.Services.AddSingleton<IChatService, ChatService>();

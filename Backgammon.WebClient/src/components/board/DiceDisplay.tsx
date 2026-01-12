@@ -34,6 +34,11 @@ export const DiceDisplay = memo(function DiceDisplay({
     ? `rotate(180 ${barCenterX} ${centerY})`
     : undefined
 
+  const remainingCount = dice.remainingMoves?.length ?? 0
+  const totalMoves = dice.values.length === 2 && dice.values[0] === dice.values[1]
+    ? 4 // doubles
+    : dice.values.length
+
   return (
     <g id="dice" transform={transform}>
       {dice.values.map((die, index) => {
@@ -67,11 +72,26 @@ export const DiceDisplay = memo(function DiceDisplay({
         )
       })}
 
+      {/* Remaining moves indicator */}
+      {totalMoves > 0 && (
+        <text
+          x={barCenterX}
+          y={startY + totalHeight + 12}
+          textAnchor="middle"
+          dominantBaseline="hanging"
+          fill={colors.textLight}
+          fontSize={11}
+          fontWeight="bold"
+        >
+          {remainingCount} / {totalMoves} moves
+        </text>
+      )}
+
       {/* Status text */}
       {statusText && (
         <text
           x={barCenterX}
-          y={startY + totalHeight + 12}
+          y={startY + totalHeight + 26}
           textAnchor="middle"
           dominantBaseline="hanging"
           fill={colors.textLight}

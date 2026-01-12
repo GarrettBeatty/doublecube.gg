@@ -12,6 +12,7 @@ public class MatchServiceValidationTests
     private readonly Mock<IMatchRepository> _matchRepositoryMock;
     private readonly Mock<IGameRepository> _gameRepositoryMock;
     private readonly Mock<IGameSessionManager> _gameSessionManagerMock;
+    private readonly Mock<IGameSessionFactory> _sessionFactoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IAiMoveService> _aiMoveServiceMock;
     private readonly Mock<ICorrespondenceGameService> _correspondenceGameServiceMock;
@@ -23,6 +24,7 @@ public class MatchServiceValidationTests
         _matchRepositoryMock = new Mock<IMatchRepository>();
         _gameRepositoryMock = new Mock<IGameRepository>();
         _gameSessionManagerMock = new Mock<IGameSessionManager>();
+        _sessionFactoryMock = new Mock<IGameSessionFactory>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _aiMoveServiceMock = new Mock<IAiMoveService>();
         _correspondenceGameServiceMock = new Mock<ICorrespondenceGameService>();
@@ -32,10 +34,15 @@ public class MatchServiceValidationTests
         _gameSessionManagerMock.Setup(x => x.CreateGame(It.IsAny<string>()))
             .Returns((string gameId) => new GameSession(gameId));
 
+        // Setup SessionFactory to return a valid session
+        _sessionFactoryMock.Setup(x => x.CreateMatchGameSession(It.IsAny<ServerMatch>(), It.IsAny<string>()))
+            .Returns((ServerMatch match, string gameId) => new GameSession(gameId));
+
         _matchService = new MatchService(
             _matchRepositoryMock.Object,
             _gameRepositoryMock.Object,
             _gameSessionManagerMock.Object,
+            _sessionFactoryMock.Object,
             _userRepositoryMock.Object,
             _aiMoveServiceMock.Object,
             _correspondenceGameServiceMock.Object,

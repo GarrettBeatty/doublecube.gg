@@ -11,6 +11,7 @@ public class MatchService : IMatchService
     private readonly IMatchRepository _matchRepository;
     private readonly IGameRepository _gameRepository;
     private readonly IGameSessionManager _gameSessionManager;
+    private readonly IGameSessionFactory _sessionFactory;
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
     private readonly ICorrespondenceGameService _correspondenceGameService;
@@ -20,6 +21,7 @@ public class MatchService : IMatchService
         IMatchRepository matchRepository,
         IGameRepository gameRepository,
         IGameSessionManager gameSessionManager,
+        IGameSessionFactory sessionFactory,
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
         ICorrespondenceGameService correspondenceGameService,
@@ -28,6 +30,7 @@ public class MatchService : IMatchService
         _matchRepository = matchRepository;
         _gameRepository = gameRepository;
         _gameSessionManager = gameSessionManager;
+        _sessionFactory = sessionFactory;
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
         _correspondenceGameService = correspondenceGameService;
@@ -149,38 +152,8 @@ public class MatchService : IMatchService
             match.LastUpdatedAt = DateTime.UtcNow;
             await _matchRepository.UpdateMatchAsync(match);
 
-            // Create game session
-            var session = _gameSessionManager.CreateGame(game.GameId);
-            session.WhitePlayerName = match.Player1Name;
-            session.RedPlayerName = match.Player2Name ?? "Waiting...";
-            session.MatchId = match.MatchId;
-            session.IsMatchGame = true;
-            session.TargetScore = match.TargetScore;
-            session.Player1Score = match.Player1Score;
-            session.Player2Score = match.Player2Score;
-            session.IsCrawfordGame = match.IsCrawfordGame;
-
-            // Set rated/unrated flag (AI matches are always unrated)
-            session.IsRated = opponentType == "AI" ? false : isRated;
-
-            // Configure time controls if enabled
-            if (match.TimeControl != null && match.TimeControl.Type != TimeControlType.None)
-            {
-                session.TimeControl = match.TimeControl;
-
-                // Calculate reserve times based on current match score
-                var whiteReserve = match.TimeControl.CalculateReserveTime(
-                    match.TargetScore, match.Player1Score, match.Player2Score);
-                var redReserve = whiteReserve; // Same for both players
-
-                session.Engine.InitializeTimeControl(match.TimeControl, whiteReserve, redReserve);
-
-                _logger.LogInformation(
-                    "Initialized time control for game {GameId}: {Type}, Reserve={Reserve}min",
-                    game.GameId,
-                    match.TimeControl.Type,
-                    whiteReserve.TotalMinutes);
-            }
+            // Create game session using factory
+            var session = _sessionFactory.CreateMatchGameSession(match, game.GameId);
 
             // For AI matches, add AI player to session
             if (opponentType == "AI")
@@ -253,48 +226,8 @@ public class MatchService : IMatchService
             // Update match with new game
             await _matchRepository.AddGameToMatchAsync(matchId, gameId);
 
-            // Create game session
-            var session = _gameSessionManager.CreateGame(gameId);
-            session.WhitePlayerName = match.Player1Name;
-            session.RedPlayerName = match.Player2Name;
-            session.MatchId = matchId;
-            session.IsMatchGame = true;
-            session.TargetScore = match.TargetScore;
-            session.Player1Score = match.Player1Score;
-            session.Player2Score = match.Player2Score;
-            session.IsCrawfordGame = match.IsCrawfordGame;
-
-            // Configure Crawford rule if applicable
-            if (match.IsCrawfordGame)
-            {
-                session.Engine.IsCrawfordGame = true;
-                session.Engine.MatchId = matchId;
-            }
-
-            // Configure time controls if enabled
-            if (match.TimeControl != null && match.TimeControl.Type != TimeControlType.None)
-            {
-                session.TimeControl = match.TimeControl;
-
-                // Calculate reserve times based on current match score
-                var whiteReserve = match.TimeControl.CalculateReserveTime(
-                    match.TargetScore, match.Player1Score, match.Player2Score);
-                var redReserve = whiteReserve; // Same for both players
-
-                session.Engine.InitializeTimeControl(match.TimeControl, whiteReserve, redReserve);
-
-                _logger.LogInformation(
-                    "Initialized time control for game {GameId}: {Type}, Reserve={Reserve}min",
-                    gameId,
-                    match.TimeControl.Type,
-                    whiteReserve.TotalMinutes);
-            }
-
-            _logger.LogInformation(
-                "Started game {GameId} for match {MatchId} (Crawford: {IsCrawford})",
-                gameId,
-                matchId,
-                match.IsCrawfordGame);
+            // Create game session using factory
+            var session = _sessionFactory.CreateMatchGameSession(match, gameId);
 
             return game;
         }
@@ -309,17 +242,45 @@ public class MatchService : IMatchService
     {
         try
         {
+            _logger.LogInformation(
+                "CompleteGameAsync called for game {GameId}, WinnerId={WinnerId}, Points={Points}",
+                gameId,
+                result.WinnerId,
+                result.PointsWon);
+
             var game = await _gameRepository.GetGameByGameIdAsync(gameId);
-            if (game == null || !game.IsMatchGame || string.IsNullOrEmpty(game.MatchId))
+            if (game == null)
             {
+                _logger.LogWarning("Game {GameId} not found in database", gameId);
+                return;
+            }
+
+            if (!game.IsMatchGame)
+            {
+                _logger.LogInformation("Game {GameId} is not a match game, skipping match score update", gameId);
+                return;
+            }
+
+            if (string.IsNullOrEmpty(game.MatchId))
+            {
+                _logger.LogWarning("Game {GameId} has no MatchId", gameId);
                 return;
             }
 
             var match = await _matchRepository.GetMatchByIdAsync(game.MatchId);
             if (match == null)
             {
+                _logger.LogWarning("Match {MatchId} not found for game {GameId}", game.MatchId, gameId);
                 return;
             }
+
+            _logger.LogInformation(
+                "Updating match {MatchId} scores. Current: {P1Score}-{P2Score}, Adding {Points} for {WinnerId}",
+                match.MatchId,
+                match.Player1Score,
+                match.Player2Score,
+                result.PointsWon,
+                result.WinnerId);
 
             // Create Core.Game from result
             var coreGame = new Core.Game(gameId)
@@ -341,8 +302,21 @@ public class MatchService : IMatchService
             bool wasCrawford = match.IsCrawfordGame;
 
             // Update scores - this handles Crawford rule logic automatically
+            _logger.LogInformation(
+                "Calling UpdateScores: WinnerId={WinnerId}, Player1Id={P1Id}, Player2Id={P2Id}, Points={Points}",
+                result.WinnerId,
+                match.Player1Id,
+                match.Player2Id,
+                result.PointsWon);
+
             match.CoreMatch.UpdateScores(result.WinnerId, result.PointsWon);
             match.LastUpdatedAt = DateTime.UtcNow;
+
+            _logger.LogInformation(
+                "After UpdateScores: Match {MatchId} scores: {P1Score}-{P2Score}",
+                match.MatchId,
+                match.Player1Score,
+                match.Player2Score);
 
             // Log Crawford rule changes
             if (!wasCrawford && match.IsCrawfordGame)
