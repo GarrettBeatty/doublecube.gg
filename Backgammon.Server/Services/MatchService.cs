@@ -139,7 +139,6 @@ public class MatchService : IMatchService
                 WhitePlayerName = match.Player1Name,
                 RedPlayerName = match.Player2Name, // Will be empty for OpenLobby
                 Status = "InProgress",
-                IsMatchGame = true,
                 MatchId = match.MatchId,
                 IsCrawfordGame = false
             };
@@ -216,7 +215,6 @@ public class MatchService : IMatchService
                 RedPlayerName = match.Player2Name,
                 Status = "InProgress",
                 MatchId = matchId,
-                IsMatchGame = true,
                 IsCrawfordGame = match.IsCrawfordGame
             };
 
@@ -255,12 +253,6 @@ public class MatchService : IMatchService
                 return;
             }
 
-            if (!game.IsMatchGame)
-            {
-                _logger.LogInformation("Game {GameId} is not a match game, skipping match score update", gameId);
-                return;
-            }
-
             if (string.IsNullOrEmpty(game.MatchId))
             {
                 _logger.LogWarning("Game {GameId} has no MatchId", gameId);
@@ -289,7 +281,6 @@ public class MatchService : IMatchService
                 Stakes = result.PointsWon,
                 WinType = result.WinType,
                 MatchId = game.MatchId,
-                IsMatchGame = true,
                 IsCrawfordGame = match.IsCrawfordGame,
                 MoveHistory = result.MoveHistory ?? new List<Move>(),
                 Status = Core.GameStatus.Completed

@@ -48,7 +48,6 @@ public partial class GameHub
             if (session != null)
             {
                 session.MatchId = match.MatchId;
-                session.IsMatchGame = true;
 
                 // For AI matches, add AI player before human joins
                 if (match.OpponentType == "AI")

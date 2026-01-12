@@ -38,7 +38,6 @@ public class GameSessionFactory : IGameSessionFactory
         session.WhitePlayerName = match.Player1Name;
         session.RedPlayerName = match.Player2Name ?? "Waiting...";
         session.MatchId = match.MatchId;
-        session.IsMatchGame = true;
 
         // Configure match scores
         session.TargetScore = match.TargetScore;
@@ -84,7 +83,6 @@ public class GameSessionFactory : IGameSessionFactory
         _logger.LogDebug("Creating analysis session: GameId={GameId}", gameId);
 
         var session = _sessionManager.CreateGame(gameId);
-        session.IsMatchGame = false;
         session.IsRated = false;
         session.WhitePlayerName = "Analysis";
         session.RedPlayerName = "Analysis";

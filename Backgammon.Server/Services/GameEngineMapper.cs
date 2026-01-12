@@ -64,6 +64,10 @@ public static class GameEngineMapper
         // Set rated/unrated flag (AI games are always unrated regardless of session setting)
         game.IsRated = game.IsAiOpponent ? false : session.IsRated;
 
+        // Copy match properties from session
+        game.MatchId = session.MatchId;
+        game.IsCrawfordGame = session.IsCrawfordGame ?? false;
+
         // If game is completed, add completion data
         if (engine.Winner != null)
         {

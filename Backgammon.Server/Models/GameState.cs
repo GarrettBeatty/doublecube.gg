@@ -79,8 +79,6 @@ public class GameState
     // Match information
     public string? MatchId { get; set; }
 
-    public bool IsMatchGame { get; set; }
-
     public int? TargetScore { get; set; }
 
     public int? Player1Score { get; set; }

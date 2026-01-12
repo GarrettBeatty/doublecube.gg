@@ -556,7 +556,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
 
         // Handle correspondence game turn tracking
-        if (session.IsMatchGame && !string.IsNullOrEmpty(session.MatchId))
+        if (!string.IsNullOrEmpty(session.MatchId))
         {
             BackgroundTaskHelper.FireAndForget(
                 async () =>

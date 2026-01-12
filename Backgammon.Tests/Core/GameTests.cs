@@ -17,7 +17,6 @@ public class GameTests
         Assert.Equal(0, game.Stakes);
         Assert.Equal(WinType.Normal, game.WinType);
         Assert.Null(game.MatchId);
-        Assert.False(game.IsMatchGame);
         Assert.False(game.IsCrawfordGame);
         Assert.Empty(game.MoveHistory);
     }
@@ -150,32 +149,6 @@ public class GameTests
     }
 
     [Fact]
-    public void IsMatchGame_CanBeSet_True()
-    {
-        // Arrange
-        var game = new Game();
-
-        // Act
-        game.IsMatchGame = true;
-
-        // Assert
-        Assert.True(game.IsMatchGame);
-    }
-
-    [Fact]
-    public void IsMatchGame_CanBeSet_False()
-    {
-        // Arrange
-        var game = new Game { IsMatchGame = true };
-
-        // Act
-        game.IsMatchGame = false;
-
-        // Assert
-        Assert.False(game.IsMatchGame);
-    }
-
-    [Fact]
     public void IsCrawfordGame_CanBeSet_True()
     {
         // Arrange
@@ -250,7 +223,6 @@ public class GameTests
             Stakes = 2,
             WinType = WinType.Gammon,
             MatchId = matchId,
-            IsMatchGame = true,
             IsCrawfordGame = false,
             Status = GameStatus.Completed
         };
@@ -262,7 +234,7 @@ public class GameTests
         Assert.Equal(2, game.Stakes);
         Assert.Equal(WinType.Gammon, game.WinType);
         Assert.Equal(matchId, game.MatchId);
-        Assert.True(game.IsMatchGame);
+        Assert.NotNull(game.MatchId);
         Assert.False(game.IsCrawfordGame);
         Assert.Equal(GameStatus.Completed, game.Status);
         Assert.Single(game.MoveHistory);
@@ -276,13 +248,12 @@ public class GameTests
         var game = new Game("crawford-game")
         {
             MatchId = "match-789",
-            IsMatchGame = true,
             IsCrawfordGame = true
         };
 
         // Assert
         Assert.Equal("match-789", game.MatchId);
-        Assert.True(game.IsMatchGame);
+        Assert.NotNull(game.MatchId);
         Assert.True(game.IsCrawfordGame);
     }
 }

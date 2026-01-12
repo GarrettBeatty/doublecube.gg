@@ -80,7 +80,6 @@ public class MatchGameContinuationTests
         {
             GameId = gameId,
             MatchId = matchId,
-            IsMatchGame = true,
             Status = "Completed",
             WhitePlayerId = player1Id,
             RedPlayerId = player2Id
@@ -156,7 +155,6 @@ public class MatchGameContinuationTests
                 var session = new GameSession(gameId)
                 {
                     MatchId = match.MatchId,
-                    IsMatchGame = true,
                     TargetScore = match.TargetScore,
                     Player1Score = match.Player1Score,
                     Player2Score = match.Player2Score,
@@ -218,7 +216,6 @@ public class MatchGameContinuationTests
         {
             GameId = gameId,
             MatchId = matchId,
-            IsMatchGame = true,
             Status = "Completed",
             WhitePlayerId = player1Id,
             RedPlayerId = player2Id
@@ -295,7 +292,6 @@ public class MatchGameContinuationTests
         {
             GameId = game1Id,
             MatchId = matchId,
-            IsMatchGame = true,
             Status = "Completed",
             WhitePlayerId = player1Id,
             RedPlayerId = player2Id
@@ -315,7 +311,6 @@ public class MatchGameContinuationTests
         {
             GameId = game2Id,
             MatchId = matchId,
-            IsMatchGame = true,
             Status = "Completed",
             WhitePlayerId = player1Id,
             RedPlayerId = player2Id
@@ -335,7 +330,6 @@ public class MatchGameContinuationTests
         {
             GameId = game3Id,
             MatchId = matchId,
-            IsMatchGame = true,
             Status = "Completed",
             WhitePlayerId = player1Id,
             RedPlayerId = player2Id
@@ -445,7 +439,6 @@ public class MatchGameContinuationTests
                 var session = new GameSession(gameId)
                 {
                     MatchId = m.MatchId,
-                    IsMatchGame = true,
                     TargetScore = m.TargetScore,
                     Player1Score = m.Player1Score,
                     Player2Score = m.Player2Score,
@@ -473,7 +466,7 @@ public class MatchGameContinuationTests
         Assert.Equal(0, capturedSession.Player2Score);
 
         // Verify it's marked as a match game
-        Assert.True(capturedSession.IsMatchGame);
+        Assert.NotNull(capturedSession.MatchId);
         Assert.False(capturedSession.IsCrawfordGame);
     }
 }

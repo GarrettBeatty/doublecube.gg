@@ -585,7 +585,7 @@ public partial class GameHub
             await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
             // Update match scores if this is a match game
-            if (session.IsMatchGame && !string.IsNullOrEmpty(session.MatchId))
+            if (!string.IsNullOrEmpty(session.MatchId))
             {
                 // Determine winner's player ID
                 var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;

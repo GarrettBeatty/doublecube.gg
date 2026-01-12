@@ -51,10 +51,10 @@ public class GameCompletionService : IGameCompletionService
             }
 
             _logger.LogInformation(
-                "Handling game completion: GameId={GameId}, Winner={Winner}, IsMatchGame={IsMatchGame}",
+                "Handling game completion: GameId={GameId}, Winner={Winner}, MatchId={MatchId}",
                 session.Id,
                 session.Engine.Winner.Name,
-                session.IsMatchGame);
+                session.MatchId ?? "None");
 
             // Update game status and stats BEFORE broadcasting
             if (session.GameMode.ShouldPersist)
@@ -72,7 +72,7 @@ public class GameCompletionService : IGameCompletionService
             await _broadcastService.BroadcastGameOverAsync(session);
 
             // Handle match-specific completion
-            if (session.IsMatchGame)
+            if (!string.IsNullOrEmpty(session.MatchId))
             {
                 await HandleMatchGameCompletionAsync(session);
             }

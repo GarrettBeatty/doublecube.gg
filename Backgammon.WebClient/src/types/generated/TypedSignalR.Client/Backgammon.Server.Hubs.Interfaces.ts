@@ -14,11 +14,10 @@ import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services'
 export type IGameHub = {
     /**
     * Join an existing game by ID
-    * @param playerId Transpiled from string
     * @param gameId Transpiled from string?
     * @returns Transpiled from System.Threading.Tasks.Task
     */
-    joinGame(playerId: string, gameId: string): Promise<void>;
+    joinGame(gameId: string): Promise<void>;
     /**
     * Create an analysis/practice game (single player controls both sides)
     * @returns Transpiled from System.Threading.Tasks.Task
@@ -26,10 +25,9 @@ export type IGameHub = {
     createAnalysisGame(): Promise<void>;
     /**
     * Create a new game against an AI opponent
-    * @param playerId Transpiled from string
     * @returns Transpiled from System.Threading.Tasks.Task
     */
-    createAiGame(playerId: string): Promise<void>;
+    createAiGame(): Promise<void>;
     /**
     * Roll dice to start turn
     * @returns Transpiled from System.Threading.Tasks.Task

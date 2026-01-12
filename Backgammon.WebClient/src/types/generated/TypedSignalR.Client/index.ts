@@ -82,16 +82,16 @@ class IGameHub_HubProxy implements IGameHub {
     public constructor(private connection: HubConnection) {
     }
 
-    public readonly joinGame = async (playerId: string, gameId: string): Promise<void> => {
-        return await this.connection.invoke("JoinGame", playerId, gameId);
+    public readonly joinGame = async (gameId: string): Promise<void> => {
+        return await this.connection.invoke("JoinGame", gameId);
     }
 
     public readonly createAnalysisGame = async (): Promise<void> => {
         return await this.connection.invoke("CreateAnalysisGame");
     }
 
-    public readonly createAiGame = async (playerId: string): Promise<void> => {
-        return await this.connection.invoke("CreateAiGame", playerId);
+    public readonly createAiGame = async (): Promise<void> => {
+        return await this.connection.invoke("CreateAiGame");
     }
 
     public readonly rollDice = async (): Promise<void> => {

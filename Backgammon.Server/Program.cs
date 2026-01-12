@@ -13,6 +13,7 @@ using Backgammon.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -32,6 +33,9 @@ builder.AddServiceDefaults();
 
 // Add services to the container
 var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+// Register authentication filter globally for all SignalR hubs
+builder.Services.AddSingleton<IHubFilter, Backgammon.Server.Hubs.Filters.AuthenticationHubFilter>();
+
 var signalRBuilder = builder.Services.AddSignalR(options =>
 {
     // Optimized timeouts for real-time gameplay
@@ -39,9 +43,6 @@ var signalRBuilder = builder.Services.AddSignalR(options =>
     options.KeepAliveInterval = TimeSpan.FromSeconds(20);      // Send keepalive pings every 20s
     options.HandshakeTimeout = TimeSpan.FromSeconds(30);       // Keep at 30s
     options.EnableDetailedErrors = builder.Environment.IsDevelopment();
-
-    // Add authentication filter - automatically enforces auth on all hub methods
-    options.AddFilter<Backgammon.Server.Hubs.Filters.AuthenticationHubFilter>();
 });
 
 // Add Redis backplane for scaling across multiple server instances

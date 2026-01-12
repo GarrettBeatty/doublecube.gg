@@ -117,15 +117,13 @@ export const GamePage: React.FC = () => {
 
       // Join the game
       try {
-        const playerId = authService.getOrCreatePlayerId()
         const displayName = authService.getDisplayName()
         console.log('[GamePage] ========== JOINING GAME ==========')
         console.log('[GamePage] Game ID:', gameId)
-        console.log('[GamePage] Player ID:', playerId)
         console.log('[GamePage] Display Name:', displayName)
         console.log('[GamePage] Auth Token:', authService.getToken() ? 'Present' : 'Missing')
         console.log('[GamePage] =====================================')
-        await hub?.joinGame(playerId, gameId)
+        await hub?.joinGame(gameId)
         // The GameStart or GameUpdate event will set the game state
         setIsLoading(false)
       } catch (error) {

@@ -110,6 +110,9 @@ dotnet build
 # Build frontend
 cd Backgammon.WebClient && npm run build
 
+# Regenerate TypedSignalR client (after changing IGameHub or IGameHubClient interfaces)
+cd Backgammon.WebClient && npm run generate:signalr
+
 # Run all tests
 dotnet test
 

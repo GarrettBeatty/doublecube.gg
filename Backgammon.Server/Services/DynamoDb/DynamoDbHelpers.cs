@@ -380,7 +380,6 @@ public static class DynamoDbHelpers
             item["matchId"] = new AttributeValue { S = game.MatchId };
         }
 
-        item["isMatchGame"] = new AttributeValue { BOOL = game.IsMatchGame };
         item["isCrawfordGame"] = new AttributeValue { BOOL = game.IsCrawfordGame };
         if (!string.IsNullOrEmpty(game.WinType))
         {
@@ -424,7 +423,6 @@ public static class DynamoDbHelpers
             IsAiOpponent = GetBool(item, "isAiOpponent", false),
             IsRated = GetBool(item, "isRated", true),
             MatchId = GetStringOrNull(item, "matchId"),
-            IsMatchGame = GetBool(item, "isMatchGame", false),
             IsCrawfordGame = GetBool(item, "isCrawfordGame", false),
             WinType = GetStringOrNull(item, "winType")
         };

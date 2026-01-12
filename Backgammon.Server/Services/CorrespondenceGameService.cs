@@ -182,7 +182,6 @@ public class CorrespondenceGameService : ICorrespondenceGameService
                 WhitePlayerName = match.Player1Name,
                 RedPlayerName = match.Player2Name ?? string.Empty,
                 Status = "InProgress",
-                IsMatchGame = true,
                 MatchId = match.MatchId,
                 IsCrawfordGame = false,
                 IsRated = isRated
@@ -201,7 +200,6 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             session.WhitePlayerName = match.Player1Name;
             session.RedPlayerName = match.Player2Name ?? "Waiting...";
             session.MatchId = match.MatchId;
-            session.IsMatchGame = true;
             session.TargetScore = match.TargetScore;
             session.Player1Score = match.Player1Score;
             session.Player2Score = match.Player2Score;

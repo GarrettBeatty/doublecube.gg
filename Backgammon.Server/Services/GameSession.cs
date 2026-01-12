@@ -85,8 +85,6 @@ public class GameSession
 
     public string? MatchId { get; set; }
 
-    public bool IsMatchGame { get; set; } = false;
-
     public int? TargetScore { get; set; }
 
     public int? Player1Score { get; set; }
@@ -333,7 +331,6 @@ public class GameSession
             IsAnalysisMode = features.ShowAnalysisBadge,
             IsRated = IsRated,
             MatchId = MatchId,
-            IsMatchGame = IsMatchGame,
             TargetScore = TargetScore,
             Player1Score = Player1Score,
             Player2Score = Player2Score,

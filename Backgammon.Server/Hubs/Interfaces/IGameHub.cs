@@ -18,7 +18,7 @@ public interface IGameHub
     /// <summary>
     /// Join an existing game by ID
     /// </summary>
-    Task JoinGame(string playerId, string? gameId);
+    Task JoinGame(string? gameId);
 
     /// <summary>
     /// Create an analysis/practice game (single player controls both sides)
@@ -28,7 +28,7 @@ public interface IGameHub
     /// <summary>
     /// Create a new game against an AI opponent
     /// </summary>
-    Task CreateAiGame(string playerId);
+    Task CreateAiGame();
 
     /// <summary>
     /// Roll dice to start turn

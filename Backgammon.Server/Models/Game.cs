@@ -292,16 +292,6 @@ public class Game
     }
 
     /// <summary>
-    /// Whether this is a match game (delegates to CoreGame)
-    /// </summary>
-    [JsonIgnore]
-    public bool IsMatchGame
-    {
-        get => CoreGame.IsMatchGame;
-        set => CoreGame.IsMatchGame = value;
-    }
-
-    /// <summary>
     /// Whether Crawford rule applies (delegates to CoreGame)
     /// </summary>
     [JsonIgnore]

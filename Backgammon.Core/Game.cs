@@ -43,11 +43,6 @@ public class Game
     public string? MatchId { get; set; }
 
     /// <summary>
-    /// Whether this game is part of a match
-    /// </summary>
-    public bool IsMatchGame { get; set; }
-
-    /// <summary>
     /// Whether this is a Crawford game (no doubling allowed)
     /// </summary>
     public bool IsCrawfordGame { get; set; }
