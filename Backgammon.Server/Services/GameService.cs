@@ -154,6 +154,42 @@ public class GameService : IGameService
         // Check if game is already in progress (for reconnection detection)
         var wasAlreadyStarted = session.Engine.GameStarted;
 
+        // For open lobby matches, join the match BEFORE AddPlayer triggers TryStartGameIfReady
+        // This ensures Player2Id is set on the match before the game starts
+        if (!string.IsNullOrEmpty(session.MatchId) && !wasAlreadyStarted)
+        {
+            var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+            if (match != null && match.OpponentType == "OpenLobby" && string.IsNullOrEmpty(match.Player2Id))
+            {
+                var isPlayer1 = match.Player1Id == playerId;
+                if (!isPlayer1)
+                {
+                    _logger.LogInformation(
+                        "Player {PlayerId} joining open lobby match {MatchId} as Player 2 (before game start)",
+                        playerId,
+                        match.MatchId);
+
+                    try
+                    {
+                        await _matchService.JoinMatchAsync(match.MatchId, playerId, displayName);
+                        _logger.LogInformation(
+                            "Player {PlayerId} successfully joined match {MatchId}",
+                            playerId,
+                            match.MatchId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Failed to join match {MatchId} for player {PlayerId}",
+                            match.MatchId,
+                            playerId);
+                        throw;
+                    }
+                }
+            }
+        }
+
         // Try to add as player; if full, add as spectator
         if (!session.AddPlayer(playerId, connectionId))
         {
@@ -199,45 +235,14 @@ public class GameService : IGameService
         }
 
         // Handle pre-created match games (empty games waiting for players to join)
+        // Note: Open lobby join is handled BEFORE AddPlayer (see above) to ensure Player2Id
+        // is set before TryStartGameIfReady triggers StartNewGame
         if (!string.IsNullOrEmpty(session.MatchId) && !session.Engine.GameStarted)
         {
             _logger.LogInformation(
                 "Player {PlayerId} joining pre-created match game {GameId}",
                 playerId,
                 session.Id);
-
-            // For open lobby matches, automatically join the match when Player 2 joins the game
-            var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
-            if (match != null && match.OpponentType == "OpenLobby" && string.IsNullOrEmpty(match.Player2Id))
-            {
-                var isPlayer1 = match.Player1Id == playerId;
-                if (!isPlayer1)
-                {
-                    // This is Player 2 joining an open lobby - update the match
-                    _logger.LogInformation(
-                        "Player {PlayerId} joining open lobby match {MatchId} as Player 2",
-                        playerId,
-                        match.MatchId);
-
-                    try
-                    {
-                        await _matchService.JoinMatchAsync(match.MatchId, playerId, displayName);
-                        _logger.LogInformation(
-                            "Player {PlayerId} successfully joined match {MatchId}",
-                            playerId,
-                            match.MatchId);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(
-                            ex,
-                            "Failed to join match {MatchId} for player {PlayerId}",
-                            match.MatchId,
-                            playerId);
-                        throw;
-                    }
-                }
-            }
 
             // Check if both players have now joined
             if (session.HasBothPlayers())

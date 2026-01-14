@@ -53,6 +53,20 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         if (session.Engine.IsOpeningRoll)
         {
             var playerColor = session.GetPlayerColor(connectionId);
+
+            // For AI players, determine color by checking which player ID is an AI
+            if (playerColor == null && string.IsNullOrEmpty(connectionId))
+            {
+                if (_aiMoveService.IsAiPlayer(session.WhitePlayerId))
+                {
+                    playerColor = CheckerColor.White;
+                }
+                else if (_aiMoveService.IsAiPlayer(session.RedPlayerId))
+                {
+                    playerColor = CheckerColor.Red;
+                }
+            }
+
             if (playerColor == null)
             {
                 return ActionResult.Error("Not a player in this game");

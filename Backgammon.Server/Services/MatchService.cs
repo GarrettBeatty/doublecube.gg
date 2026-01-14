@@ -155,14 +155,8 @@ public class MatchService : IMatchService
             await _matchRepository.UpdateMatchAsync(match);
 
             // Create game session using factory
+            // Factory now sets player IDs from match (Player1 = White, Player2 = Red)
             var session = _sessionFactory.CreateMatchGameSession(match, game.GameId);
-
-            // For AI matches, add AI player to session
-            if (opponentType == "AI")
-            {
-                session.AddPlayer(match.Player2Id!, string.Empty); // Empty connection for AI
-                session.SetPlayerName(match.Player2Id!, match.Player2Name ?? "Computer");
-            }
 
             _logger.LogInformation(
                 "Created first game {GameId} for match {MatchId}",

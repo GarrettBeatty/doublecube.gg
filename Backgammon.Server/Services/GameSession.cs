@@ -110,7 +110,7 @@ public class GameSession
     {
         LastActivityAt = DateTime.UtcNow;
 
-        // Check if player is already in this game (reconnection/multi-tab)
+        // Check if player is already in this game (reconnection/multi-tab or match game joining)
         if (WhitePlayerId == playerId)
         {
             _whiteConnections.Add(connectionId);
@@ -120,6 +120,8 @@ public class GameSession
                 WhitePlayerName = GenerateFriendlyName(playerId);
             }
 
+            // Start game if both players are ready (for match games where IDs are pre-assigned)
+            TryStartGameIfReady();
             return true;
         }
 
@@ -132,6 +134,8 @@ public class GameSession
                 RedPlayerName = GenerateFriendlyName(playerId);
             }
 
+            // Start game if both players are ready (for match games where IDs are pre-assigned)
+            TryStartGameIfReady();
             return true;
         }
 
@@ -141,6 +145,7 @@ public class GameSession
             WhitePlayerId = playerId;
             _whiteConnections.Add(connectionId);
             WhitePlayerName = GenerateFriendlyName(playerId);
+            TryStartGameIfReady();
             return true;
         }
 
@@ -149,14 +154,7 @@ public class GameSession
             RedPlayerId = playerId;
             _redConnections.Add(connectionId);
             RedPlayerName = GenerateFriendlyName(playerId);
-            // Start game when both players joined (only if not already started)
-            if (!Engine.GameStarted)
-            {
-                Engine.StartNewGame();
-                // Explicit status transition: both players joined, game is now in progress
-                Status = SessionStatus.InProgress;
-            }
-
+            TryStartGameIfReady();
             return true;
         }
 
@@ -164,12 +162,32 @@ public class GameSession
     }
 
     /// <summary>
-    /// Set the Red player directly (used for analysis mode)
+    /// Set the White player directly (used for match game initialization).
+    /// Does not add a connection - use when player ID is known but connection will come later.
     /// </summary>
-    public void SetRedPlayer(string playerId, string connectionId)
+    public void SetWhitePlayer(string playerId)
+    {
+        WhitePlayerId = playerId;
+        if (string.IsNullOrEmpty(WhitePlayerName))
+        {
+            WhitePlayerName = GenerateFriendlyName(playerId);
+        }
+
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Set the Red player directly (used for analysis mode and match game initialization).
+    /// Optionally adds a connection ID if provided.
+    /// </summary>
+    public void SetRedPlayer(string playerId, string? connectionId = null)
     {
         RedPlayerId = playerId;
-        _redConnections.Add(connectionId);
+        if (!string.IsNullOrEmpty(connectionId))
+        {
+            _redConnections.Add(connectionId);
+        }
+
         if (string.IsNullOrEmpty(RedPlayerName))
         {
             RedPlayerName = GenerateFriendlyName(playerId);
@@ -263,11 +281,19 @@ public class GameSession
     }
 
     /// <summary>
-    /// Check if both players have joined the game (at least one connection each)
+    /// Check if both players have joined the game.
+    /// Returns true if both player IDs are assigned (even if one is AI with no connection)
+    /// or if both have at least one connection.
     /// </summary>
     public bool HasBothPlayers()
     {
-        return _whiteConnections.Count > 0 && _redConnections.Count > 0;
+        // Both player IDs assigned (e.g., match game with AI or both humans registered)
+        bool bothIdsAssigned = !string.IsNullOrEmpty(WhitePlayerId) && !string.IsNullOrEmpty(RedPlayerId);
+
+        // Both have connections (original check - for non-match games)
+        bool bothHaveConnections = _whiteConnections.Count > 0 && _redConnections.Count > 0;
+
+        return bothIdsAssigned || bothHaveConnections;
     }
 
     /// <summary>
@@ -525,6 +551,34 @@ public class GameSession
         }
 
         return playerId;
+    }
+
+    /// <summary>
+    /// Start the game if both players are ready and game hasn't started yet.
+    /// For match games, considers AI players (no connection) as "ready".
+    /// </summary>
+    private void TryStartGameIfReady()
+    {
+        if (Engine.GameStarted)
+        {
+            return;
+        }
+
+        // Check if both player IDs are set
+        if (string.IsNullOrEmpty(WhitePlayerId) || string.IsNullOrEmpty(RedPlayerId))
+        {
+            return;
+        }
+
+        // For the game to start, at least one human player must have a connection
+        // (AI players won't have connections but that's fine)
+        if (_whiteConnections.Count == 0 && _redConnections.Count == 0)
+        {
+            return;
+        }
+
+        Engine.StartNewGame();
+        Status = SessionStatus.InProgress;
     }
 
     private PointState[] GetBoardState()

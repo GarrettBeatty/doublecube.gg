@@ -1,3 +1,15 @@
+/**
+ * Legacy gameStore - provides backward compatibility during migration
+ *
+ * This file combines the split stores into a single interface matching the old API.
+ * New code should import from individual stores directly:
+ * - useGameStateStore - Core game state, doubling cube
+ * - useBoardInteractionStore - Selected checker, valid moves, board flip
+ * - useAnalysisStore - Analysis mode, evaluation, best moves
+ * - useMatchStore - Match state, game result modal
+ * - useChatStore - Chat messages
+ */
+
 import { create } from 'zustand'
 import type { GameState } from '@/types/generated/Backgammon.Server.Models'
 import { CheckerColor } from '@/types/generated/Backgammon.Core'
@@ -9,16 +21,8 @@ import {
 } from '@/types/game.types'
 import { PositionEvaluation, BestMovesAnalysis } from '@/types/analysis.types'
 
-export interface MatchState {
-  matchId: string
-  player1Score: number
-  player2Score: number
-  targetScore: number
-  isCrawfordGame: boolean
-  matchComplete: boolean
-  matchWinner: string | null
-  lastUpdatedAt?: string // ISO timestamp for staleness detection
-}
+// Re-export MatchState from matchStore for backward compatibility
+export { type MatchState } from './matchStore'
 
 interface DoublingCubeState {
   value: number
@@ -28,6 +32,17 @@ interface DoublingCubeState {
   pendingResponse: boolean
   offerFrom: CheckerColor | null
   newValue: number | null
+}
+
+interface MatchState {
+  matchId: string
+  player1Score: number
+  player2Score: number
+  targetScore: number
+  isCrawfordGame: boolean
+  matchComplete: boolean
+  matchWinner: string | null
+  lastUpdatedAt?: string
 }
 
 interface GameStore {

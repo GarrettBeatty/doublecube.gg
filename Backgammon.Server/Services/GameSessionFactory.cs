@@ -34,6 +34,14 @@ public class GameSessionFactory : IGameSessionFactory
 
         var session = _sessionManager.CreateGame(gameId);
 
+        // Configure player IDs from match (Player1 = White, Player2 = Red)
+        // This ensures correct color assignment even when AI joins first
+        session.SetWhitePlayer(match.Player1Id);
+        if (!string.IsNullOrEmpty(match.Player2Id))
+        {
+            session.SetRedPlayer(match.Player2Id);
+        }
+
         // Configure match context
         session.WhitePlayerName = match.Player1Name;
         session.RedPlayerName = match.Player2Name ?? "Waiting...";
