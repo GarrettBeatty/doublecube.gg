@@ -65,6 +65,7 @@ artifacts/
 TestResults/
 *.cobertura.xml
 coverage.cobertura.xml
+coverage/
 
 # macOS
 .DS_Store
