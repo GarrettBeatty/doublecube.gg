@@ -9,7 +9,8 @@ import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
-import { GameResultModal } from '@/components/modals/GameResultModal'
+import { GameCompletedOverlay } from '@/components/game/GameCompletedOverlay'
+import { CompletedGameBanner } from '@/components/game/CompletedGameBanner'
 import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
 import { DoubleOfferModal } from '@/components/modals/DoubleOfferModal'
 import { NotFound } from '@/components/NotFound'
@@ -417,6 +418,8 @@ export const GamePage: React.FC = () => {
               />
             )}
 
+            <CompletedGameBanner gameState={currentGameState} />
+
             <GameControls gameState={currentGameState} isSpectator={isSpectator} />
           </div>
 
@@ -460,15 +463,13 @@ export const GamePage: React.FC = () => {
                     gameState={currentGameState}
                     isSpectator={isSpectator}
                   />
+                  <GameCompletedOverlay />
                 </div>
               </CardContent>
             </Card>
           </div>
         </div>
       </div>
-
-      {/* Game Result Modal */}
-      <GameResultModal />
 
       {/* Double Confirm Modal - shown when player wants to offer double */}
       {currentGameState && (

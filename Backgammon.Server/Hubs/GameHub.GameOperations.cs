@@ -556,89 +556,44 @@ public partial class GameHub
             // Check if game is already over
             if (session.Engine.GameOver)
             {
-                _logger.LogWarning("Game {GameId} is already over, cannot abandon", session.Id);
+                _logger.LogWarning("Game {GameId} is already over, cannot forfeit", session.Id);
                 await Clients.Caller.Error("Game is already finished");
                 return;
             }
 
-            // Determine if this is an ABANDON (no points) or FORFEIT (points awarded)
-            // Abandon: Game never started OR still in opening roll phase
-            // Forfeit: Game in progress after opening roll
-            bool isAbandon = !session.Engine.GameStarted || session.Engine.IsOpeningRoll;
+            // Forfeit the game - opponent wins
+            session.Engine.ForfeitGame(opponentPlayer);
 
-            if (isAbandon)
+            // Get stakes from doubling cube and determine win type
+            var stakes = session.Engine.GetGameResult();
+
+            _logger.LogInformation(
+                "Game {GameId} forfeited by {Player}. Winner: {Winner} (Stakes: {Stakes})",
+                session.Id,
+                abandoningPlayer.Name,
+                opponentPlayer.Name,
+                stakes);
+
+            // Update database status
+            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+
+            // Update match scores if this is a match game
+            if (!string.IsNullOrEmpty(session.MatchId))
             {
-                // ABANDON: Game never really started - NO points awarded
-                _logger.LogInformation(
-                    "Game {GameId} abandoned by {Player} before gameplay started (GameStarted={GameStarted}, IsOpeningRoll={IsOpeningRoll}). No points awarded.",
-                    session.Id,
-                    abandoningPlayer.Name,
-                    session.Engine.GameStarted,
-                    session.Engine.IsOpeningRoll);
+                var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
 
-                // Update database to Abandoned status
-                await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
-
-                // Update match scores if this is a match game - record with 0 points
-                if (!string.IsNullOrEmpty(session.MatchId))
+                var gameResult = new GameResult(winnerPlayerId!, session.Engine.DetermineWinType(), session.Engine.DoublingCube.Value)
                 {
-                    // Determine "winner" (opponent) but with 0 points
-                    var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
-                    var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
+                    WinnerColor = winnerColor,
+                    MoveHistory = session.Engine.MoveHistory.ToList()
+                };
 
-                    // Create game result with IsAbandoned flag - 0 points awarded
-                    var gameResult = new GameResult(winnerPlayerId!, WinType.Normal, 0)
-                    {
-                        WinnerColor = winnerColor,
-                        IsAbandoned = true,
-                        MoveHistory = session.Engine.MoveHistory.ToList()
-                    };
-
-                    await _matchService.CompleteGameAsync(session.Id, gameResult);
-                    _logger.LogInformation(
-                        "Updated match {MatchId} after game {GameId} was abandoned (0 points awarded)",
-                        session.MatchId,
-                        session.Id);
-                }
-            }
-            else
-            {
-                // FORFEIT: Game in progress - opponent wins points based on board state
-                session.Engine.ForfeitGame(opponentPlayer);
-
-                // Get stakes from doubling cube and determine win type
-                var stakes = session.Engine.GetGameResult();
-
+                await _matchService.CompleteGameAsync(session.Id, gameResult);
                 _logger.LogInformation(
-                    "Game {GameId} forfeited by {Player}. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id,
-                    abandoningPlayer.Name,
-                    opponentPlayer.Name,
-                    stakes);
-
-                // Update database to Forfeit status
-                await _gameRepository.UpdateGameStatusAsync(session.Id, "Forfeit");
-
-                // Update match scores if this is a match game - award points based on board state
-                if (!string.IsNullOrEmpty(session.MatchId))
-                {
-                    // Determine winner's player ID
-                    var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
-                    var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
-
-                    // Create game result - use actual win type (Normal/Gammon/Backgammon) and cube value
-                    var gameResult = new GameResult(winnerPlayerId!, session.Engine.DetermineWinType(), session.Engine.DoublingCube.Value)
-                    {
-                        WinnerColor = winnerColor,
-                        MoveHistory = session.Engine.MoveHistory.ToList()
-                    };
-
-                    await _matchService.CompleteGameAsync(session.Id, gameResult);
-                    _logger.LogInformation(
-                        "Updated match {MatchId} scores after game {GameId} was forfeited",
-                        session.MatchId,
-                        session.Id);
-                }
+                    "Updated match {MatchId} scores after game {GameId} was forfeited",
+                    session.MatchId,
+                    session.Id);
             }
 
             // Skip stats update for non-competitive games
@@ -652,7 +607,11 @@ public partial class GameHub
                 _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
             }
 
-            _logger.LogInformation("Updated game {GameId} to Abandoned status and user stats", session.Id);
+            // Mark session as completed so status is correctly set in GetState()
+            // Note: ForfeitGame already sets Engine.Winner and Engine.GameOver
+            session.MarkCompleted();
+
+            _logger.LogInformation("Game {GameId} completed (forfeited)", session.Id);
 
             // Broadcast game over AFTER database is updated
             var finalState = session.GetState();

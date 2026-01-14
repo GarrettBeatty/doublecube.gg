@@ -52,6 +52,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     {
         _logger.LogDebug("RollDice called by connection {ConnectionId}", connectionId);
 
+        // Prevent actions on completed games
+        if (session.Engine.Winner != null)
+        {
+            return ActionResult.Error("Game is already completed");
+        }
+
         // Handle opening roll
         if (session.Engine.IsOpeningRoll)
         {
@@ -302,6 +308,16 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             from,
             to);
 
+        // Prevent moves on completed games
+        if (session.Engine.Winner != null)
+        {
+            _logger.LogWarning(
+                "Move rejected: Game already completed. Game={GameId}, Winner={Winner}",
+                session.Id,
+                session.Engine.Winner.Color);
+            return ActionResult.Error("Game is already completed");
+        }
+
         if (!session.IsPlayerTurn(connectionId))
         {
             _logger.LogWarning(
@@ -410,6 +426,15 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             from,
             to,
             string.Join(",", intermediatePoints));
+
+        // Prevent moves on completed games
+        if (session.Engine.Winner != null)
+        {
+            _logger.LogWarning(
+                "Combined move rejected: Game already completed. Game={GameId}",
+                session.Id);
+            return ActionResult.Error("Game is already completed");
+        }
 
         if (!session.IsPlayerTurn(connectionId))
         {
@@ -532,6 +557,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
     public async Task<ActionResult> EndTurnAsync(GameSession session, string connectionId)
     {
+        // Prevent actions on completed games
+        if (session.Engine.Winner != null)
+        {
+            return ActionResult.Error("Game is already completed");
+        }
+
         if (!session.IsPlayerTurn(connectionId))
         {
             return ActionResult.Error("Not your turn");
@@ -619,6 +650,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
     public async Task<ActionResult> UndoLastMoveAsync(GameSession session, string connectionId)
     {
+        // Prevent actions on completed games
+        if (session.Engine.Winner != null)
+        {
+            return ActionResult.Error("Game is already completed");
+        }
+
         if (!session.IsPlayerTurn(connectionId))
         {
             return ActionResult.Error("Not your turn");

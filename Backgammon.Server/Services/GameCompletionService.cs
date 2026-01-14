@@ -63,6 +63,8 @@ public class GameCompletionService : IGameCompletionService
                 session.MatchId ?? "None");
 
             // Update game status and stats BEFORE broadcasting
+            session.MarkCompleted();
+
             if (session.GameMode.ShouldPersist)
             {
                 await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");

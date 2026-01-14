@@ -17,12 +17,7 @@ public enum SessionStatus
     InProgress,
 
     /// <summary>
-    /// Game completed with a winner
+    /// Game completed (natural win, forfeit, timeout, etc.)
     /// </summary>
-    Completed,
-
-    /// <summary>
-    /// Game abandoned (forfeit, disconnect, timeout)
-    /// </summary>
-    Abandoned
+    Completed
 }

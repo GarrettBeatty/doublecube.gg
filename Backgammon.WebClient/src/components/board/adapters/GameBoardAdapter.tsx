@@ -55,6 +55,11 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   const highlights = useMemo<PointHighlight[]>(() => {
     const result: PointHighlight[] = []
 
+    // Don't show move highlights for completed games
+    if (gameState.status === GameStatus.Completed) {
+      return result
+    }
+
     // Don't show highlights in free move mode
     if (gameState.isAnalysisMode && isFreeMoveEnabled) {
       return result
@@ -144,7 +149,8 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
 
   // Build buttons based on game state
   const buttons = useMemo<ButtonConfig[]>(() => {
-    if (isSpectator) return []
+    // No action buttons for spectators or completed games
+    if (isSpectator || gameState.status === GameStatus.Completed) return []
 
     const result: ButtonConfig[] = []
     const isGameInProgress = gameState.status === GameStatus.InProgress
@@ -165,7 +171,9 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     const canRoll =
       !hideRollForCustomDice &&
       isGameInProgress &&
-      (isOpeningRoll ? !youHaveRolled || gameState.isOpeningRollTie : isYourTurn && !hasDiceRolled)
+      (isOpeningRoll
+        ? !youHaveRolled || gameState.isOpeningRollTie
+        : (gameState.isAnalysisMode || isYourTurn) && !hasDiceRolled)
 
     if (canRoll) {
       result.push({
@@ -290,6 +298,8 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   const isDraggable = useCallback(
     (point: number): boolean => {
       if (isSpectator) return false
+      // Never allow moves on completed games
+      if (gameState.status === GameStatus.Completed) return false
       if (gameState.isAnalysisMode && isFreeMoveEnabled) {
         // In free move, any piece can be dragged
         const pointData = position.points.find((p) => p.position === point)
@@ -297,8 +307,11 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       }
       return validSources.includes(point)
     },
-    [isSpectator, gameState.isAnalysisMode, isFreeMoveEnabled, validSources, position.points]
+    [isSpectator, gameState.status, gameState.isAnalysisMode, isFreeMoveEnabled, validSources, position.points]
   )
+
+  // Disable interactions for spectators and completed games
+  const isInteractionDisabled = isSpectator || gameState.status === GameStatus.Completed
 
   return (
     <UnifiedBoard
@@ -306,7 +319,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       display={{
         isFlipped: isBoardFlipped,
         showPointNumbers: true,
-        interactionMode: isSpectator ? 'none' : 'drag',
+        interactionMode: isInteractionDisabled ? 'none' : 'drag',
       }}
       highlights={highlights}
       interaction={{

@@ -50,6 +50,12 @@ public class DoublingHandler : IDoublingHandler
             return Result.Failure(ErrorCodes.SessionNotFound, "Not in a game");
         }
 
+        // Prevent doubling on completed games
+        if (session.Engine.Winner != null)
+        {
+            return Result.Failure(ErrorCodes.CannotDouble, "Game is already completed");
+        }
+
         var (success, currentValue, newValue, error) = await _doubleOfferService.OfferDoubleAsync(session, connectionId);
         if (!success)
         {
@@ -124,6 +130,12 @@ public class DoublingHandler : IDoublingHandler
             return Result.Failure(ErrorCodes.SessionNotFound, "Not in a game");
         }
 
+        // Prevent actions on completed games
+        if (session.Engine.Winner != null)
+        {
+            return Result.Failure(ErrorCodes.CannotDouble, "Game is already completed");
+        }
+
         await _doubleOfferService.AcceptDoubleAsync(session);
         await _gameService.BroadcastDoubleAcceptedAsync(session);
 
@@ -145,6 +157,12 @@ public class DoublingHandler : IDoublingHandler
         if (session == null)
         {
             return Result.Failure(ErrorCodes.SessionNotFound, "Not in a game");
+        }
+
+        // Prevent actions on completed games
+        if (session.Engine.Winner != null)
+        {
+            return Result.Failure(ErrorCodes.CannotDouble, "Game is already completed");
         }
 
         var (success, winner, stakes, error) = await _doubleOfferService.DeclineDoubleAsync(session, connectionId);

@@ -17,81 +17,53 @@ export const TimeDisplay: React.FC<TimeDisplayProps> = ({
   isActive,
   color,
 }) => {
-  const colorName = color === CheckerColor.White ? 'White' : 'Red'
   const [displaySeconds, setDisplaySeconds] = useState(reserveSeconds || 0)
   const [displayDelaySeconds, setDisplayDelaySeconds] = useState(delayRemaining || 0)
 
-  // Debug: Log props on every render
-  console.log(`[TimeDisplay ${colorName}] Render - reserveSeconds: ${reserveSeconds}, isInDelay: ${isInDelay}, delayRemaining: ${delayRemaining}, isActive: ${isActive}`)
-
   // Sync display time with server updates
   useEffect(() => {
-    console.log(`[TimeDisplay ${colorName}] Sync reserve effect - reserveSeconds: ${reserveSeconds}`)
     if (reserveSeconds !== null) {
-      console.log(`[TimeDisplay ${colorName}] Setting displaySeconds to ${reserveSeconds}`)
       setDisplaySeconds(reserveSeconds)
     }
-  }, [reserveSeconds, colorName])
+  }, [reserveSeconds])
 
   // Sync delay display with server updates
   useEffect(() => {
-    console.log(`[TimeDisplay ${colorName}] Sync delay effect - delayRemaining: ${delayRemaining}`)
     if (delayRemaining !== null) {
-      console.log(`[TimeDisplay ${colorName}] Setting displayDelaySeconds to ${delayRemaining}`)
       setDisplayDelaySeconds(delayRemaining)
     }
-  }, [delayRemaining, colorName])
+  }, [delayRemaining])
 
   // Local countdown for reserve time (only when NOT in delay)
   // Note: reserveSeconds intentionally excluded from deps - the sync effect handles server updates,
   // and including it here causes the interval to be recreated every server update (race condition)
   useEffect(() => {
-    console.log(`[TimeDisplay ${colorName}] Reserve countdown effect - isActive: ${isActive}, isInDelay: ${isInDelay}, reserveSeconds: ${reserveSeconds}`)
     if (!isActive || isInDelay || reserveSeconds === null) {
-      console.log(`[TimeDisplay ${colorName}] Reserve countdown - SKIPPING (isActive=${isActive}, isInDelay=${isInDelay}, reserveSeconds=${reserveSeconds})`)
       return
     }
 
-    console.log(`[TimeDisplay ${colorName}] Reserve countdown - STARTING interval`)
     const interval = setInterval(() => {
-      setDisplaySeconds((prev) => {
-        const next = Math.max(0, prev - 1)
-        console.log(`[TimeDisplay ${colorName}] Reserve countdown tick: ${prev} -> ${next}`)
-        return next
-      })
+      setDisplaySeconds((prev) => Math.max(0, prev - 1))
     }, 1000)
 
-    return () => {
-      console.log(`[TimeDisplay ${colorName}] Reserve countdown - CLEARING interval`)
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isInDelay, colorName])
+  }, [isActive, isInDelay])
 
   // Local countdown for delay time (only when in delay)
   // Note: delayRemaining intentionally excluded from deps - same race condition issue as above
   useEffect(() => {
-    console.log(`[TimeDisplay ${colorName}] Delay countdown effect - isActive: ${isActive}, isInDelay: ${isInDelay}, delayRemaining: ${delayRemaining}`)
     if (!isActive || !isInDelay || delayRemaining === null) {
-      console.log(`[TimeDisplay ${colorName}] Delay countdown - SKIPPING (isActive=${isActive}, isInDelay=${isInDelay}, delayRemaining=${delayRemaining})`)
       return
     }
 
-    console.log(`[TimeDisplay ${colorName}] Delay countdown - STARTING interval`)
     const interval = setInterval(() => {
-      setDisplayDelaySeconds((prev) => {
-        const next = Math.max(0, prev - 1)
-        console.log(`[TimeDisplay ${colorName}] Delay countdown tick: ${prev} -> ${next}`)
-        return next
-      })
+      setDisplayDelaySeconds((prev) => Math.max(0, prev - 1))
     }, 1000)
 
-    return () => {
-      console.log(`[TimeDisplay ${colorName}] Delay countdown - CLEARING interval`)
-      clearInterval(interval)
-    }
+    return () => clearInterval(interval)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive, isInDelay, colorName])
+  }, [isActive, isInDelay])
 
   // Format time as MM:SS
   const formatTime = (seconds: number): string => {

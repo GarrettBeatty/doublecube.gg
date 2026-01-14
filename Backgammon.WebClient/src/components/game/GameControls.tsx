@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { type GameState, GameStatus } from '@/types/generated/Backgammon.Server.Models'
 import { useGameStore } from '@/stores/gameStore'
 import { Button } from '@/components/ui/button'
-import { AbandonConfirmModal } from '@/components/modals/AbandonConfirmModal'
+import { ForfeitConfirmModal } from '@/components/modals/ForfeitConfirmModal'
 import { ChatPanel } from '@/components/game/ChatPanel'
 import { RefreshCw, Flag, MessageCircle } from 'lucide-react'
 
@@ -16,7 +16,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   isSpectator = false,
 }) => {
   const { toggleBoardFlip, toggleChat, showChat, chatMessages } = useGameStore()
-  const [showAbandonModal, setShowAbandonModal] = useState(false)
+  const [showForfeitModal, setShowForfeitModal] = useState(false)
 
   if (!gameState) return null
 
@@ -45,10 +45,22 @@ export const GameControls: React.FC<GameControlsProps> = ({
     )
   }
 
+  // Determine if forfeit button should show
+  const isGameCompleted = gameState.status === GameStatus.Completed
+  const showForfeitButton = !gameState.isAnalysisMode && !isGameCompleted
+
+  // Calculate grid columns based on visible buttons
+  const getGridCols = () => {
+    const buttonCount = 1 + (showChatButton ? 1 : 0) + (showForfeitButton ? 1 : 0)
+    if (buttonCount === 1) return 'grid-cols-1'
+    if (buttonCount === 2) return 'grid-cols-2'
+    return 'grid-cols-3'
+  }
+
   return (
     <div className="space-y-2">
       {/* Utility Buttons */}
-      <div className={`grid gap-2 ${showChatButton ? 'grid-cols-3' : gameState.isAnalysisMode ? 'grid-cols-1' : 'grid-cols-2'}`}>
+      <div className={`grid gap-2 ${getGridCols()}`}>
         <Button
           variant="outline"
           size="lg"
@@ -78,16 +90,16 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </Button>
         )}
 
-        {!gameState.isAnalysisMode && (
+        {showForfeitButton && (
           <Button
             variant="destructive"
             size="lg"
-            onClick={() => setShowAbandonModal(true)}
+            onClick={() => setShowForfeitModal(true)}
             className="w-full h-12"
           >
             <div className="text-center">
               <Flag className="h-5 w-5 mx-auto mb-1" />
-              <div className="text-xs">{gameState.leaveGameAction}</div>
+              <div className="text-xs">Forfeit</div>
             </div>
           </Button>
         )}
@@ -96,10 +108,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
       {/* Chat Panel - only show in multiplayer games */}
       {showChatButton && <ChatPanel />}
 
-      <AbandonConfirmModal
-        isOpen={showAbandonModal}
-        onClose={() => setShowAbandonModal(false)}
-        gameState={gameState}
+      <ForfeitConfirmModal
+        isOpen={showForfeitModal}
+        onClose={() => setShowForfeitModal(false)}
       />
     </div>
   )

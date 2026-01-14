@@ -381,7 +381,6 @@ public class GameSession
                 SessionStatus.WaitingForOpponent => ServerGameStatus.WaitingForPlayer,
                 SessionStatus.InProgress => ServerGameStatus.InProgress,
                 SessionStatus.Completed => ServerGameStatus.Completed,
-                SessionStatus.Abandoned => ServerGameStatus.Completed,
                 _ => throw new InvalidOperationException($"Unknown session status: {Status}")
             },
             Winner = Engine.Winner?.Color,
@@ -518,28 +517,19 @@ public class GameSession
     public bool IsActiveGame() => Status == SessionStatus.InProgress;
 
     /// <summary>
-    /// Check if the game is over (completed or abandoned).
+    /// Check if the game is over.
     /// </summary>
-    public bool IsGameOver() => Status == SessionStatus.Completed || Status == SessionStatus.Abandoned;
+    public bool IsGameOver() => Status == SessionStatus.Completed;
 
     // ==================== Status Transition Methods ====================
 
     /// <summary>
     /// Mark this game session as completed.
-    /// Called when the game ends with a winner.
+    /// Called when the game ends (natural win, forfeit, timeout, etc.)
     /// </summary>
     public void MarkCompleted()
     {
         Status = SessionStatus.Completed;
-    }
-
-    /// <summary>
-    /// Mark this game session as abandoned.
-    /// Called when a player forfeits, disconnects, or times out.
-    /// </summary>
-    public void MarkAbandoned()
-    {
-        Status = SessionStatus.Abandoned;
     }
 
     private string GenerateFriendlyName(string playerId)

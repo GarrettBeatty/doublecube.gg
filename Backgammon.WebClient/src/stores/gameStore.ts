@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand'
-import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import { type GameState, GameStatus } from '@/types/generated/Backgammon.Server.Models'
 import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import {
   SelectedChecker,
@@ -182,8 +182,10 @@ export const useGameStore = create<GameStore>((set) => ({
         }
       } else {
         // Regular mode or analysis with rules: only valid sources from game rules
+        // Also check that game is not completed - no moves allowed on finished games
+        const isGameInProgress = state.status === GameStatus.InProgress
         validSources =
-          state.isYourTurn && state.validMoves
+          isGameInProgress && state.isYourTurn && state.validMoves
             ? Array.from(new Set(state.validMoves.map((move) => move.from)))
             : []
       }
@@ -222,28 +224,19 @@ export const useGameStore = create<GameStore>((set) => ({
     }),
 
   updateTimeState: (timeUpdate) =>
-    set((state) => {
-      console.log('[gameStore] updateTimeState called', {
-        hasCurrentGameState: !!state.currentGameState,
-        prevWhiteIsInDelay: state.currentGameState?.whiteIsInDelay,
-        prevRedIsInDelay: state.currentGameState?.redIsInDelay,
-        newWhiteIsInDelay: timeUpdate.whiteIsInDelay,
-        newRedIsInDelay: timeUpdate.redIsInDelay,
-      })
-      return {
-        currentGameState: state.currentGameState
-          ? {
-              ...state.currentGameState,
-              whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
-              redReserveSeconds: timeUpdate.redReserveSeconds,
-              whiteIsInDelay: timeUpdate.whiteIsInDelay,
-              redIsInDelay: timeUpdate.redIsInDelay,
-              whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
-              redDelayRemaining: timeUpdate.redDelayRemaining,
-            }
-          : null,
-      }
-    }),
+    set((state) => ({
+      currentGameState: state.currentGameState
+        ? {
+            ...state.currentGameState,
+            whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
+            redReserveSeconds: timeUpdate.redReserveSeconds,
+            whiteIsInDelay: timeUpdate.whiteIsInDelay,
+            redIsInDelay: timeUpdate.redIsInDelay,
+            whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
+            redDelayRemaining: timeUpdate.redDelayRemaining,
+          }
+        : null,
+    })),
 
   setMyColor: (color) => set({ myColor: color }),
 
@@ -400,7 +393,8 @@ function calculateFreeMoveValidSources(state: GameState): number[] {
 }
 
 function calculateRuleBasedValidSources(state: GameState): number[] {
-  return state.isYourTurn && state.validMoves
+  const isGameInProgress = state.status === GameStatus.InProgress
+  return isGameInProgress && state.isYourTurn && state.validMoves
     ? Array.from(new Set(state.validMoves.map((move) => move.from)))
     : []
 }
