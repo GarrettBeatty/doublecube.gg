@@ -297,18 +297,8 @@ public partial class GameHub
                 return null;
             }
 
-            // Build game history from match
-            var games = match.CoreMatch.Games.Select((g, index) => new MatchGameDto
-            {
-                GameId = g.GameId,
-                GameNumber = index + 1,
-                Status = g.Status.ToString(),
-                Winner = g.Winner?.ToString(),
-                WinType = g.WinType.ToString(),
-                PointsScored = g.Stakes,
-                IsCrawford = g.IsCrawfordGame,
-                CompletedAt = null // Core.Game doesn't track this, could add if needed
-            }).ToList();
+            // Reuse GetMatchGames for consistent game fetching
+            var games = await GetMatchGames(matchId);
 
             var winnerId = match.CoreMatch.GetWinnerId();
 

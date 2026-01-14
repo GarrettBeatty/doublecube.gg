@@ -574,8 +574,9 @@ public partial class GameHub
                 opponentPlayer.Name,
                 stakes);
 
-            // Update database status
-            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
+            // Save complete game state (including Winner, WinType, Stakes)
+            var completedGame = GameEngineMapper.ToGame(session);
+            await _gameRepository.SaveGameAsync(completedGame);
 
             // Update match scores if this is a match game
             if (!string.IsNullOrEmpty(session.MatchId))

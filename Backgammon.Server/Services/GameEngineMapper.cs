@@ -72,6 +72,7 @@ public static class GameEngineMapper
         if (engine.Winner != null)
         {
             game.Winner = engine.Winner.Color.ToString();
+            game.WinType = engine.DetermineWinType().ToString();
             game.Stakes = engine.GetGameResult();
             game.CompletedAt = DateTime.UtcNow;
             game.DurationSeconds = (int)(DateTime.UtcNow - session.CreatedAt).TotalSeconds;
