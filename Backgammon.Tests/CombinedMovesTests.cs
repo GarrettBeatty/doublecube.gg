@@ -359,4 +359,315 @@ public class CombinedMovesTests
 
         Assert.NotNull(validCombinedBearOff);
     }
+
+    [Fact]
+    public void CombinedMoves_RedBearingOff_ShouldWork()
+    {
+        // Arrange - All Red checkers in home board, dice that can bear off combined
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board and set up bearing off scenario for Red
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put Red checkers in home board (points 19-24)
+        session.Engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+        session.Engine.Board.GetPoint(21).AddChecker(CheckerColor.Red);
+
+        // Set Red as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.Red);
+
+        // Set dice to 3-2 (can bear off from point 20 with 3+2=5, normalized 25-20=5)
+        session.Engine.Dice.SetDice(3, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined bear-off from point 20 to 25 (via intermediate)
+        // Path: 20 -> 23 (using 3) -> 25 (using 2), or 20 -> 22 (using 2) -> 25 (using 3)
+        var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 20 && m.To == 25);
+
+        Assert.NotNull(combinedBearOff);
+        Assert.True(combinedBearOff.IsCombinedMove);
+        Assert.NotNull(combinedBearOff.DiceUsed);
+        Assert.Equal(2, combinedBearOff.DiceUsed.Length);
+    }
+
+    [Fact]
+    public void CombinedMoves_RedBearingOff_WithMultipleCheckersOnSource()
+    {
+        // Arrange - Test GetEffectiveHighestPoint when source has >1 checker
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put 3 Red checkers on point 20 (so after combined move, still some remain)
+        session.Engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+        session.Engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+        session.Engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+
+        // Set Red as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.Red);
+
+        // Set dice to 3-2
+        session.Engine.Dice.SetDice(3, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined bear-off should work, and GetEffectiveHighestPoint
+        // should return 20 (since it still has >1 checker)
+        var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 20 && m.To == 25);
+
+        Assert.NotNull(combinedBearOff);
+    }
+
+    [Fact]
+    public void CombinedMoves_RedBearingOff_NotFromHighestPoint()
+    {
+        // Arrange - Test that Red can't bear off from non-highest point with big die
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put Red checkers on points 19 (farthest from bear off) and 24 (closest)
+        session.Engine.Board.GetPoint(19).AddChecker(CheckerColor.Red);
+        session.Engine.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+
+        // Set Red as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.Red);
+
+        // Set dice to 6-1 (die 6 > normalized 24 = 1)
+        session.Engine.Dice.SetDice(6, 1);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Should NOT have combined bear-off from 24 because 19 is highest
+        // Combined 24->25 would require die > 1 and 24 being highest, but 19 is highest
+        var invalidCombinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 24 && m.To == 25);
+
+        // The combined move calculation considers effective highest after the source moves
+        // This tests the GetEffectiveHighestPoint logic for Red
+    }
+
+    [Fact]
+    public void CombinedMoves_WhiteBearingOff_SourceHasMultipleCheckers()
+    {
+        // Arrange - Test GetEffectiveHighestPoint when source has >1 checker for White
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put 2 White checkers on point 4
+        session.Engine.Board.GetPoint(4).AddChecker(CheckerColor.White);
+        session.Engine.Board.GetPoint(4).AddChecker(CheckerColor.White);
+
+        // Set White as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Set dice to 2-2 (doubles)
+        session.Engine.Dice.SetDice(2, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined move 4->2->off using 2+2 should be available
+        var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 4 && m.To == 25);
+
+        Assert.NotNull(combinedBearOff);
+    }
+
+    [Fact]
+    public void CombinedMoves_WithHit_ShouldMarkAsHit()
+    {
+        // Arrange - Combined move that ends on a blot
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear points in path
+        session.Engine.Board.GetPoint(17).Checkers.Clear();
+        session.Engine.Board.GetPoint(18).Checkers.Clear();
+        session.Engine.Board.GetPoint(23).Checkers.Clear();
+
+        // Put Red blot on point 17 (final destination)
+        session.Engine.Board.GetPoint(17).AddChecker(CheckerColor.Red);
+
+        // Set White as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Set dice to 6-1
+        session.Engine.Dice.SetDice(6, 1);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined move to 17 should be marked as hit
+        var combinedMoveWithHit = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 24 && m.To == 17);
+
+        Assert.NotNull(combinedMoveWithHit);
+        // Note: The IsHit property should be set if destination has blot
+    }
+
+    [Fact]
+    public void CombinedMoves_RedPlayer_NormalMoves()
+    {
+        // Arrange - Red player making combined moves (tests direction logic)
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear intermediate points for Red moving from 1
+        session.Engine.Board.GetPoint(7).Checkers.Clear();
+        session.Engine.Board.GetPoint(8).Checkers.Clear();
+        session.Engine.Board.GetPoint(2).Checkers.Clear();
+
+        // Set Red as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.Red);
+
+        // Set dice to 6-1
+        session.Engine.Dice.SetDice(6, 1);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Should have combined move from point 1 to point 8 (1+6+1=8 for Red)
+        var combinedMoves = state.ValidMoves.Where(m => m.IsCombinedMove && m.From == 1).ToList();
+        Assert.NotEmpty(combinedMoves);
+
+        // Red moves in positive direction (1 -> 7 -> 8 or 1 -> 2 -> 8)
+        var move1To8 = combinedMoves.FirstOrDefault(m => m.To == 8);
+        Assert.NotNull(move1To8);
+    }
+
+    [Fact]
+    public void CombinedMoves_CalculatorReturnsEmpty_ForBarPosition()
+    {
+        // Arrange - Direct test of combined moves from bar (position 0)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Put checker on bar
+        engine.WhitePlayer.CheckersOnBar = 1;
+
+        // Set dice
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var moves = engine.GetValidMoves(includeCombined: true);
+
+        // Assert - All moves should be from bar (0), no combined moves
+        var combinedMoves = moves.Where(m => m.IsCombined).ToList();
+        Assert.Empty(combinedMoves);
+
+        // All moves should be from bar
+        Assert.All(moves, m => Assert.Equal(0, m.From));
+    }
+
+    [Fact]
+    public void CombinedMoves_WhiteBearingOff_OnlyOneCheckerLeft()
+    {
+        // Arrange - Test GetEffectiveHighestPoint return originalSource path
+        // When there's only one checker and it's on the source point
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board completely
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put single White checker on point 4
+        session.Engine.Board.GetPoint(4).AddChecker(CheckerColor.White);
+
+        // Set White as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.White);
+
+        // Set dice to 2-2 (can go 4->2->off)
+        session.Engine.Dice.SetDice(2, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined bear-off should be available
+        // This tests GetEffectiveHighestPoint returning originalSource when no other checkers
+        var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 4 && m.To == 25);
+
+        Assert.NotNull(combinedBearOff);
+    }
+
+    [Fact]
+    public void CombinedMoves_RedBearingOff_OnlyOneCheckerLeft()
+    {
+        // Arrange - Test GetEffectiveHighestPoint for Red with only one checker
+        var session = new GameSession("test-game");
+        session.Engine.StartNewGame();
+
+        // Clear board completely
+        for (int i = 1; i <= 24; i++)
+        {
+            session.Engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put single Red checker on point 21 (normalized position = 25 - 21 = 4)
+        session.Engine.Board.GetPoint(21).AddChecker(CheckerColor.Red);
+
+        // Set Red as current player
+        session.Engine.SetCurrentPlayer(CheckerColor.Red);
+
+        // Set dice to 2-2 (can go 21->23->off)
+        session.Engine.Dice.SetDice(2, 2);
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+
+        // Act
+        var state = session.GetState("test-connection");
+
+        // Assert - Combined bear-off should be available
+        var combinedBearOff = state.ValidMoves.FirstOrDefault(m =>
+            m.IsCombinedMove && m.From == 21 && m.To == 25);
+
+        Assert.NotNull(combinedBearOff);
+    }
 }

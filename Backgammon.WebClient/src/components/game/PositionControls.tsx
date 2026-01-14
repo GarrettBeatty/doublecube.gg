@@ -13,18 +13,30 @@ export const PositionControls: React.FC = () => {
   const [isImporting, setIsImporting] = useState(false)
   const currentSgfRef = useRef('')
 
+  // Helper to decode base64 to raw SGF
+  const decodeBase64ToSgf = (base64: string): string => {
+    try {
+      return atob(base64)
+    } catch {
+      // If it's not valid base64, return as-is (might already be raw SGF)
+      return base64
+    }
+  }
+
   // Auto-fetch SGF whenever game state changes
   useEffect(() => {
     const fetchSgf = async () => {
       if (!currentGameState || isImporting) return
 
       try {
-        const sgf = (await hub?.exportPosition()) as string
+        // exportPosition returns base64-encoded SGF
+        const base64Sgf = (await hub?.exportPosition()) as string
 
         // Only update if SGF actually changed
-        if (sgf !== currentSgfRef.current) {
-          currentSgfRef.current = sgf
-          setSgfText(sgf)
+        if (base64Sgf !== currentSgfRef.current) {
+          currentSgfRef.current = base64Sgf
+          // Decode base64 to show human-readable SGF in the textbox
+          setSgfText(decodeBase64ToSgf(base64Sgf))
         }
       } catch (error) {
         console.error('Failed to export position:', error)
@@ -35,16 +47,19 @@ export const PositionControls: React.FC = () => {
   }, [currentGameState, hub, isImporting])
 
   const handleBlur = async () => {
-    // If text hasn't changed, nothing to do
-    if (sgfText.trim() === currentSgfRef.current.trim()) return
+    // Compare against the decoded version of the current stored SGF
+    const currentDecodedSgf = decodeBase64ToSgf(currentSgfRef.current)
 
-    // If empty, reset to current
+    // If text hasn't changed, nothing to do
+    if (sgfText.trim() === currentDecodedSgf.trim()) return
+
+    // If empty, reset to current (decoded)
     if (!sgfText.trim()) {
-      setSgfText(currentSgfRef.current)
+      setSgfText(currentDecodedSgf)
       return
     }
 
-    // Import the new position
+    // Import the new position (server accepts both raw SGF and base64)
     setIsImporting(true)
     try {
       await hub?.importPosition(sgfText.trim())
@@ -60,8 +75,8 @@ export const PositionControls: React.FC = () => {
         description: 'Failed to import position. Check SGF format.',
         variant: 'destructive',
       })
-      // Reset to current SGF on error
-      setSgfText(currentSgfRef.current)
+      // Reset to current SGF on error (decoded)
+      setSgfText(currentDecodedSgf)
     } finally {
       setIsImporting(false)
     }

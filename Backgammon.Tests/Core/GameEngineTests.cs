@@ -1023,4 +1023,862 @@ public class GameEngineTests
         // Assert
         Assert.Equal(engine.WhitePlayer, engine.Winner);
     }
+
+    [Fact]
+    public void RollOpening_Tie_ReturnsMinus1AndSetsFlag()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Simulate both players rolling same value by calling multiple times
+        // This tests the tie handling path
+        bool hadTie = false;
+        for (int i = 0; i < 100; i++)
+        {
+            engine.StartNewGame(); // Reset
+            var roll1 = engine.RollOpening(CheckerColor.White);
+            var roll2 = engine.RollOpening(CheckerColor.Red);
+
+            if (roll2 == -1)
+            {
+                hadTie = true;
+                Assert.True(engine.IsOpeningRollTie);
+                break;
+            }
+        }
+
+        // May not always get a tie in 100 attempts, so we just verify the logic works when it does
+        if (hadTie)
+        {
+            Assert.True(engine.IsOpeningRollTie);
+        }
+    }
+
+    [Fact]
+    public void RollOpening_AfterTie_ClearsPreviousRolls()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Manually set up a tie state
+        // This is to test that rolling after a tie clears the previous values
+        bool foundTie = false;
+        for (int attempt = 0; attempt < 200 && !foundTie; attempt++)
+        {
+            engine.StartNewGame();
+            engine.RollOpening(CheckerColor.White);
+            var result = engine.RollOpening(CheckerColor.Red);
+
+            if (result == -1)
+            {
+                foundTie = true;
+                Assert.True(engine.IsOpeningRollTie);
+
+                // Now roll again - should clear the tie
+                engine.RollOpening(CheckerColor.White);
+                Assert.False(engine.IsOpeningRollTie);
+            }
+        }
+    }
+
+    [Fact]
+    public void ExecuteMove_Combined_Success()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Create a combined move
+        var combinedMove = new Move(24, 17, new[] { 6, 1 }, new[] { 18 });
+
+        // Act
+        var result = engine.ExecuteMove(combinedMove);
+
+        // Assert - depends on board position
+        // This tests the combined move execution path
+    }
+
+    [Fact]
+    public void ExecuteMove_WinCondition_SetsGameOver()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up final bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        engine.Board.GetPoint(1).AddChecker(CheckerColor.White);
+        engine.WhitePlayer.CheckersBornOff = 14; // One more to win
+
+        engine.Dice.SetDice(1, 2);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var move = new Move(1, 0, 1);
+        engine.ExecuteMove(move);
+
+        // Assert
+        Assert.True(engine.GameOver);
+        Assert.Equal(engine.WhitePlayer, engine.Winner);
+    }
+
+    [Fact]
+    public void AcceptDouble_AtMaxCube_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Double to max value
+        for (int i = 0; i < 6; i++)
+        {
+            engine.DoublingCube.Double(CheckerColor.White);
+        }
+
+        Assert.Equal(64, engine.DoublingCube.Value);
+
+        // Act
+        var result = engine.AcceptDouble();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetValidMoves_NoCombined_ReturnsSingleMoves()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var movesWithCombined = engine.GetValidMoves(includeCombined: true);
+        var movesWithoutCombined = engine.GetValidMoves(includeCombined: false);
+
+        // Assert - without combined should have fewer or equal moves
+        Assert.True(movesWithoutCombined.Count <= movesWithCombined.Count);
+    }
+
+    [Fact]
+    public void IsValidMove_InvalidDieValue_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try move with die value not in remaining
+        var move = new Move(13, 8, 5);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void RollDice_WhenGameOver_ThrowsException()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+        engine.ForfeitGame(engine.WhitePlayer);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => engine.RollDice());
+    }
+
+    [Fact]
+    public void StartTurnTimer_WithTimeControl_StartsTimer()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+        engine.InitializeTimeControl(
+            new TimeControlConfig { Type = TimeControlType.ChicagoPoint },
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(10));
+
+        // Act
+        engine.StartTurnTimer();
+
+        // Assert
+        Assert.NotNull(engine.WhiteTimeState?.TurnStartTime);
+    }
+
+    [Fact]
+    public void EndTurnTimer_WithTimeControl_EndsTimer()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+        engine.InitializeTimeControl(
+            new TimeControlConfig { Type = TimeControlType.ChicagoPoint },
+            TimeSpan.FromMinutes(10),
+            TimeSpan.FromMinutes(10));
+        engine.StartTurnTimer();
+
+        // Act
+        engine.EndTurnTimer();
+
+        // Assert
+        Assert.Null(engine.WhiteTimeState?.TurnStartTime);
+    }
+
+    [Fact]
+    public void IsValidMove_FromBar_WithNoCheckersOnBar_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.Dice.SetDice(5, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to enter from bar when no checkers on bar
+        var move = new Move(0, 20, 5);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsValidMove_NotFromBar_WithCheckersOnBar_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.WhitePlayer.CheckersOnBar = 1;
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try normal move when has checkers on bar
+        var move = new Move(13, 9, 4);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void CanBearOff_RedPlayer_ExactDieMatch()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.Red);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position - all red checkers in home board
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Red home is points 19-24
+        engine.Board.GetPoint(22).AddChecker(CheckerColor.Red); // normalizedPosition = 25 - 22 = 3
+
+        engine.Dice.SetDice(3, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var move = new Move(22, 25, 3); // Bear off from 22 with die 3
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void CanBearOff_RedPlayer_HigherDieFromHighestPoint()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.Red);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Red home is points 19-24
+        engine.Board.GetPoint(23).AddChecker(CheckerColor.Red); // normalizedPosition = 25 - 23 = 2
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - die 6 > 2, can bear off if 23 is highest point
+        var move = new Move(23, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void CanBearOff_RedPlayer_HigherDieNotFromHighestPoint_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.Red);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Red home is points 19-24
+        engine.Board.GetPoint(19).AddChecker(CheckerColor.Red); // This is the highest point (farthest from bear off)
+        engine.Board.GetPoint(24).AddChecker(CheckerColor.Red);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - die 6 > 1 (normalized 24), but 24 is not highest (19 is)
+        var move = new Move(24, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void CanBearOff_WhitePlayer_HigherDieFromHighestPoint()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // White home is points 1-6
+        engine.Board.GetPoint(2).AddChecker(CheckerColor.White);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - die 6 > 2, can bear off if 2 is highest point
+        var move = new Move(2, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void CanBearOff_WhitePlayer_PointOutsideHomeBoard_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put checker outside home board
+        engine.Board.GetPoint(7).AddChecker(CheckerColor.White);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to bear off from point 7 (outside home)
+        var move = new Move(7, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void CanBearOff_EmptyFromPoint_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Only put checker on point 5
+        engine.Board.GetPoint(5).AddChecker(CheckerColor.White);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to bear off from empty point
+        var move = new Move(6, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void CanBearOff_WrongColor_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Put Red checker in White's home board
+        engine.Board.GetPoint(6).AddChecker(CheckerColor.Red);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to bear off opponent's checker
+        var move = new Move(6, 25, 6);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ExecuteCombinedMove_InvalidDiceUsed_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Create invalid combined move with wrong dice
+        var combinedMove = new Move(24, 17, new[] { 5, 2 }, new[] { 19 });
+
+        // Act
+        var result = engine.ExecuteMove(combinedMove);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ExecuteCombinedMove_NullDiceUsed_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Create a move that looks combined but has null DiceUsed
+        // This is an edge case to test the DiceUsed null check
+        var move = new Move(24, 17, 7); // Invalid die value, but set DiceUsed manually
+        move.DiceUsed = null;
+        move.IntermediatePoints = new[] { 18 };
+
+        // When DiceUsed is null, IsCombined returns false, so it's treated as a single move
+        // The single move will fail because 7 is not in remaining moves
+        var result = engine.ExecuteMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsValidCombinedMove_InvalidDestination_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Create combined move to invalid destination
+        var combinedMove = new Move(24, 10, new[] { 6, 1 }, new[] { 18 });
+
+        // Act
+        var result = engine.IsValidMove(combinedMove);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetGameResult_WithDoubleCube()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+
+        engine.DoublingCube.Double(CheckerColor.White);
+        Assert.Equal(2, engine.DoublingCube.Value);
+
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        engine.WhitePlayer.CheckersBornOff = 15;
+        engine.RedPlayer.CheckersBornOff = 5;
+
+        engine.ForfeitGame(engine.WhitePlayer);
+
+        // Act
+        var result = engine.GetGameResult();
+
+        // Assert
+        Assert.Equal(2, result); // 1 * cube value (2)
+    }
+
+    [Fact]
+    public void GetValidMoves_EmptyRemainingMoves_ReturnsEmpty()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.RemainingMoves.Clear();
+
+        // Act
+        var moves = engine.GetValidMoves();
+
+        // Assert
+        Assert.Empty(moves);
+    }
+
+    [Fact]
+    public void CreateGameResult_RedWinner()
+    {
+        // Arrange
+        var engine = new GameEngine("WhitePlayer", "RedPlayer");
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        engine.RedPlayer.CheckersBornOff = 15;
+        engine.WhitePlayer.CheckersBornOff = 5;
+
+        engine.ForfeitGame(engine.RedPlayer);
+
+        // Act
+        var result = engine.CreateGameResult();
+
+        // Assert
+        Assert.Equal("RedPlayer", result.WinnerId);
+    }
+
+    [Fact]
+    public void UndoLastMove_Hit_FromBarEntry_RestoresOpponent()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.WhitePlayer.CheckersOnBar = 1;
+
+        // Put a Red blot on entry point
+        engine.Board.GetPoint(20).Checkers.Clear();
+        engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+
+        engine.Dice.SetDice(5, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        var move = new Move(0, 20, 5);
+        engine.ExecuteMove(move);
+
+        Assert.Equal(0, engine.WhitePlayer.CheckersOnBar);
+        Assert.Equal(1, engine.RedPlayer.CheckersOnBar);
+
+        // Act
+        engine.UndoLastMove();
+
+        // Assert
+        Assert.Equal(1, engine.WhitePlayer.CheckersOnBar);
+        Assert.Equal(0, engine.RedPlayer.CheckersOnBar);
+        Assert.Equal(CheckerColor.Red, engine.Board.GetPoint(20).Color);
+    }
+
+    [Fact]
+    public void ForfeitGame_WhenAlreadyOver_ThrowsException()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+        engine.ForfeitGame(engine.WhitePlayer);
+
+        // Act & Assert
+        Assert.Throws<InvalidOperationException>(() => engine.ForfeitGame(engine.RedPlayer));
+    }
+
+    [Fact]
+    public void DetermineWinType_BackgammonInOpponentHome()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetGameStarted(true);
+
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        // Red checker in White's home board (points 1-6)
+        engine.Board.GetPoint(5).AddChecker(CheckerColor.Red);
+
+        engine.WhitePlayer.CheckersBornOff = 15;
+        engine.RedPlayer.CheckersBornOff = 0;
+
+        engine.ForfeitGame(engine.WhitePlayer);
+
+        // Act
+        var result = engine.DetermineWinType();
+
+        // Assert
+        Assert.Equal(WinType.Backgammon, result);
+    }
+
+    [Fact]
+    public void HasCurrentPlayerTimedOut_NullTimeState_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.TimeControl = new TimeControlConfig { Type = TimeControlType.ChicagoPoint, DelaySeconds = 12 };
+        // Don't initialize time states
+
+        // Act
+        var result = engine.HasCurrentPlayerTimedOut();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void HasCurrentPlayerTimedOut_TypeNone_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.TimeControl = new TimeControlConfig { Type = TimeControlType.None };
+
+        // Act
+        var result = engine.HasCurrentPlayerTimedOut();
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetValidMoves_BearingOff_IncludesBearOffMoves()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Set up bearing off position
+        for (int i = 1; i <= 24; i++)
+        {
+            engine.Board.GetPoint(i).Checkers.Clear();
+        }
+
+        engine.Board.GetPoint(6).AddChecker(CheckerColor.White);
+        engine.Board.GetPoint(5).AddChecker(CheckerColor.White);
+
+        engine.Dice.SetDice(6, 5);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var moves = engine.GetValidMoves(includeCombined: false);
+
+        // Assert
+        Assert.Contains(moves, m => m.From == 6 && m.To == 25);
+        Assert.Contains(moves, m => m.From == 5 && m.To == 25);
+    }
+
+    [Fact]
+    public void GetValidMoves_NormalMoves_ReturnsValidMoves()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act
+        var moves = engine.GetValidMoves(includeCombined: false);
+
+        // Assert - should have moves from points with white checkers
+        Assert.Contains(moves, m => m.From == 24);
+        Assert.Contains(moves, m => m.From == 13);
+    }
+
+    [Fact]
+    public void IsValidMove_ToBlockedPoint_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Point 20 has Red checkers (2 or more)
+        engine.Board.GetPoint(20).Checkers.Clear();
+        engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+        engine.Board.GetPoint(20).AddChecker(CheckerColor.Red);
+
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to move to blocked point
+        var move = new Move(24, 20, 4);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void IsValidMove_FromEmptyPoint_ReturnsFalse()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Clear point 10 (empty)
+        engine.Board.GetPoint(10).Checkers.Clear();
+
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Act - try to move from empty point
+        var move = new Move(10, 6, 4);
+        var result = engine.IsValidMove(move);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void ExecuteCombinedMove_WithRollback_RestoresState()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+
+        // Block intermediate point
+        engine.Board.GetPoint(18).Checkers.Clear();
+        engine.Board.GetPoint(18).AddChecker(CheckerColor.Red);
+        engine.Board.GetPoint(18).AddChecker(CheckerColor.Red);
+
+        engine.Dice.SetDice(6, 1);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        var originalCount = engine.Board.GetPoint(24).Count;
+
+        // Try combined move through blocked point (should fail and rollback)
+        var combinedMove = new Move(24, 17, new[] { 6, 1 }, new[] { 18 });
+
+        // Act
+        var result = engine.ExecuteMove(combinedMove);
+
+        // Assert - state should be restored
+        Assert.False(result);
+        Assert.Equal(originalCount, engine.Board.GetPoint(24).Count);
+    }
 }

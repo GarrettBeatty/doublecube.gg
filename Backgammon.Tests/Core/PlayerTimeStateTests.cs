@@ -196,4 +196,157 @@ public class PlayerTimeStateTests
         Assert.Null(timeState.DelayStartTime);
         Assert.True(timeState.IsInDelay);
     }
+
+    [Fact]
+    public void GetRemainingTime_AfterDelay_ReturnsReducedReserve()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromMinutes(10)
+        };
+
+        // Simulate turn started in the past (after delay period)
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 5);
+        timeState.IsInDelay = false;
+
+        // Act
+        var remaining = timeState.GetRemainingTime(DefaultDelaySeconds);
+
+        // Assert - reserve should be reduced
+        Assert.True(remaining < TimeSpan.FromMinutes(10));
+    }
+
+    [Fact]
+    public void GetDelayRemaining_AfterDelay_ReturnsZero()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromMinutes(10)
+        };
+
+        // Simulate turn started past delay period
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 5);
+
+        // Act
+        var delayRemaining = timeState.GetDelayRemaining(DefaultDelaySeconds);
+
+        // Assert
+        Assert.Equal(TimeSpan.Zero, delayRemaining);
+    }
+
+    [Fact]
+    public void CalculateIsInDelay_AfterDelayPeriod_ReturnsFalse()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromMinutes(10)
+        };
+
+        // Simulate turn started past delay period
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 5);
+
+        // Act
+        var isInDelay = timeState.CalculateIsInDelay(DefaultDelaySeconds);
+
+        // Assert
+        Assert.False(isInDelay);
+    }
+
+    [Fact]
+    public void HasTimedOut_ReserveExhausted_ReturnsTrue()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromSeconds(1) // Small reserve
+        };
+
+        // Simulate turn started well past delay + reserve
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 10);
+
+        // Act
+        var timedOut = timeState.HasTimedOut(DefaultDelaySeconds);
+
+        // Assert
+        Assert.True(timedOut);
+    }
+
+    [Fact]
+    public void EndTurn_AfterDelay_ConsumesReserve()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromMinutes(10)
+        };
+
+        // Simulate turn started past delay period
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 5);
+
+        // Act
+        timeState.EndTurn(DefaultDelaySeconds);
+
+        // Assert - reserve should be reduced
+        Assert.True(timeState.ReserveTime < TimeSpan.FromMinutes(10));
+    }
+
+    [Fact]
+    public void EndTurn_WithinDelay_NoReserveConsumed()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromMinutes(10)
+        };
+
+        // Start turn just now (within delay period)
+        timeState.StartTurn();
+
+        // Act
+        timeState.EndTurn(DefaultDelaySeconds);
+
+        // Assert - reserve should be unchanged
+        Assert.Equal(TimeSpan.FromMinutes(10), timeState.ReserveTime);
+    }
+
+    [Fact]
+    public void EndTurn_ReserveGoesBelowZero_ClampedToZero()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromSeconds(1) // Very small reserve
+        };
+
+        // Simulate turn started well past delay + reserve
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 100);
+
+        // Act
+        timeState.EndTurn(DefaultDelaySeconds);
+
+        // Assert - reserve should be clamped to zero
+        Assert.Equal(TimeSpan.Zero, timeState.ReserveTime);
+    }
+
+    [Fact]
+    public void GetRemainingTime_ReserveExhausted_ReturnsZero()
+    {
+        // Arrange
+        var timeState = new PlayerTimeState
+        {
+            ReserveTime = TimeSpan.FromSeconds(1)
+        };
+
+        // Simulate turn started well past delay + reserve
+        timeState.TurnStartTime = DateTime.UtcNow - TimeSpan.FromSeconds(DefaultDelaySeconds + 100);
+
+        // Act
+        var remaining = timeState.GetRemainingTime(DefaultDelaySeconds);
+
+        // Assert
+        Assert.Equal(TimeSpan.Zero, remaining);
+    }
 }
