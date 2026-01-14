@@ -35,6 +35,12 @@ public class GameResult
     /// </summary>
     public bool IsAbandoned { get; set; }
 
+    /// <summary>
+    /// Flag to indicate game was forfeited (player quit mid-game).
+    /// When false and IsAbandoned is false, game completed naturally.
+    /// </summary>
+    public bool IsForfeit { get; set; }
+
     public void SetWinType(WinType winType)
     {
         WinType = winType;

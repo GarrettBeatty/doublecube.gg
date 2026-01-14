@@ -5,6 +5,9 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using CoreGame = Backgammon.Core.Game;
+using CoreGameStatus = Backgammon.Core.GameStatus;
+using CoreMatch = Backgammon.Core.Match;
 using ServerGame = Backgammon.Server.Models.Game;
 using ServerMatch = Backgammon.Server.Models.Match;
 
@@ -534,7 +537,7 @@ public class MatchGameContinuationTests
 
         // Verify game was added to history
         Assert.Single(match.CoreMatch.Games);
-        Assert.Equal(GameStatus.Abandoned, match.CoreMatch.Games[0].Status);
+        Assert.Equal(CoreGameStatus.Abandoned, match.CoreMatch.Games[0].Status);
         Assert.Equal(0, match.CoreMatch.Games[0].Stakes);
 
         // Verify match can continue
@@ -578,6 +581,7 @@ public class MatchGameContinuationTests
         var result = new GameResult(player2Id, WinType.Backgammon, 1)
         {
             IsAbandoned = false,
+            IsForfeit = true,
             WinnerColor = CheckerColor.Red
         };
 
@@ -596,7 +600,7 @@ public class MatchGameContinuationTests
 
         // Verify game was added to history with correct points
         Assert.Single(match.CoreMatch.Games);
-        Assert.Equal(GameStatus.Forfeit, match.CoreMatch.Games[0].Status);
+        Assert.Equal(CoreGameStatus.Forfeit, match.CoreMatch.Games[0].Status);
         Assert.Equal(3, match.CoreMatch.Games[0].Stakes);
 
         // Verify match can continue
@@ -607,12 +611,12 @@ public class MatchGameContinuationTests
     public void CanContinueToNextGame_ReturnsTrue_AfterAbandonedGame()
     {
         // Arrange
-        var match = new Core.Match("match1", "player1", "player2", 7);
-        var abandonedGame = new Core.Game("game1")
+        var match = new CoreMatch("match1", "player1", "player2", 7);
+        var abandonedGame = new CoreGame("game1")
         {
-            Status = GameStatus.Abandoned,
-            WinnerId = "player2",
-            PointsScored = 0
+            Status = CoreGameStatus.Abandoned,
+            Winner = CheckerColor.Red, // player2 = Red
+            Stakes = 0
         };
 
         match.AddGame(abandonedGame);
@@ -628,16 +632,16 @@ public class MatchGameContinuationTests
     public void CanContinueToNextGame_ReturnsTrue_AfterForfeitedGame()
     {
         // Arrange
-        var match = new Core.Match("match1", "player1", "player2", 7);
+        var match = new CoreMatch("match1", "player1", "player2", 7);
 
         // Simulate forfeit by manually updating scores
         match.UpdateScores("player2", 3); // Player 2 wins 3 points from forfeit
 
-        var forfeitedGame = new Core.Game("game1")
+        var forfeitedGame = new CoreGame("game1")
         {
-            Status = GameStatus.Forfeit,
-            WinnerId = "player2",
-            PointsScored = 3
+            Status = CoreGameStatus.Forfeit,
+            Winner = CheckerColor.Red, // player2 = Red
+            Stakes = 3
         };
 
         match.AddGame(forfeitedGame);
@@ -694,6 +698,7 @@ public class MatchGameContinuationTests
         var result2 = new GameResult(player2Id, WinType.Backgammon, 1)
         {
             IsAbandoned = false,
+            IsForfeit = true,
             WinnerColor = CheckerColor.Red
         };
 
@@ -721,11 +726,11 @@ public class MatchGameContinuationTests
 
         // Verify game history has all 3 games
         Assert.Equal(3, match.CoreMatch.Games.Count);
-        Assert.Equal(GameStatus.Abandoned, match.CoreMatch.Games[0].Status);
+        Assert.Equal(CoreGameStatus.Abandoned, match.CoreMatch.Games[0].Status);
         Assert.Equal(0, match.CoreMatch.Games[0].Stakes);
-        Assert.Equal(GameStatus.Forfeit, match.CoreMatch.Games[1].Status);
+        Assert.Equal(CoreGameStatus.Forfeit, match.CoreMatch.Games[1].Status);
         Assert.Equal(3, match.CoreMatch.Games[1].Stakes);
-        Assert.Equal(GameStatus.Completed, match.CoreMatch.Games[2].Status);
+        Assert.Equal(CoreGameStatus.Completed, match.CoreMatch.Games[2].Status);
         Assert.Equal(2, match.CoreMatch.Games[2].Stakes);
     }
 }

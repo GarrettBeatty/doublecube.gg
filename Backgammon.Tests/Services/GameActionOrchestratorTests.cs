@@ -19,6 +19,7 @@ public class GameActionOrchestratorTests
     private readonly Mock<IGameCompletionService> _mockCompletionService;
     private readonly Mock<IMatchRepository> _mockMatchRepository;
     private readonly Mock<ICorrespondenceGameService> _mockCorrespondenceGameService;
+    private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
     private readonly Mock<ILogger<GameActionOrchestrator>> _mockLogger;
     private readonly GameActionOrchestrator _orchestrator;
 
@@ -31,6 +32,7 @@ public class GameActionOrchestratorTests
         _mockCompletionService = new Mock<IGameCompletionService>();
         _mockMatchRepository = new Mock<IMatchRepository>();
         _mockCorrespondenceGameService = new Mock<ICorrespondenceGameService>();
+        _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
         _mockLogger = new Mock<ILogger<GameActionOrchestrator>>();
 
         _orchestrator = new GameActionOrchestrator(
@@ -41,6 +43,7 @@ public class GameActionOrchestratorTests
             _mockCompletionService.Object,
             _mockMatchRepository.Object,
             _mockCorrespondenceGameService.Object,
+            _mockHubContext.Object,
             _mockLogger.Object);
     }
 

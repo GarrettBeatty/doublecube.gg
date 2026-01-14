@@ -284,7 +284,9 @@ public class MatchService : IMatchService
                 MatchId = game.MatchId,
                 IsCrawfordGame = match.IsCrawfordGame,
                 MoveHistory = result.MoveHistory ?? new List<Move>(),
-                Status = result.IsAbandoned ? Core.GameStatus.Abandoned : Core.GameStatus.Forfeit
+                Status = result.IsAbandoned ? Core.GameStatus.Abandoned
+                    : result.IsForfeit ? Core.GameStatus.Forfeit
+                    : Core.GameStatus.Completed
             };
 
             // Add game to match and update scores (uses Core business logic)
