@@ -290,6 +290,42 @@ public class MatchService : IMatchService
             // Add game to match and update scores (uses Core business logic)
             match.CoreMatch.AddGame(coreGame);
 
+            // Update the game summary with completion info (gameId was already added by AddGameToMatchAsync)
+            var gameSummary = match.GamesSummary.FirstOrDefault(g => g.GameId == gameId);
+            if (gameSummary != null)
+            {
+                gameSummary.Winner = result.WinnerColor.ToString();
+                gameSummary.Stakes = result.PointsWon;
+                gameSummary.WinType = result.WinType.ToString();
+                gameSummary.IsCrawford = match.IsCrawfordGame;
+                gameSummary.CompletedAt = DateTime.UtcNow;
+
+                _logger.LogInformation(
+                    "Updated game summary for {GameId}: Winner={Winner}, Stakes={Stakes}, WinType={WinType}",
+                    gameId,
+                    gameSummary.Winner,
+                    gameSummary.Stakes,
+                    gameSummary.WinType);
+            }
+            else
+            {
+                // Game not found in summaries (shouldn't happen, but handle gracefully)
+                _logger.LogWarning(
+                    "Game {GameId} not found in GamesSummary for match {MatchId}, adding it now",
+                    gameId,
+                    match.MatchId);
+
+                match.GamesSummary.Add(new MatchGameSummary
+                {
+                    GameId = gameId,
+                    Winner = result.WinnerColor.ToString(),
+                    Stakes = result.PointsWon,
+                    WinType = result.WinType.ToString(),
+                    IsCrawford = match.IsCrawfordGame,
+                    CompletedAt = DateTime.UtcNow
+                });
+            }
+
             // Track Crawford rule state before update
             bool wasCrawford = match.IsCrawfordGame;
 

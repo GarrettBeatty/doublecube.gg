@@ -9,6 +9,11 @@ namespace Backgammon.Server.Models;
 public class Match
 {
     /// <summary>
+    /// Backing field for CurrentGameId - stored directly to avoid hollow objects.
+    /// </summary>
+    private string? _currentGameIdStored;
+
+    /// <summary>
     /// Core domain object containing pure match logic
     /// </summary>
     [JsonPropertyName("coreMatch")]
@@ -81,6 +86,16 @@ public class Match
     /// </summary>
     [JsonPropertyName("player2DisplayName")]
     public string? Player2DisplayName { get; set; }
+
+    // Game summaries for avoiding hollow objects
+
+    /// <summary>
+    /// Summaries of games played in this match.
+    /// This is the authoritative list of games with actual data.
+    /// Avoids hollow Core.Game objects.
+    /// </summary>
+    [JsonPropertyName("gamesSummary")]
+    public List<MatchGameSummary> GamesSummary { get; set; } = new();
 
     // Correspondence game fields
 
@@ -242,47 +257,59 @@ public class Match
     }
 
     /// <summary>
-    /// Total number of games played (delegates to CoreMatch)
+    /// Total number of games played - computed from GamesSummary.
+    /// Falls back to CoreMatch for backward compatibility.
     /// </summary>
     [JsonIgnore]
-    public int TotalGamesPlayed => CoreMatch.TotalGamesPlayed;
+    public int TotalGamesPlayed => GamesSummary.Count > 0 ? GamesSummary.Count : CoreMatch.TotalGamesPlayed;
 
     /// <summary>
-    /// Current game ID (for backward compatibility - extracts GameId from CurrentGame)
+    /// Current game ID - stored directly to avoid hollow Core.Game objects.
+    /// Also syncs with CoreMatch.CurrentGame when a full game is available.
     /// </summary>
     [JsonIgnore]
     public string? CurrentGameId
     {
-        get => CoreMatch.CurrentGame?.GameId;
+        get
+        {
+            // Prefer stored value to avoid hollow objects
+            // CoreMatch.CurrentGame may contain full game data during gameplay
+            return _currentGameIdStored ?? CoreMatch.CurrentGame?.GameId;
+        }
+
         set
         {
-            // For setter, we need to create or update CurrentGame
-            if (value == null)
-            {
-                CoreMatch.CurrentGame = null;
-            }
-            else if (CoreMatch.CurrentGame == null)
-            {
-                CoreMatch.CurrentGame = new Core.Game(value);
-            }
-            else
-            {
-                CoreMatch.CurrentGame.GameId = value;
-            }
+            _currentGameIdStored = value;
+            // Don't create hollow Core.Game - CoreMatch.CurrentGame will be set
+            // when a full game is loaded during gameplay
         }
     }
 
     /// <summary>
-    /// List of game IDs (for backward compatibility - extracts GameIds from Games list)
+    /// List of game IDs - computed from GamesSummary to avoid hollow objects.
+    /// Falls back to CoreMatch.Games for backward compatibility during migration.
     /// </summary>
     [JsonIgnore]
     public List<string> GameIds
     {
-        get => CoreMatch.Games.Select(g => g.GameId).ToList();
+        get
+        {
+            // Prefer GamesSummary (has actual data) over CoreMatch.Games (may be hollow)
+            if (GamesSummary.Count > 0)
+            {
+                return GamesSummary.Select(g => g.GameId).ToList();
+            }
+
+            // Fallback for migration: use CoreMatch.Games if GamesSummary not yet populated
+            return CoreMatch.Games.Select(g => g.GameId).ToList();
+        }
+
         set
         {
-            // For backward compatibility, create Core.Game objects with just IDs
-            CoreMatch.Games = value.Select(id => new Core.Game(id)).ToList();
+            // During migration, populate GamesSummary from IDs
+            // This creates minimal summaries that can be enriched later
+            GamesSummary = value.Select(id => new MatchGameSummary { GameId = id }).ToList();
+            // Don't set CoreMatch.Games to avoid hollow objects
         }
     }
 

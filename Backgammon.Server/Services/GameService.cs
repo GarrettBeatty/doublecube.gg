@@ -251,21 +251,15 @@ public class GameService : IGameService
                     "Both players joined match game {GameId}. Broadcasting GameStart.",
                     session.Id);
 
-                // Both players ready - start game with opening roll
-                await BroadcastGameStartAsync(session);
-
-                // Save game state when game starts (progressive save)
+                // Save game state when game starts (progressive save) - save before broadcast
                 if (session.GameMode.ShouldPersist)
                 {
-                    BackgroundTaskHelper.FireAndForget(
-                        async () =>
-                        {
-                            var game = GameEngineMapper.ToGame(session);
-                            await _gameRepository.SaveGameAsync(game);
-                        },
-                        _logger,
-                        $"SaveGameState-{session.Id}");
+                    var game = GameEngineMapper.ToGame(session);
+                    await _gameRepository.SaveGameAsync(game);
                 }
+
+                // Both players ready - start game with opening roll
+                await BroadcastGameStartAsync(session);
 
                 return;
             }
@@ -313,23 +307,17 @@ public class GameService : IGameService
                 return;
             }
 
+            // Save game state when game starts (progressive save) - save before broadcast
+            if (session.GameMode.ShouldPersist)
+            {
+                var game = GameEngineMapper.ToGame(session);
+                await _gameRepository.SaveGameAsync(game);
+            }
+
             // Game just became full - broadcast start to both players
             await BroadcastGameStartAsync(session);
 
             // Timer will be started after opening roll completes (see GameActionOrchestrator.RollDiceAsync)
-
-            // Save game state when game starts (progressive save) - skip for analysis mode
-            if (session.GameMode.ShouldPersist)
-            {
-                BackgroundTaskHelper.FireAndForget(
-                    async () =>
-                    {
-                        var game = GameEngineMapper.ToGame(session);
-                        await _gameRepository.SaveGameAsync(game);
-                    },
-                    _logger,
-                    $"SaveGameState-{session.Id}");
-            }
 
             // Check if AI should move first (only for non-opening-roll games, i.e., reconnections)
             // For opening roll, AI will roll after human rolls (triggered in RollDiceAsync)
@@ -503,17 +491,11 @@ public class GameService : IGameService
             humanState.IsYourTurn,
             humanState.CurrentPlayer,
             humanState.YourColor);
-        await _hubContext.Clients.Client(connectionId).GameStart(humanState);
+        // Save initial game state before broadcasting
+        var gameToSave = GameEngineMapper.ToGame(session);
+        await _gameRepository.SaveGameAsync(gameToSave);
 
-        // Save initial game state - fire and forget
-        BackgroundTaskHelper.FireAndForget(
-            async () =>
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _gameRepository.SaveGameAsync(game);
-            },
-            _logger,
-            $"SaveGameState-{session.Id}");
+        await _hubContext.Clients.Client(connectionId).GameStart(humanState);
 
         // AI will roll after human rolls (triggered in RollDiceAsync)
         _logger.LogInformation(

@@ -181,7 +181,17 @@ public class DynamoDbMatchRepository : IMatchRepository
             }
 
             // Note: gameIds is NOT updated here - it's managed exclusively by AddGameToMatchAsync
-            // which uses atomic list_append for thread-safe additions
+            // which uses atomic list_append for thread-safe additions.
+            // However, gamesSummary IS updated here because we need to update the last game's
+            // winner/stakes info when a game completes.
+            if (match.GamesSummary.Any())
+            {
+                updateExpression += ", gamesSummary = :gamesSummary";
+                expressionAttributeValues[":gamesSummary"] = new AttributeValue
+                {
+                    L = match.GamesSummary.Select(DynamoDbHelpers.MarshalMatchGameSummary).ToList()
+                };
+            }
 
             // Add completion data if match is complete
             if (match.Status == "Completed" && match.CompletedAt.HasValue)
@@ -552,6 +562,10 @@ public class DynamoDbMatchRepository : IMatchRepository
     {
         try
         {
+            // Create a minimal game summary for the new game
+            var gameSummary = new MatchGameSummary { GameId = gameId };
+            var gameSummaryAttr = DynamoDbHelpers.MarshalMatchGameSummary(gameSummary);
+
             await _dynamoDbClient.UpdateItemAsync(new UpdateItemRequest
             {
                 TableName = _tableName,
@@ -560,12 +574,16 @@ public class DynamoDbMatchRepository : IMatchRepository
                     ["PK"] = new AttributeValue { S = $"MATCH#{matchId}" },
                     ["SK"] = new AttributeValue { S = "METADATA" }
                 },
-                UpdateExpression = "SET currentGameId = :gameId, lastUpdatedAt = :now, gameIds = list_append(if_not_exists(gameIds, :emptyList), :newGameId)",
+                UpdateExpression = @"SET currentGameId = :gameId,
+                    lastUpdatedAt = :now,
+                    gameIds = list_append(if_not_exists(gameIds, :emptyList), :newGameId),
+                    gamesSummary = list_append(if_not_exists(gamesSummary, :emptyList), :newGameSummary)",
                 ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                 {
                     [":gameId"] = new AttributeValue { S = gameId },
                     [":now"] = new AttributeValue { S = DateTime.UtcNow.ToString("O") },
                     [":newGameId"] = new AttributeValue { L = new List<AttributeValue> { new AttributeValue { S = gameId } } },
+                    [":newGameSummary"] = new AttributeValue { L = new List<AttributeValue> { gameSummaryAttr } },
                     [":emptyList"] = new AttributeValue { L = new List<AttributeValue>() }
                 }
             });

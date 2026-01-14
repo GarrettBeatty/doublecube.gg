@@ -183,9 +183,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                             firstPlayerId,
                             session.Id);
 
-                        // Broadcast current state first, then trigger AI
-                        await _broadcastService.BroadcastGameUpdateAsync(session);
+                        // Save first, then broadcast (ensures DB has state before client sees it)
                         await SaveGameStateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
 
                         BackgroundTaskHelper.FireAndForget(
                             async () =>
@@ -199,9 +199,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     }
                     else
                     {
-                        // Human won opening roll - broadcast timer state immediately
-                        await _broadcastService.BroadcastGameUpdateAsync(session);
+                        // Human won opening roll - save first, then broadcast
                         await SaveGameStateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
                     }
                 }
                 else if (session.Engine.IsOpeningRoll)
@@ -215,9 +215,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     {
                         _logger.LogInformation("AI (White) needs to roll opening die in game {GameId}", session.Id);
 
-                        // Broadcast current state first
-                        await _broadcastService.BroadcastGameUpdateAsync(session);
+                        // Save first, then broadcast
                         await SaveGameStateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
 
                         // Trigger AI opening roll
                         BackgroundTaskHelper.FireAndForget(
@@ -236,9 +236,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     {
                         _logger.LogInformation("AI (Red) needs to roll opening die in game {GameId}", session.Id);
 
-                        // Broadcast current state first
-                        await _broadcastService.BroadcastGameUpdateAsync(session);
+                        // Save first, then broadcast
                         await SaveGameStateAsync(session);
+                        await _broadcastService.BroadcastGameUpdateAsync(session);
 
                         // Trigger AI opening roll
                         BackgroundTaskHelper.FireAndForget(
@@ -255,9 +255,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 }
             }
 
-            // Broadcast and save
-            await _broadcastService.BroadcastGameUpdateAsync(session);
+            // Save first, then broadcast
             await SaveGameStateAsync(session);
+            await _broadcastService.BroadcastGameUpdateAsync(session);
 
             return ActionResult.Ok();
         }
@@ -292,9 +292,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.Engine.Dice.Die1,
             session.Engine.Dice.Die2);
 
-        // Broadcast and save
-        await _broadcastService.BroadcastGameUpdateAsync(session);
+        // Save first, then broadcast
         await SaveGameStateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
 
         return ActionResult.Ok();
     }
@@ -398,9 +398,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.GameActionLock.Release();
         }
 
-        // Broadcast and save
-        await _broadcastService.BroadcastGameUpdateAsync(session);
+        // Save first, then broadcast
         await SaveGameStateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
 
         // Check if game is over
         if (session.Engine.Winner != null)
@@ -541,9 +541,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.GameActionLock.Release();
         }
 
-        // Broadcast and save
-        await _broadcastService.BroadcastGameUpdateAsync(session);
+        // Save first, then broadcast
         await SaveGameStateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
 
         // Check if game is over (same logic as MakeMoveAsync)
         if (session.Engine.Winner != null)
@@ -594,9 +594,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
         session.UpdateActivity();
 
-        // Broadcast and save
-        await _broadcastService.BroadcastGameUpdateAsync(session);
+        // Save first, then broadcast
         await SaveGameStateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
 
         _logger.LogInformation(
             "Turn ended in game {GameId}. Current player: {Player}",
@@ -673,9 +673,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
 
         session.UpdateActivity();
 
-        // Broadcast and save
-        await _broadcastService.BroadcastGameUpdateAsync(session);
+        // Save first, then broadcast
         await SaveGameStateAsync(session);
+        await _broadcastService.BroadcastGameUpdateAsync(session);
 
         _logger.LogInformation(
             "Player {ConnectionId} undid last move in game {GameId}",
@@ -716,16 +716,10 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             return;
         }
 
-        try
-        {
-            var game = GameEngineMapper.ToGame(session);
-            await _gameRepository.SaveGameAsync(game);
-            _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to save game state for {GameId}", session.Id);
-        }
+        // Let exceptions propagate - callers should handle failures
+        var game = GameEngineMapper.ToGame(session);
+        await _gameRepository.SaveGameAsync(game);
+        _logger.LogDebug("Saved game state for {GameId}, Status={Status}", session.Id, game.Status);
     }
 
     private string? GetCurrentPlayerId(GameSession session)

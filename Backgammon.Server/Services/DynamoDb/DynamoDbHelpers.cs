@@ -538,6 +538,48 @@ public static class DynamoDbHelpers
         };
     }
 
+    // Marshal MatchGameSummary to AttributeValue
+    public static AttributeValue MarshalMatchGameSummary(MatchGameSummary summary)
+    {
+        var map = new Dictionary<string, AttributeValue>
+        {
+            ["gameId"] = new AttributeValue { S = summary.GameId },
+            ["stakes"] = new AttributeValue { N = summary.Stakes.ToString() },
+            ["isCrawford"] = new AttributeValue { BOOL = summary.IsCrawford }
+        };
+
+        if (!string.IsNullOrEmpty(summary.Winner))
+        {
+            map["winner"] = new AttributeValue { S = summary.Winner };
+        }
+
+        if (!string.IsNullOrEmpty(summary.WinType))
+        {
+            map["winType"] = new AttributeValue { S = summary.WinType };
+        }
+
+        if (summary.CompletedAt.HasValue)
+        {
+            map["completedAt"] = new AttributeValue { S = summary.CompletedAt.Value.ToString("O") };
+        }
+
+        return new AttributeValue { M = map };
+    }
+
+    // Unmarshal MatchGameSummary from AttributeValue
+    public static MatchGameSummary UnmarshalMatchGameSummary(Dictionary<string, AttributeValue> map)
+    {
+        return new MatchGameSummary
+        {
+            GameId = map["gameId"].S,
+            Winner = GetStringOrNull(map, "winner"),
+            Stakes = GetInt(map, "stakes"),
+            WinType = GetStringOrNull(map, "winType"),
+            IsCrawford = GetBool(map, "isCrawford"),
+            CompletedAt = GetNullableDateTime(map, "completedAt")
+        };
+    }
+
     // Marshal Match to DynamoDB item
     public static Dictionary<string, AttributeValue> MarshalMatch(Match match)
     {
@@ -565,7 +607,16 @@ public static class DynamoDbHelpers
         item["GSI3PK"] = new AttributeValue { S = $"MATCH_STATUS#{match.Status}" };
         item["GSI3SK"] = new AttributeValue { S = match.LastUpdatedAt.Ticks.ToString("D19") };
 
-        // Game IDs
+        // Game summaries (new format with actual game data)
+        if (match.GamesSummary.Any())
+        {
+            item["gamesSummary"] = new AttributeValue
+            {
+                L = match.GamesSummary.Select(MarshalMatchGameSummary).ToList()
+            };
+        }
+
+        // Game IDs (backward compat - computed from GamesSummary)
         if (match.GameIds.Any())
         {
             item["gameIds"] = new AttributeValue { L = match.GameIds.Select(id => new AttributeValue { S = id }).ToList() };
@@ -672,7 +723,6 @@ public static class DynamoDbHelpers
             CompletedAt = GetNullableDateTime(item, "completedAt"),
             WinnerId = GetStringOrNull(item, "winnerId"),
             DurationSeconds = GetInt(item, "durationSeconds"),
-            GameIds = GetStringList(item, "gameIds"),
             // Lobby-specific fields
             OpponentType = GetStringOrNull(item, "opponentType") ?? "Friend",
             IsOpenLobby = GetBool(item, "isOpenLobby"),
@@ -680,6 +730,21 @@ public static class DynamoDbHelpers
             Player1DisplayName = GetStringOrNull(item, "player1DisplayName"),
             Player2DisplayName = GetStringOrNull(item, "player2DisplayName")
         };
+
+        // Parse game summaries (preferred) or fall back to gameIds (backward compat)
+        if (item.TryGetValue("gamesSummary", out var gamesSummaryValue) && gamesSummaryValue.L != null)
+        {
+            match.GamesSummary = gamesSummaryValue.L
+                .Where(v => v.M != null)
+                .Select(v => UnmarshalMatchGameSummary(v.M))
+                .ToList();
+        }
+        else
+        {
+            // Fallback: populate GamesSummary from gameIds (creates minimal summaries)
+            var gameIds = GetStringList(item, "gameIds");
+            match.GamesSummary = gameIds.Select(id => new MatchGameSummary { GameId = id }).ToList();
+        }
 
         // Parse time control if present
         var timeControlTypeStr = GetStringOrNull(item, "timeControlType");
