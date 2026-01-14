@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
 using Backgammon.Server.Hubs.Interfaces;
@@ -15,6 +16,11 @@ namespace Backgammon.Server.Hubs;
 /// </summary>
 public partial class GameHub
 {
+    /// <summary>
+    /// Per-match locks to prevent race conditions when multiple ContinueMatch calls happen simultaneously.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _matchContinuationLocks = new();
+
     public async Task ContinueMatch(string matchId)
     {
         try
@@ -26,141 +32,162 @@ public partial class GameHub
                 matchId,
                 Context.ConnectionId);
 
-            var match = await _matchService.GetMatchAsync(matchId);
-            if (match == null)
-            {
-                _logger.LogWarning("ContinueMatch: Match {MatchId} not found", matchId);
-                await Clients.Caller.Error("Match not found");
-                return;
-            }
-
-            _logger.LogInformation(
-                "ContinueMatch: Match {MatchId} - Status={Status}, Player1Id={P1}, Player2Id={P2}, CurrentGameId={GameId}, P1Score={P1Score}, P2Score={P2Score}",
-                matchId,
-                match.Status,
-                match.Player1Id,
-                match.Player2Id ?? "null",
-                match.CurrentGameId ?? "null",
-                match.Player1Score,
-                match.Player2Score);
-
-            // Check if match can continue to next game
-            // Match must be InProgress AND have a completed game to continue from
-            if (!match.CoreMatch.CanContinueToNextGame())
-            {
-                _logger.LogWarning(
-                    "ContinueMatch: Cannot continue match {MatchId} - Status={Status}, MatchComplete={Complete}, CompletedGames={Games}",
-                    matchId,
-                    match.CoreMatch.Status,
-                    match.CoreMatch.IsMatchComplete(),
-                    match.CoreMatch.Games.Count(g => g.Status == Core.GameStatus.Completed));
-                await Clients.Caller.Error("Cannot continue to next game");
-                return;
-            }
-
             var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
             var connectionId = Context.ConnectionId;
 
-            _logger.LogInformation(
-                "ContinueMatch: Player {PlayerId} from connection {ConnectionId}",
-                playerId,
-                connectionId);
+            // Get or create a lock for this specific match
+            var matchLock = _matchContinuationLocks.GetOrAdd(matchId, _ => new SemaphoreSlim(1, 1));
 
-            if (playerId != match.Player1Id && playerId != match.Player2Id)
+            // Try to acquire the lock with a timeout
+            if (!await matchLock.WaitAsync(TimeSpan.FromSeconds(5)))
             {
                 _logger.LogWarning(
-                    "ContinueMatch: Player {PlayerId} is not in match {MatchId} (P1={P1}, P2={P2})",
-                    playerId,
-                    matchId,
-                    match.Player1Id,
-                    match.Player2Id ?? "null");
-                await Clients.Caller.Error("You are not a player in this match");
+                    "ContinueMatch: Timeout waiting for lock on match {MatchId}",
+                    matchId);
+                await Clients.Caller.Error("Please wait, match continuation in progress");
                 return;
             }
 
-            // Check if next game already exists (idempotency - handle both players clicking)
-            if (!string.IsNullOrEmpty(match.CurrentGameId))
+            try
             {
+                // Re-fetch match state after acquiring lock (another request may have created a new game)
+                var match = await _matchService.GetMatchAsync(matchId);
+                if (match == null)
+                {
+                    _logger.LogWarning("ContinueMatch: Match {MatchId} not found", matchId);
+                    await Clients.Caller.Error("Match not found");
+                    return;
+                }
+
                 _logger.LogInformation(
-                    "ContinueMatch: Checking for existing game {GameId}",
-                    match.CurrentGameId);
+                    "ContinueMatch: Match {MatchId} - Status={Status}, Player1Id={P1}, Player2Id={P2}, CurrentGameId={GameId}, P1Score={P1Score}, P2Score={P2Score}",
+                    matchId,
+                    match.Status,
+                    match.Player1Id,
+                    match.Player2Id ?? "null",
+                    match.CurrentGameId ?? "null",
+                    match.Player1Score,
+                    match.Player2Score);
 
-                var existingSession = _sessionManager.GetSession(match.CurrentGameId);
+                // Check if match can continue to next game
+                // Match must be InProgress AND have a completed game to continue from
+                if (!match.CoreMatch.CanContinueToNextGame())
+                {
+                    _logger.LogWarning(
+                        "ContinueMatch: Cannot continue match {MatchId} - Status={Status}, MatchComplete={Complete}, CompletedGames={Games}",
+                        matchId,
+                        match.CoreMatch.Status,
+                        match.CoreMatch.IsMatchComplete(),
+                        match.CoreMatch.Games.Count(g => g.Status == Core.GameStatus.Completed));
+                    await Clients.Caller.Error("Cannot continue to next game");
+                    return;
+                }
 
-                if (existingSession != null)
+                _logger.LogInformation(
+                    "ContinueMatch: Player {PlayerId} from connection {ConnectionId}",
+                    playerId,
+                    connectionId);
+
+                if (playerId != match.Player1Id && playerId != match.Player2Id)
+                {
+                    _logger.LogWarning(
+                        "ContinueMatch: Player {PlayerId} is not in match {MatchId} (P1={P1}, P2={P2})",
+                        playerId,
+                        matchId,
+                        match.Player1Id,
+                        match.Player2Id ?? "null");
+                    await Clients.Caller.Error("You are not a player in this match");
+                    return;
+                }
+
+                // Check if next game already exists (idempotency - handle both players clicking)
+                if (!string.IsNullOrEmpty(match.CurrentGameId))
                 {
                     _logger.LogInformation(
-                        "ContinueMatch: Found existing session {GameId} - GameStarted={Started}, Winner={Winner}",
-                        match.CurrentGameId,
-                        existingSession.Engine.GameStarted,
-                        existingSession.Engine.Winner?.Name ?? "null");
+                        "ContinueMatch: Checking for existing game {GameId}",
+                        match.CurrentGameId);
+
+                    var existingSession = _sessionManager.GetSession(match.CurrentGameId);
+
+                    if (existingSession != null)
+                    {
+                        _logger.LogInformation(
+                            "ContinueMatch: Found existing session {GameId} - GameStarted={Started}, Winner={Winner}",
+                            match.CurrentGameId,
+                            existingSession.Engine.GameStarted,
+                            existingSession.Engine.Winner?.Name ?? "null");
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "ContinueMatch: No existing session found for {GameId}",
+                            match.CurrentGameId);
+                    }
+
+                    if (existingSession != null &&
+                        existingSession.Engine.GameStarted &&
+                        existingSession.Engine.Winner == null)
+                    {
+                        // Game already created, started, and still in progress - just join it
+                        _logger.LogInformation(
+                            "ContinueMatch: Player {PlayerId} joining existing in-progress game {GameId} for match {MatchId}",
+                            playerId,
+                            match.CurrentGameId,
+                            matchId);
+
+                        await JoinGame(match.CurrentGameId);
+                        return;
+                    }
+                    else if (existingSession != null && existingSession.Engine.Winner != null)
+                    {
+                        // Current game is completed/abandoned - need to create new game
+                        _logger.LogInformation(
+                            "ContinueMatch: Current game {GameId} is completed/abandoned (Winner={Winner}), creating new game for match {MatchId}",
+                            match.CurrentGameId,
+                            existingSession.Engine.Winner.Name,
+                            matchId);
+                    }
+                    else if (existingSession != null && !existingSession.Engine.GameStarted)
+                    {
+                        _logger.LogInformation(
+                            "ContinueMatch: Current game {GameId} exists but not started, creating new game for match {MatchId}",
+                            match.CurrentGameId,
+                            matchId);
+                    }
                 }
                 else
                 {
                     _logger.LogInformation(
-                        "ContinueMatch: No existing session found for {GameId}",
-                        match.CurrentGameId);
+                        "ContinueMatch: No CurrentGameId set for match {MatchId}",
+                        matchId);
                 }
 
-                if (existingSession != null &&
-                    existingSession.Engine.GameStarted &&
-                    existingSession.Engine.Winner == null)
-                {
-                    // Game already created, started, and still in progress - just join it
-                    _logger.LogInformation(
-                        "ContinueMatch: Player {PlayerId} joining existing in-progress game {GameId} for match {MatchId}",
-                        playerId,
-                        match.CurrentGameId,
-                        matchId);
-
-                    await JoinGame(match.CurrentGameId);
-                    return;
-                }
-                else if (existingSession != null && existingSession.Engine.Winner != null)
-                {
-                    // Current game is completed/abandoned - need to create new game
-                    _logger.LogInformation(
-                        "ContinueMatch: Current game {GameId} is completed/abandoned (Winner={Winner}), creating new game for match {MatchId}",
-                        match.CurrentGameId,
-                        existingSession.Engine.Winner.Name,
-                        matchId);
-                }
-                else if (existingSession != null && !existingSession.Engine.GameStarted)
-                {
-                    _logger.LogInformation(
-                        "ContinueMatch: Current game {GameId} exists but not started, creating new game for match {MatchId}",
-                        match.CurrentGameId,
-                        matchId);
-                }
-            }
-            else
-            {
+                // First player to click - create game atomically with all players
                 _logger.LogInformation(
-                    "ContinueMatch: No CurrentGameId set for match {MatchId}",
+                    "ContinueMatch: Player {PlayerId} creating next game for match {MatchId}",
+                    playerId,
+                    matchId);
+
+                // Determine which player is calling
+                bool isPlayer1 = playerId == match.Player1Id;
+                var player1Connections = isPlayer1 ? new HashSet<string> { connectionId } : new HashSet<string>();
+                var player2Connections = !isPlayer1 ? new HashSet<string> { connectionId } : new HashSet<string>();
+
+                // Create and start the next game atomically
+                var session = await _gameCompletionService.CreateAndStartNextMatchGameAsync(
+                    match,
+                    player1Connections,
+                    player2Connections);
+
+                _logger.LogInformation(
+                    "Created and started next game {GameId} for match {MatchId}",
+                    session.Id,
                     matchId);
             }
-
-            // First player to click - create game atomically with all players
-            _logger.LogInformation(
-                "ContinueMatch: Player {PlayerId} creating next game for match {MatchId}",
-                playerId,
-                matchId);
-
-            // Determine which player is calling
-            bool isPlayer1 = playerId == match.Player1Id;
-            var player1Connections = isPlayer1 ? new HashSet<string> { connectionId } : new HashSet<string>();
-            var player2Connections = !isPlayer1 ? new HashSet<string> { connectionId } : new HashSet<string>();
-
-            // Create and start the next game atomically
-            var session = await _gameCompletionService.CreateAndStartNextMatchGameAsync(
-                match,
-                player1Connections,
-                player2Connections);
-
-            _logger.LogInformation(
-                "Created and started next game {GameId} for match {MatchId}",
-                session.Id,
-                matchId);
+            finally
+            {
+                matchLock.Release();
+            }
         }
         catch (Exception ex)
         {
