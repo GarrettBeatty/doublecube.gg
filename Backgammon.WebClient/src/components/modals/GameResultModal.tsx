@@ -69,10 +69,22 @@ export const GameResultModal: React.FC = () => {
     navigate('/')
   }
 
-  const handleViewAnalysis = () => {
+  const handleViewAnalysis = async () => {
     if (!currentGameState?.gameId) return
     setShowGameResultModal(false)
-    navigate(`/analysis/game/${currentGameState.gameId}`)
+    try {
+      const sgf = await hub?.exportPosition()
+      if (sgf) {
+        const encodedSgf = encodeURIComponent(sgf)
+        navigate(`/analysis/${encodedSgf}`)
+      } else {
+        // Fallback to home if export fails
+        navigate('/')
+      }
+    } catch (error) {
+      console.error('Failed to export position for analysis:', error)
+      navigate('/')
+    }
   }
 
   if (!currentGameState) return null

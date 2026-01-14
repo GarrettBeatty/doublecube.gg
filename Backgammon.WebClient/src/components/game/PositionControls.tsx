@@ -19,8 +19,7 @@ export const PositionControls: React.FC = () => {
       if (!currentGameState || isImporting) return
 
       try {
-        const base64Sgf = (await hub?.exportPosition()) as string
-        const sgf = atob(base64Sgf)
+        const sgf = (await hub?.exportPosition()) as string
 
         // Only update if SGF actually changed
         if (sgf !== currentSgfRef.current) {

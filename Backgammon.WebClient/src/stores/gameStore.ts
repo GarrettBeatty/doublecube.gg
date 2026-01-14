@@ -222,19 +222,28 @@ export const useGameStore = create<GameStore>((set) => ({
     }),
 
   updateTimeState: (timeUpdate) =>
-    set((state) => ({
-      currentGameState: state.currentGameState
-        ? {
-            ...state.currentGameState,
-            whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
-            redReserveSeconds: timeUpdate.redReserveSeconds,
-            whiteIsInDelay: timeUpdate.whiteIsInDelay,
-            redIsInDelay: timeUpdate.redIsInDelay,
-            whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
-            redDelayRemaining: timeUpdate.redDelayRemaining,
-          }
-        : null,
-    })),
+    set((state) => {
+      console.log('[gameStore] updateTimeState called', {
+        hasCurrentGameState: !!state.currentGameState,
+        prevWhiteIsInDelay: state.currentGameState?.whiteIsInDelay,
+        prevRedIsInDelay: state.currentGameState?.redIsInDelay,
+        newWhiteIsInDelay: timeUpdate.whiteIsInDelay,
+        newRedIsInDelay: timeUpdate.redIsInDelay,
+      })
+      return {
+        currentGameState: state.currentGameState
+          ? {
+              ...state.currentGameState,
+              whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
+              redReserveSeconds: timeUpdate.redReserveSeconds,
+              whiteIsInDelay: timeUpdate.whiteIsInDelay,
+              redIsInDelay: timeUpdate.redIsInDelay,
+              whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
+              redDelayRemaining: timeUpdate.redDelayRemaining,
+            }
+          : null,
+      }
+    }),
 
   setMyColor: (color) => set({ myColor: color }),
 

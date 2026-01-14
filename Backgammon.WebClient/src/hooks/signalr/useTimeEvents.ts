@@ -22,11 +22,23 @@ export function useTimeEvents(connection: HubConnection | null) {
     const handleTimeUpdate = (timeUpdate: TimeUpdateDto) => {
       const context = parseGameContextFromPath(window.location.pathname)
 
+      console.log('[useTimeEvents] Received TimeUpdate:', {
+        gameId: timeUpdate.gameId,
+        whiteReserve: timeUpdate.whiteReserveSeconds,
+        redReserve: timeUpdate.redReserveSeconds,
+        whiteIsInDelay: timeUpdate.whiteIsInDelay,
+        redIsInDelay: timeUpdate.redIsInDelay,
+        whiteDelayRemaining: timeUpdate.whiteDelayRemaining,
+        redDelayRemaining: timeUpdate.redDelayRemaining,
+      })
+
       // Ignore time updates for games we're not viewing
       if (context.gameId && context.gameId !== timeUpdate.gameId) {
+        console.log('[useTimeEvents] Ignoring - different game')
         return
       }
 
+      console.log('[useTimeEvents] Updating time state in store')
       updateTimeState({
         whiteReserveSeconds: timeUpdate.whiteReserveSeconds,
         redReserveSeconds: timeUpdate.redReserveSeconds,

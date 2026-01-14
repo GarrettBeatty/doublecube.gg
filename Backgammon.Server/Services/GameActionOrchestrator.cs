@@ -23,6 +23,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
     private readonly IGameCompletionService _completionService;
     private readonly IMatchRepository _matchRepository;
     private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameActionOrchestrator> _logger;
 
     public GameActionOrchestrator(
@@ -33,6 +34,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         IGameCompletionService completionService,
         IMatchRepository matchRepository,
         ICorrespondenceGameService correspondenceGameService,
+        IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameActionOrchestrator> logger)
     {
         _gameRepository = gameRepository;
@@ -42,6 +44,7 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         _completionService = completionService;
         _matchRepository = matchRepository;
         _correspondenceGameService = correspondenceGameService;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -142,8 +145,8 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     // Start timer for first player's turn
                     session.Engine.StartTurnTimer();
 
-                    // TODO: Move time update broadcasting to a dedicated service
-                    // Time updates currently handled separately from refactored services
+                    // Start broadcasting time updates (only after opening roll completes)
+                    session.StartTimeUpdates(_hubContext);
 
                     // For correspondence games, update turn tracking with the actual first player
                     var firstPlayerId = GetCurrentPlayerId(session);
