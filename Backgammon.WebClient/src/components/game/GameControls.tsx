@@ -87,7 +87,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           >
             <div className="text-center">
               <Flag className="h-5 w-5 mx-auto mb-1" />
-              <div className="text-xs">Abandon</div>
+              <div className="text-xs">{gameState.leaveGameAction}</div>
             </div>
           </Button>
         )}
@@ -99,6 +99,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       <AbandonConfirmModal
         isOpen={showAbandonModal}
         onClose={() => setShowAbandonModal(false)}
+        gameState={gameState}
       />
     </div>
   )

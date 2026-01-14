@@ -553,7 +553,7 @@ public partial class GameHub
                 ? session.Engine.RedPlayer
                 : session.Engine.WhitePlayer;
 
-            // Check if game is already over or hasn't started
+            // Check if game is already over
             if (session.Engine.GameOver)
             {
                 _logger.LogWarning("Game {GameId} is already over, cannot abandon", session.Id);
@@ -561,45 +561,84 @@ public partial class GameHub
                 return;
             }
 
-            if (!session.Engine.GameStarted)
+            // Determine if this is an ABANDON (no points) or FORFEIT (points awarded)
+            // Abandon: Game never started OR still in opening roll phase
+            // Forfeit: Game in progress after opening roll
+            bool isAbandon = !session.Engine.GameStarted || session.Engine.IsOpeningRoll;
+
+            if (isAbandon)
             {
-                _logger.LogWarning("Game {GameId} hasn't started yet, cannot forfeit", session.Id);
-                await Clients.Caller.Error("Game hasn't started yet");
-                return;
-            }
+                // ABANDON: Game never really started - NO points awarded
+                _logger.LogInformation(
+                    "Game {GameId} abandoned by {Player} before gameplay started (GameStarted={GameStarted}, IsOpeningRoll={IsOpeningRoll}). No points awarded.",
+                    session.Id,
+                    abandoningPlayer.Name,
+                    session.Engine.GameStarted,
+                    session.Engine.IsOpeningRoll);
 
-            // Forfeit game - set opponent as winner
-            session.Engine.ForfeitGame(opponentPlayer);
+                // Update database to Abandoned status
+                await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
 
-            // Get stakes from doubling cube
-            var stakes = session.Engine.GetGameResult();
-
-            _logger.LogInformation(
-                "Game {GameId} abandoned by {Player}. Winner: {Winner} (Stakes: {Stakes})",
-                session.Id,
-                abandoningPlayer.Name,
-                opponentPlayer.Name,
-                stakes);
-
-            // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
-            await _gameRepository.UpdateGameStatusAsync(session.Id, "Abandoned");
-
-            // Update match scores if this is a match game
-            if (!string.IsNullOrEmpty(session.MatchId))
-            {
-                // Determine winner's player ID
-                var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
-                var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
-
-                // Create game result - forfeit is a normal win
-                var gameResult = new GameResult(winnerPlayerId!, WinType.Normal, session.Engine.DoublingCube.Value)
+                // Update match scores if this is a match game - record with 0 points
+                if (!string.IsNullOrEmpty(session.MatchId))
                 {
-                    WinnerColor = winnerColor,
-                    MoveHistory = session.Engine.MoveHistory.ToList()
-                };
+                    // Determine "winner" (opponent) but with 0 points
+                    var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                    var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
 
-                await _matchService.CompleteGameAsync(session.Id, gameResult);
-                _logger.LogInformation("Updated match {MatchId} scores after game {GameId} was abandoned", session.MatchId, session.Id);
+                    // Create game result with IsAbandoned flag - 0 points awarded
+                    var gameResult = new GameResult(winnerPlayerId!, WinType.Normal, 0)
+                    {
+                        WinnerColor = winnerColor,
+                        IsAbandoned = true,
+                        MoveHistory = session.Engine.MoveHistory.ToList()
+                    };
+
+                    await _matchService.CompleteGameAsync(session.Id, gameResult);
+                    _logger.LogInformation(
+                        "Updated match {MatchId} after game {GameId} was abandoned (0 points awarded)",
+                        session.MatchId,
+                        session.Id);
+                }
+            }
+            else
+            {
+                // FORFEIT: Game in progress - opponent wins points based on board state
+                session.Engine.ForfeitGame(opponentPlayer);
+
+                // Get stakes from doubling cube and determine win type
+                var stakes = session.Engine.GetGameResult();
+
+                _logger.LogInformation(
+                    "Game {GameId} forfeited by {Player}. Winner: {Winner} (Stakes: {Stakes})",
+                    session.Id,
+                    abandoningPlayer.Name,
+                    opponentPlayer.Name,
+                    stakes);
+
+                // Update database to Forfeit status
+                await _gameRepository.UpdateGameStatusAsync(session.Id, "Forfeit");
+
+                // Update match scores if this is a match game - award points based on board state
+                if (!string.IsNullOrEmpty(session.MatchId))
+                {
+                    // Determine winner's player ID
+                    var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
+                    var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
+
+                    // Create game result - use actual win type (Normal/Gammon/Backgammon) and cube value
+                    var gameResult = new GameResult(winnerPlayerId!, session.Engine.DetermineWinType(), session.Engine.DoublingCube.Value)
+                    {
+                        WinnerColor = winnerColor,
+                        MoveHistory = session.Engine.MoveHistory.ToList()
+                    };
+
+                    await _matchService.CompleteGameAsync(session.Id, gameResult);
+                    _logger.LogInformation(
+                        "Updated match {MatchId} scores after game {GameId} was forfeited",
+                        session.MatchId,
+                        session.Id);
+                }
             }
 
             // Skip stats update for non-competitive games
@@ -619,9 +658,59 @@ public partial class GameHub
             var finalState = session.GetState();
             await Clients.Group(session.Id).GameOver(finalState);
 
-            // Remove from memory to prevent memory leak
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Removed abandoned game {GameId} from memory", session.Id);
+            // Handle match continuation (if this is a match game)
+            if (!string.IsNullOrEmpty(session.MatchId))
+            {
+                var match = await _matchService.GetMatchAsync(session.MatchId);
+                if (match != null)
+                {
+                    // Broadcast match score update - next game will be created when players click "Continue"
+                    await Clients.Group(session.Id).MatchUpdate(new MatchUpdateDto
+                    {
+                        MatchId = match.MatchId,
+                        Player1Score = match.Player1Score,
+                        Player2Score = match.Player2Score,
+                        TargetScore = match.TargetScore,
+                        IsCrawfordGame = match.IsCrawfordGame,
+                        MatchComplete = match.Status == "Completed",
+                        MatchWinner = match.WinnerId,
+                        NextGameId = match.CurrentGameId // Current game for reference
+                    });
+
+                    if (!match.CoreMatch.IsMatchComplete())
+                    {
+                        _logger.LogInformation(
+                            "Match {MatchId} continues after abandoned game. Score: {P1Score}-{P2Score}. Waiting for players to continue.",
+                            match.MatchId,
+                            match.Player1Score,
+                            match.Player2Score);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Match {MatchId} complete after abandoned game. Winner: {WinnerId}",
+                            match.MatchId,
+                            match.WinnerId);
+                    }
+
+                    _logger.LogInformation(
+                        "Broadcasted match update for match {MatchId}: {P1Score}-{P2Score}",
+                        match.MatchId,
+                        match.Player1Score,
+                        match.Player2Score);
+
+                    // Keep completed match game in memory for continuation (will be cleaned up when next game starts)
+                    _logger.LogInformation(
+                        "Keeping abandoned match game {GameId} in memory for continuation",
+                        session.Id);
+                }
+            }
+            else
+            {
+                // Remove from memory to prevent memory leak (only for non-match games)
+                _sessionManager.RemoveGame(session.Id);
+                _logger.LogInformation("Removed abandoned game {GameId} from memory", session.Id);
+            }
         }
         catch (Exception ex)
         {
@@ -808,6 +897,34 @@ public partial class GameHub
         }
 
         return await _analysisService.FindBestMovesAsync(session.Engine, evaluatorType);
+    }
+
+    /// <summary>
+    /// Get turn-by-turn history for a completed game for analysis board replay
+    /// </summary>
+    /// <param name="gameId">The game ID to retrieve history for</param>
+    /// <returns>Game history with turn snapshots, or null if game not found</returns>
+    public async Task<GameHistoryDto?> GetGameHistory(string gameId)
+    {
+        var game = await _gameRepository.GetGameByGameIdAsync(gameId);
+        if (game == null)
+        {
+            return null;
+        }
+
+        return new GameHistoryDto
+        {
+            GameId = game.GameId,
+            MatchId = game.MatchId,
+            TurnHistory = game.TurnHistory,
+            WhitePlayerName = game.WhitePlayerName,
+            RedPlayerName = game.RedPlayerName,
+            Winner = game.Winner,
+            WinType = game.WinType,
+            CreatedAt = game.CreatedAt,
+            CompletedAt = game.CompletedAt,
+            DoublingCubeValue = game.DoublingCubeValue
+        };
     }
 
     // ==================== Correspondence Game Methods ====================

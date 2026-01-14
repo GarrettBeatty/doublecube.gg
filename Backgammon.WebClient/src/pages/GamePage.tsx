@@ -490,6 +490,7 @@ export const GamePage: React.FC = () => {
           newStakes={doublingCube.newValue}
         />
       )}
+
     </div>
   )
 }

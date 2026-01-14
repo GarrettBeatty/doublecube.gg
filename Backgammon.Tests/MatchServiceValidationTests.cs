@@ -15,6 +15,7 @@ public class MatchServiceValidationTests
     private readonly Mock<IGameSessionFactory> _sessionFactoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IAiMoveService> _aiMoveServiceMock;
+    private readonly Mock<IAiPlayerManager> _aiPlayerManagerMock;
     private readonly Mock<ICorrespondenceGameService> _correspondenceGameServiceMock;
     private readonly Mock<ILogger<MatchService>> _loggerMock;
     private readonly MatchService _matchService;
@@ -27,6 +28,7 @@ public class MatchServiceValidationTests
         _sessionFactoryMock = new Mock<IGameSessionFactory>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _aiMoveServiceMock = new Mock<IAiMoveService>();
+        _aiPlayerManagerMock = new Mock<IAiPlayerManager>();
         _correspondenceGameServiceMock = new Mock<ICorrespondenceGameService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
@@ -38,6 +40,12 @@ public class MatchServiceValidationTests
         _sessionFactoryMock.Setup(x => x.CreateMatchGameSession(It.IsAny<ServerMatch>(), It.IsAny<string>()))
             .Returns((ServerMatch match, string gameId) => new GameSession(gameId));
 
+        // Setup AiPlayerManager to return consistent AI player IDs and names
+        _aiPlayerManagerMock.Setup(x => x.GetOrCreateAiForMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string matchId, string aiType) => $"ai_{aiType.ToLower()}_{Guid.NewGuid()}");
+        _aiPlayerManagerMock.Setup(x => x.GetAiNameForMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string matchId, string aiType) => $"{aiType} Bot");
+
         _matchService = new MatchService(
             _matchRepositoryMock.Object,
             _gameRepositoryMock.Object,
@@ -45,6 +53,7 @@ public class MatchServiceValidationTests
             _sessionFactoryMock.Object,
             _userRepositoryMock.Object,
             _aiMoveServiceMock.Object,
+            _aiPlayerManagerMock.Object,
             _correspondenceGameServiceMock.Object,
             _loggerMock.Object);
     }

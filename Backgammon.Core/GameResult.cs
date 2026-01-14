@@ -29,6 +29,12 @@ public class GameResult
 
     public List<Move> MoveHistory { get; set; } = new();
 
+    /// <summary>
+    /// Flag to indicate game was abandoned (no points should be awarded to winner).
+    /// Used to differentiate Abandon (0 points) from Forfeit (points awarded).
+    /// </summary>
+    public bool IsAbandoned { get; set; }
+
     public void SetWinType(WinType winType)
     {
         WinType = winType;

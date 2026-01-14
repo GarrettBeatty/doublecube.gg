@@ -207,6 +207,11 @@ public interface IGameHub
     /// </summary>
     Task<BestMovesAnalysisDto> FindBestMoves(string gameId, string? evaluatorType);
 
+    /// <summary>
+    /// Get turn-by-turn history for a completed game for analysis board replay
+    /// </summary>
+    Task<GameHistoryDto?> GetGameHistory(string gameId);
+
     // ==================== Chat ====================
 
     /// <summary>

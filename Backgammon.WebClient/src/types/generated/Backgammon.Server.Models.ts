@@ -82,6 +82,30 @@ export enum FriendshipStatus {
     Blocked = 2,
 }
 
+/** Transpiled from Backgammon.Server.Models.GameHistoryDto */
+export type GameHistoryDto = {
+    /** Transpiled from string */
+    gameId: string;
+    /** Transpiled from string? */
+    matchId?: string;
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.TurnSnapshotDto> */
+    turnHistory: TurnSnapshotDto[];
+    /** Transpiled from string? */
+    whitePlayerName?: string;
+    /** Transpiled from string? */
+    redPlayerName?: string;
+    /** Transpiled from string? */
+    winner?: string;
+    /** Transpiled from string? */
+    winType?: string;
+    /** Transpiled from System.DateTime */
+    createdAt: (Date | string);
+    /** Transpiled from System.DateTime */
+    completedAt?: (Date | string);
+    /** Transpiled from int */
+    doublingCubeValue: number;
+}
+
 /** Transpiled from Backgammon.Server.Models.GameState */
 export type GameState = {
     /** Transpiled from string */
@@ -168,6 +192,8 @@ export type GameState = {
     redOpeningRoll?: number;
     /** Transpiled from bool */
     isOpeningRollTie: boolean;
+    /** Transpiled from string */
+    leaveGameAction: string;
     /** Transpiled from string? */
     whiteUsername?: string;
     /** Transpiled from string? */
@@ -563,6 +589,26 @@ export type RecentOpponentDto = {
     lastPlayedAt: (Date | string);
     /** Transpiled from bool */
     isAi: boolean;
+}
+
+/** Transpiled from Backgammon.Server.Models.TurnSnapshotDto */
+export type TurnSnapshotDto = {
+    /** Transpiled from int */
+    turnNumber: number;
+    /** Transpiled from string */
+    player: string;
+    /** Transpiled from int[] */
+    diceRolled: number[];
+    /** Transpiled from string */
+    positionSgf: string;
+    /** Transpiled from System.Collections.Generic.List<string> */
+    moves: string[];
+    /** Transpiled from string? */
+    doublingAction?: string;
+    /** Transpiled from int */
+    cubeValue: number;
+    /** Transpiled from string? */
+    cubeOwner?: string;
 }
 
 /** Transpiled from Backgammon.Server.Models.UserStats */

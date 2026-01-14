@@ -17,6 +17,8 @@ public class GameCompletionService : IGameCompletionService
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameSessionFactory _sessionFactory;
     private readonly IGameBroadcastService _broadcastService;
+    private readonly IAiMoveService _aiMoveService;
+    private readonly IAiPlayerManager _aiPlayerManager;
     private readonly ILogger<GameCompletionService> _logger;
 
     public GameCompletionService(
@@ -26,6 +28,8 @@ public class GameCompletionService : IGameCompletionService
         IGameSessionManager sessionManager,
         IGameSessionFactory sessionFactory,
         IGameBroadcastService broadcastService,
+        IAiMoveService aiMoveService,
+        IAiPlayerManager aiPlayerManager,
         ILogger<GameCompletionService> logger)
     {
         _gameRepository = gameRepository;
@@ -34,6 +38,8 @@ public class GameCompletionService : IGameCompletionService
         _sessionManager = sessionManager;
         _sessionFactory = sessionFactory;
         _broadcastService = broadcastService;
+        _aiMoveService = aiMoveService;
+        _aiPlayerManager = aiPlayerManager;
         _logger = logger;
     }
 
@@ -75,15 +81,109 @@ public class GameCompletionService : IGameCompletionService
             if (!string.IsNullOrEmpty(session.MatchId))
             {
                 await HandleMatchGameCompletionAsync(session);
-            }
 
-            // Remove from memory to prevent memory leak
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Removed completed game {GameId} from memory", session.Id);
+                // Schedule cleanup after 5 minutes to allow players time to continue
+                var gameId = session.Id;
+                _ = Task.Delay(TimeSpan.FromMinutes(5)).ContinueWith(_ =>
+                {
+                    _sessionManager.RemoveGame(gameId);
+                    _logger.LogInformation("Cleaned up completed match game {GameId} after timeout", gameId);
+                });
+
+                _logger.LogInformation(
+                    "Keeping completed match game {GameId} in memory for continuation (will cleanup after 5 minutes)",
+                    session.Id);
+            }
+            else
+            {
+                // Standalone game - remove immediately
+                _sessionManager.RemoveGame(session.Id);
+                _logger.LogInformation("Removed completed standalone game {GameId} from memory", session.Id);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling game completion for game {GameId}", session.Id);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Creates and starts the next game in a match atomically.
+    /// This eliminates the "empty session" pattern by creating the game, adding players,
+    /// starting the engine, and broadcasting in a single operation.
+    /// </summary>
+    public async Task<GameSession> CreateAndStartNextMatchGameAsync(
+        Match match,
+        HashSet<string> player1Connections,
+        HashSet<string> player2Connections)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "========== CreateAndStartNextMatchGame ==========");
+            _logger.LogInformation(
+                "Match {MatchId} - OpponentType={OpponentType}, P1={P1Id}, P2={P2Id}, Current score: {P1Score}-{P2Score}",
+                match.MatchId,
+                match.OpponentType,
+                match.Player1Id,
+                match.Player2Id ?? "null",
+                match.Player1Score,
+                match.Player2Score);
+            _logger.LogInformation(
+                "Player1 connections: {P1Connections}, Player2 connections: {P2Connections}",
+                player1Connections.Count,
+                player2Connections.Count);
+
+            // Create the next game in the database
+            var nextGame = await _matchService.StartNextGameAsync(match.MatchId);
+
+            _logger.LogInformation(
+                "Created next game {GameId} in database",
+                nextGame.GameId);
+
+            // Get the session that was just created
+            var session = _sessionManager.GetSession(nextGame.GameId);
+            if (session == null)
+            {
+                _logger.LogError("Session not found for newly created game {GameId}", nextGame.GameId);
+                throw new InvalidOperationException($"Session not found for game {nextGame.GameId}");
+            }
+
+            _logger.LogInformation(
+                "Found session {GameId} in memory",
+                nextGame.GameId);
+
+            // Add both players to the session
+            AddPlayersToSession(session, match, player1Connections, player2Connections);
+
+            _logger.LogInformation(
+                "Added players to session {GameId}",
+                nextGame.GameId);
+
+            // Start the game engine
+            session.Engine.StartNewGame();
+
+            _logger.LogInformation(
+                "Started game engine for {GameId}. Players: P1={P1Id} ({P1Name}), P2={P2Id} ({P2Name})",
+                nextGame.GameId,
+                match.Player1Id,
+                match.Player1Name,
+                match.Player2Id ?? "null",
+                match.Player2Name ?? "null");
+
+            // Broadcast GameStart to all connected clients
+            await _broadcastService.BroadcastGameStartAsync(session);
+
+            _logger.LogInformation(
+                "Broadcasted GameStart for {GameId}",
+                nextGame.GameId);
+
+            return session;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create and start next game for match {MatchId}", match.MatchId);
             throw;
         }
     }
@@ -122,10 +222,14 @@ public class GameCompletionService : IGameCompletionService
                 // Broadcast match score update
                 await _broadcastService.BroadcastMatchUpdateAsync(match, session.Id);
 
-                // Auto-start next game if match is not complete
+                // Log match status - next game will be created when players click "Continue"
                 if (!match.CoreMatch.IsMatchComplete())
                 {
-                    await StartNextGameInMatchAsync(match, session);
+                    _logger.LogInformation(
+                        "Match {MatchId} game completed. Score: {P1Score}-{P2Score}. Waiting for players to continue.",
+                        match.MatchId,
+                        match.Player1Score,
+                        match.Player2Score);
                 }
                 else
                 {
@@ -146,73 +250,62 @@ public class GameCompletionService : IGameCompletionService
     }
 
     /// <summary>
-    /// Starts the next game in a match after the previous game completes.
+    /// Helper method to add players to a session based on match configuration.
+    /// Handles both human vs human and human vs AI matches.
     /// </summary>
-    private async Task StartNextGameInMatchAsync(Match match, GameSession completedSession)
+    private void AddPlayersToSession(
+        GameSession session,
+        Match match,
+        HashSet<string> player1Connections,
+        HashSet<string> player2Connections)
     {
-        try
+        // Add player 1 (always human in match context)
+        foreach (var connectionId in player1Connections)
         {
-            _logger.LogInformation(
-                "Auto-starting next game for match {MatchId}. Current score: {P1Score}-{P2Score}",
-                match.MatchId,
-                match.Player1Score,
-                match.Player2Score);
-
-            // Start the next game (this creates the session in MatchService)
-            var nextGame = await _matchService.StartNextGameAsync(match.MatchId);
-
-            // Get the session that was just created
-            var session = _sessionManager.GetSession(nextGame.GameId);
-            if (session == null)
-            {
-                _logger.LogError("Session not found for newly created game {GameId}", nextGame.GameId);
-                return;
-            }
-
-            // Add player connections from completed game
-            // Map player IDs to their connections from the completed session (by player ID, not color)
-            var player1Connections = completedSession.WhitePlayerId == match.Player1Id
-                ? completedSession.WhiteConnections
-                : completedSession.RedConnections;
-
-            var player2Connections = completedSession.WhitePlayerId == match.Player2Id
-                ? completedSession.WhiteConnections
-                : completedSession.RedConnections;
-
-            // Add Player 1 connections to new session
-            foreach (var connectionId in player1Connections.ToList())
-            {
-                if (await IsConnectionActiveAsync(connectionId))
-                {
-                    session.AddPlayer(match.Player1Id, connectionId);
-                }
-            }
-
-            // Add Player 2 connections to new session
-            foreach (var connectionId in player2Connections.ToList())
-            {
-                if (await IsConnectionActiveAsync(connectionId))
-                {
-                    session.AddPlayer(match.Player2Id, connectionId);
-                }
-            }
-
-            // Initialize game engine (but don't roll dice - players will do opening roll)
-            session.Engine.StartNewGame();
-
-            // Broadcast the new game to connected clients
-            await _broadcastService.BroadcastMatchGameStartingAsync(match, nextGame.GameId);
-
-            _logger.LogInformation(
-                "Started next game {GameId} for match {MatchId}",
-                nextGame.GameId,
-                match.MatchId);
+            session.AddPlayer(match.Player1Id, connectionId);
         }
-        catch (Exception ex)
+
+        session.SetPlayerName(match.Player1Id, match.Player1Name);
+
+        _logger.LogInformation(
+            "Added player 1 to session {GameId}: {PlayerId} ({PlayerName}) with {ConnectionCount} connections",
+            session.Id,
+            match.Player1Id,
+            match.Player1Name,
+            player1Connections.Count);
+
+        // Add player 2 (human or AI)
+        if (match.OpponentType == "AI")
         {
-            _logger.LogError(ex, "Failed to auto-start next game for match {MatchId}", match.MatchId);
-            // Don't throw - failing to auto-start shouldn't crash the completion flow
-            // Client can still manually call ContinueMatch()
+            // Get AI player for this match (consistent across all games)
+            var aiPlayerId = _aiPlayerManager.GetOrCreateAiForMatch(match.MatchId);
+            var aiPlayerName = _aiPlayerManager.GetAiNameForMatch(match.MatchId, "Greedy"); // aiType param ignored, uses stored type
+
+            session.AddPlayer(aiPlayerId, string.Empty); // Empty connection ID for AI
+            session.SetPlayerName(aiPlayerId, aiPlayerName);
+
+            _logger.LogInformation(
+                "Added AI player to session {GameId}: {AiPlayerId} ({AiName})",
+                session.Id,
+                aiPlayerId,
+                aiPlayerName);
+        }
+        else
+        {
+            // Add human player 2 with all their connections
+            foreach (var connectionId in player2Connections)
+            {
+                session.AddPlayer(match.Player2Id, connectionId);
+            }
+
+            session.SetPlayerName(match.Player2Id, match.Player2Name);
+
+            _logger.LogInformation(
+                "Added player 2 to session {GameId}: {PlayerId} ({PlayerName}) with {ConnectionCount} connections",
+                session.Id,
+                match.Player2Id,
+                match.Player2Name,
+                player2Connections.Count);
         }
     }
 

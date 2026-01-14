@@ -89,6 +89,41 @@ public class GameBroadcastService : IGameBroadcastService
     }
 
     /// <summary>
+    /// Broadcasts game start event to all players in the game.
+    /// Each player receives their personalized view of the game state.
+    /// </summary>
+    public async Task BroadcastGameStartAsync(GameSession session)
+    {
+        try
+        {
+            // Broadcast to all white player connections
+            foreach (var connectionId in session.WhiteConnections)
+            {
+                var whiteState = session.GetState(connectionId);
+                await _hubContext.Clients.Client(connectionId).GameStart(whiteState);
+            }
+
+            // Broadcast to all red player connections
+            foreach (var connectionId in session.RedConnections)
+            {
+                var redState = session.GetState(connectionId);
+                await _hubContext.Clients.Client(connectionId).GameStart(redState);
+            }
+
+            _logger.LogInformation(
+                "Broadcasted GameStart for game {GameId}, WhiteConnections: {WhiteCount}, RedConnections: {RedCount}",
+                session.Id,
+                session.WhiteConnections.Count,
+                session.RedConnections.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error broadcasting game start for game {GameId}", session.Id);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Broadcasts match score update to all players.
     /// </summary>
     public async Task BroadcastMatchUpdateAsync(Match match, string gameId)
@@ -103,7 +138,8 @@ public class GameBroadcastService : IGameBroadcastService
                 TargetScore = match.TargetScore,
                 IsCrawfordGame = match.IsCrawfordGame,
                 MatchComplete = match.Status == "Completed",
-                MatchWinner = match.WinnerId
+                MatchWinner = match.WinnerId,
+                NextGameId = match.CurrentGameId // Game ID for continuing the match
             });
 
             _logger.LogInformation(

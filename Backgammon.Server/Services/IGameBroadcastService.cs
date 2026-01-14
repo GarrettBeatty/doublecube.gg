@@ -19,6 +19,11 @@ public interface IGameBroadcastService
     Task BroadcastGameOverAsync(GameSession session);
 
     /// <summary>
+    /// Broadcasts game start event to all players in the game.
+    /// </summary>
+    Task BroadcastGameStartAsync(GameSession session);
+
+    /// <summary>
     /// Broadcasts match score update to all players.
     /// </summary>
     Task BroadcastMatchUpdateAsync(Match match, string gameId);

@@ -97,6 +97,8 @@ public class DynamoDbMatchRepository : IMatchRepository
     {
         try
         {
+            _logger.LogDebug("GetMatchByIdAsync: Fetching match {MatchId} with ConsistentRead=true", matchId);
+
             var response = await _dynamoDbClient.GetItemAsync(new GetItemRequest
             {
                 TableName = _tableName,
@@ -104,15 +106,27 @@ public class DynamoDbMatchRepository : IMatchRepository
                 {
                     ["PK"] = new AttributeValue { S = $"MATCH#{matchId}" },
                     ["SK"] = new AttributeValue { S = "METADATA" }
-                }
+                },
+                ConsistentRead = true // Use strongly consistent read to avoid stale data
             });
 
             if (!response.IsItemSet)
             {
+                _logger.LogDebug("GetMatchByIdAsync: Match {MatchId} not found", matchId);
                 return null;
             }
 
-            return DynamoDbHelpers.UnmarshalMatch(response.Item);
+            var match = DynamoDbHelpers.UnmarshalMatch(response.Item);
+
+            _logger.LogDebug(
+                "GetMatchByIdAsync: Fetched match {MatchId} - Status={Status}, P1={P1}, P2={P2}, CurrentGameId={GameId}",
+                matchId,
+                match.Status,
+                match.Player1Id,
+                match.Player2Id ?? "null",
+                match.CurrentGameId ?? "null");
+
+            return match;
         }
         catch (Exception ex)
         {
@@ -553,12 +567,13 @@ public class DynamoDbMatchRepository : IMatchRepository
                     ["PK"] = new AttributeValue { S = $"MATCH#{matchId}" },
                     ["SK"] = new AttributeValue { S = "METADATA" }
                 },
-                UpdateExpression = "SET currentGameId = :gameId, lastUpdatedAt = :now ADD gameIds :newGameId",
+                UpdateExpression = "SET currentGameId = :gameId, lastUpdatedAt = :now, gameIds = list_append(if_not_exists(gameIds, :emptyList), :newGameId)",
                 ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                 {
                     [":gameId"] = new AttributeValue { S = gameId },
                     [":now"] = new AttributeValue { S = DateTime.UtcNow.ToString("O") },
-                    [":newGameId"] = new AttributeValue { SS = new List<string> { gameId } }
+                    [":newGameId"] = new AttributeValue { L = new List<AttributeValue> { new AttributeValue { S = gameId } } },
+                    [":emptyList"] = new AttributeValue { L = new List<AttributeValue>() }
                 }
             });
 

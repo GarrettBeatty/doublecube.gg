@@ -162,6 +162,9 @@ builder.Services.AddHostedService<CorrespondenceTimeoutService>();
 // AI opponent service
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
+// AI player management for matches (ensures consistent AI across match continuations)
+builder.Services.AddSingleton<IAiPlayerManager, AiPlayerManager>();
+
 // Player connection tracking service
 builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
 

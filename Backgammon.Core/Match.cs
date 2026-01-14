@@ -97,6 +97,28 @@ public class Match
         }
     }
 
+    // ==================== Semantic Helper Methods ====================
+
+    /// <summary>
+    /// Check if match can continue to next game.
+    /// Match must be InProgress and not yet complete (neither player reached target score).
+    /// Note: Games collection may not be populated from database, so we don't check it.
+    /// </summary>
+    public bool CanContinueToNextGame()
+    {
+        return Status == MatchStatus.InProgress && !IsMatchComplete();
+    }
+
+    /// <summary>
+    /// Check if player can reconnect to this match.
+    /// Player must be a participant and match must still be in progress.
+    /// </summary>
+    public bool CanPlayerReconnect(string playerId)
+    {
+        return (playerId == Player1Id || playerId == Player2Id) &&
+               Status == MatchStatus.InProgress;
+    }
+
     private void CheckCrawfordRule()
     {
         if (!HasCrawfordGameBeenPlayed && !IsCrawfordGame)

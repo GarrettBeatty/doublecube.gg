@@ -22,6 +22,7 @@ public class GameService : IGameService
     private readonly IAiMoveService _aiMoveService;
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IMatchRepository _matchRepository;
+    private readonly IMatchService _matchService;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameService> _logger;
 
@@ -32,6 +33,7 @@ public class GameService : IGameService
         IAiMoveService aiMoveService,
         IGameActionOrchestrator gameActionOrchestrator,
         IMatchRepository matchRepository,
+        IMatchService matchService,
         IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameService> logger)
     {
@@ -41,6 +43,7 @@ public class GameService : IGameService
         _aiMoveService = aiMoveService;
         _gameActionOrchestrator = gameActionOrchestrator;
         _matchRepository = matchRepository;
+        _matchService = matchService;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -60,22 +63,68 @@ public class GameService : IGameService
                 throw new InvalidOperationException($"Game {gameId} not found");
             }
 
-            // If game is completed or abandoned, load it as read-only view
-            if (game.Status == "Completed" || game.Status == "Abandoned")
+            // If game is completed or abandoned, check if this is a match participant
+            if (game.CoreGame.Status == Core.GameStatus.Completed || game.CoreGame.Status == Core.GameStatus.Abandoned)
             {
                 _logger.LogInformation(
                     "Loading {Status} game {GameId} for viewing by {PlayerId}",
-                    game.Status,
+                    game.CoreGame.Status,
                     gameId,
                     playerId);
 
-                // Reconstruct session from database for viewing only
+                // Check if this is a match game and if the player is a participant
+                bool isMatchParticipant = false;
+                if (!string.IsNullOrEmpty(game.MatchId))
+                {
+                    var match = await _matchRepository.GetMatchByIdAsync(game.MatchId);
+                    // Check if player can reconnect to this match (must be participant and match still in progress)
+                    isMatchParticipant = match?.CoreMatch.CanPlayerReconnect(playerId) ?? false;
+                }
+
+                // Reconstruct session from database
                 session = GameEngineMapper.FromGame(game);
 
-                // Add to group for notifications but don't add to session manager
-                await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
+                // If match participant and session exists in manager, allow rejoining as player
+                var existingSession = _sessionManager.GetSession(gameId);
+                if (isMatchParticipant && existingSession != null)
+                {
+                    session = existingSession; // Use existing session from manager
 
-                // Send as spectator view (read-only) - use SpectatorJoined event
+                    await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
+
+                    // Allow rejoining as player (not spectator)
+                    if (session.AddPlayer(playerId, connectionId))
+                    {
+                        _sessionManager.RegisterPlayerConnection(connectionId, session.Id);
+
+                        // Fetch user data
+                        var matchUser = await _userRepository.GetByUserIdAsync(playerId);
+                        if (matchUser != null)
+                        {
+                            var effectiveDisplayName = !string.IsNullOrEmpty(displayName) ? displayName : matchUser.DisplayName;
+                            if (!string.IsNullOrEmpty(effectiveDisplayName))
+                            {
+                                session.SetPlayerName(playerId, effectiveDisplayName);
+                            }
+
+                            SetPlayerRating(session, playerId, matchUser.Rating);
+                        }
+
+                        // Send game state as player (includes winner info for modal)
+                        var playerState = session.GetState(connectionId);
+                        await _hubContext.Clients.Client(connectionId).GameUpdate(playerState);
+
+                        _logger.LogInformation(
+                            "Match participant {PlayerId} rejoined completed game {GameId} as player",
+                            playerId,
+                            gameId);
+
+                        return;
+                    }
+                }
+
+                // Non-participants or if session not in manager: send as spectator view
+                await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
                 var viewState = session.GetState(null);
                 await _hubContext.Clients.Client(connectionId).SpectatorJoined(viewState);
 
@@ -146,6 +195,86 @@ public class GameService : IGameService
             if (!string.IsNullOrEmpty(displayName))
             {
                 session.SetPlayerName(playerId, displayName);
+            }
+        }
+
+        // Handle pre-created match games (empty games waiting for players to join)
+        if (!string.IsNullOrEmpty(session.MatchId) && !session.Engine.GameStarted)
+        {
+            _logger.LogInformation(
+                "Player {PlayerId} joining pre-created match game {GameId}",
+                playerId,
+                session.Id);
+
+            // For open lobby matches, automatically join the match when Player 2 joins the game
+            var match = await _matchRepository.GetMatchByIdAsync(session.MatchId);
+            if (match != null && match.OpponentType == "OpenLobby" && string.IsNullOrEmpty(match.Player2Id))
+            {
+                var isPlayer1 = match.Player1Id == playerId;
+                if (!isPlayer1)
+                {
+                    // This is Player 2 joining an open lobby - update the match
+                    _logger.LogInformation(
+                        "Player {PlayerId} joining open lobby match {MatchId} as Player 2",
+                        playerId,
+                        match.MatchId);
+
+                    try
+                    {
+                        await _matchService.JoinMatchAsync(match.MatchId, playerId, displayName);
+                        _logger.LogInformation(
+                            "Player {PlayerId} successfully joined match {MatchId}",
+                            playerId,
+                            match.MatchId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(
+                            ex,
+                            "Failed to join match {MatchId} for player {PlayerId}",
+                            match.MatchId,
+                            playerId);
+                        throw;
+                    }
+                }
+            }
+
+            // Check if both players have now joined
+            if (session.HasBothPlayers())
+            {
+                _logger.LogInformation(
+                    "Both players joined match game {GameId}. Broadcasting GameStart.",
+                    session.Id);
+
+                // Both players ready - start game with opening roll
+                await BroadcastGameStartAsync(session);
+
+                // Save game state when game starts (progressive save)
+                if (session.GameMode.ShouldPersist)
+                {
+                    BackgroundTaskHelper.FireAndForget(
+                        async () =>
+                        {
+                            var game = GameEngineMapper.ToGame(session);
+                            await _gameRepository.SaveGameAsync(game);
+                        },
+                        _logger,
+                        $"SaveGameState-{session.Id}");
+                }
+
+                return;
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Player {PlayerId} waiting for opponent in match game {GameId}",
+                    playerId,
+                    session.Id);
+
+                // Send GameUpdate showing waiting state
+                var waitingState = session.GetState(connectionId);
+                await _hubContext.Clients.Client(connectionId).GameUpdate(waitingState);
+                return;
             }
         }
 
@@ -493,11 +622,12 @@ public class GameService : IGameService
             Player2Score = match.Player2Score,
             TargetScore = match.TargetScore,
             IsCrawfordGame = match.IsCrawfordGame,
-            MatchComplete = match.Status == "Completed",
-            MatchWinner = match.WinnerId
+            MatchComplete = match.CoreMatch.Status == Core.MatchStatus.Completed,
+            MatchWinner = match.WinnerId,
+            NextGameId = match.CurrentGameId // Game ID for continuing the match
         });
 
-        if (match.Status == "Completed")
+        if (match.CoreMatch.Status == Core.MatchStatus.Completed)
         {
             _logger.LogInformation("Match {MatchId} completed. Winner: {WinnerId}", match.MatchId, match.WinnerId);
         }

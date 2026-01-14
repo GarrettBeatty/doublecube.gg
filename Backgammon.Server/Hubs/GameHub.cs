@@ -36,6 +36,7 @@ public partial class GameHub : Hub<IGameHubClient>
     private readonly IGameSessionManager _sessionManager;
     private readonly IGameRepository _gameRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IAiPlayerManager _aiPlayerManager;
     private readonly IEloRatingService _eloRatingService;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IMatchService _matchService;
@@ -55,11 +56,13 @@ public partial class GameHub : Hub<IGameHubClient>
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IAuthService _authService;
     private readonly IDailyPuzzleService _dailyPuzzleService;
+    private readonly IGameCompletionService _gameCompletionService;
 
     public GameHub(
         IGameSessionManager sessionManager,
         IGameRepository gameRepository,
         IAiMoveService aiMoveService,
+        IAiPlayerManager aiPlayerManager,
         IEloRatingService eloRatingService,
         IHubContext<GameHub, IGameHubClient> hubContext,
         IMatchService matchService,
@@ -78,11 +81,13 @@ public partial class GameHub : Hub<IGameHubClient>
         IFriendService friendService,
         ICorrespondenceGameService correspondenceGameService,
         IAuthService authService,
-        IDailyPuzzleService dailyPuzzleService)
+        IDailyPuzzleService dailyPuzzleService,
+        IGameCompletionService gameCompletionService)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
         _aiMoveService = aiMoveService;
+        _aiPlayerManager = aiPlayerManager;
         _eloRatingService = eloRatingService;
         _hubContext = hubContext;
         _matchService = matchService;
@@ -102,6 +107,7 @@ public partial class GameHub : Hub<IGameHubClient>
         _correspondenceGameService = correspondenceGameService;
         _authService = authService;
         _dailyPuzzleService = dailyPuzzleService;
+        _gameCompletionService = gameCompletionService;
     }
 
     /// <summary>

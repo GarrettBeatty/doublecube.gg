@@ -1,5 +1,6 @@
 import React from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
+import type { GameState } from '@/types/generated/Backgammon.Server.Models'
 import {
   Dialog,
   DialogContent,
@@ -14,11 +15,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 interface AbandonConfirmModalProps {
   isOpen: boolean
   onClose: () => void
+  gameState: GameState | null
 }
 
 export const AbandonConfirmModal: React.FC<AbandonConfirmModalProps> = ({
   isOpen,
   onClose,
+  gameState,
 }) => {
   const { hub } = useSignalR()
 
@@ -31,19 +34,30 @@ export const AbandonConfirmModal: React.FC<AbandonConfirmModalProps> = ({
     }
   }
 
+  // Determine if this is an abandon or forfeit
+  const isAbandon = gameState?.leaveGameAction === 'Abandon'
+  const actionText = isAbandon ? 'Abandon' : 'Forfeit'
+  const title = isAbandon ? 'Abandon Game?' : 'Forfeit Game?'
+  const description = isAbandon
+    ? 'The game has not started yet. No points will be awarded.'
+    : 'Are you sure you want to forfeit this game in progress?'
+  const warningText = isAbandon
+    ? 'This action cannot be undone. The game will be cancelled and recorded with no points awarded to either player.'
+    : 'This action cannot be undone. You will lose the game and your opponent will be awarded points based on the current board position (Normal, Gammon, or Backgammon).'
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Abandon Game?</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Are you sure you want to forfeit this game?
+            {description}
           </DialogDescription>
         </DialogHeader>
 
         <Alert variant="destructive">
           <AlertDescription>
-            This action cannot be undone. You will lose the game and your opponent will be declared the winner.
+            {warningText}
           </AlertDescription>
         </Alert>
 
@@ -52,7 +66,7 @@ export const AbandonConfirmModal: React.FC<AbandonConfirmModalProps> = ({
             Cancel
           </Button>
           <Button variant="destructive" onClick={handleConfirm}>
-            Abandon Game
+            {actionText} Game
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -9,9 +9,7 @@ import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { HubEvents } from '@/types/signalr.types'
 import {
   MatchCreatedDto,
-  MatchGameStartingDto,
   MatchUpdateDto,
-  MatchContinuedDto,
   OpponentJoinedMatchDto,
   TimeUpdateDto,
   PlayerTimedOutDto,
@@ -144,18 +142,44 @@ export const useSignalREvents = () => {
       const isOnAnalysisPage = currentPath.startsWith('/analysis')
       const currentGameIdFromUrl = isOnGamePage ? currentPath.split('/game/')[1] : null
 
-      // If we're on a different game page, ignore this GameStart (it's from an old game)
+      // For match games, allow GameStart for new games in the same match (continuation)
+      // Only ignore if it's a completely unrelated game
       if (currentGameIdFromUrl && currentGameIdFromUrl !== gameState.gameId) {
-        console.log('[SignalR] Ignoring GameStart for old game:', gameState.gameId, 'current game:', currentGameIdFromUrl)
-        return
+        // Check if this is a match continuation (same match, different game)
+        const currentMatchIdFromUrl = currentPath.includes('/match/')
+          ? currentPath.split('/match/')[1]?.split('/')[0]
+          : null
+
+        const isSameMatchDifferentGame = currentMatchIdFromUrl &&
+          gameState.matchId &&
+          currentMatchIdFromUrl === gameState.matchId &&
+          currentGameIdFromUrl !== gameState.gameId
+
+        if (!isSameMatchDifferentGame) {
+          // It's a different match or standalone game - ignore
+          console.log('[SignalR] Ignoring GameStart for unrelated game:', gameState.gameId, 'current game:', currentGameIdFromUrl)
+          return
+        }
+
+        // It's a match continuation - log and proceed to navigate
+        console.log('[SignalR] GameStart for next game in match:', gameState.gameId, 'previous game:', currentGameIdFromUrl)
       }
 
       setGameState(gameState)
       setCurrentGameId(gameState.gameId)
       prevGameStateRef.current = gameState
 
-      // Only navigate if we're not already on a game page or analysis page
-      if (!isOnGamePage && !isOnAnalysisPage && gameState.matchId) {
+      // Close game result modal if open (for match continuation flow)
+      setShowGameResultModal(false)
+
+      // Navigate to the new game if it's different from current URL
+      if (gameState.matchId && currentGameIdFromUrl !== gameState.gameId) {
+        // Always navigate for match games when game ID changes (continuation)
+        console.log('[SignalR] Navigating to new match game:', gameState.gameId)
+        navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`, { replace: true })
+      } else if (!isOnGamePage && !isOnAnalysisPage && gameState.matchId) {
+        // First time joining - navigate to game page
+        console.log('[SignalR] Navigating to match game:', gameState.gameId)
         navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`)
       }
     })
@@ -282,56 +306,6 @@ export const useSignalREvents = () => {
       // Game page will receive WaitingForOpponent → GameStart flow
     })
 
-    // MatchGameStarting - Match game starting, navigate to game
-    connection.on(HubEvents.MatchGameStarting, (data: MatchGameStartingDto) => {
-      console.log('[SignalR] MatchGameStarting', {
-        matchId: data.matchId,
-        gameId: data.gameId,
-        gameNumber: data.gameNumber,
-        score: `${data.currentScore.player1}-${data.currentScore.player2}`,
-        isCrawford: data.isCrawfordGame
-      })
-
-      // Update game state with the new game
-      // Add missing fields to match the GameState interface
-      const now = new Date().toISOString()
-      const gameState = {
-        ...data.state,
-        createdAt: now,
-        updatedAt: now,
-      } as unknown as GameState
-      setGameState(gameState)
-      setCurrentGameId(data.gameId)
-      prevGameStateRef.current = gameState
-
-      // Update match state
-      setMatchState({
-        matchId: data.matchId,
-        player1Score: data.currentScore.player1,
-        player2Score: data.currentScore.player2,
-        targetScore: data.state.targetScore || 0,
-        isCrawfordGame: data.isCrawfordGame,
-        matchComplete: false,
-        matchWinner: null as string | null,
-        lastUpdatedAt: new Date().toISOString(),
-      })
-
-      // Close any open game result modal
-      setShowGameResultModal(false)
-
-      // Check if we're already on a game page for this match
-      const currentPath = window.location.pathname
-      const isOnGamePage = currentPath.startsWith('/match/')
-
-      if (isOnGamePage) {
-        // If on a game page, force navigation to the new game
-        navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`, { replace: true })
-      } else {
-        // If not on a game page, navigate normally
-        navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`)
-      }
-    })
-
     // TimeUpdate - Server broadcasts updated time state every second
     connection.on(HubEvents.TimeUpdate, (timeUpdate: TimeUpdateDto) => {
       const currentPath = window.location.pathname
@@ -386,30 +360,6 @@ export const useSignalREvents = () => {
       })
     })
 
-    // MatchContinued - Next game in match started
-    connection.on(HubEvents.MatchContinued, (data: MatchContinuedDto) => {
-      console.log('[SignalR] MatchContinued', data)
-
-      // Update match state with timestamp
-      setMatchState({
-        matchId: data.matchId,
-        player1Score: data.player1Score,
-        player2Score: data.player2Score,
-        targetScore: data.targetScore,
-        isCrawfordGame: data.isCrawfordGame,
-        matchComplete: false,
-        matchWinner: null,
-        lastUpdatedAt: new Date().toISOString(),
-      })
-
-      // Close the result modal
-      setShowGameResultModal(false)
-
-      // Navigate to new game
-      setCurrentGameId(data.gameId)
-      navigateRef.current(`/match/${data.matchId}/game/${data.gameId}`, { replace: true })
-    })
-
     // Cleanup on unmount
     return () => {
       console.log('[useSignalREvents] Cleaning up event handlers')
@@ -427,13 +377,40 @@ export const useSignalREvents = () => {
       connection.off(HubEvents.Info)
       connection.off(HubEvents.MatchCreated)
       connection.off(HubEvents.OpponentJoinedMatch)
-      connection.off(HubEvents.MatchGameStarting)
       connection.off(HubEvents.TimeUpdate)
       connection.off(HubEvents.PlayerTimedOut)
       connection.off(HubEvents.MatchUpdate)
-      connection.off(HubEvents.MatchContinued)
     }
   }, [connection, setGameState, updateTimeState, setIsSpectator, setCurrentGameId, addChatMessage, setMatchState, setShowGameResultModal, setLastGameResult, setPendingDoubleOffer, myColor, toast])
+
+  // Defensive check: If page refreshed during/after game completion in a match,
+  // restore the game result modal so user can continue
+  useEffect(() => {
+    const gameState = useGameStore.getState()
+    const matchState = gameState.matchState
+
+    // Show modal if:
+    // 1. Game has ended (has a winner)
+    // 2. Part of an active match (matchState exists and match not complete)
+    // 3. Modal not already showing
+    if (
+      gameState.currentGameState?.winner &&
+      matchState &&
+      !matchState.matchComplete &&
+      !gameState.showGameResultModal
+    ) {
+      // Calculate points from game state
+      const currentGame = gameState.currentGameState
+      const points = currentGame.winType === 'Gammon'
+        ? 2 * (currentGame.doublingCubeValue || 1)
+        : currentGame.winType === 'Backgammon'
+        ? 3 * (currentGame.doublingCubeValue || 1)
+        : (currentGame.doublingCubeValue || 1)
+
+      setLastGameResult(currentGame.winner ?? null, points)
+      setShowGameResultModal(true)
+    }
+  }, [setShowGameResultModal, setLastGameResult])
 
   return { connection }
 }

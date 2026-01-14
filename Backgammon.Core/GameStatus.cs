@@ -6,6 +6,7 @@ namespace Backgammon.Core;
 public enum GameStatus
 {
     InProgress,
-    Completed,
-    Abandoned
+    Completed,    // Natural completion (player bore off all checkers)
+    Abandoned,    // Game never started (no rolls, or opponent never joined) - NO points awarded
+    Forfeit // Player quit mid-game (opponent wins points based on board state)
 }

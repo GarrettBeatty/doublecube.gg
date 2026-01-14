@@ -27,19 +27,32 @@ export const GameResultModal: React.FC = () => {
     currentGameState,
     myColor,
   } = useGameStore()
+  const [isContinuing, setIsContinuing] = React.useState(false)
 
   const handleContinueMatch = async () => {
-    if (!matchState?.matchId) return
+    if (!matchState || isContinuing) return
 
+    setIsContinuing(true)
     try {
-      // Call server to start next game
+      // Call server method to create and start next game
+      console.log('[GameResultModal] Continuing match:', matchState.matchId)
       await hub?.continueMatch(matchState.matchId)
-      // Modal will be closed by MatchContinued event handler
+
+      // Keep modal open until GameStart event received
+      // Modal will close when useSignalREvents receives GameStart and navigates
     } catch (error) {
       console.error('Failed to continue match:', error)
       setShowGameResultModal(false)
+      setIsContinuing(false)
     }
   }
+
+  // Reset continuing state when modal closes
+  React.useEffect(() => {
+    if (!showGameResultModal) {
+      setIsContinuing(false)
+    }
+  }, [showGameResultModal])
 
   const handleViewMatchResults = () => {
     if (!matchState?.matchId) return
@@ -54,6 +67,12 @@ export const GameResultModal: React.FC = () => {
   const handlePlayAgain = () => {
     setShowGameResultModal(false)
     navigate('/')
+  }
+
+  const handleViewAnalysis = () => {
+    if (!currentGameState?.gameId) return
+    setShowGameResultModal(false)
+    navigate(`/analysis/game/${currentGameState.gameId}`)
   }
 
   if (!currentGameState) return null
@@ -171,17 +190,23 @@ export const GameResultModal: React.FC = () => {
                 <Button variant="outline" onClick={handleClose}>
                   Close
                 </Button>
+                <Button variant="outline" onClick={handleViewAnalysis}>
+                  View in Analysis
+                </Button>
                 <Button onClick={handleViewMatchResults}>
                   View Match Results
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={handleClose}>
+                <Button variant="outline" onClick={handleClose} disabled={isContinuing}>
                   Stay Here
                 </Button>
-                <Button onClick={handleContinueMatch}>
-                  Continue to Next Game
+                <Button variant="outline" onClick={handleViewAnalysis} disabled={isContinuing}>
+                  View in Analysis
+                </Button>
+                <Button onClick={handleContinueMatch} disabled={isContinuing}>
+                  {isContinuing ? 'Starting next game...' : 'Continue to Next Game'}
                 </Button>
               </>
             )
@@ -190,6 +215,9 @@ export const GameResultModal: React.FC = () => {
             <>
               <Button variant="outline" onClick={handleClose}>
                 Close
+              </Button>
+              <Button variant="outline" onClick={handleViewAnalysis}>
+                View in Analysis
               </Button>
               <Button onClick={handlePlayAgain}>
                 Play Again

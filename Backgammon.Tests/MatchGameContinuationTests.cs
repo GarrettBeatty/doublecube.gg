@@ -22,6 +22,7 @@ public class MatchGameContinuationTests
     private readonly Mock<IGameSessionFactory> _sessionFactoryMock;
     private readonly Mock<IUserRepository> _userRepositoryMock;
     private readonly Mock<IAiMoveService> _aiMoveServiceMock;
+    private readonly Mock<IAiPlayerManager> _aiPlayerManagerMock;
     private readonly Mock<ICorrespondenceGameService> _correspondenceGameServiceMock;
     private readonly Mock<ILogger<MatchService>> _loggerMock;
     private readonly MatchService _matchService;
@@ -34,12 +35,19 @@ public class MatchGameContinuationTests
         _sessionFactoryMock = new Mock<IGameSessionFactory>();
         _userRepositoryMock = new Mock<IUserRepository>();
         _aiMoveServiceMock = new Mock<IAiMoveService>();
+        _aiPlayerManagerMock = new Mock<IAiPlayerManager>();
         _correspondenceGameServiceMock = new Mock<ICorrespondenceGameService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
         // Setup GameSessionManager to return a valid session
         _gameSessionManagerMock.Setup(x => x.CreateGame(It.IsAny<string>()))
             .Returns((string gameId) => new GameSession(gameId));
+
+        // Setup AiPlayerManager to return consistent AI player IDs and names
+        _aiPlayerManagerMock.Setup(x => x.GetOrCreateAiForMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string matchId, string aiType) => $"ai_{aiType.ToLower()}_{Guid.NewGuid()}");
+        _aiPlayerManagerMock.Setup(x => x.GetAiNameForMatch(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns((string matchId, string aiType) => $"{aiType} Bot");
 
         _matchService = new MatchService(
             _matchRepositoryMock.Object,
@@ -48,6 +56,7 @@ public class MatchGameContinuationTests
             _sessionFactoryMock.Object,
             _userRepositoryMock.Object,
             _aiMoveServiceMock.Object,
+            _aiPlayerManagerMock.Object,
             _correspondenceGameServiceMock.Object,
             _loggerMock.Object);
     }
@@ -468,5 +477,255 @@ public class MatchGameContinuationTests
         // Verify it's marked as a match game
         Assert.NotNull(capturedSession.MatchId);
         Assert.False(capturedSession.IsCrawfordGame);
+    }
+
+    [Fact]
+    public async Task CompleteGameAsync_AwardNoPoints_WhenGameAbandoned()
+    {
+        // Arrange
+        var matchId = Guid.NewGuid().ToString();
+        var gameId = Guid.NewGuid().ToString();
+        var player1Id = "player1";
+        var player2Id = "player2";
+
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = player1Id,
+            Player2Id = player2Id,
+            Player1Name = "Player 1",
+            Player2Name = "Player 2",
+            TargetScore = 7,
+            Player1Score = 0,
+            Player2Score = 0,
+            Status = "InProgress",
+            IsCrawfordGame = false,
+            OpponentType = "Human"
+        };
+
+        var game = new ServerGame
+        {
+            GameId = gameId,
+            MatchId = matchId,
+            Status = "Abandoned",
+            WhitePlayerId = player1Id,
+            RedPlayerId = player2Id
+        };
+
+        // Create game result with IsAbandoned flag - 0 points
+        var result = new GameResult(player2Id, WinType.Normal, 0)
+        {
+            IsAbandoned = true,
+            WinnerColor = CheckerColor.Red
+        };
+
+        _gameRepositoryMock.Setup(x => x.GetGameByGameIdAsync(gameId))
+            .ReturnsAsync(game);
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        await _matchService.CompleteGameAsync(gameId, result);
+
+        // Assert - scores should remain 0-0 (no points awarded)
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(0, match.Player2Score);
+        Assert.Equal("InProgress", match.Status);
+
+        // Verify game was added to history
+        Assert.Single(match.CoreMatch.Games);
+        Assert.Equal(GameStatus.Abandoned, match.CoreMatch.Games[0].Status);
+        Assert.Equal(0, match.CoreMatch.Games[0].Stakes);
+
+        // Verify match can continue
+        Assert.True(match.CoreMatch.CanContinueToNextGame());
+    }
+
+    [Fact]
+    public async Task CompleteGameAsync_AwardPoints_WhenGameForfeited()
+    {
+        // Arrange
+        var matchId = Guid.NewGuid().ToString();
+        var gameId = Guid.NewGuid().ToString();
+        var player1Id = "player1";
+        var player2Id = "player2";
+
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = player1Id,
+            Player2Id = player2Id,
+            Player1Name = "Player 1",
+            Player2Name = "Player 2",
+            TargetScore = 7,
+            Player1Score = 0,
+            Player2Score = 0,
+            Status = "InProgress",
+            IsCrawfordGame = false,
+            OpponentType = "Human"
+        };
+
+        var game = new ServerGame
+        {
+            GameId = gameId,
+            MatchId = matchId,
+            Status = "Forfeit",
+            WhitePlayerId = player1Id,
+            RedPlayerId = player2Id
+        };
+
+        // Player 1 forfeits, Player 2 wins 3 points (Backgammon with cube=1)
+        var result = new GameResult(player2Id, WinType.Backgammon, 1)
+        {
+            IsAbandoned = false,
+            WinnerColor = CheckerColor.Red
+        };
+
+        _gameRepositoryMock.Setup(x => x.GetGameByGameIdAsync(gameId))
+            .ReturnsAsync(game);
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        await _matchService.CompleteGameAsync(gameId, result);
+
+        // Assert - Player 2 should have 3 points
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(3, match.Player2Score);
+        Assert.Equal("InProgress", match.Status);
+
+        // Verify game was added to history with correct points
+        Assert.Single(match.CoreMatch.Games);
+        Assert.Equal(GameStatus.Forfeit, match.CoreMatch.Games[0].Status);
+        Assert.Equal(3, match.CoreMatch.Games[0].Stakes);
+
+        // Verify match can continue
+        Assert.True(match.CoreMatch.CanContinueToNextGame());
+    }
+
+    [Fact]
+    public void CanContinueToNextGame_ReturnsTrue_AfterAbandonedGame()
+    {
+        // Arrange
+        var match = new Core.Match("match1", "player1", "player2", 7);
+        var abandonedGame = new Core.Game("game1")
+        {
+            Status = GameStatus.Abandoned,
+            WinnerId = "player2",
+            PointsScored = 0
+        };
+
+        match.AddGame(abandonedGame);
+
+        // Act & Assert
+        Assert.True(match.CanContinueToNextGame());
+        Assert.False(match.IsMatchComplete());
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(0, match.Player2Score);
+    }
+
+    [Fact]
+    public void CanContinueToNextGame_ReturnsTrue_AfterForfeitedGame()
+    {
+        // Arrange
+        var match = new Core.Match("match1", "player1", "player2", 7);
+
+        // Simulate forfeit by manually updating scores
+        match.UpdateScores("player2", 3); // Player 2 wins 3 points from forfeit
+
+        var forfeitedGame = new Core.Game("game1")
+        {
+            Status = GameStatus.Forfeit,
+            WinnerId = "player2",
+            PointsScored = 3
+        };
+
+        match.AddGame(forfeitedGame);
+
+        // Act & Assert
+        Assert.True(match.CanContinueToNextGame());
+        Assert.False(match.IsMatchComplete());
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(3, match.Player2Score);
+    }
+
+    [Fact]
+    public async Task FullMatchFlow_HandlesAbandonAndForfeit_Correctly()
+    {
+        // Arrange - 5-point match
+        var matchId = Guid.NewGuid().ToString();
+        var player1Id = "player1";
+        var player2Id = "player2";
+
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = player1Id,
+            Player2Id = player2Id,
+            Player1Name = "Player 1",
+            Player2Name = "Player 2",
+            TargetScore = 5,
+            Player1Score = 0,
+            Player2Score = 0,
+            Status = "InProgress",
+            OpponentType = "Human"
+        };
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Game 1: Abandoned (0 points)
+        var game1 = new ServerGame { GameId = "game1", MatchId = matchId, Status = "Abandoned" };
+        var result1 = new GameResult(player2Id, WinType.Normal, 0)
+        {
+            IsAbandoned = true,
+            WinnerColor = CheckerColor.Red
+        };
+
+        _gameRepositoryMock.Setup(x => x.GetGameByGameIdAsync("game1")).ReturnsAsync(game1);
+        await _matchService.CompleteGameAsync("game1", result1);
+
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(0, match.Player2Score);
+        Assert.True(match.CoreMatch.CanContinueToNextGame());
+
+        // Game 2: Forfeit (3 points to Player 2)
+        var game2 = new ServerGame { GameId = "game2", MatchId = matchId, Status = "Forfeit" };
+        var result2 = new GameResult(player2Id, WinType.Backgammon, 1)
+        {
+            IsAbandoned = false,
+            WinnerColor = CheckerColor.Red
+        };
+
+        _gameRepositoryMock.Setup(x => x.GetGameByGameIdAsync("game2")).ReturnsAsync(game2);
+        await _matchService.CompleteGameAsync("game2", result2);
+
+        Assert.Equal(0, match.Player1Score);
+        Assert.Equal(3, match.Player2Score);
+        Assert.True(match.CoreMatch.CanContinueToNextGame());
+
+        // Game 3: Normal completion (2 points to Player 1)
+        var game3 = new ServerGame { GameId = "game3", MatchId = matchId, Status = "Completed" };
+        var result3 = new GameResult(player1Id, WinType.Gammon, 1)
+        {
+            WinnerColor = CheckerColor.White
+        };
+
+        _gameRepositoryMock.Setup(x => x.GetGameByGameIdAsync("game3")).ReturnsAsync(game3);
+        await _matchService.CompleteGameAsync("game3", result3);
+
+        Assert.Equal(2, match.Player1Score);
+        Assert.Equal(3, match.Player2Score);
+        Assert.True(match.CoreMatch.CanContinueToNextGame());
+        Assert.False(match.CoreMatch.IsMatchComplete());
+
+        // Verify game history has all 3 games
+        Assert.Equal(3, match.CoreMatch.Games.Count);
+        Assert.Equal(GameStatus.Abandoned, match.CoreMatch.Games[0].Status);
+        Assert.Equal(0, match.CoreMatch.Games[0].Stakes);
+        Assert.Equal(GameStatus.Forfeit, match.CoreMatch.Games[1].Status);
+        Assert.Equal(3, match.CoreMatch.Games[1].Stakes);
+        Assert.Equal(GameStatus.Completed, match.CoreMatch.Games[2].Status);
+        Assert.Equal(2, match.CoreMatch.Games[2].Stakes);
     }
 }

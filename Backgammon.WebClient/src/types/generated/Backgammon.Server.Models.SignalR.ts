@@ -387,6 +387,8 @@ export type MatchUpdateDto = {
     matchComplete: boolean;
     /** Transpiled from string? */
     matchWinner?: string;
+    /** Transpiled from string? */
+    nextGameId?: string;
 }
 
 /** Transpiled from Backgammon.Server.Models.SignalR.OpponentJoinedMatchDto */

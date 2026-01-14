@@ -96,6 +96,11 @@ public class GameState
 
     public bool IsOpeningRollTie { get; set; }
 
+    /// <summary>
+    /// Action that will occur if player leaves the game: "Abandon" (no points) or "Forfeit" (opponent gets points)
+    /// </summary>
+    public string LeaveGameAction { get; set; } = "Abandon";
+
     public string? WhiteUsername { get; set; }
 
     public string? RedUsername { get; set; }

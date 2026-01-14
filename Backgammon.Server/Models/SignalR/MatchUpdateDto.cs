@@ -21,4 +21,9 @@ public class MatchUpdateDto
     public bool MatchComplete { get; set; }
 
     public string? MatchWinner { get; set; }
+
+    /// <summary>
+    /// The game ID to join for continuing the match (pre-created but waiting for players)
+    /// </summary>
+    public string? NextGameId { get; set; }
 }

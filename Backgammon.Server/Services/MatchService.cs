@@ -14,6 +14,7 @@ public class MatchService : IMatchService
     private readonly IGameSessionFactory _sessionFactory;
     private readonly IUserRepository _userRepository;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IAiPlayerManager _aiPlayerManager;
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly ILogger<MatchService> _logger;
 
@@ -24,6 +25,7 @@ public class MatchService : IMatchService
         IGameSessionFactory sessionFactory,
         IUserRepository userRepository,
         IAiMoveService aiMoveService,
+        IAiPlayerManager aiPlayerManager,
         ICorrespondenceGameService correspondenceGameService,
         ILogger<MatchService> logger)
     {
@@ -33,6 +35,7 @@ public class MatchService : IMatchService
         _sessionFactory = sessionFactory;
         _userRepository = userRepository;
         _aiMoveService = aiMoveService;
+        _aiPlayerManager = aiPlayerManager;
         _correspondenceGameService = correspondenceGameService;
         _logger = logger;
     }
@@ -97,11 +100,11 @@ public class MatchService : IMatchService
             // Handle opponent based on type
             if (opponentType == "AI")
             {
-                // Generate AI player ID with specified AI type
-                var aiPlayerId = _aiMoveService.GenerateAiPlayerId(aiType);
+                // Get or create AI player for this match (ensures same AI across all games)
+                var aiPlayerId = _aiPlayerManager.GetOrCreateAiForMatch(match.MatchId, aiType);
                 match.Player2Id = aiPlayerId;
-                match.Player2Name = GetAiDisplayName(aiType);
-                match.Status = "InProgress";  // AI matches start immediately
+                match.Player2Name = _aiPlayerManager.GetAiNameForMatch(match.MatchId, aiType);
+                match.CoreMatch.Status = Core.MatchStatus.InProgress;  // AI matches start immediately
                 match.IsOpenLobby = false;
                 match.IsRated = false; // AI matches are always unrated
             }
@@ -111,13 +114,13 @@ public class MatchService : IMatchService
                 var player2 = await _userRepository.GetByUserIdAsync(player2Id);
                 match.Player2Id = player2Id;
                 match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
-                match.Status = "InProgress";  // Friend match with both players ready
+                match.CoreMatch.Status = Core.MatchStatus.InProgress;  // Friend match with both players ready
                 match.IsOpenLobby = false;
             }
             else
             {
                 // OpenLobby: Player2Id remains null
-                match.Status = "WaitingForPlayers";  // Waiting for join
+                match.CoreMatch.Status = Core.MatchStatus.WaitingForPlayers;  // Waiting for join
                 match.IsOpenLobby = true;
             }
 
@@ -198,7 +201,7 @@ public class MatchService : IMatchService
                 throw new InvalidOperationException($"Match {matchId} not found");
             }
 
-            if (match.Status != "InProgress")
+            if (match.CoreMatch.Status != Core.MatchStatus.InProgress)
             {
                 throw new InvalidOperationException($"Cannot start new game in completed match {matchId}");
             }
@@ -267,8 +270,11 @@ public class MatchService : IMatchService
             }
 
             _logger.LogInformation(
-                "Updating match {MatchId} scores. Current: {P1Score}-{P2Score}, Adding {Points} for {WinnerId}",
+                "CompleteGameAsync: Match {MatchId} before update - Status={Status}, P1={P1}, P2={P2}, Current: {P1Score}-{P2Score}, Adding {Points} for {WinnerId}",
                 match.MatchId,
+                match.Status,
+                match.Player1Id,
+                match.Player2Id ?? "null",
                 match.Player1Score,
                 match.Player2Score,
                 result.PointsWon,
@@ -283,7 +289,7 @@ public class MatchService : IMatchService
                 MatchId = game.MatchId,
                 IsCrawfordGame = match.IsCrawfordGame,
                 MoveHistory = result.MoveHistory ?? new List<Move>(),
-                Status = Core.GameStatus.Completed
+                Status = result.IsAbandoned ? Core.GameStatus.Abandoned : Core.GameStatus.Forfeit
             };
 
             // Add game to match and update scores (uses Core business logic)
@@ -292,15 +298,27 @@ public class MatchService : IMatchService
             // Track Crawford rule state before update
             bool wasCrawford = match.IsCrawfordGame;
 
-            // Update scores - this handles Crawford rule logic automatically
-            _logger.LogInformation(
-                "Calling UpdateScores: WinnerId={WinnerId}, Player1Id={P1Id}, Player2Id={P2Id}, Points={Points}",
-                result.WinnerId,
-                match.Player1Id,
-                match.Player2Id,
-                result.PointsWon);
+            // Only update scores if game was NOT abandoned (abandoned games award 0 points)
+            if (!result.IsAbandoned)
+            {
+                _logger.LogInformation(
+                    "Calling UpdateScores: WinnerId={WinnerId}, Player1Id={P1Id}, Player2Id={P2Id}, Points={Points}",
+                    result.WinnerId,
+                    match.Player1Id,
+                    match.Player2Id,
+                    result.PointsWon);
 
-            match.CoreMatch.UpdateScores(result.WinnerId, result.PointsWon);
+                match.CoreMatch.UpdateScores(result.WinnerId, result.PointsWon);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Game abandoned - no points awarded. Match {MatchId} scores remain: {P1Score}-{P2Score}",
+                    match.MatchId,
+                    match.Player1Score,
+                    match.Player2Score);
+            }
+
             match.LastUpdatedAt = DateTime.UtcNow;
 
             _logger.LogInformation(
@@ -324,8 +342,11 @@ public class MatchService : IMatchService
             {
                 match.WinnerId = match.CoreMatch.GetWinnerId();
                 match.DurationSeconds = (int)(DateTime.UtcNow - match.CreatedAt).TotalSeconds;
-                match.Status = "Completed";
+                match.CoreMatch.Status = Core.MatchStatus.Completed;
                 match.CompletedAt = DateTime.UtcNow;
+
+                // Clean up AI player mapping for this match
+                _aiPlayerManager.RemoveMatch(match.MatchId);
 
                 _logger.LogInformation(
                     "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",
@@ -351,7 +372,7 @@ public class MatchService : IMatchService
     public async Task<bool> IsMatchCompleteAsync(string matchId)
     {
         var match = await _matchRepository.GetMatchByIdAsync(matchId);
-        return match?.Status == "Completed";
+        return match?.CoreMatch.Status == Core.MatchStatus.Completed;
     }
 
     public async Task<List<Match>> GetPlayerMatchesAsync(string playerId, string? status = null)
@@ -390,12 +411,12 @@ public class MatchService : IMatchService
             }
 
             // Allow abandoning both WaitingForPlayers and InProgress matches
-            if (match.Status != "InProgress" && match.Status != "WaitingForPlayers")
+            if (match.CoreMatch.Status != Core.MatchStatus.InProgress && match.CoreMatch.Status != Core.MatchStatus.WaitingForPlayers)
             {
                 return;  // Already completed or abandoned
             }
 
-            match.Status = "Abandoned";
+            match.CoreMatch.Status = Core.MatchStatus.Abandoned;
             match.CompletedAt = DateTime.UtcNow;
             match.DurationSeconds = (int)(match.CompletedAt.Value - match.CreatedAt).TotalSeconds;
 
@@ -447,9 +468,9 @@ public class MatchService : IMatchService
             }
 
             // Validate match is in correct state
-            if (match.Status != "WaitingForPlayers")
+            if (match.CoreMatch.Status != Core.MatchStatus.WaitingForPlayers)
             {
-                throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.Status})");
+                throw new InvalidOperationException($"Match {matchId} is not accepting players (Status: {match.CoreMatch.Status})");
             }
 
             // Get player 2 info - user guaranteed to exist (created in OnConnectedAsync)
@@ -457,7 +478,7 @@ public class MatchService : IMatchService
             match.Player2Id = player2Id;
             match.Player2Name = player2?.DisplayName ?? "Unknown"; // Fallback just in case
             match.Player2DisplayName = player2DisplayName;
-            match.Status = "InProgress";  // Transition from WaitingForPlayers to InProgress
+            match.CoreMatch.Status = Core.MatchStatus.InProgress;  // Transition from WaitingForPlayers to InProgress
             match.LastUpdatedAt = DateTime.UtcNow;
 
             // Create Player2's player-match index item (wasn't created when match was initially saved)

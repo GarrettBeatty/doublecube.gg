@@ -79,6 +79,7 @@ function AppContent() {
           <Route path="/profile/:username" element={<ProfilePage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/analysis/game/:gameId" element={<AnalysisPage />} />
           <Route path="/analysis/:sgf?" element={<AnalysisPage />} />
           <Route path="/puzzle" element={<DailyPuzzlePage />} />
           <Route path="/about" element={<AboutPage />} />

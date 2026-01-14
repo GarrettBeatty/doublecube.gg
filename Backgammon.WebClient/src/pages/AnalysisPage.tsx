@@ -23,10 +23,11 @@ import {
   PositionEvaluation,
   BestMovesAnalysis,
 } from '@/types/analysis.types'
+import { GameHistoryDto } from '@/types/generated/Backgammon.Server.Models'
 
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
-  const { sgf } = useParams<{ sgf?: string }>()
+  const { sgf, gameId } = useParams<{ sgf?: string; gameId?: string }>()
   const { hub, isConnected } = useSignalR()
   const { toast } = useToast()
   const {
@@ -45,6 +46,8 @@ export const AnalysisPage: React.FC = () => {
   } = useGameStore()
   const [isCreating, setIsCreating] = useState(false)
   const [evaluatorType, setEvaluatorType] = useState<'Heuristic' | 'Gnubg'>('Gnubg')
+  const [gameHistory, setGameHistory] = useState<GameHistoryDto | null>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
@@ -52,6 +55,7 @@ export const AnalysisPage: React.FC = () => {
   const lastAnalyzedState = useRef<string | null>(null)
   const isExecutingMoves = useRef(false)
   const analysisRequestCounter = useRef(0)
+  const hasLoadedHistory = useRef(false)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -85,6 +89,64 @@ export const AnalysisPage: React.FC = () => {
     createAnalysisGame()
   }, [isConnected, hub, toast, isCreating])
 
+  // Load game history when gameId is present in URL
+  useEffect(() => {
+    const loadGameHistory = async () => {
+      if (!gameId || !isConnected || !hub) {
+        return
+      }
+
+      // Prevent loading history multiple times
+      if (hasLoadedHistory.current || isLoadingHistory) {
+        return
+      }
+
+      setIsLoadingHistory(true)
+      hasLoadedHistory.current = true
+
+      try {
+        console.log('[AnalysisPage] Loading game history for gameId:', gameId)
+        const history = await hub.getGameHistory(gameId)
+
+        if (!history) {
+          toast({
+            title: 'Game Not Found',
+            description: 'Could not load game history',
+            variant: 'destructive',
+          })
+          navigate('/analysis')
+          return
+        }
+
+        console.log('[AnalysisPage] Game history loaded:', history)
+        setGameHistory(history)
+
+        // Load the initial position from first turn's SGF, or use starting position
+        if (history.turnHistory && history.turnHistory.length > 0) {
+          const firstTurn = history.turnHistory[0]
+          if (firstTurn.positionSgf) {
+            console.log('[AnalysisPage] Importing initial position from turn history')
+            await hub.importPosition(firstTurn.positionSgf)
+            lastImportedSgf.current = firstTurn.positionSgf
+            lastExportedSgf.current = firstTurn.positionSgf
+          }
+        }
+      } catch (error) {
+        console.error('[AnalysisPage] Failed to load game history:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to load game history',
+          variant: 'destructive',
+        })
+        hasLoadedHistory.current = false
+      } finally {
+        setIsLoadingHistory(false)
+      }
+    }
+
+    loadGameHistory()
+  }, [gameId, isConnected, hub, toast, navigate, isLoadingHistory])
+
   // Update the current game ID when game state arrives
   useEffect(() => {
     if (currentGameState?.gameId) {
@@ -95,6 +157,11 @@ export const AnalysisPage: React.FC = () => {
   // Import position from URL if present (only when SGF parameter changes and is different)
   useEffect(() => {
     const importFromUrl = async () => {
+      // Skip if we're viewing a game history (gameId is present)
+      if (gameId) {
+        return
+      }
+
       if (!currentGameState || !sgf) {
         return
       }
@@ -132,11 +199,16 @@ export const AnalysisPage: React.FC = () => {
     }
 
     importFromUrl()
-  }, [sgf, currentGameState, hub, toast])
+  }, [sgf, currentGameState, hub, toast, gameId])
 
   // Update URL when position changes (but don't trigger if we just imported)
   useEffect(() => {
     const updateUrl = async () => {
+      // Skip URL updates when viewing game history
+      if (gameId) {
+        return
+      }
+
       if (!currentGameState) {
         return
       }
@@ -171,7 +243,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     updateUrl()
-  }, [currentGameState, hub, navigate, sgf])
+  }, [currentGameState, hub, navigate, sgf, gameId])
 
   // Cleanup when leaving the page
   useEffect(() => {
@@ -360,11 +432,21 @@ export const AnalysisPage: React.FC = () => {
     <div className="min-h-screen bg-background">
       <div className="max-w-[1920px] mx-auto px-2 py-4">
         {/* Header */}
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="text-lg py-2 px-4">
             <BarChart3 className="h-5 w-5 mr-2" />
-            Analysis Mode - Control Both Sides
+            {gameHistory ? 'Game Replay' : 'Analysis Mode - Control Both Sides'}
           </Badge>
+          {gameHistory && (
+            <Badge variant="outline" className="text-sm py-1 px-3">
+              {gameHistory.whitePlayerName} vs {gameHistory.redPlayerName}
+            </Badge>
+          )}
+          {gameHistory && gameHistory.winner && (
+            <Badge variant="default" className="text-sm py-1 px-3">
+              Winner: {gameHistory.winner === 'White' ? gameHistory.whitePlayerName : gameHistory.redPlayerName}
+            </Badge>
+          )}
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_320px] gap-3">

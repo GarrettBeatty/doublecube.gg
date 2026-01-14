@@ -79,6 +79,12 @@ public class GameSession
 
     public IGameMode GameMode { get; private set; }
 
+    /// <summary>
+    /// Explicit lifecycle status of this game session.
+    /// Replaces computed status from Engine.Winner/GameStarted/IsFull.
+    /// </summary>
+    public SessionStatus Status { get; private set; } = SessionStatus.WaitingForOpponent;
+
     public bool IsAnalysisMode => GameMode is AnalysisMode;
 
     public bool IsBotGame { get; set; } = false;
@@ -147,6 +153,8 @@ public class GameSession
             if (!Engine.GameStarted)
             {
                 Engine.StartNewGame();
+                // Explicit status transition: both players joined, game is now in progress
+                Status = SessionStatus.InProgress;
             }
 
             return true;
@@ -255,6 +263,14 @@ public class GameSession
     }
 
     /// <summary>
+    /// Check if both players have joined the game (at least one connection each)
+    /// </summary>
+    public bool HasBothPlayers()
+    {
+        return _whiteConnections.Count > 0 && _redConnections.Count > 0;
+    }
+
+    /// <summary>
     /// Get the color assigned to a specific player connection
     /// </summary>
     public CheckerColor? GetPlayerColor(string connectionId)
@@ -278,6 +294,22 @@ public class GameSession
     public bool IsPlayerTurn(string connectionId)
     {
         return GameMode.IsPlayerTurn(connectionId, this);
+    }
+
+    /// <summary>
+    /// Determine whether leaving this game would be an Abandon or Forfeit.
+    /// Abandon: Game never started or still in opening roll (no points awarded).
+    /// Forfeit: Game in progress (opponent gets points based on board state).
+    /// </summary>
+    public string GetLeaveGameAction()
+    {
+        // Abandon if game hasn't started or still in opening roll
+        if (!Engine.GameStarted || Engine.IsOpeningRoll)
+        {
+            return "Abandon"; // No points awarded
+        }
+
+        return "Forfeit"; // Opponent gets points based on board state
     }
 
     /// <summary>
@@ -318,7 +350,14 @@ public class GameSession
             RedBornOff = Engine.RedPlayer.CheckersBornOff,
             WhitePipCount = CalculatePipCount(CheckerColor.White),
             RedPipCount = CalculatePipCount(CheckerColor.Red),
-            Status = IsFull ? (Engine.Winner != null ? ServerGameStatus.Completed : ServerGameStatus.InProgress) : ServerGameStatus.WaitingForPlayer,
+            Status = Status switch
+            {
+                SessionStatus.WaitingForOpponent => ServerGameStatus.WaitingForPlayer,
+                SessionStatus.InProgress => ServerGameStatus.InProgress,
+                SessionStatus.Completed => ServerGameStatus.Completed,
+                SessionStatus.Abandoned => ServerGameStatus.Completed,
+                _ => throw new InvalidOperationException($"Unknown session status: {Status}")
+            },
             Winner = Engine.Winner?.Color,
             DoublingCubeValue = Engine.DoublingCube.Value,
             DoublingCubeOwner = Engine.DoublingCube.Owner?.ToString(),
@@ -339,6 +378,7 @@ public class GameSession
             WhiteOpeningRoll = Engine.WhiteOpeningRoll,
             RedOpeningRoll = Engine.RedOpeningRoll,
             IsOpeningRollTie = Engine.IsOpeningRollTie,
+            LeaveGameAction = GetLeaveGameAction(),
             TimeControlType = TimeControl?.Type.ToString(),
             DelaySeconds = TimeControl?.DelaySeconds,
             WhiteReserveSeconds = Engine.WhiteTimeState?.GetRemainingTime(TimeControl?.DelaySeconds ?? 0).TotalSeconds,
@@ -437,6 +477,43 @@ public class GameSession
             _timeUpdateTimer?.Dispose();
             _timeUpdateTimer = null;
         }
+    }
+
+    // ==================== Semantic Helper Methods ====================
+
+    /// <summary>
+    /// Check if a player can join this game session.
+    /// </summary>
+    public bool CanPlayerJoin() => Status == SessionStatus.WaitingForOpponent;
+
+    /// <summary>
+    /// Check if this is an active game in progress.
+    /// </summary>
+    public bool IsActiveGame() => Status == SessionStatus.InProgress;
+
+    /// <summary>
+    /// Check if the game is over (completed or abandoned).
+    /// </summary>
+    public bool IsGameOver() => Status == SessionStatus.Completed || Status == SessionStatus.Abandoned;
+
+    // ==================== Status Transition Methods ====================
+
+    /// <summary>
+    /// Mark this game session as completed.
+    /// Called when the game ends with a winner.
+    /// </summary>
+    public void MarkCompleted()
+    {
+        Status = SessionStatus.Completed;
+    }
+
+    /// <summary>
+    /// Mark this game session as abandoned.
+    /// Called when a player forfeits, disconnects, or times out.
+    /// </summary>
+    public void MarkAbandoned()
+    {
+        Status = SessionStatus.Abandoned;
     }
 
     private string GenerateFriendlyName(string playerId)

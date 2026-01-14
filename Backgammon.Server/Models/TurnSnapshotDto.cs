@@ -1,11 +1,13 @@
 using System.Text.Json.Serialization;
 using Backgammon.Core;
+using Tapper;
 
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Data transfer object for turn snapshots, used for database serialization
 /// </summary>
+[TranspilationSource]
 public class TurnSnapshotDto
 {
     [JsonPropertyName("turnNumber")]
