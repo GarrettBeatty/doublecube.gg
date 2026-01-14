@@ -193,7 +193,8 @@ export const GamePage: React.FC = () => {
         // Preserve existing matchComplete/matchWinner (set via MatchUpdate events)
         matchComplete: previousMatchState?.matchComplete || false,
         matchWinner: previousMatchState?.matchWinner || null,
-        lastUpdatedAt: new Date().toISOString(),
+        // Use previous timestamp or epoch 0 so server fetch can override with accurate matchComplete
+        lastUpdatedAt: previousMatchState?.lastUpdatedAt || new Date(0).toISOString(),
       }
     })
   }, [currentGameState, setMatchState])
