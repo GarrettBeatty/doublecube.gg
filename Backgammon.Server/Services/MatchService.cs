@@ -148,11 +148,12 @@ public class MatchService : IMatchService
 
             await _gameRepository.SaveGameAsync(game);
 
-            // Update match with game ID
+            // Add first game to match using AddGameToMatchAsync (atomic list_append)
+            // This is the canonical way to add games - ensures consistency with subsequent games
+            await _matchRepository.AddGameToMatchAsync(match.MatchId, game.GameId);
+
+            // Update in-memory state to match what's in DB
             match.CurrentGameId = game.GameId;
-            match.GameIds.Add(game.GameId);
-            match.LastUpdatedAt = DateTime.UtcNow;
-            await _matchRepository.UpdateMatchAsync(match);
 
             // Create game session using factory
             // Factory now sets player IDs from match (Player1 = White, Player2 = Red)

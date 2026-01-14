@@ -180,15 +180,8 @@ public class DynamoDbMatchRepository : IMatchRepository
                 expressionAttributeValues[":p2Name"] = new AttributeValue { S = match.Player2Name ?? "Unknown" };
             }
 
-            // Add game IDs if they've changed
-            if (match.GameIds.Any())
-            {
-                updateExpression += ", gameIds = :gameIds";
-                expressionAttributeValues[":gameIds"] = new AttributeValue
-                {
-                    L = match.GameIds.Select(id => new AttributeValue { S = id }).ToList()
-                };
-            }
+            // Note: gameIds is NOT updated here - it's managed exclusively by AddGameToMatchAsync
+            // which uses atomic list_append for thread-safe additions
 
             // Add completion data if match is complete
             if (match.Status == "Completed" && match.CompletedAt.HasValue)
