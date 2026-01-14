@@ -142,6 +142,16 @@ public interface IGameHub
     Task<List<ActiveGameDto>> GetActiveGames(int limit);
 
     /// <summary>
+    /// Get player's active (in-progress) matches
+    /// </summary>
+    Task<List<ActiveMatchDto>> GetActiveMatches(int limit);
+
+    /// <summary>
+    /// Get all games for a specific match
+    /// </summary>
+    Task<List<MatchGameDto>> GetMatchGames(string matchId);
+
+    /// <summary>
     /// Get player's recent completed games
     /// </summary>
     Task<List<RecentGameDto>> GetRecentGames(int limit);

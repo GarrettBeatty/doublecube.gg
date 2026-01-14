@@ -5,7 +5,7 @@
 import type { HubConnection, IStreamResult, Subject } from '@microsoft/signalr';
 import type { IGameHub, IGameHubClient } from './Backgammon.Server.Hubs.Interfaces';
 import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
-import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
+import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
 
@@ -176,6 +176,14 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly getActiveGames = async (limit: number): Promise<ActiveGameDto[]> => {
         return await this.connection.invoke("GetActiveGames", limit);
+    }
+
+    public readonly getActiveMatches = async (limit: number): Promise<ActiveMatchDto[]> => {
+        return await this.connection.invoke("GetActiveMatches", limit);
+    }
+
+    public readonly getMatchGames = async (matchId: string): Promise<MatchGameDto[]> => {
+        return await this.connection.invoke("GetMatchGames", matchId);
     }
 
     public readonly getRecentGames = async (limit: number): Promise<RecentGameDto[]> => {

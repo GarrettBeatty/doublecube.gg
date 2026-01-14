@@ -302,11 +302,11 @@ public partial class GameHub
             {
                 GameId = g.GameId,
                 GameNumber = index + 1,
-                Winner = g.Winner,
-                Points = g.Stakes,
-                IsGamemon = g.WinType == WinType.Gammon,
-                IsBackgammon = g.WinType == WinType.Backgammon,
-                IsCrawfordGame = g.IsCrawfordGame,
+                Status = g.Status.ToString(),
+                Winner = g.Winner?.ToString(),
+                WinType = g.WinType.ToString(),
+                PointsScored = g.Stakes,
+                IsCrawford = g.IsCrawfordGame,
                 CompletedAt = null // Core.Game doesn't track this, could add if needed
             }).ToList();
 
@@ -481,20 +481,22 @@ public partial class GameHub
         try
         {
             var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
-            var matches = await _matchService.GetPlayerMatchesAsync(playerId, "InProgress");
 
-            var activeGames = matches.Take(limit).Select(m =>
+            // Query games directly by status instead of matches
+            var games = await _gameRepository.GetPlayerGamesAsync(playerId, "InProgress", limit);
+
+            var activeGames = new List<object>();
+
+            foreach (var game in games)
             {
-                var isPlayer1 = m.Player1Id == playerId;
-                var opponentId = isPlayer1 ? m.Player2Id : m.Player1Id;
-                var opponentName = isPlayer1 ? m.Player2Name : m.Player1Name;
-                var myColor = isPlayer1 ? "White" : "Red";
+                // Determine player's color based on their ID
+                var isWhite = game.WhitePlayerId == playerId;
+                var myColor = isWhite ? "White" : "Red";
 
-                // Try to get current game state if there's an active game session
-                var currentGameId = m.CurrentGameId;
-                var gameSession = currentGameId != null ? _sessionManager.GetSession(currentGameId) : null;
+                // Try to get current game state from active session
+                var gameSession = _sessionManager.GetSession(game.GameId);
 
-                var currentPlayer = gameSession?.Engine?.CurrentPlayer.ToString() ?? "White";
+                var currentPlayer = gameSession?.Engine?.CurrentPlayer.ToString() ?? game.CurrentPlayer;
                 var isYourTurn = currentPlayer == myColor;
 
                 // Get board state if session exists
@@ -503,7 +505,6 @@ public partial class GameHub
                 int redOnBar = 0;
                 int whiteBornOff = 0;
                 int redBornOff = 0;
-
                 int[]? diceValues = null;
                 int cubeValue = 1;
                 string cubeOwner = "Center";
@@ -538,24 +539,46 @@ public partial class GameHub
                     cubeValue = gameSession.Engine.DoublingCube?.Value ?? 1;
                     cubeOwner = gameSession.Engine.DoublingCube?.Owner?.ToString() ?? "Center";
                 }
-
-                return new
+                else
                 {
-                    matchId = m.MatchId,
-                    gameId = currentGameId,
-                    player1Name = m.Player1Name ?? "Player 1",
-                    player2Name = m.Player2Name ?? "Player 2",
+                    // Fall back to persisted game state
+                    cubeValue = game.DoublingCubeValue;
+                    cubeOwner = game.DoublingCubeOwner ?? "Center";
+                }
+
+                // Fetch match info for score and target
+                string matchScore = "0-0";
+                int matchLength = 1;
+                bool isCrawford = game.IsCrawfordGame;
+
+                if (!string.IsNullOrEmpty(game.MatchId))
+                {
+                    var match = await _matchService.GetMatchAsync(game.MatchId);
+                    if (match != null)
+                    {
+                        matchScore = $"{match.Player1Score}-{match.Player2Score}";
+                        matchLength = match.TargetScore;
+                        isCrawford = match.IsCrawfordGame;
+                    }
+                }
+
+                activeGames.Add(new
+                {
+                    matchId = game.MatchId ?? string.Empty,
+                    gameId = game.GameId,
+                    player1Name = game.WhitePlayerName ?? "Player 1",
+                    player2Name = game.RedPlayerName ?? "Player 2",
                     player1Rating = 0, // TODO: Fetch from user profile
                     player2Rating = 0, // TODO: Fetch from user profile
                     currentPlayer,
                     myColor,
                     isYourTurn,
-                    matchScore = $"{m.Player1Score}-{m.Player2Score}",
-                    matchLength = m.TargetScore,
-                    timeControl = "Standard", // TODO: Add time control to Match model
+                    matchScore,
+                    matchLength,
+                    timeControl = "Standard", // TODO: Add time control
                     cubeValue,
                     cubeOwner,
-                    isCrawford = m.IsCrawfordGame,
+                    isCrawford,
                     viewers = 0, // TODO: Add spectator tracking
                     board = boardState,
                     whiteCheckersOnBar = whiteOnBar,
@@ -563,14 +586,99 @@ public partial class GameHub
                     whiteBornOff,
                     redBornOff,
                     dice = diceValues
-                };
-            }).ToList<object>();
+                });
+            }
 
             return activeGames;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting active games for player");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Get player's active matches (in-progress). Links to match summary page.
+    /// </summary>
+    public async Task<List<ActiveMatchDto>> GetActiveMatches(int limit = 10)
+    {
+        try
+        {
+            var playerId = GetAuthenticatedUserId()!;
+            var matches = await _matchService.GetPlayerMatchesAsync(playerId, "InProgress");
+
+            var activeMatches = matches.Take(limit).Select(m =>
+            {
+                var isPlayer1 = m.Player1Id == playerId;
+                var opponentName = isPlayer1 ? m.Player2Name : m.Player1Name;
+
+                return new ActiveMatchDto
+                {
+                    MatchId = m.MatchId,
+                    OpponentName = opponentName ?? "Waiting...",
+                    MyScore = isPlayer1 ? m.Player1Score : m.Player2Score,
+                    OpponentScore = isPlayer1 ? m.Player2Score : m.Player1Score,
+                    TargetScore = m.TargetScore,
+                    CurrentGameId = m.CurrentGameId,
+                    GamesPlayed = m.TotalGamesPlayed,
+                    IsCrawford = m.IsCrawfordGame,
+                    IsCorrespondence = m.IsCorrespondence,
+                    CreatedAt = m.CreatedAt
+                };
+            }).ToList();
+
+            return activeMatches;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting active matches for player");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Get all games for a specific match
+    /// </summary>
+    public async Task<List<MatchGameDto>> GetMatchGames(string matchId)
+    {
+        try
+        {
+            var match = await _matchService.GetMatchAsync(matchId);
+            if (match == null)
+            {
+                _logger.LogWarning("Match {MatchId} not found when getting games", matchId);
+                return new List<MatchGameDto>();
+            }
+
+            var games = new List<MatchGameDto>();
+            var gameNumber = 1;
+
+            foreach (var gameId in match.GameIds)
+            {
+                var game = await _gameRepository.GetGameByGameIdAsync(gameId);
+                if (game != null)
+                {
+                    games.Add(new MatchGameDto
+                    {
+                        GameId = game.GameId,
+                        GameNumber = gameNumber,
+                        Status = game.Status,
+                        Winner = game.Winner,
+                        WinType = game.WinType,
+                        PointsScored = game.Stakes,
+                        IsCrawford = game.IsCrawfordGame,
+                        CompletedAt = game.CompletedAt
+                    });
+                    gameNumber++;
+                }
+            }
+
+            return games;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting games for match {MatchId}", matchId);
             throw;
         }
     }

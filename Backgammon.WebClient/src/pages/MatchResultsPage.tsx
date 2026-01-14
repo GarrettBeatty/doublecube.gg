@@ -2,7 +2,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import type { MatchResultsDto } from '@/types/generated/Backgammon.Server.Models.SignalR'
-import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Trophy } from 'lucide-react'
@@ -125,7 +124,7 @@ export const MatchResultsPage: React.FC = () => {
                     <span className="font-semibold text-sm">
                       Game {game.gameNumber}
                     </span>
-                    {game.isCrawfordGame && (
+                    {game.isCrawford && (
                       <span className="text-xs bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded">
                         Crawford
                       </span>
@@ -133,16 +132,12 @@ export const MatchResultsPage: React.FC = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold text-sm">
-                      {game.winner === CheckerColor.White ? 'White' : 'Red'} wins
+                      {game.winner} wins
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {game.isBackgammon
-                        ? 'Backgammon'
-                        : game.isGamemon
-                          ? 'Gammon'
-                          : 'Normal'}
+                      {game.winType || 'Normal'}
                       {' '}
-                      ({game.points} {game.points === 1 ? 'point' : 'points'})
+                      ({game.pointsScored} {game.pointsScored === 1 ? 'point' : 'points'})
                     </p>
                   </div>
                 </div>

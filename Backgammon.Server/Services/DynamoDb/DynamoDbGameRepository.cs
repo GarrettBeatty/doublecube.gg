@@ -344,7 +344,19 @@ public class DynamoDbGameRepository : IGameRepository
                 var game = await GetGameByGameIdAsync(gameId);
                 if (game != null)
                 {
-                    games.Add(game);
+                    // Double-check status matches (defensive: index items might be stale)
+                    if (string.IsNullOrEmpty(status) || game.Status == status)
+                    {
+                        games.Add(game);
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Game {GameId} has status {ActualStatus} but index item had status {ExpectedStatus} - skipping",
+                            gameId,
+                            game.Status,
+                            status);
+                    }
                 }
             }
 

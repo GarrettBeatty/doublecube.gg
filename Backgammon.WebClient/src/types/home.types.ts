@@ -92,3 +92,16 @@ export interface RecentOpponent {
   lastPlayedAt: string
   isAi: boolean
 }
+
+export interface ActiveMatch {
+  matchId: string
+  opponentName: string
+  myScore: number
+  opponentScore: number
+  targetScore: number
+  currentGameId?: string
+  gamesPlayed: number
+  isCrawford: boolean
+  isCorrespondence: boolean
+  createdAt: string
+}

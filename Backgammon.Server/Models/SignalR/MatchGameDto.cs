@@ -1,4 +1,3 @@
-using Backgammon.Core;
 using Tapper;
 
 namespace Backgammon.Server.Models.SignalR;
@@ -13,15 +12,15 @@ public class MatchGameDto
 
     public int GameNumber { get; set; }
 
-    public CheckerColor? Winner { get; set; }
+    public string Status { get; set; } = string.Empty;
 
-    public int Points { get; set; }
+    public string? Winner { get; set; }
 
-    public bool IsGamemon { get; set; }
+    public string? WinType { get; set; }
 
-    public bool IsBackgammon { get; set; }
+    public int PointsScored { get; set; }
 
-    public bool IsCrawfordGame { get; set; }
+    public bool IsCrawford { get; set; }
 
     public DateTime? CompletedAt { get; set; }
 }

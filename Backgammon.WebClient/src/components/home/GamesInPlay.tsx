@@ -7,6 +7,7 @@ import { useActiveGames } from '@/hooks/useActiveGames'
 import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
 import { MiniBoardAdapter } from '@/components/board'
 import { MiniPoint } from '@/types/home.types'
+import { ActiveMatches } from './ActiveMatches'
 
 interface GameCardProps {
   gameId: string
@@ -157,40 +158,46 @@ export function GamesInPlay() {
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle>Active Games</CardTitle>
-          {totalYourTurn > 0 && (
-            <Badge variant="destructive" className="animate-pulse">
-              {totalYourTurn} your turn
-            </Badge>
+    <div className="space-y-6">
+      {/* Active Games (individual in-progress games) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <div className="flex items-center gap-2">
+            <CardTitle>Active Games</CardTitle>
+            {totalYourTurn > 0 && (
+              <Badge variant="destructive" className="animate-pulse">
+                {totalYourTurn} your turn
+              </Badge>
+            )}
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sortedGames.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">No active games</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Join a game from the Lobby or Correspondence tabs
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-6">
+              {sortedGames.map((game) => (
+                <GameCard
+                  key={game.gameId}
+                  {...game}
+                  onPlay={handlePlayGame}
+                />
+              ))}
+            </div>
           )}
-        </div>
-        <Button variant="ghost" size="icon" onClick={handleRefresh} title="Refresh">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {sortedGames.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No active games</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Join a game from the Lobby or Correspondence tabs
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-6">
-            {sortedGames.map((game) => (
-              <GameCard
-                key={game.gameId}
-                {...game}
-                onPlay={handlePlayGame}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      {/* Active Matches (multi-game matches in progress) */}
+      <ActiveMatches />
+    </div>
   )
 }

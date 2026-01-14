@@ -108,7 +108,7 @@ export function useGameStateEvents(connection: HubConnection | null) {
       // Navigate to the new game if it's different from current URL
       if (gameState.matchId && context.gameId !== gameState.gameId) {
         console.log('[SignalR] Navigating to new match game:', gameState.gameId)
-        navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`, { replace: true })
+        navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`)
       } else if (!context.isOnGamePage && !context.isOnAnalysisPage && gameState.matchId) {
         console.log('[SignalR] Navigating to match game:', gameState.gameId)
         navigateRef.current(`/match/${gameState.matchId}/game/${gameState.gameId}`)
