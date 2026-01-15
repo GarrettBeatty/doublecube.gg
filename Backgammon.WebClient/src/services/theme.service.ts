@@ -5,8 +5,6 @@ import type {
   UpdateThemeRequest,
 } from '@/types/theme.types'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-
 function getAuthHeaders(): HeadersInit {
   const token = localStorage.getItem('backgammon_token')
   return token
@@ -30,7 +28,7 @@ export const themeService = {
     const params = new URLSearchParams({ limit: limit.toString() })
     if (cursor) params.append('cursor', cursor)
 
-    const response = await fetch(`${API_BASE}/api/themes?${params}`)
+    const response = await fetch(`/api/themes?${params}`)
     if (!response.ok) {
       throw new Error('Failed to fetch themes')
     }
@@ -41,7 +39,7 @@ export const themeService = {
    * Get default (system) themes
    */
   async getDefaultThemes(): Promise<BoardTheme[]> {
-    const response = await fetch(`${API_BASE}/api/themes/defaults`)
+    const response = await fetch(`/api/themes/defaults`)
     if (!response.ok) {
       throw new Error('Failed to fetch default themes')
     }
@@ -52,7 +50,7 @@ export const themeService = {
    * Get a theme by ID
    */
   async getThemeById(themeId: string): Promise<BoardTheme | null> {
-    const response = await fetch(`${API_BASE}/api/themes/${themeId}`)
+    const response = await fetch(`/api/themes/${themeId}`)
     if (response.status === 404) {
       return null
     }
@@ -66,7 +64,7 @@ export const themeService = {
    * Get current user's created themes
    */
   async getMyThemes(): Promise<BoardTheme[]> {
-    const response = await fetch(`${API_BASE}/api/themes/my`, {
+    const response = await fetch(`/api/themes/my`, {
       headers: getAuthHeaders(),
     })
     if (!response.ok) {
@@ -79,7 +77,7 @@ export const themeService = {
    * Create a new theme
    */
   async createTheme(request: CreateThemeRequest): Promise<BoardTheme> {
-    const response = await fetch(`${API_BASE}/api/themes`, {
+    const response = await fetch(`/api/themes`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(request),
@@ -97,7 +95,7 @@ export const themeService = {
     themeId: string,
     request: UpdateThemeRequest
   ): Promise<BoardTheme> {
-    const response = await fetch(`${API_BASE}/api/themes/${themeId}`, {
+    const response = await fetch(`/api/themes/${themeId}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(request),
@@ -112,7 +110,7 @@ export const themeService = {
    * Delete a theme
    */
   async deleteTheme(themeId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/themes/${themeId}`, {
+    const response = await fetch(`/api/themes/${themeId}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     })
@@ -125,7 +123,7 @@ export const themeService = {
    * Like a theme
    */
   async likeTheme(themeId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/themes/${themeId}/like`, {
+    const response = await fetch(`/api/themes/${themeId}/like`, {
       method: 'POST',
       headers: getAuthHeaders(),
     })
@@ -138,7 +136,7 @@ export const themeService = {
    * Unlike a theme
    */
   async unlikeTheme(themeId: string): Promise<void> {
-    const response = await fetch(`${API_BASE}/api/themes/${themeId}/like`, {
+    const response = await fetch(`/api/themes/${themeId}/like`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     })
@@ -151,7 +149,7 @@ export const themeService = {
    * Get user's theme preference
    */
   async getThemePreference(): Promise<{ selectedThemeId: string | null }> {
-    const response = await fetch(`${API_BASE}/api/themes/preference`, {
+    const response = await fetch(`/api/themes/preference`, {
       headers: getAuthHeaders(),
     })
     if (!response.ok) {
@@ -165,7 +163,7 @@ export const themeService = {
    */
   async setThemePreference(themeId: string | null): Promise<void> {
     const params = themeId ? `?themeId=${themeId}` : ''
-    const response = await fetch(`${API_BASE}/api/themes/preference${params}`, {
+    const response = await fetch(`/api/themes/preference${params}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
     })
@@ -179,7 +177,7 @@ export const themeService = {
    */
   async searchThemes(query: string): Promise<BoardTheme[]> {
     const response = await fetch(
-      `${API_BASE}/api/themes/search?q=${encodeURIComponent(query)}`
+      `/api/themes/search?q=${encodeURIComponent(query)}`
     )
     if (!response.ok) {
       throw new Error('Failed to search themes')
