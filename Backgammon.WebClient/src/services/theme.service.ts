@@ -6,7 +6,7 @@ import type {
 } from '@/types/theme.types'
 
 function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('backgammon_token')
+  const token = localStorage.getItem('auth_token')
   return token
     ? {
         'Content-Type': 'application/json',

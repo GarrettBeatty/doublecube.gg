@@ -46,7 +46,7 @@ export interface ThemeColors {
 /**
  * Theme visibility options
  */
-export type ThemeVisibility = 'public' | 'private' | 'unlisted'
+export type ThemeVisibility = 'Public' | 'Private' | 'Unlisted'
 
 /**
  * Full board theme with metadata

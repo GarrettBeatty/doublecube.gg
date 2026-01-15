@@ -205,7 +205,7 @@ export function ThemeEditor({ open, onOpenChange, editingTheme }: ThemeEditorPro
         await themeService.createTheme({
           name: themeName.trim(),
           description: themeDescription.trim(),
-          visibility: 'private',
+          visibility: 'Private',
           colors: fullColors,
         })
       }

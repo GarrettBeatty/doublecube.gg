@@ -1,8 +1,11 @@
+using System.Text.Json.Serialization;
+
 namespace Backgammon.Server.Models;
 
 /// <summary>
 /// Theme visibility options.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ThemeVisibility
 {
     /// <summary>
