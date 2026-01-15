@@ -1,6 +1,5 @@
 using Backgammon.Analysis.Configuration;
 using Backgammon.Analysis.Evaluators;
-using Backgammon.Analysis.Gnubg;
 using Backgammon.Plugins.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,25 +11,20 @@ namespace Backgammon.Server.Services;
 /// </summary>
 public class PositionEvaluatorFactory : IDisposable
 {
-    private readonly GnubgProcessManager _gnubgProcessManager;
-    private readonly IOptions<GnubgSettings> _gnubgSettings;
+    private readonly HttpGnubgEvaluator _httpGnubgEvaluator;
     private readonly AnalysisSettings _analysisSettings;
-    private readonly ILogger<GnubgEvaluator> _gnubgLogger;
+    private readonly ILogger<PositionEvaluatorFactory> _logger;
     private readonly HeuristicEvaluator _heuristicEvaluator;
-    private readonly object _lock = new();
-    private GnubgEvaluator? _gnubgEvaluator;
     private bool _disposed;
 
     public PositionEvaluatorFactory(
-        GnubgProcessManager gnubgProcessManager,
-        IOptions<GnubgSettings> gnubgSettings,
+        HttpGnubgEvaluator httpGnubgEvaluator,
         IOptions<AnalysisSettings> analysisSettings,
-        ILogger<GnubgEvaluator> gnubgLogger)
+        ILogger<PositionEvaluatorFactory> logger)
     {
-        _gnubgProcessManager = gnubgProcessManager ?? throw new ArgumentNullException(nameof(gnubgProcessManager));
-        _gnubgSettings = gnubgSettings ?? throw new ArgumentNullException(nameof(gnubgSettings));
+        _httpGnubgEvaluator = httpGnubgEvaluator ?? throw new ArgumentNullException(nameof(httpGnubgEvaluator));
         _analysisSettings = analysisSettings.Value ?? throw new ArgumentNullException(nameof(analysisSettings));
-        _gnubgLogger = gnubgLogger ?? throw new ArgumentNullException(nameof(gnubgLogger));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _heuristicEvaluator = new HeuristicEvaluator();
     }
 
@@ -52,10 +46,12 @@ public class PositionEvaluatorFactory : IDisposable
 
         if (evaluatorType.Equals("Gnubg", StringComparison.OrdinalIgnoreCase))
         {
-            return GetGnubgEvaluator();
+            _logger.LogDebug("Using HttpGnubgEvaluator for position evaluation");
+            return _httpGnubgEvaluator;
         }
 
         // Default to heuristic for any other value
+        _logger.LogDebug("Using HeuristicEvaluator for position evaluation");
         return _heuristicEvaluator;
     }
 
@@ -69,46 +65,6 @@ public class PositionEvaluatorFactory : IDisposable
             return;
         }
 
-        lock (_lock)
-        {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _gnubgEvaluator = null;
-            _disposed = true;
-        }
-    }
-
-    private IPositionEvaluator GetGnubgEvaluator()
-    {
-        // Lazy initialization with thread safety
-        if (_gnubgEvaluator == null)
-        {
-            lock (_lock)
-            {
-                if (_gnubgEvaluator == null)
-                {
-                    // Check if gnubg is available
-                    if (!_gnubgProcessManager.IsAvailableAsync().GetAwaiter().GetResult())
-                    {
-                        _gnubgLogger.LogError(
-                            "Gnubg not available at {Path}. Please ensure GNU Backgammon is installed and the path is configured correctly.",
-                            _gnubgSettings.Value.ExecutablePath);
-                        throw new InvalidOperationException(
-                            $"GNU Backgammon evaluator requested but not available at: {_gnubgSettings.Value.ExecutablePath}. " +
-                            "Please install GNU Backgammon or use the Heuristic evaluator instead.");
-                    }
-
-                    _gnubgEvaluator = new GnubgEvaluator(
-                        _gnubgProcessManager,
-                        _gnubgSettings,
-                        _gnubgLogger);
-                }
-            }
-        }
-
-        return _gnubgEvaluator;
+        _disposed = true;
     }
 }

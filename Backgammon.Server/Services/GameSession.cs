@@ -206,6 +206,21 @@ public class GameSession
     }
 
     /// <summary>
+    /// Start the game engine and set status to InProgress.
+    /// Used by analysis mode which bypasses normal player addition flow.
+    /// </summary>
+    public void ForceStartGame()
+    {
+        if (!Engine.GameStarted)
+        {
+            Engine.StartNewGame();
+        }
+
+        Status = SessionStatus.InProgress;
+        LastActivityAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
     /// Add a spectator connection (not a player)
     /// </summary>
     public void AddSpectator(string connectionId)

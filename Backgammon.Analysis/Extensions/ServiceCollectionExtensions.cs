@@ -32,9 +32,47 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Add GNUBG evaluator and bot (requires gnubg to be installed)
+    /// Add GNUBG evaluator via HTTP service (preferred approach)
     /// </summary>
     public static IServiceCollection AddGnubgEvaluator(this IServiceCollection services)
+    {
+        // Register HttpGnubgEvaluator with typed HttpClient
+        // Note: AddHttpClient<T> automatically registers T as a transient service
+        // DO NOT add another AddTransient<T> as it would override the HttpClient-injected version
+        services.AddHttpClient<HttpGnubgEvaluator>((sp, client) =>
+        {
+            var settings = sp.GetRequiredService<IOptions<GnubgSettings>>().Value;
+            var logger = sp.GetService<ILogger<HttpGnubgEvaluator>>();
+
+            logger?.LogInformation("Configuring HttpGnubgEvaluator with ServiceUrl: {ServiceUrl}", settings.ServiceUrl ?? "(not set)");
+
+            if (string.IsNullOrEmpty(settings.ServiceUrl))
+            {
+                logger?.LogWarning("GnubgSettings.ServiceUrl is not configured. HTTP requests will fail.");
+            }
+            else
+            {
+                client.BaseAddress = new Uri(settings.ServiceUrl);
+                logger?.LogInformation("HttpGnubgEvaluator BaseAddress set to: {BaseAddress}", client.BaseAddress);
+            }
+
+            client.Timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
+        });
+
+        // Register metadata for discovery by the registry
+        services.AddSingleton(new Backgammon.Plugins.Registration.EvaluatorRegistration(
+            "gnubg",
+            "GNU Backgammon",
+            RequiresExternalResources: true,
+            typeof(HttpGnubgEvaluator)));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Add GNUBG evaluator via local process (legacy, for when gnubg is installed locally)
+    /// </summary>
+    public static IServiceCollection AddGnubgProcessEvaluator(this IServiceCollection services)
     {
         // Register gnubg infrastructure - DI resolves IOptions and ILogger automatically
         services.AddSingleton<GnubgProcessManager>();
@@ -44,8 +82,8 @@ public static class ServiceCollectionExtensions
 
         // Register metadata for discovery by the registry
         services.AddSingleton(new Backgammon.Plugins.Registration.EvaluatorRegistration(
-            "gnubg",
-            "GNU Backgammon",
+            "gnubg-local",
+            "GNU Backgammon (Local)",
             RequiresExternalResources: true,
             typeof(GnubgEvaluator)));
 
@@ -57,11 +95,11 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGnubgBot(this IServiceCollection services)
     {
-        // Register GnubgBot - injects GnubgEvaluator as IPositionEvaluator
+        // Register GnubgBot - injects HttpGnubgEvaluator as IPositionEvaluator
         services.AddTransient<GnubgBot>(sp =>
         {
-            // Get the GnubgEvaluator and pass it as the IPositionEvaluator
-            var evaluator = sp.GetRequiredService<GnubgEvaluator>();
+            // Get the HttpGnubgEvaluator and pass it as the IPositionEvaluator
+            var evaluator = sp.GetRequiredService<HttpGnubgEvaluator>();
             return new GnubgBot(evaluator);
         });
 

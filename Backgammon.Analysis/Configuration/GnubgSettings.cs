@@ -8,7 +8,14 @@ public class GnubgSettings
     public const string SectionName = "Gnubg";
 
     /// <summary>
-    /// Full path to gnubg executable. Default is "gnubg" (assumes it's in PATH)
+    /// URL of the gnubg HTTP service. When set, HTTP mode is used instead of local process.
+    /// Example: "http://gnubg-service" or "http://localhost:8080"
+    /// </summary>
+    public string? ServiceUrl { get; set; }
+
+    /// <summary>
+    /// Full path to gnubg executable. Only used when ServiceUrl is not set.
+    /// Default is "gnubg" (assumes it's in PATH)
     /// </summary>
     public string ExecutablePath { get; set; } = "gnubg";
 

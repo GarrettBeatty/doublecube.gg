@@ -402,7 +402,8 @@ public class GameService : IGameService
         // Start game immediately and skip opening roll for analysis mode
         if (!session.Engine.GameStarted)
         {
-            session.Engine.StartNewGame();
+            // Use ForceStartGame() to properly set Status = InProgress
+            session.ForceStartGame();
 
             // Skip opening roll phase in analysis mode - user will set dice manually
             // Force the game out of opening roll state
@@ -419,9 +420,11 @@ public class GameService : IGameService
         // Analysis games are not persisted to database
 
         _logger.LogInformation(
-            "Analysis game {GameId} created by {UserId}",
+            "Analysis game {GameId} created. Status={Status}, GameStarted={GameStarted}, IsOpeningRoll={IsOpeningRoll}",
             session.Id,
-            userId);
+            session.Status,
+            session.Engine.GameStarted,
+            session.Engine.IsOpeningRoll);
     }
 
     public async Task CreateAiGameAsync(string connectionId, string playerId, string? displayName)

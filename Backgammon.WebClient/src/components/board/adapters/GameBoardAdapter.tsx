@@ -175,6 +175,18 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
         ? !youHaveRolled || gameState.isOpeningRollTie
         : (gameState.isAnalysisMode || isYourTurn) && !hasDiceRolled)
 
+    // Debug logging for roll button conditions
+    console.log('[GameBoardAdapter] Roll button conditions:', {
+      isGameInProgress,
+      isAnalysisMode: gameState.isAnalysisMode,
+      isOpeningRoll,
+      hasDiceRolled,
+      isYourTurn,
+      hideRollForCustomDice,
+      status: gameState.status,
+      canRoll,
+    })
+
     if (canRoll) {
       result.push({
         type: 'roll',
