@@ -18,9 +18,9 @@ public class AnalysisMode : IGameMode
 
     public bool IsPlayerTurn(string connectionId, GameSession session)
     {
-        // Player controls both sides in analysis mode
-        return session.WhitePlayerId == _controllingPlayerId ||
-               session.RedPlayerId == _controllingPlayerId;
+        // In analysis mode, the controlling player can play both sides
+        // Verify the connectionId belongs to the controlling player
+        return session.GetPlayerColor(connectionId) != null;
     }
 
     public GameModeFeatures GetFeatures() => new()

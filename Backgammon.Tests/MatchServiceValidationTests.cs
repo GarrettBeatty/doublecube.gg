@@ -377,4 +377,501 @@ public class MatchServiceValidationTests
         // Assert
         Assert.Equal(targetScore, match.TargetScore);
     }
+
+    [Fact]
+    public async Task CreateMatchAsync_InvalidOpponentType_ThrowsException()
+    {
+        // Arrange
+        var player1Id = "player1";
+        var targetScore = 7;
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => _matchService.CreateMatchAsync(player1Id, targetScore, "InvalidType"));
+        Assert.Contains("OpponentType must be 'AI', 'OpenLobby', or 'Friend'", exception.Message);
+    }
+
+    [Fact]
+    public async Task CreateMatchAsync_AI_CreatesAIMatch()
+    {
+        // Arrange
+        var player1Id = "player1";
+        var targetScore = 7;
+
+        _userRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
+            .ReturnsAsync((User?)null);
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<ServerMatch>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "AI");
+
+        // Assert
+        Assert.NotNull(match.Player2Id);
+        Assert.Equal("InProgress", match.Status);
+        Assert.False(match.IsOpenLobby);
+        Assert.False(match.IsRated); // AI matches are always unrated
+    }
+
+    [Fact]
+    public async Task CreateMatchAsync_OpenLobby_CreatesWaitingMatch()
+    {
+        // Arrange
+        var player1Id = "player1";
+        var targetScore = 7;
+
+        _userRepositoryMock.Setup(x => x.GetByUserIdAsync(It.IsAny<string>()))
+            .ReturnsAsync((User?)null);
+        _matchRepositoryMock.Setup(x => x.SaveMatchAsync(It.IsAny<ServerMatch>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var (match, firstGame) = await _matchService.CreateMatchAsync(player1Id, targetScore, "OpenLobby");
+
+        // Assert
+        Assert.True(string.IsNullOrEmpty(match.Player2Id)); // OpenLobby has no Player2 yet
+        Assert.Equal("WaitingForPlayers", match.Status);
+        Assert.True(match.IsOpenLobby);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_ReturnsMatch()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var expectedMatch = new ServerMatch { MatchId = matchId };
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(expectedMatch);
+
+        // Act
+        var result = await _matchService.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(matchId, result.MatchId);
+    }
+
+    [Fact]
+    public async Task GetMatchAsync_ReturnsNullForNonexistent()
+    {
+        // Arrange
+        var matchId = "nonexistent-match";
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync((ServerMatch?)null);
+
+        // Act
+        var result = await _matchService.GetMatchAsync(matchId);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task UpdateMatchAsync_CallsRepository()
+    {
+        // Arrange
+        var match = new ServerMatch { MatchId = "match-123" };
+
+        // Act
+        await _matchService.UpdateMatchAsync(match);
+
+        // Assert
+        _matchRepositoryMock.Verify(x => x.UpdateMatchAsync(match), Times.Once);
+    }
+
+    [Fact]
+    public async Task StartNextGameAsync_MatchNotFound_ThrowsException()
+    {
+        // Arrange
+        var matchId = "nonexistent";
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync((ServerMatch?)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.StartNextGameAsync(matchId));
+        Assert.Contains("not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task StartNextGameAsync_MatchCompleted_ThrowsException()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch { MatchId = matchId };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.Completed;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.StartNextGameAsync(matchId));
+        Assert.Contains("Cannot start new game in completed match", exception.Message);
+    }
+
+    [Fact]
+    public async Task StartNextGameAsync_Success_CreatesGame()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = "player1",
+            Player2Id = "player2",
+            Player1Name = "Player 1",
+            Player2Name = "Player 2"
+        };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.InProgress;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        var game = await _matchService.StartNextGameAsync(matchId);
+
+        // Assert
+        Assert.NotNull(game);
+        Assert.Equal(matchId, game.MatchId);
+        Assert.Equal("player1", game.WhitePlayerId);
+        Assert.Equal("player2", game.RedPlayerId);
+        _gameRepositoryMock.Verify(x => x.SaveGameAsync(It.IsAny<Backgammon.Server.Models.Game>()), Times.Once);
+        _matchRepositoryMock.Verify(x => x.AddGameToMatchAsync(matchId, It.IsAny<string>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task IsMatchCompleteAsync_Completed_ReturnsTrue()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch { MatchId = matchId };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.Completed;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        var result = await _matchService.IsMatchCompleteAsync(matchId);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task IsMatchCompleteAsync_InProgress_ReturnsFalse()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch { MatchId = matchId };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.InProgress;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        var result = await _matchService.IsMatchCompleteAsync(matchId);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task GetPlayerMatchesAsync_CallsRepository()
+    {
+        // Arrange
+        var playerId = "player1";
+        var matches = new List<ServerMatch>
+        {
+            new() { MatchId = "match-1" },
+            new() { MatchId = "match-2" }
+        };
+        _matchRepositoryMock.Setup(x => x.GetPlayerMatchesAsync(playerId, null))
+            .ReturnsAsync(matches);
+
+        // Act
+        var result = await _matchService.GetPlayerMatchesAsync(playerId);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task GetActiveMatchesAsync_CallsRepository()
+    {
+        // Arrange
+        var matches = new List<ServerMatch>
+        {
+            new() { MatchId = "match-1" }
+        };
+        _matchRepositoryMock.Setup(x => x.GetActiveMatchesAsync())
+            .ReturnsAsync(matches);
+
+        // Act
+        var result = await _matchService.GetActiveMatchesAsync();
+
+        // Assert
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task GetOpenLobbiesAsync_CallsRepository()
+    {
+        // Arrange
+        var matches = new List<ServerMatch>
+        {
+            new() { MatchId = "lobby-1", IsOpenLobby = true }
+        };
+        _matchRepositoryMock.Setup(x => x.GetOpenLobbiesAsync(50, null))
+            .ReturnsAsync(matches);
+
+        // Act
+        var result = await _matchService.GetOpenLobbiesAsync();
+
+        // Assert
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task GetRegularLobbiesAsync_CallsRepositoryWithFalse()
+    {
+        // Arrange
+        var matches = new List<ServerMatch>();
+        _matchRepositoryMock.Setup(x => x.GetOpenLobbiesAsync(50, false))
+            .ReturnsAsync(matches);
+
+        // Act
+        await _matchService.GetRegularLobbiesAsync();
+
+        // Assert
+        _matchRepositoryMock.Verify(x => x.GetOpenLobbiesAsync(50, false), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetCorrespondenceLobbiesAsync_CallsRepositoryWithTrue()
+    {
+        // Arrange
+        var matches = new List<ServerMatch>();
+        _matchRepositoryMock.Setup(x => x.GetOpenLobbiesAsync(50, true))
+            .ReturnsAsync(matches);
+
+        // Act
+        await _matchService.GetCorrespondenceLobbiesAsync();
+
+        // Assert
+        _matchRepositoryMock.Verify(x => x.GetOpenLobbiesAsync(50, true), Times.Once);
+    }
+
+    [Fact]
+    public async Task AbandonMatchAsync_MatchNotFound_ReturnsEarly()
+    {
+        // Arrange
+        var matchId = "nonexistent";
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync((ServerMatch?)null);
+
+        // Act
+        await _matchService.AbandonMatchAsync(matchId, "player1");
+
+        // Assert
+        _matchRepositoryMock.Verify(x => x.UpdateMatchAsync(It.IsAny<ServerMatch>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AbandonMatchAsync_MatchCompleted_ReturnsEarly()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch { MatchId = matchId };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.Completed;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        await _matchService.AbandonMatchAsync(matchId, "player1");
+
+        // Assert
+        _matchRepositoryMock.Verify(x => x.UpdateMatchAsync(It.IsAny<ServerMatch>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AbandonMatchAsync_InProgress_SetsOpponentAsWinner()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = "player1",
+            Player2Id = "player2"
+        };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.InProgress;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        await _matchService.AbandonMatchAsync(matchId, "player1");
+
+        // Assert
+        Assert.Equal("Abandoned", match.Status);
+        Assert.Equal("player2", match.WinnerId); // Opponent wins
+        _matchRepositoryMock.Verify(x => x.UpdateMatchAsync(match), Times.Once);
+    }
+
+    [Fact]
+    public async Task AbandonMatchAsync_WaitingNoPlayer2_NoWinner()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = "player1"
+        };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.WaitingForPlayers;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act
+        await _matchService.AbandonMatchAsync(matchId, "player1");
+
+        // Assert
+        Assert.Equal("Abandoned", match.Status);
+        Assert.Null(match.WinnerId); // No winner if match never started
+    }
+
+    [Fact]
+    public async Task GetPlayerMatchStatsAsync_CallsRepository()
+    {
+        // Arrange
+        var playerId = "player1";
+        var stats = new MatchStats { TotalMatches = 10, MatchesWon = 5 };
+        _matchRepositoryMock.Setup(x => x.GetPlayerMatchStatsAsync(playerId))
+            .ReturnsAsync(stats);
+
+        // Act
+        var result = await _matchService.GetPlayerMatchStatsAsync(playerId);
+
+        // Assert
+        Assert.Equal(10, result.TotalMatches);
+        Assert.Equal(5, result.MatchesWon);
+    }
+
+    [Fact]
+    public async Task JoinMatchAsync_MatchNotFound_ThrowsException()
+    {
+        // Arrange
+        var matchId = "nonexistent";
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync((ServerMatch?)null);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.JoinMatchAsync(matchId, "player2"));
+        Assert.Contains("not found", exception.Message);
+    }
+
+    [Fact]
+    public async Task JoinMatchAsync_AIMatch_ThrowsException()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            OpponentType = "AI"
+        };
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.JoinMatchAsync(matchId, "player2"));
+        Assert.Contains("does not allow joining", exception.Message);
+    }
+
+    [Fact]
+    public async Task JoinMatchAsync_AlreadyHasPlayer2_ThrowsException()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            OpponentType = "OpenLobby",
+            Player2Id = "existing-player"
+        };
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.JoinMatchAsync(matchId, "player2"));
+        Assert.Contains("already has a second player", exception.Message);
+    }
+
+    [Fact]
+    public async Task JoinMatchAsync_NotWaiting_ThrowsException()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            OpponentType = "OpenLobby"
+        };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.InProgress;
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+
+        // Act & Assert
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _matchService.JoinMatchAsync(matchId, "player2"));
+        Assert.Contains("not accepting players", exception.Message);
+    }
+
+    [Fact]
+    public async Task JoinMatchAsync_Success_SetsPlayer2AndInProgress()
+    {
+        // Arrange
+        var matchId = "match-123";
+        var player2Id = "player2";
+        var match = new ServerMatch
+        {
+            MatchId = matchId,
+            Player1Id = "player1",
+            OpponentType = "OpenLobby"
+        };
+        match.CoreMatch.Status = Backgammon.Core.MatchStatus.WaitingForPlayers;
+
+        var user2 = new User { UserId = player2Id, DisplayName = "Player Two" };
+
+        _matchRepositoryMock.Setup(x => x.GetMatchByIdAsync(matchId))
+            .ReturnsAsync(match);
+        _userRepositoryMock.Setup(x => x.GetByUserIdAsync(player2Id))
+            .ReturnsAsync(user2);
+
+        // Act
+        var result = await _matchService.JoinMatchAsync(matchId, player2Id);
+
+        // Assert
+        Assert.Equal(player2Id, result.Player2Id);
+        Assert.Equal("Player Two", result.Player2Name);
+        Assert.Equal("InProgress", result.Status);
+        _matchRepositoryMock.Verify(x => x.UpdateMatchAsync(match), Times.Once);
+        _matchRepositoryMock.Verify(
+            x => x.CreatePlayerMatchIndexAsync(
+                player2Id,
+                matchId,
+                match.Player1Id,
+                "InProgress",
+                match.CreatedAt),
+            Times.Once);
+    }
 }
