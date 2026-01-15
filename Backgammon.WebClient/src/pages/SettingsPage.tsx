@@ -17,6 +17,7 @@ import {
 import { Settings, Volume2, VolumeX, Bell, Moon, Sun, Shield, User, Palette } from 'lucide-react'
 import { audioService } from '@/services/audio.service'
 import { ThemeBrowser } from '@/components/themes/ThemeBrowser'
+import { ThemeEditor } from '@/components/themes/ThemeEditor'
 import { ThemePreviewBoard } from '@/components/themes/ThemePreviewBoard'
 import { useThemeStore, useThemeColors } from '@/stores/themeStore'
 
@@ -66,6 +67,7 @@ export const SettingsPage: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings>(loadSettings)
   const [hasChanges, setHasChanges] = useState(false)
   const [themeBrowserOpen, setThemeBrowserOpen] = useState(false)
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false)
   const { currentTheme } = useThemeStore()
   const themeColors = useThemeColors()
 
@@ -328,12 +330,20 @@ export const SettingsPage: React.FC = () => {
                     {currentTheme?.name || 'Classic (Default)'}
                   </p>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setThemeBrowserOpen(true)}
-                >
-                  Browse Themes
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setThemeBrowserOpen(true)}
+                  >
+                    Browse Themes
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={() => setThemeEditorOpen(true)}
+                  >
+                    Create Theme
+                  </Button>
+                </div>
               </div>
 
               <Separator />
@@ -354,6 +364,11 @@ export const SettingsPage: React.FC = () => {
           <ThemeBrowser
             open={themeBrowserOpen}
             onOpenChange={setThemeBrowserOpen}
+          />
+
+          <ThemeEditor
+            open={themeEditorOpen}
+            onOpenChange={setThemeEditorOpen}
           />
 
           {/* Notification Settings */}
