@@ -214,6 +214,11 @@ export type IGameHub = {
     */
     exportPosition(): Promise<string>;
     /**
+    * Export full game SGF with move history
+    * @returns Transpiled from System.Threading.Tasks.Task<string>
+    */
+    exportGameSgf(): Promise<string>;
+    /**
     * Import a position from SGF or base64
     * @param positionData Transpiled from string
     * @returns Transpiled from System.Threading.Tasks.Task
@@ -239,6 +244,12 @@ export type IGameHub = {
     * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.GameHistoryDto?>
     */
     getGameHistory(gameId: string): Promise<GameHistoryDto>;
+    /**
+    * Parse a full game SGF into turn history for replay
+    * @param sgf Transpiled from string
+    * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.GameHistoryDto?>
+    */
+    parseGameSgf(sgf: string): Promise<GameHistoryDto>;
     /**
     * Send a chat message to all players in the game
     * @param message Transpiled from string

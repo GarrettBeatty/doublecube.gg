@@ -740,6 +740,20 @@ public partial class GameHub
     }
 
     /// <summary>
+    /// Export full game SGF with move history
+    /// </summary>
+    public Task<string> ExportGameSgf()
+    {
+        var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+        if (session == null)
+        {
+            return Task.FromResult(string.Empty);
+        }
+
+        return Task.FromResult(session.Engine.GameSgf);
+    }
+
+    /// <summary>
     /// Import a position (auto-detects raw SGF or base64-encoded SGF)
     /// </summary>
     public async Task ImportPosition(string positionData)
@@ -872,11 +886,19 @@ public partial class GameHub
             return null;
         }
 
+        // Parse turns from SGF game record
+        var turnHistory = new List<TurnSnapshotDto>();
+        if (!string.IsNullOrEmpty(game.GameSgf))
+        {
+            var gameRecord = SgfSerializer.ParseGameSgf(game.GameSgf);
+            turnHistory = gameRecord.Turns.Select(TurnSnapshotDto.FromGameTurn).ToList();
+        }
+
         return new GameHistoryDto
         {
             GameId = game.GameId,
             MatchId = game.MatchId,
-            TurnHistory = game.TurnHistory,
+            TurnHistory = turnHistory,
             WhitePlayerName = game.WhitePlayerName,
             RedPlayerName = game.RedPlayerName,
             Winner = game.Winner,
@@ -885,6 +907,48 @@ public partial class GameHub
             CompletedAt = game.CompletedAt,
             DoublingCubeValue = game.DoublingCubeValue
         };
+    }
+
+    /// <summary>
+    /// Parse a full game SGF into turn history for replay.
+    /// This allows analyzing games from SGF strings without needing a gameId.
+    /// </summary>
+    /// <param name="sgf">The full game SGF string</param>
+    /// <returns>Parsed game history with turn snapshots, or null if invalid</returns>
+    public Task<GameHistoryDto?> ParseGameSgf(string sgf)
+    {
+        if (string.IsNullOrWhiteSpace(sgf))
+        {
+            return Task.FromResult<GameHistoryDto?>(null);
+        }
+
+        try
+        {
+            var gameRecord = SgfSerializer.ParseGameSgf(sgf);
+
+            var turnHistory = gameRecord.Turns
+                .Select(TurnSnapshotDto.FromGameTurn)
+                .ToList();
+
+            var result = new GameHistoryDto
+            {
+                GameId = string.Empty,
+                TurnHistory = turnHistory,
+                WhitePlayerName = gameRecord.WhitePlayer,
+                RedPlayerName = gameRecord.BlackPlayer,
+                Winner = gameRecord.Winner?.ToString(),
+                WinType = gameRecord.WinType?.ToString(),
+                CreatedAt = DateTime.UtcNow,
+                DoublingCubeValue = 1
+            };
+
+            return Task.FromResult<GameHistoryDto?>(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to parse game SGF");
+            return Task.FromResult<GameHistoryDto?>(null);
+        }
     }
 
     // ==================== Correspondence Game Methods ====================

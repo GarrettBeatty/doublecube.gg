@@ -50,15 +50,22 @@ export const GameCompletedOverlay: React.FC = () => {
   const handleViewAnalysis = async () => {
     if (!currentGameState?.gameId) return
     try {
-      const sgf = await hub?.exportPosition()
+      // Export full game SGF with move history
+      const sgf = await hub?.exportGameSgf()
       if (sgf) {
         const encodedSgf = encodeURIComponent(sgf)
         navigate(`/analysis/${encodedSgf}`)
       } else {
-        navigate('/')
+        // Fallback to position-only export
+        const positionSgf = await hub?.exportPosition()
+        if (positionSgf) {
+          navigate(`/analysis/${encodeURIComponent(positionSgf)}`)
+        } else {
+          navigate('/')
+        }
       }
     } catch (error) {
-      console.error('Failed to export position for analysis:', error)
+      console.error('Failed to export game for analysis:', error)
       navigate('/')
     }
   }

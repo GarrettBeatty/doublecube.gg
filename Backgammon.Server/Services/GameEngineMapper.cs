@@ -54,6 +54,7 @@ public static class GameEngineMapper
                              $"{m.From}/{m.To}")
                 .ToList(),
             MoveCount = engine.MoveHistory.Count,
+            GameSgf = engine.GameSgf,
             CreatedAt = session.CreatedAt,
             LastUpdatedAt = DateTime.UtcNow
         };

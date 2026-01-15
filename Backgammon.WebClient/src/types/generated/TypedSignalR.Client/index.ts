@@ -222,6 +222,10 @@ class IGameHub_HubProxy implements IGameHub {
         return await this.connection.invoke("ExportPosition");
     }
 
+    public readonly exportGameSgf = async (): Promise<string> => {
+        return await this.connection.invoke("ExportGameSgf");
+    }
+
     public readonly importPosition = async (positionData: string): Promise<void> => {
         return await this.connection.invoke("ImportPosition", positionData);
     }
@@ -236,6 +240,10 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly getGameHistory = async (gameId: string): Promise<GameHistoryDto> => {
         return await this.connection.invoke("GetGameHistory", gameId);
+    }
+
+    public readonly parseGameSgf = async (sgf: string): Promise<GameHistoryDto> => {
+        return await this.connection.invoke("ParseGameSgf", sgf);
     }
 
     public readonly sendChatMessage = async (message: string): Promise<void> => {

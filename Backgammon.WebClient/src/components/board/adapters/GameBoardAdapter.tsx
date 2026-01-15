@@ -17,12 +17,14 @@ interface GameBoardAdapterProps {
   gameState: GameState
   isSpectator?: boolean
   onOfferDouble?: () => void
+  suppressButtons?: boolean
 }
 
 export const GameBoardAdapter = memo(function GameBoardAdapter({
   gameState,
   isSpectator = false,
   onOfferDouble,
+  suppressButtons = false,
 }: GameBoardAdapterProps) {
   const { hub } = useSignalR()
   const {
@@ -31,7 +33,6 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     validSources,
     isBoardFlipped,
     isFreeMoveEnabled,
-    isCustomDiceEnabled,
     highlightedMoves,
     doublingCube,
   } = useGameStore()
@@ -149,8 +150,8 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
 
   // Build buttons based on game state
   const buttons = useMemo<ButtonConfig[]>(() => {
-    // No action buttons for spectators or completed games
-    if (isSpectator || gameState.status === GameStatus.Completed) return []
+    // No action buttons for spectators, completed games, or during turn navigation
+    if (isSpectator || gameState.status === GameStatus.Completed || suppressButtons) return []
 
     const result: ButtonConfig[] = []
     const isGameInProgress = gameState.status === GameStatus.InProgress
@@ -166,8 +167,8 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       ((yourColor === CheckerColor.White && gameState.whiteOpeningRoll != null) ||
         (yourColor === CheckerColor.Red && gameState.redOpeningRoll != null))
 
-    // Roll button
-    const hideRollForCustomDice = gameState.isAnalysisMode && isCustomDiceEnabled
+    // Roll button - always hidden in analysis mode (use Set Dice instead)
+    const hideRollForCustomDice = gameState.isAnalysisMode
     const canRoll =
       !hideRollForCustomDice &&
       isGameInProgress &&
@@ -252,10 +253,10 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   }, [
     gameState,
     isSpectator,
-    isCustomDiceEnabled,
     doublingCube.canDouble,
     hub,
     onOfferDouble,
+    suppressButtons,
   ])
 
   // Handle checker selection (for highlighting during drag)

@@ -201,6 +201,11 @@ public interface IGameHub
     Task<string> ExportPosition();
 
     /// <summary>
+    /// Export full game SGF with move history
+    /// </summary>
+    Task<string> ExportGameSgf();
+
+    /// <summary>
     /// Import a position from SGF or base64
     /// </summary>
     Task ImportPosition(string positionData);
@@ -221,6 +226,11 @@ public interface IGameHub
     /// Get turn-by-turn history for a completed game for analysis board replay
     /// </summary>
     Task<GameHistoryDto?> GetGameHistory(string gameId);
+
+    /// <summary>
+    /// Parse a full game SGF into turn history for replay
+    /// </summary>
+    Task<GameHistoryDto?> ParseGameSgf(string sgf);
 
     // ==================== Chat ====================
 

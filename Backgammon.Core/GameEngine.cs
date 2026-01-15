@@ -15,6 +15,16 @@ public class GameEngine
     /// </summary>
     private DoublingAction? _pendingDoublingAction;
 
+    /// <summary>
+    /// Dice rolled for the current turn (stored for SGF generation)
+    /// </summary>
+    private (int Die1, int Die2)? _currentTurnDice;
+
+    /// <summary>
+    /// Moves made during the current turn (stored for SGF generation)
+    /// </summary>
+    private List<Move> _currentTurnMoves = new();
+
     public GameEngine(string whiteName = "White", string redName = "Red")
     {
         Board = new Board();
@@ -50,6 +60,12 @@ public class GameEngine
     /// Complete game history tracking all turns for analysis and replay
     /// </summary>
     public GameHistory History { get; private set; }
+
+    /// <summary>
+    /// Complete game record in SGF format (industry standard).
+    /// This is the primary format for game history - updated after each turn.
+    /// </summary>
+    public string GameSgf { get; private set; } = string.Empty;
 
     public bool GameStarted { get; private set; }
 
@@ -98,6 +114,18 @@ public class GameEngine
         _currentTurn = null;
         _pendingDoublingAction = null;
 
+        // Initialize SGF game record
+        GameSgf = SgfSerializer.CreateGameHeader(
+            WhitePlayer.Name,
+            RedPlayer.Name,
+            matchLength: 0,  // Will be set if this is a match game
+            gameNumber: 1,
+            whiteScore: 0,
+            blackScore: 0,
+            isCrawford: IsCrawfordGame);
+        _currentTurnDice = null;
+        _currentTurnMoves.Clear();
+
         // Start with opening roll phase
         IsOpeningRoll = true;
         WhiteOpeningRoll = null;
@@ -118,6 +146,10 @@ public class GameEngine
         Dice.Roll();
         RemainingMoves = new List<int>(Dice.GetMoves());
         MoveHistory.Clear(); // Clear history for new turn
+
+        // Store dice for SGF generation (will be appended at EndTurn)
+        _currentTurnDice = (Dice.Die1, Dice.Die2);
+        _currentTurnMoves.Clear();
 
         // Start new turn snapshot for game history
         _currentTurn = new TurnSnapshot
@@ -215,6 +247,19 @@ public class GameEngine
             _currentTurn = null;
         }
 
+        // Append turn to SGF record
+        if (_currentTurnDice.HasValue)
+        {
+            GameSgf = SgfSerializer.AppendTurn(
+                GameSgf,
+                CurrentPlayer.Color,
+                _currentTurnDice.Value.Die1,
+                _currentTurnDice.Value.Die2,
+                _currentTurnMoves);
+            _currentTurnDice = null;
+            _currentTurnMoves.Clear();
+        }
+
         RemainingMoves.Clear();
         MoveHistory.Clear();
         Dice.SetDice(0, 0); // Clear dice for next player
@@ -308,6 +353,9 @@ public class GameEngine
         {
             // Record that a double was offered (will be included in next turn snapshot)
             _pendingDoublingAction = Core.DoublingAction.Offered;
+
+            // Append to SGF
+            GameSgf = SgfSerializer.AppendCubeAction(GameSgf, CurrentPlayer.Color, CubeAction.Double);
         }
 
         return canDouble;
@@ -326,6 +374,9 @@ public class GameEngine
 
         // Record that the double was accepted
         _pendingDoublingAction = Core.DoublingAction.Accepted;
+
+        // Append to SGF (the opponent accepts, so use GetOpponent)
+        GameSgf = SgfSerializer.AppendCubeAction(GameSgf, GetOpponent().Color, CubeAction.Take);
         return true;
     }
 
@@ -336,6 +387,9 @@ public class GameEngine
     {
         // Record that the double was declined
         _pendingDoublingAction = Core.DoublingAction.Declined;
+
+        // Append to SGF (the opponent declines, so use GetOpponent)
+        GameSgf = SgfSerializer.AppendCubeAction(GameSgf, GetOpponent().Color, CubeAction.Drop);
     }
 
     /// <summary>
@@ -350,6 +404,9 @@ public class GameEngine
 
         Winner = winner;
         GameOver = true;
+
+        // Finalize SGF with result
+        FinalizeGameSgf();
     }
 
     /// <summary>
@@ -589,6 +646,23 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Finalize the SGF record with game result.
+    /// Called automatically when game ends.
+    /// </summary>
+    private void FinalizeGameSgf()
+    {
+        if (Winner == null)
+        {
+            GameSgf = SgfSerializer.FinalizeGame(GameSgf);
+        }
+        else
+        {
+            var winType = GameOver ? DetermineWinType() : WinType.Normal;
+            GameSgf = SgfSerializer.FinalizeGame(GameSgf, Winner!.Color, winType);
+        }
+    }
+
+    /// <summary>
     /// Determine which player goes first by rolling dice
     /// </summary>
     private void DetermineFirstPlayer()
@@ -738,6 +812,14 @@ public class GameEngine
         // Track move in per-turn history
         MoveHistory.Add(move);
 
+        // Track move for SGF generation
+        _currentTurnMoves.Add(new Move(move.From, move.To, move.DieValue)
+        {
+            IsHit = move.IsHit,
+            OpponentCheckersOnBarBefore = move.OpponentCheckersOnBarBefore,
+            CurrentPlayerBornOffBefore = move.CurrentPlayerBornOffBefore
+        });
+
         // Track move in current turn snapshot for game history
         if (_currentTurn != null)
         {
@@ -756,6 +838,21 @@ public class GameEngine
         {
             GameOver = true;
             Winner = CurrentPlayer;
+
+            // Finalize SGF with result (need to append the final turn first)
+            if (_currentTurnDice.HasValue)
+            {
+                GameSgf = SgfSerializer.AppendTurn(
+                    GameSgf,
+                    CurrentPlayer.Color,
+                    _currentTurnDice.Value.Die1,
+                    _currentTurnDice.Value.Die2,
+                    _currentTurnMoves);
+                _currentTurnDice = null;
+                _currentTurnMoves.Clear();
+            }
+
+            FinalizeGameSgf();
         }
 
         return true;

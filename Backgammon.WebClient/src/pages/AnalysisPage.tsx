@@ -18,6 +18,7 @@ import { AnalysisModeToggles } from '@/components/game/AnalysisModeToggles'
 import { PositionEvaluation as PositionEvaluationComponent } from '@/components/game/PositionEvaluation'
 import { BestMovesPanel } from '@/components/game/BestMovesPanel'
 import { EvaluatorSelector } from '@/components/game/EvaluatorSelector'
+import { TurnNavigator } from '@/components/game/TurnNavigator'
 import { CheckerColor, Move } from '@/types/game.types'
 import {
   PositionEvaluation,
@@ -25,16 +26,22 @@ import {
 } from '@/types/analysis.types'
 import { GameHistoryDto } from '@/types/generated/Backgammon.Server.Models'
 
+// Helper to detect if SGF is a full game (has moves) vs just a position
+const isFullGameSgf = (sgf: string): boolean => {
+  // Full game SGF has move nodes like ;W[...] or ;B[...] with dice+moves
+  // Position SGF only has AW/AB/PL/DI etc.
+  return /;[WB]\[\d/.test(sgf)
+}
+
 export const AnalysisPage: React.FC = () => {
   const navigate = useNavigate()
-  const { sgf, gameId } = useParams<{ sgf?: string; gameId?: string }>()
+  const { sgf } = useParams<{ sgf?: string }>()
   const { hub, isConnected } = useSignalR()
   const { toast } = useToast()
   const {
     currentGameState,
     setCurrentGameId,
     resetGame,
-    isCustomDiceEnabled,
     currentEvaluation,
     bestMoves,
     isAnalyzing,
@@ -48,6 +55,8 @@ export const AnalysisPage: React.FC = () => {
   const [evaluatorType, setEvaluatorType] = useState<'Heuristic' | 'Gnubg'>('Gnubg')
   const [gameHistory, setGameHistory] = useState<GameHistoryDto | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [currentTurnIndex, setCurrentTurnIndex] = useState(0)
+  const [isNavigating, setIsNavigating] = useState(false)
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
@@ -55,7 +64,7 @@ export const AnalysisPage: React.FC = () => {
   const lastAnalyzedState = useRef<string | null>(null)
   const isExecutingMoves = useRef(false)
   const analysisRequestCounter = useRef(0)
-  const hasLoadedHistory = useRef(false)
+  const hasLoadedGameSgf = useRef(false)
 
   useEffect(() => {
     // Auto-create an analysis game when the page loads
@@ -89,63 +98,6 @@ export const AnalysisPage: React.FC = () => {
     createAnalysisGame()
   }, [isConnected, hub, toast, isCreating])
 
-  // Load game history when gameId is present in URL
-  useEffect(() => {
-    const loadGameHistory = async () => {
-      if (!gameId || !isConnected || !hub) {
-        return
-      }
-
-      // Prevent loading history multiple times
-      if (hasLoadedHistory.current || isLoadingHistory) {
-        return
-      }
-
-      setIsLoadingHistory(true)
-      hasLoadedHistory.current = true
-
-      try {
-        console.log('[AnalysisPage] Loading game history for gameId:', gameId)
-        const history = await hub.getGameHistory(gameId)
-
-        if (!history) {
-          toast({
-            title: 'Game Not Found',
-            description: 'Could not load game history',
-            variant: 'destructive',
-          })
-          navigate('/analysis')
-          return
-        }
-
-        console.log('[AnalysisPage] Game history loaded:', history)
-        setGameHistory(history)
-
-        // Load the initial position from first turn's SGF, or use starting position
-        if (history.turnHistory && history.turnHistory.length > 0) {
-          const firstTurn = history.turnHistory[0]
-          if (firstTurn.positionSgf) {
-            console.log('[AnalysisPage] Importing initial position from turn history')
-            await hub.importPosition(firstTurn.positionSgf)
-            lastImportedSgf.current = firstTurn.positionSgf
-            lastExportedSgf.current = firstTurn.positionSgf
-          }
-        }
-      } catch (error) {
-        console.error('[AnalysisPage] Failed to load game history:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to load game history',
-          variant: 'destructive',
-        })
-        hasLoadedHistory.current = false
-      } finally {
-        setIsLoadingHistory(false)
-      }
-    }
-
-    loadGameHistory()
-  }, [gameId, isConnected, hub, toast, navigate, isLoadingHistory])
 
   // Update the current game ID when game state arrives
   useEffect(() => {
@@ -157,18 +109,25 @@ export const AnalysisPage: React.FC = () => {
   // Import position from URL if present (only when SGF parameter changes and is different)
   useEffect(() => {
     const importFromUrl = async () => {
-      // Skip if we're viewing a game history (gameId is present)
-      if (gameId) {
-        return
-      }
-
-      if (!currentGameState || !sgf) {
+      if (!currentGameState || !sgf || !hub) {
         return
       }
 
       // Skip import if we're currently executing moves (prevents flashing during move sequences)
       if (isExecutingMoves.current) {
         console.log('[AnalysisPage] Skipping import - executing moves')
+        return
+      }
+
+      // Skip import if we're navigating between turns (turn navigator controls position)
+      if (isNavigating) {
+        console.log('[AnalysisPage] Skipping import - navigating between turns')
+        return
+      }
+
+      // Skip URL imports when game history is loaded (turn navigation handles position changes)
+      if (gameHistory && hasLoadedGameSgf.current) {
+        console.log('[AnalysisPage] Skipping import - game history loaded, turn nav controls position')
         return
       }
 
@@ -182,12 +141,58 @@ export const AnalysisPage: React.FC = () => {
       }
 
       try {
-        console.log('[AnalysisPage] Importing position from URL:', decodedSgf)
-        lastImportedSgf.current = decodedSgf
-        lastExportedSgf.current = decodedSgf // Also track as exported to prevent immediate re-export
-        await hub?.importPosition(decodedSgf)
+        // Check if this is a full game SGF (has moves) or just a position
+        if (isFullGameSgf(decodedSgf) && !hasLoadedGameSgf.current) {
+          console.log('[AnalysisPage] Detected full game SGF, parsing...')
+          hasLoadedGameSgf.current = true
+          setIsLoadingHistory(true)
+
+          const history = await hub.parseGameSgf(decodedSgf)
+
+          if (history && history.turnHistory && history.turnHistory.length > 0) {
+            console.log('[AnalysisPage] Game SGF parsed:', history.turnHistory.length, 'turns')
+            console.log('[AnalysisPage] Turn history details:', history.turnHistory.map((t, i) => ({
+              index: i,
+              turnNumber: t.turnNumber,
+              player: t.player,
+              hasPositionSgf: !!t.positionSgf,
+              positionSgfLength: t.positionSgf?.length || 0,
+              diceRolled: t.diceRolled,
+              moves: t.moves,
+            })))
+            setGameHistory(history)
+            setCurrentTurnIndex(0)
+
+            // Import the first turn's position
+            const firstTurn = history.turnHistory[0]
+            if (firstTurn.positionSgf) {
+              await hub.importPosition(firstTurn.positionSgf)
+              lastImportedSgf.current = firstTurn.positionSgf
+              lastExportedSgf.current = firstTurn.positionSgf
+
+              // Set dice if available
+              if (firstTurn.diceRolled && firstTurn.diceRolled.length >= 2) {
+                await hub.setDice(firstTurn.diceRolled[0], firstTurn.diceRolled[1])
+              }
+            }
+          } else {
+            // Fallback: treat as position SGF if parsing fails
+            console.log('[AnalysisPage] Game SGF parsing returned no turns, treating as position')
+            await hub.importPosition(decodedSgf)
+            lastImportedSgf.current = decodedSgf
+            lastExportedSgf.current = decodedSgf
+          }
+
+          setIsLoadingHistory(false)
+        } else if (!isFullGameSgf(decodedSgf)) {
+          // Position SGF - just import it
+          console.log('[AnalysisPage] Importing position from URL:', decodedSgf)
+          lastImportedSgf.current = decodedSgf
+          lastExportedSgf.current = decodedSgf
+          await hub.importPosition(decodedSgf)
+        }
       } catch (error) {
-        console.error('[AnalysisPage] Failed to import position from URL:', error)
+        console.error('[AnalysisPage] Failed to import from URL:', error)
         toast({
           title: 'Error',
           description: 'Failed to load position from URL',
@@ -195,17 +200,24 @@ export const AnalysisPage: React.FC = () => {
         })
         lastImportedSgf.current = null
         lastExportedSgf.current = null
+        hasLoadedGameSgf.current = false
+        setIsLoadingHistory(false)
       }
     }
 
     importFromUrl()
-  }, [sgf, currentGameState, hub, toast, gameId])
+  }, [sgf, currentGameState, hub, toast, gameHistory, isNavigating])
 
   // Update URL when position changes (but don't trigger if we just imported)
   useEffect(() => {
     const updateUrl = async () => {
-      // Skip URL updates when viewing game history
-      if (gameId) {
+      // Skip URL updates when viewing game history (keep the game SGF in URL)
+      if (gameHistory) {
+        return
+      }
+
+      // Skip URL updates while loading game history (prevents replacing full game SGF with position)
+      if (isLoadingHistory || hasLoadedGameSgf.current) {
         return
       }
 
@@ -243,7 +255,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     updateUrl()
-  }, [currentGameState, hub, navigate, sgf, gameId])
+  }, [currentGameState, hub, navigate, sgf, gameHistory, isLoadingHistory])
 
   // Cleanup when leaving the page
   useEffect(() => {
@@ -256,6 +268,66 @@ export const AnalysisPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Navigate to a specific turn in game history
+  const handleTurnChange = async (index: number) => {
+    console.log('[AnalysisPage] handleTurnChange called:', index, {
+      hasHistory: !!gameHistory?.turnHistory,
+      turnCount: gameHistory?.turnHistory?.length,
+      isNavigating,
+    })
+
+    if (!gameHistory?.turnHistory || isNavigating) {
+      console.log('[AnalysisPage] Skipping navigation - no history or already navigating')
+      return
+    }
+
+    setIsNavigating(true)
+    setCurrentTurnIndex(index)
+
+    try {
+      const turn = gameHistory.turnHistory[index]
+      console.log('[AnalysisPage] Turn data:', {
+        turnNumber: turn.turnNumber,
+        player: turn.player,
+        positionSgf: turn.positionSgf?.substring(0, 50) + '...',
+        positionSgfLength: turn.positionSgf?.length,
+        diceRolled: turn.diceRolled,
+        moves: turn.moves,
+      })
+
+      // Import the position for this turn
+      if (turn.positionSgf) {
+        console.log('[AnalysisPage] Importing position SGF...')
+        await hub?.importPosition(turn.positionSgf)
+        lastImportedSgf.current = turn.positionSgf
+        lastExportedSgf.current = turn.positionSgf
+        console.log('[AnalysisPage] Position imported successfully')
+      } else {
+        console.error('[AnalysisPage] positionSgf is empty for turn', index)
+        toast({
+          title: 'Warning',
+          description: 'Position data missing for this turn',
+          variant: 'destructive',
+        })
+      }
+
+      // Set dice to match what was rolled (enables "best moves" analysis)
+      if (turn.diceRolled && turn.diceRolled.length >= 2) {
+        console.log('[AnalysisPage] Setting dice:', turn.diceRolled)
+        await hub?.setDice(turn.diceRolled[0], turn.diceRolled[1])
+      }
+    } catch (error) {
+      console.error('[AnalysisPage] Failed to navigate to turn:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load turn position',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsNavigating(false)
+    }
+  }
 
   // Execute a sequence of moves
   const handleExecuteMoves = async (moves: Move[]) => {
@@ -459,8 +531,8 @@ export const AnalysisPage: React.FC = () => {
             {/* Analysis Mode Toggles */}
             <AnalysisModeToggles />
 
-            {/* Dice Selector - Only shown when custom dice is enabled */}
-            {isCustomDiceEnabled && <DiceSelector />}
+            {/* Dice Selector - Always shown in analysis mode (no Roll button) */}
+            <DiceSelector />
 
             {/* Player Switcher - Always shown in analysis */}
             <PlayerSwitcher currentPlayer={currentGameState.currentPlayer} />
@@ -482,11 +554,21 @@ export const AnalysisPage: React.FC = () => {
 
           {/* Main Board Area */}
           <div className="space-y-3">
+            {/* Turn Navigator - only shown when viewing game history */}
+            {gameHistory && gameHistory.turnHistory && gameHistory.turnHistory.length > 0 && (
+              <TurnNavigator
+                turnHistory={gameHistory.turnHistory}
+                currentTurnIndex={currentTurnIndex}
+                onTurnChange={handleTurnChange}
+                isLoading={isNavigating || isLoadingHistory}
+              />
+            )}
+
             <Card>
               <CardContent className="p-2 relative">
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <GameBoardAdapter gameState={currentGameState} />
+                  <GameBoardAdapter gameState={currentGameState} suppressButtons={isNavigating} />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={false}

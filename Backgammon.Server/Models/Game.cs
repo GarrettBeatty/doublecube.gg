@@ -164,7 +164,15 @@ public class Game
     /// Each turn includes position SGF, dice rolled, moves made, and doubling actions.
     /// </summary>
     [JsonPropertyName("turnHistory")]
+    [Obsolete("Use GameSgf instead. TurnHistory is kept for backwards compatibility.")]
     public List<TurnSnapshotDto> TurnHistory { get; set; } = new();
+
+    /// <summary>
+    /// Complete game record in SGF format (industry standard).
+    /// Contains all moves, dice rolls, cube actions, and result.
+    /// </summary>
+    [JsonPropertyName("gameSgf")]
+    public string GameSgf { get; set; } = string.Empty;
 
     // Timestamps
 

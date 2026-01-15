@@ -64,13 +64,20 @@ export const CompletedGameBanner: React.FC<CompletedGameBannerProps> = ({ gameSt
 
   const handleViewAnalysis = async () => {
     try {
-      const sgf = await hub?.exportPosition()
+      // Export full game SGF with move history
+      const sgf = await hub?.exportGameSgf()
       if (sgf) {
         const encodedSgf = encodeURIComponent(sgf)
         navigate(`/analysis/${encodedSgf}`)
+      } else {
+        // Fallback to position-only export
+        const positionSgf = await hub?.exportPosition()
+        if (positionSgf) {
+          navigate(`/analysis/${encodeURIComponent(positionSgf)}`)
+        }
       }
     } catch (error) {
-      console.error('Failed to export position for analysis:', error)
+      console.error('Failed to export game for analysis:', error)
     }
   }
 
