@@ -4,7 +4,7 @@
 // @ts-nocheck
 import type { IStreamResult, Subject } from '@microsoft/signalr';
 import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
-import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
+import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, ChatHistoryDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
 /**
@@ -424,6 +424,12 @@ export type IGameHubClient = {
     * @returns Transpiled from System.Threading.Tasks.Task
     */
     receiveChatMessage(senderName: string, message: string, senderConnectionId: string): Promise<void>;
+    /**
+    * Sent when a player joins a game to provide chat history from previous games in the match
+    * @param history Transpiled from Backgammon.Server.Models.SignalR.ChatHistoryDto
+    * @returns Transpiled from System.Threading.Tasks.Task
+    */
+    receiveChatHistory(history: ChatHistoryDto): Promise<void>;
     /**
     * Sent when an error occurs
     * @param errorMessage Transpiled from string

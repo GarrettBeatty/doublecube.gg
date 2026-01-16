@@ -27,6 +27,7 @@ public class MatchGameContinuationTests
     private readonly Mock<IAiMoveService> _aiMoveServiceMock;
     private readonly Mock<IAiPlayerManager> _aiPlayerManagerMock;
     private readonly Mock<ICorrespondenceGameService> _correspondenceGameServiceMock;
+    private readonly Mock<IChatService> _chatServiceMock;
     private readonly Mock<ILogger<MatchService>> _loggerMock;
     private readonly MatchService _matchService;
 
@@ -40,6 +41,7 @@ public class MatchGameContinuationTests
         _aiMoveServiceMock = new Mock<IAiMoveService>();
         _aiPlayerManagerMock = new Mock<IAiPlayerManager>();
         _correspondenceGameServiceMock = new Mock<ICorrespondenceGameService>();
+        _chatServiceMock = new Mock<IChatService>();
         _loggerMock = new Mock<ILogger<MatchService>>();
 
         // Setup GameSessionManager to return a valid session
@@ -61,6 +63,7 @@ public class MatchGameContinuationTests
             _aiMoveServiceMock.Object,
             _aiPlayerManagerMock.Object,
             _correspondenceGameServiceMock.Object,
+            _chatServiceMock.Object,
             _loggerMock.Object);
     }
 

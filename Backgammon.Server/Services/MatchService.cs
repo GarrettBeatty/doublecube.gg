@@ -16,6 +16,7 @@ public class MatchService : IMatchService
     private readonly IAiMoveService _aiMoveService;
     private readonly IAiPlayerManager _aiPlayerManager;
     private readonly ICorrespondenceGameService _correspondenceGameService;
+    private readonly IChatService _chatService;
     private readonly ILogger<MatchService> _logger;
 
     public MatchService(
@@ -27,6 +28,7 @@ public class MatchService : IMatchService
         IAiMoveService aiMoveService,
         IAiPlayerManager aiPlayerManager,
         ICorrespondenceGameService correspondenceGameService,
+        IChatService chatService,
         ILogger<MatchService> logger)
     {
         _matchRepository = matchRepository;
@@ -37,6 +39,7 @@ public class MatchService : IMatchService
         _aiMoveService = aiMoveService;
         _aiPlayerManager = aiPlayerManager;
         _correspondenceGameService = correspondenceGameService;
+        _chatService = chatService;
         _logger = logger;
     }
 
@@ -381,6 +384,9 @@ public class MatchService : IMatchService
                 // Clean up AI player mapping for this match
                 _aiPlayerManager.RemoveMatch(match.MatchId);
 
+                // Clean up in-memory chat storage for this match
+                _chatService.ClearMatchChat(match.MatchId);
+
                 _logger.LogInformation(
                     "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1Score}-{P2Score}",
                     match.MatchId,
@@ -465,6 +471,9 @@ public class MatchService : IMatchService
             }
 
             await _matchRepository.UpdateMatchAsync(match);
+
+            // Clean up in-memory chat storage for this match
+            _chatService.ClearMatchChat(matchId);
 
             _logger.LogInformation("Match {MatchId} abandoned by {PlayerId}", matchId, abandoningPlayerId);
         }

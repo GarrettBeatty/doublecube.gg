@@ -5,7 +5,7 @@
 import type { HubConnection, IStreamResult, Subject } from '@microsoft/signalr';
 import type { IGameHub, IGameHubClient } from './Backgammon.Server.Hubs.Interfaces';
 import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
-import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
+import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, ChatHistoryDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
 
@@ -345,6 +345,7 @@ class IGameHubClient_Binder implements ReceiverRegister<IGameHubClient> {
         const __doubleOffered = (...args: [DoubleOfferDto]) => receiver.doubleOffered(...args);
         const __doubleAccepted = (...args: [GameState]) => receiver.doubleAccepted(...args);
         const __receiveChatMessage = (...args: [string, string, string]) => receiver.receiveChatMessage(...args);
+        const __receiveChatHistory = (...args: [ChatHistoryDto]) => receiver.receiveChatHistory(...args);
         const __error = (...args: [string]) => receiver.error(...args);
         const __info = (...args: [string]) => receiver.info(...args);
         const __matchCreated = (...args: [MatchCreatedDto]) => receiver.matchCreated(...args);
@@ -376,6 +377,7 @@ class IGameHubClient_Binder implements ReceiverRegister<IGameHubClient> {
         connection.on("DoubleOffered", __doubleOffered);
         connection.on("DoubleAccepted", __doubleAccepted);
         connection.on("ReceiveChatMessage", __receiveChatMessage);
+        connection.on("ReceiveChatHistory", __receiveChatHistory);
         connection.on("Error", __error);
         connection.on("Info", __info);
         connection.on("MatchCreated", __matchCreated);
@@ -408,6 +410,7 @@ class IGameHubClient_Binder implements ReceiverRegister<IGameHubClient> {
             { methodName: "DoubleOffered", method: __doubleOffered },
             { methodName: "DoubleAccepted", method: __doubleAccepted },
             { methodName: "ReceiveChatMessage", method: __receiveChatMessage },
+            { methodName: "ReceiveChatHistory", method: __receiveChatHistory },
             { methodName: "Error", method: __error },
             { methodName: "Info", method: __info },
             { methodName: "MatchCreated", method: __matchCreated },

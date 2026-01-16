@@ -3,6 +3,7 @@ using System.Net;
 using Backgammon.Core;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Hubs.Interfaces;
+using Backgammon.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -32,6 +33,7 @@ public class ChatService : IChatService
 
     private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
+    private readonly IMatchChatStorage _matchChatStorage;
     private readonly ILogger<ChatService> _logger;
 
     /// <summary>
@@ -45,14 +47,17 @@ public class ChatService : IChatService
     /// </summary>
     /// <param name="sessionManager">The game session manager.</param>
     /// <param name="hubContext">The SignalR hub context.</param>
+    /// <param name="matchChatStorage">The match chat storage.</param>
     /// <param name="logger">The logger instance.</param>
     public ChatService(
         IGameSessionManager sessionManager,
         IHubContext<GameHub, IGameHubClient> hubContext,
+        IMatchChatStorage matchChatStorage,
         ILogger<ChatService> logger)
     {
         _sessionManager = sessionManager;
         _hubContext = hubContext;
+        _matchChatStorage = matchChatStorage;
         _logger = logger;
     }
 
@@ -109,6 +114,18 @@ public class ChatService : IChatService
         // Record message for rate limiting
         RecordMessage(connectionId);
 
+        // Store message in match chat storage if this is a match game
+        if (!string.IsNullOrEmpty(session.MatchId))
+        {
+            _matchChatStorage.AddMessage(session.MatchId, new ChatMessage
+            {
+                SenderName = senderName,
+                Message = message,
+                SenderConnectionId = connectionId,
+                Timestamp = DateTime.UtcNow
+            });
+        }
+
         // Broadcast to all players in the game
         await _hubContext.Clients.Group(session.Id).ReceiveChatMessage(
             senderName,
@@ -125,6 +142,19 @@ public class ChatService : IChatService
     public void CleanupConnection(string connectionId)
     {
         _messageHistory.TryRemove(connectionId, out _);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<ChatMessage> GetMatchChatHistory(string matchId)
+    {
+        return _matchChatStorage.GetMessages(matchId);
+    }
+
+    /// <inheritdoc />
+    public void ClearMatchChat(string matchId)
+    {
+        _matchChatStorage.ClearMatch(matchId);
+        _logger.LogInformation("Cleared chat history for match {MatchId}", matchId);
     }
 
     /// <summary>

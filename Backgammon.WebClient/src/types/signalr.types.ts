@@ -10,6 +10,7 @@ export const HubEvents = {
   DoubleOffered: 'DoubleOffered',
   DoubleAccepted: 'DoubleAccepted',
   ReceiveChatMessage: 'ReceiveChatMessage',
+  ReceiveChatHistory: 'ReceiveChatHistory',
   SpectatorJoined: 'SpectatorJoined',
   Error: 'Error',
   Info: 'Info',

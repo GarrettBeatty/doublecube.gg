@@ -83,6 +83,24 @@ export type ActiveMatchDto = {
     createdAt: (Date | string);
 }
 
+/** Transpiled from Backgammon.Server.Models.SignalR.ChatHistoryDto */
+export type ChatHistoryDto = {
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.SignalR.ChatMessageDto> */
+    messages: ChatMessageDto[];
+}
+
+/** Transpiled from Backgammon.Server.Models.SignalR.ChatMessageDto */
+export type ChatMessageDto = {
+    /** Transpiled from string */
+    senderName: string;
+    /** Transpiled from string */
+    message: string;
+    /** Transpiled from System.DateTime */
+    timestamp: (Date | string);
+    /** Transpiled from bool */
+    isOwn: boolean;
+}
+
 /** Transpiled from Backgammon.Server.Models.SignalR.CheckerColorDto */
 export enum CheckerColorDto {
     White = 0,

@@ -12,6 +12,7 @@ public class ChatServiceTests
 {
     private readonly Mock<IGameSessionManager> _mockSessionManager;
     private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
+    private readonly Mock<IMatchChatStorage> _mockMatchChatStorage;
     private readonly Mock<ILogger<ChatService>> _mockLogger;
     private readonly ChatService _service;
 
@@ -19,11 +20,13 @@ public class ChatServiceTests
     {
         _mockSessionManager = new Mock<IGameSessionManager>();
         _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
+        _mockMatchChatStorage = new Mock<IMatchChatStorage>();
         _mockLogger = new Mock<ILogger<ChatService>>();
 
         _service = new ChatService(
             _mockSessionManager.Object,
             _mockHubContext.Object,
+            _mockMatchChatStorage.Object,
             _mockLogger.Object);
     }
 

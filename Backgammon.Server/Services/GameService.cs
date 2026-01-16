@@ -23,6 +23,7 @@ public class GameService : IGameService
     private readonly IGameActionOrchestrator _gameActionOrchestrator;
     private readonly IMatchRepository _matchRepository;
     private readonly IMatchService _matchService;
+    private readonly IChatService _chatService;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<GameService> _logger;
 
@@ -34,6 +35,7 @@ public class GameService : IGameService
         IGameActionOrchestrator gameActionOrchestrator,
         IMatchRepository matchRepository,
         IMatchService matchService,
+        IChatService chatService,
         IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<GameService> logger)
     {
@@ -44,6 +46,7 @@ public class GameService : IGameService
         _gameActionOrchestrator = gameActionOrchestrator;
         _matchRepository = matchRepository;
         _matchService = matchService;
+        _chatService = chatService;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -113,6 +116,9 @@ public class GameService : IGameService
                         // Send game state as player (includes winner info for modal)
                         var playerState = session.GetState(connectionId);
                         await _hubContext.Clients.Client(connectionId).GameUpdate(playerState);
+
+                        // Send chat history for match games
+                        await SendMatchChatHistoryAsync(session, connectionId);
 
                         _logger.LogInformation(
                             "Match participant {PlayerId} rejoined completed game {GameId} as player",
@@ -261,6 +267,12 @@ public class GameService : IGameService
                 // Both players ready - start game with opening roll
                 await BroadcastGameStartAsync(session);
 
+                // Send chat history to all players in match games
+                foreach (var connId in session.WhiteConnections.Concat(session.RedConnections))
+                {
+                    await SendMatchChatHistoryAsync(session, connId);
+                }
+
                 return;
             }
             else
@@ -304,6 +316,10 @@ public class GameService : IGameService
 
                 var state = session.GetState(connectionId);
                 await _hubContext.Clients.Client(connectionId).GameStart(state);
+
+                // Send chat history for match games
+                await SendMatchChatHistoryAsync(session, connectionId);
+
                 return;
             }
 
@@ -316,6 +332,12 @@ public class GameService : IGameService
 
             // Game just became full - broadcast start to both players
             await BroadcastGameStartAsync(session);
+
+            // Send chat history for match games
+            foreach (var connId in session.WhiteConnections.Concat(session.RedConnections))
+            {
+                await SendMatchChatHistoryAsync(session, connId);
+            }
 
             // Timer will be started after opening roll completes (see GameActionOrchestrator.RollDiceAsync)
 
@@ -725,5 +747,42 @@ public class GameService : IGameService
         {
             _logger.LogWarning("Could not set rating for playerId {PlayerId} - not found as White or Red in game {GameId}", playerId, session.Id);
         }
+    }
+
+    /// <summary>
+    /// Sends chat history to a player who joins a match game.
+    /// This enables chat persistence across games within a match.
+    /// </summary>
+    private async Task SendMatchChatHistoryAsync(GameSession session, string connectionId)
+    {
+        if (string.IsNullOrEmpty(session.MatchId))
+        {
+            return;
+        }
+
+        var chatHistory = _chatService.GetMatchChatHistory(session.MatchId);
+        if (chatHistory.Count == 0)
+        {
+            return;
+        }
+
+        var historyDto = new ChatHistoryDto
+        {
+            Messages = chatHistory.Select(m => new ChatMessageDto
+            {
+                SenderName = m.SenderConnectionId == connectionId ? "You" : m.SenderName,
+                Message = m.Message,
+                Timestamp = m.Timestamp,
+                IsOwn = m.SenderConnectionId == connectionId
+            }).ToList()
+        };
+
+        await _hubContext.Clients.Client(connectionId).ReceiveChatHistory(historyDto);
+
+        _logger.LogDebug(
+            "Sent {Count} chat history messages to connection {ConnectionId} for match {MatchId}",
+            chatHistory.Count,
+            connectionId,
+            session.MatchId);
     }
 }

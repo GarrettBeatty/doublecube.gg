@@ -181,6 +181,7 @@ builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>()
 
 builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
 builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
+builder.Services.AddSingleton<IMatchChatStorage, MatchChatStorage>();
 builder.Services.AddSingleton<IChatService, ChatService>();
 
 // ========== ANALYSIS CONFIGURATION ==========

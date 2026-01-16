@@ -69,6 +69,11 @@ public interface IGameHubClient
     /// </summary>
     Task ReceiveChatMessage(string senderName, string message, string senderConnectionId);
 
+    /// <summary>
+    /// Sent when a player joins a game to provide chat history from previous games in the match
+    /// </summary>
+    Task ReceiveChatHistory(ChatHistoryDto history);
+
     // ==================== Error/Info Events ====================
 
     /// <summary>
