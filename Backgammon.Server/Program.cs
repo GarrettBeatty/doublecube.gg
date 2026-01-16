@@ -161,6 +161,7 @@ builder.Services.AddSingleton<ICorrespondenceGameService, CorrespondenceGameServ
 builder.Services.AddHostedService<CorrespondenceTimeoutService>();
 
 // AI opponent service
+builder.Services.AddSingleton<IBotResolver, BotResolver>();
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 
 // AI player management for matches (ensures consistent AI across match continuations)

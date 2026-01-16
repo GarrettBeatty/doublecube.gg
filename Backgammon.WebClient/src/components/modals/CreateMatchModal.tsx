@@ -30,7 +30,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [targetScore, setTargetScore] = useState<number>(1)
   const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
   const [isRated, setIsRated] = useState<boolean>(true)
-  const [aiType, setAiType] = useState<'greedy' | 'random'>('greedy')
+  const [aiType, setAiType] = useState<'greedy' | 'random' | 'gnubg'>('greedy')
   const [isCreating, setIsCreating] = useState(false)
   const isAuthenticated = authService.isAuthenticated()
 
@@ -128,7 +128,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
           {opponentType === 'AI' && (
             <div className="space-y-3">
               <Label>AI Difficulty</Label>
-              <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random')}>
+              <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random' | 'gnubg')}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="greedy" id="ai-greedy" />
                   <Label htmlFor="ai-greedy" className="font-normal cursor-pointer">
@@ -144,6 +144,15 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                     <div className="flex flex-col">
                       <span>Random Bot</span>
                       <span className="text-sm text-muted-foreground">Makes random valid moves - good for practice</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="gnubg" id="ai-gnubg" />
+                  <Label htmlFor="ai-gnubg" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Expert Bot (GNUBG)</span>
+                      <span className="text-sm text-muted-foreground">World-class neural network AI - very strong play</span>
                     </div>
                   </Label>
                 </div>

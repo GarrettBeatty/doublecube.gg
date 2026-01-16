@@ -500,32 +500,35 @@ public static class SgfSerializer
     }
 
     /// <summary>
-    /// Convert point number to SGF coordinate
+    /// Convert point number to SGF coordinate.
+    /// SGF uses board coordinates where 'a' = point 1, 'x' = point 24,
+    /// regardless of which player's checker it is.
     /// </summary>
     private static char PointToSgf(int point, CheckerColor color)
     {
+        // Color parameter kept for API compatibility but not used -
+        // SGF coordinates are board positions, not player-relative
+        _ = color;
+
         if (point < 1 || point > 24)
         {
             throw new ArgumentException($"Point must be between 1 and 24, got {point}");
         }
 
-        if (color == CheckerColor.White)
-        {
-            // White: Point 1 = 'a', Point 2 = 'b', ..., Point 24 = 'x'
-            return (char)('a' + point - 1);
-        }
-        else
-        {
-            // Red: Point 1 = 'x', Point 2 = 'w', ..., Point 24 = 'a'
-            return (char)('a' + 24 - point);
-        }
+        // Board coordinates: Point 1 = 'a', Point 2 = 'b', ..., Point 24 = 'x'
+        return (char)('a' + point - 1);
     }
 
     /// <summary>
-    /// Convert SGF coordinate to point number
+    /// Convert SGF coordinate to point number.
+    /// SGF uses board coordinates where 'a' = point 1, 'x' = point 24.
     /// </summary>
     private static int SgfToPoint(char coord, CheckerColor color)
     {
+        // Color parameter kept for API compatibility but not used -
+        // SGF coordinates are board positions, not player-relative
+        _ = color;
+
         if (coord == 'y' || coord == 'z')
         {
             throw new ArgumentException($"Coordinate '{coord}' is not a board point");
@@ -536,16 +539,8 @@ public static class SgfSerializer
             throw new ArgumentException($"Invalid SGF coordinate: {coord}");
         }
 
-        if (color == CheckerColor.White)
-        {
-            // White: 'a' = Point 1, 'b' = Point 2, ..., 'x' = Point 24
-            return coord - 'a' + 1;
-        }
-        else
-        {
-            // Red: 'a' = Point 24, 'b' = Point 23, ..., 'x' = Point 1
-            return 24 - (coord - 'a');
-        }
+        // Board coordinates: 'a' = Point 1, 'b' = Point 2, ..., 'x' = Point 24
+        return coord - 'a' + 1;
     }
 
     /// <summary>

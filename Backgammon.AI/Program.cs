@@ -1,4 +1,6 @@
 using Backgammon.AI;
+using Backgammon.AI.Bots;
+using Backgammon.Plugins.Abstractions;
 
 namespace BackgammonAI;
 
@@ -10,19 +12,19 @@ internal class Program
 
         // Select AIs
         Console.WriteLine("Available AI players:");
-        Console.WriteLine("1. RandomAI - Makes random valid moves");
-        Console.WriteLine("2. GreedyAI - Prioritizes bearing off and hitting");
+        Console.WriteLine("1. Random Bot - Makes random valid moves");
+        Console.WriteLine("2. Greedy Bot - Prioritizes bearing off and hitting");
 
         Console.Write("\nSelect White AI (1-2, default: 1): ");
-        var whiteAI = CreateAI(Console.ReadLine(), "White");
+        var whiteBot = CreateBot(Console.ReadLine());
 
         Console.Write("Select Red AI (1-2, default: 2): ");
-        var redAI = CreateAI(Console.ReadLine(), "Red");
+        var redBot = CreateBot(Console.ReadLine());
 
-        Console.WriteLine($"\nMatchup: {whiteAI.Name} vs {redAI.Name}\n");
+        Console.WriteLine($"\nMatchup: {whiteBot.DisplayName} vs {redBot.DisplayName}\n");
 
         // Create simulator
-        var simulator = new AISimulator(whiteAI, redAI, verbose: false);
+        var simulator = new AISimulator(whiteBot, redBot, verbose: false);
 
         // Ask user how many games to run
         Console.Write("How many games to simulate? (default: 100): ");
@@ -50,12 +52,12 @@ internal class Program
         simulator.RunGame();
     }
 
-    private static IBackgammonAI CreateAI(string? choice, string color)
+    private static IGameBot CreateBot(string? choice)
     {
         return choice?.Trim() switch
         {
-            "2" => new GreedyAI($"Greedy-{color}"),
-            _ => new RandomAI($"Random-{color}")
+            "2" => new GreedyBot(),
+            _ => new RandomBot()
         };
     }
 }

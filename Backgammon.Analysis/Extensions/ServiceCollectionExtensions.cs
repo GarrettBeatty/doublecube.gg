@@ -95,12 +95,13 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddGnubgBot(this IServiceCollection services)
     {
-        // Register GnubgBot - injects HttpGnubgEvaluator as IPositionEvaluator
+        // Register GnubgBot - injects HttpGnubgEvaluator as IPositionEvaluator and logger
         services.AddTransient<GnubgBot>(sp =>
         {
             // Get the HttpGnubgEvaluator and pass it as the IPositionEvaluator
             var evaluator = sp.GetRequiredService<HttpGnubgEvaluator>();
-            return new GnubgBot(evaluator);
+            var logger = sp.GetService<ILogger<GnubgBot>>();
+            return new GnubgBot(evaluator, logger);
         });
 
         // Register metadata for discovery by the registry

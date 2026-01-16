@@ -8,9 +8,17 @@ namespace Backgammon.Plugins.Models;
 public class MoveSequenceEvaluation
 {
     /// <summary>
-    /// The sequence of moves in order
+    /// The sequence of moves in order (primary ordering)
     /// </summary>
     public List<Move> Moves { get; set; } = new();
+
+    /// <summary>
+    /// Alternative move orderings for abbreviated moves.
+    /// When gnubg returns abbreviated notation like "24/15", there may be multiple
+    /// valid intermediate points. This list contains all possible orderings.
+    /// The first element is always the same as <see cref="Moves"/>.
+    /// </summary>
+    public List<List<Move>> Alternatives { get; set; } = new();
 
     /// <summary>
     /// Evaluation of the position after all moves are executed

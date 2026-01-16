@@ -1,37 +1,53 @@
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
 
 namespace Backgammon.AI;
 
 /// <summary>
-/// Simulates games between AI players
+/// Simulates games between bot players.
 /// </summary>
 public class AISimulator
 {
-    public AISimulator(IBackgammonAI whiteAI, IBackgammonAI redAI, bool verbose = false)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AISimulator"/> class.
+    /// </summary>
+    /// <param name="whiteBot">The bot playing as White.</param>
+    /// <param name="redBot">The bot playing as Red.</param>
+    /// <param name="verbose">Whether to print verbose output.</param>
+    public AISimulator(IGameBot whiteBot, IGameBot redBot, bool verbose = false)
     {
-        WhiteAI = whiteAI;
-        RedAI = redAI;
+        WhiteBot = whiteBot;
+        RedBot = redBot;
         Verbose = verbose;
     }
 
-    public IBackgammonAI WhiteAI { get; }
+    /// <summary>
+    /// Gets the bot playing as White.
+    /// </summary>
+    public IGameBot WhiteBot { get; }
 
-    public IBackgammonAI RedAI { get; }
+    /// <summary>
+    /// Gets the bot playing as Red.
+    /// </summary>
+    public IGameBot RedBot { get; }
 
+    /// <summary>
+    /// Gets or sets whether to print verbose output.
+    /// </summary>
     public bool Verbose { get; set; }
 
     /// <summary>
-    /// Run a single game between the two AIs
+    /// Run a single game between the two bots.
     /// </summary>
-    /// <returns>The game result (positive if white wins, negative if red wins)</returns>
+    /// <returns>The game result.</returns>
     public GameResult RunGame()
     {
-        var engine = new GameEngine(WhiteAI.Name, RedAI.Name);
+        var engine = new GameEngine(WhiteBot.DisplayName, RedBot.DisplayName);
         engine.StartNewGame();
 
         if (Verbose)
         {
-            Console.WriteLine($"=== New Game: {WhiteAI.Name} (White) vs {RedAI.Name} (Red) ===");
+            Console.WriteLine($"=== New Game: {WhiteBot.DisplayName} (White) vs {RedBot.DisplayName} (Red) ===");
             Console.WriteLine($"Opening roll: {engine.Dice}");
             Console.WriteLine($"{engine.CurrentPlayer.Name} goes first");
         }
@@ -41,7 +57,7 @@ public class AISimulator
         while (!engine.GameOver)
         {
             turnCount++;
-            var currentAI = engine.CurrentPlayer.Color == CheckerColor.White ? WhiteAI : RedAI;
+            var currentBot = engine.CurrentPlayer.Color == CheckerColor.White ? WhiteBot : RedBot;
 
             if (Verbose)
             {
@@ -59,8 +75,8 @@ public class AISimulator
                 }
             }
 
-            // Let AI choose and execute moves
-            var moves = currentAI.ChooseMoves(engine);
+            // Let bot choose and execute moves (sync call for simulation)
+            var moves = currentBot.ChooseMovesAsync(engine).GetAwaiter().GetResult();
 
             if (Verbose)
             {
@@ -101,7 +117,6 @@ public class AISimulator
         if (engine.GameOver && engine.Winner != null)
         {
             var result = engine.GetGameResult();
-            var winnerAI = engine.Winner.Color == CheckerColor.White ? WhiteAI : RedAI;
 
             if (Verbose)
             {
@@ -135,18 +150,20 @@ public class AISimulator
     }
 
     /// <summary>
-    /// Run multiple games and return statistics
+    /// Run multiple games and return statistics.
     /// </summary>
+    /// <param name="gameCount">Number of games to simulate.</param>
+    /// <returns>The simulation statistics.</returns>
     public SimulationStats RunSimulation(int gameCount)
     {
         var stats = new SimulationStats
         {
             TotalGames = gameCount,
-            WhiteAIName = WhiteAI.Name,
-            RedAIName = RedAI.Name
+            WhiteAIName = WhiteBot.DisplayName,
+            RedAIName = RedBot.DisplayName
         };
 
-        Console.WriteLine($"Running {gameCount} games: {WhiteAI.Name} vs {RedAI.Name}");
+        Console.WriteLine($"Running {gameCount} games: {WhiteBot.DisplayName} vs {RedBot.DisplayName}");
 
         for (int i = 0; i < gameCount; i++)
         {
@@ -174,7 +191,7 @@ public class AISimulator
         return stats;
     }
 
-    private string FormatMove(Move move)
+    private static string FormatMove(Move move)
     {
         if (move.From == 0)
         {
@@ -190,7 +207,7 @@ public class AISimulator
         }
     }
 
-    private string GetResultType(int multiplier)
+    private static string GetResultType(int multiplier)
     {
         return multiplier switch
         {

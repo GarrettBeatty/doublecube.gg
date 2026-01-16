@@ -1,5 +1,6 @@
 using Backgammon.Plugins.Abstractions;
 using Backgammon.Plugins.Base;
+using Microsoft.Extensions.Logging;
 
 namespace Backgammon.AI.Bots;
 
@@ -9,8 +10,8 @@ namespace Backgammon.AI.Bots;
 /// </summary>
 public class GnubgBot : EvaluatorBackedBot
 {
-    public GnubgBot(IPositionEvaluator evaluator)
-        : base(evaluator)
+    public GnubgBot(IPositionEvaluator evaluator, ILogger<GnubgBot>? logger = null)
+        : base(evaluator, logger)
     {
     }
 

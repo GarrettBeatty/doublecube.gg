@@ -53,10 +53,11 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
-        // White: points 1,2,3. Red: points 24,23,22,21 (which are 'a','b','c','d' for Red)
+        // White: points 1,2,3 ('a','b','c'). Red: points 24,23,22,21 ('x','w','v','u')
+        // SGF uses board coordinates: 'a'=1, 'b'=2, ..., 'x'=24
         var sgf = @"(;GM[6]
-  AW[a[5]][b[3]][c[5]][y[2]]
-  AB[a[2]][b[5]][c[3]][d[5]]
+  AW[a][a][a][a][a][b][b][b][c][c][c][c][c][y][y]
+  AB[x][x][w][w][w][w][w][v][v][v][u][u][u][u][u]
   PL[W]
   DI[34]
 )";
@@ -78,10 +79,11 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
-        // White: points 1,2,3,4 (which are 'a','b','c','d'). Red: points 24,23,22 (which are 'a','b','c' for Red)
+        // White: points 1,2,3,4 ('a','b','c','d'). Red: points 24,23,22 ('x','w','v') + 1 on bar
+        // SGF uses board coordinates: 'a'=1, 'b'=2, ..., 'x'=24
         var sgf = @"(;GM[6]
-  AW[a[2]][b[5]][c[3]][d[5]]
-  AB[a[5]][b[3]][c[6]][y[1]]
+  AW[a][a][b][b][b][b][b][c][c][c][d][d][d][d][d]
+  AB[x][x][x][x][x][w][w][w][v][v][v][v][v][v][y]
   PL[B]
   DI[34]
 )";
@@ -100,10 +102,11 @@ public class SgfSerializerTests
     {
         // Arrange
         var game = new GameEngine();
-        // White on points 1,2. Red on points 24,23 (which are 'a','b' for Red)
+        // White on points 1,2 ('a','b'). Red on points 24,23 ('x','w')
+        // SGF uses board coordinates: 'a'=1, 'b'=2, ..., 'x'=24, 'z'=borne off
         var sgf = @"(;GM[6]
-  AW[a[3]][b[2]][z[10]]
-  AB[a[3]][b[2]][z[10]]
+  AW[a][a][a][b][b][z][z][z][z][z][z][z][z][z][z]
+  AB[x][x][x][w][w][z][z][z][z][z][z][z][z][z][z]
   PL[W]
 )";
 
@@ -217,10 +220,11 @@ public class SgfSerializerTests
         var game = new GameEngine();
         // White has 1 checker on bar, needs to enter at point 22 or 21 (25-3 or 25-4)
         // Make sure points 21 and 22 are not blocked (max 1 Red checker)
-        // White: points 1,2,3. Red: points 24,23,20,19 (not 21,22!)
+        // White: points 1,2,3 ('a','b','c'). Red: points 24,23,20,19 ('x','w','t','s') - NOT 21,22!
+        // SGF uses board coordinates: 'a'=1, ..., 'x'=24, 'y'=bar
         var sgf = @"(;GM[6]
-  AW[a[6]][b[3]][c[5]][y[1]]
-  AB[a[2]][b[5]][e[3]][f[5]]
+  AW[a][a][a][a][a][a][b][b][b][c][c][c][c][c][y]
+  AB[x][x][w][w][w][w][w][t][t][t][s][s][s][s][s]
   PL[W]
   DI[34]
   CO[c]
@@ -247,10 +251,11 @@ public class SgfSerializerTests
         var game = new GameEngine();
         // Red has 1 checker on bar, needs to enter at point 3 or 4 (0+3 or 0+4)
         // Make sure points 3 and 4 are not blocked (max 1 White checker)
-        // White: points 1,2,5,6 (not 3,4!). Red: points 24,23,22 (which are 'a','b','c' for Red)
+        // White: points 1,2,5,6 ('a','b','e','f') - NOT 3,4! Red: points 24,23,22 ('x','w','v')
+        // SGF uses board coordinates: 'a'=1, ..., 'x'=24, 'y'=bar
         var sgf = @"(;GM[6]
-  AW[a[2]][b[5]][e[3]][f[5]]
-  AB[a[5]][b[3]][c[6]][y[1]]
+  AW[a][a][b][b][b][b][b][e][e][e][f][f][f][f][f]
+  AB[x][x][x][x][x][w][w][w][v][v][v][v][v][v][y]
   PL[B]
   DI[34]
   CO[c]

@@ -1,5 +1,8 @@
+using Backgammon.AI.Bots;
 using Backgammon.Core;
+using Backgammon.Plugins.Abstractions;
 using Backgammon.Server.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -8,12 +11,19 @@ namespace Backgammon.Tests.Services;
 public class AiMoveServiceTests
 {
     private readonly Mock<ILogger<AiMoveService>> _mockLogger;
+    private readonly Mock<IBotResolver> _mockBotResolver;
     private readonly AiMoveService _service;
 
     public AiMoveServiceTests()
     {
         _mockLogger = new Mock<ILogger<AiMoveService>>();
-        _service = new AiMoveService(_mockLogger.Object);
+        _mockBotResolver = new Mock<IBotResolver>();
+
+        // Setup default IsBot behavior
+        _mockBotResolver.Setup(x => x.IsBot(It.Is<string>(s => s != null && s.StartsWith("ai_")))).Returns(true);
+        _mockBotResolver.Setup(x => x.IsBot(It.Is<string?>(s => s == null || !s.StartsWith("ai_")))).Returns(false);
+
+        _service = new AiMoveService(_mockBotResolver.Object, _mockLogger.Object);
     }
 
     [Fact]
@@ -44,6 +54,19 @@ public class AiMoveServiceTests
     {
         // Arrange
         var playerId = "ai_random_67890";
+
+        // Act
+        var result = _service.IsAiPlayer(playerId);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsAiPlayer_WithGnubgAiPrefix_ReturnsTrue()
+    {
+        // Arrange
+        var playerId = "ai_gnubg_12345";
 
         // Act
         var result = _service.IsAiPlayer(playerId);
@@ -86,7 +109,6 @@ public class AiMoveServiceTests
 
         // Assert
         Assert.StartsWith("ai_greedy_", playerId);
-        Assert.True(_service.IsAiPlayer(playerId));
     }
 
     [Fact]
@@ -97,7 +119,16 @@ public class AiMoveServiceTests
 
         // Assert
         Assert.StartsWith("ai_random_", playerId);
-        Assert.True(_service.IsAiPlayer(playerId));
+    }
+
+    [Fact]
+    public void GenerateAiPlayerId_WithGnubgType_GeneratesGnubgId()
+    {
+        // Act
+        var playerId = _service.GenerateAiPlayerId("gnubg");
+
+        // Assert
+        Assert.StartsWith("ai_gnubg_", playerId);
     }
 
     [Fact]
@@ -108,7 +139,6 @@ public class AiMoveServiceTests
 
         // Assert
         Assert.StartsWith("ai_greedy_", playerId);
-        Assert.True(_service.IsAiPlayer(playerId));
     }
 
     [Fact]
@@ -119,7 +149,6 @@ public class AiMoveServiceTests
 
         // Assert
         Assert.StartsWith("ai_greedy_", playerId);
-        Assert.True(_service.IsAiPlayer(playerId));
     }
 
     [Fact]
@@ -130,7 +159,6 @@ public class AiMoveServiceTests
 
         // Assert
         Assert.StartsWith("ai_random_", playerId);
-        Assert.True(_service.IsAiPlayer(playerId));
     }
 
     [Fact]
@@ -147,7 +175,14 @@ public class AiMoveServiceTests
     [Fact]
     public async Task ExecuteAiTurnAsync_CompletesWithoutError()
     {
-        // Arrange
+        // Arrange - create a real bot resolver with actual bots
+        var services = new ServiceCollection();
+        services.AddSingleton<GreedyBot>();
+        services.AddSingleton<RandomBot>();
+        var serviceProvider = services.BuildServiceProvider();
+        var botResolver = new BotResolver(serviceProvider);
+        var service = new AiMoveService(botResolver, _mockLogger.Object);
+
         var session = new GameSession("game-123");
         // Add players - White first, then Red
         session.AddPlayer("ai_greedy_123", string.Empty);
@@ -181,7 +216,7 @@ public class AiMoveServiceTests
         };
 
         // Act - use the AI player ID we set up
-        await _service.ExecuteAiTurnAsync(session, "ai_greedy_123", broadcastUpdate);
+        await service.ExecuteAiTurnAsync(session, "ai_greedy_123", broadcastUpdate);
 
         // Assert - verify broadcast was called at least once (for dice roll)
         Assert.True(broadcastCallCount > 0);
@@ -190,7 +225,14 @@ public class AiMoveServiceTests
     [Fact]
     public async Task ExecuteAiTurnAsync_WithRandomAi_CompletesWithoutError()
     {
-        // Arrange
+        // Arrange - create a real bot resolver with actual bots
+        var services = new ServiceCollection();
+        services.AddSingleton<GreedyBot>();
+        services.AddSingleton<RandomBot>();
+        var serviceProvider = services.BuildServiceProvider();
+        var botResolver = new BotResolver(serviceProvider);
+        var service = new AiMoveService(botResolver, _mockLogger.Object);
+
         var session = new GameSession("game-123");
         // Add players - White first, then Red
         session.AddPlayer("ai_random_456", string.Empty);
@@ -224,7 +266,7 @@ public class AiMoveServiceTests
         };
 
         // Act - use the AI player ID we set up
-        await _service.ExecuteAiTurnAsync(session, "ai_random_456", broadcastUpdate);
+        await service.ExecuteAiTurnAsync(session, "ai_random_456", broadcastUpdate);
 
         // Assert
         Assert.True(broadcastCallCount > 0);

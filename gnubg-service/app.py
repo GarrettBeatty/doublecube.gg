@@ -180,6 +180,155 @@ def cube():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/execute", methods=["POST"])
+def execute():
+    """
+    Execute raw gnubg commands.
+
+    Request body:
+        {
+            "commands": ["set board simple ...", "set dice 3 1", "hint"]
+        }
+
+    Response:
+        {
+            "output": "... raw gnubg output ..."
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data or "commands" not in data:
+            return jsonify({"error": "Missing 'commands' field"}), 400
+
+        commands = data["commands"]
+
+        output = runner.execute_commands(commands)
+
+        return jsonify({"output": output})
+
+    except TimeoutError as e:
+        return jsonify({"error": str(e)}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/hint-native", methods=["POST"])
+def hint_native():
+    """
+    Get best move suggestions using native position format.
+
+    Request body:
+        {
+            "position": "4HPwATDgc/ABMA",  // Position ID (Base64)
+            "dice": [3, 1],
+            "player": "O",  // O = player 0 (moves 24->1), X = player 1 (moves 1->24)
+            "plies": 2
+        }
+
+    Response:
+        {
+            "moves": [
+                {"rank": 1, "notation": "8/5 6/5", "equity": 0.2},
+                ...
+            ]
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        position = data.get("position")
+        dice = data.get("dice")
+        player = data.get("player", "O")
+        plies = data.get("plies", 2)
+
+        if not position or not dice:
+            return jsonify({"error": "Missing 'position' or 'dice' field"}), 400
+
+        # Build commands using Position ID format (handles bar correctly)
+        commands = [
+            "set automatic game off",
+            "set automatic roll off",
+            f"set evaluation chequerplay evaluation plies {plies}",
+            f"set evaluation cubedecision evaluation plies {plies}",
+            "set evaluation chequerplay evaluation cubeful off",
+            "new game",
+            f"set board {position}",
+            f"set dice {dice[0]} {dice[1]}",
+            "hint"
+        ]
+
+        output = runner.execute_commands(commands)
+
+        # Parse output
+        moves = parse_move_analysis(output)
+
+        return jsonify({
+            "moves": [asdict(m) for m in moves]
+        })
+
+    except TimeoutError as e:
+        return jsonify({"error": str(e)}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/eval-native", methods=["POST"])
+def eval_native():
+    """
+    Evaluate position using native position format.
+
+    Request body:
+        {
+            "position": "4HPwATDgc/ABMA",  // Position ID (Base64)
+            "dice": [3, 1],
+            "player": "O",
+            "plies": 2
+        }
+    """
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({"error": "Missing request body"}), 400
+
+        position = data.get("position")
+        dice = data.get("dice")
+        player = data.get("player", "O")
+        plies = data.get("plies", 2)
+
+        if not position or not dice:
+            return jsonify({"error": "Missing 'position' or 'dice' field"}), 400
+
+        # Build commands using Position ID format (handles bar correctly)
+        commands = [
+            "set automatic game off",
+            "set automatic roll off",
+            f"set evaluation chequerplay evaluation plies {plies}",
+            f"set evaluation cubedecision evaluation plies {plies}",
+            "set evaluation chequerplay evaluation cubeful off",
+            "new game",
+            f"set board {position}",
+            f"set dice {dice[0]} {dice[1]}",
+            "eval"
+        ]
+
+        output = runner.execute_commands(commands)
+
+        # Parse output
+        evaluation = parse_evaluation(output)
+
+        return jsonify(asdict(evaluation))
+
+    except TimeoutError as e:
+        return jsonify({"error": str(e)}), 504
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     debug = os.environ.get("FLASK_DEBUG", "false").lower() == "true"

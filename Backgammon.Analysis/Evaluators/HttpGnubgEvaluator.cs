@@ -56,16 +56,24 @@ public class HttpGnubgEvaluator : IPositionEvaluator
     {
         try
         {
-            var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.LogDebug("Evaluating position via HTTP. SGF: {Sgf}", sgf);
+            // Use Position ID format to correctly handle bar checkers
+            var positionId = GnubgPositionConverter.ToPositionId(engine);
+            var player = GnubgPositionConverter.GetPlayerString(engine);
 
-            var request = new EvaluateRequest
+            _logger?.LogDebug(
+                "Evaluating position via HTTP. PositionID: {PositionId}, Player: {Player}",
+                positionId,
+                player);
+
+            var request = new NativeEvalRequest
             {
-                Sgf = sgf,
+                Position = positionId,
+                Dice = new[] { engine.Dice.Die1, engine.Dice.Die2 },
+                Player = player,
                 Plies = _settings.EvaluationPlies
             };
 
-            var response = await _httpClient.PostAsJsonAsync("/evaluate", request, JsonOptions, ct);
+            var response = await _httpClient.PostAsJsonAsync("/eval-native", request, JsonOptions, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<EvaluateResponse>(JsonOptions, ct)
@@ -94,20 +102,29 @@ public class HttpGnubgEvaluator : IPositionEvaluator
     {
         try
         {
-            var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.LogDebug("Finding best moves via HTTP. SGF: {Sgf}", sgf);
+            // Use Position ID format to correctly handle bar checkers
+            var positionId = GnubgPositionConverter.ToPositionId(engine);
+            var player = GnubgPositionConverter.GetPlayerString(engine);
+
+            _logger?.LogDebug(
+                "Finding best moves via HTTP. PositionID: {PositionId}, Player: {Player}, Dice: [{Dice}]",
+                positionId,
+                player,
+                GnubgPositionConverter.GetDiceString(engine));
 
             // Get initial evaluation
             var initialEvaluation = await EvaluateAsync(engine, ct);
 
-            // Get move hints
-            var request = new HintRequest
+            // Get move hints using native endpoint
+            var request = new NativeHintRequest
             {
-                Sgf = sgf,
+                Position = positionId,
+                Dice = new[] { engine.Dice.Die1, engine.Dice.Die2 },
+                Player = player,
                 Plies = _settings.EvaluationPlies
             };
 
-            var response = await _httpClient.PostAsJsonAsync("/hint", request, JsonOptions, ct);
+            var response = await _httpClient.PostAsJsonAsync("/hint-native", request, JsonOptions, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<HintResponse>(JsonOptions, ct)
@@ -122,29 +139,61 @@ public class HttpGnubgEvaluator : IPositionEvaluator
             {
                 // Get original dice for parsing abbreviated notation
                 var availableDice = engine.Dice.GetMoves();
+                _logger?.LogInformation(
+                    "Parsing gnubg moves. Player: {Player}, Dice: [{Dice}], RemainingMoves: [{Remaining}]",
+                    engine.CurrentPlayer.Color,
+                    string.Join(", ", availableDice),
+                    string.Join(", ", engine.RemainingMoves));
 
                 foreach (var moveHint in result.Moves.Take(5))
                 {
-                    // Parse move notation into Move objects
-                    var moves = GnubgOutputParser.ParseMoveNotation(
+                    _logger?.LogInformation(
+                        "Gnubg hint #{Rank}: notation='{Notation}', equity={Equity}",
+                        moveHint.Rank,
                         moveHint.Notation,
-                        engine.CurrentPlayer.Color,
-                        availableDice);
+                        moveHint.Equity);
 
-                    var moveEvaluation = new PositionEvaluation
+                    // Parse move notation into Move objects with alternatives
+                    try
                     {
-                        Equity = moveHint.Equity,
-                        Features = new PositionFeatures()
-                    };
+                        var alternatives = GnubgOutputParser.ParseMoveNotationWithAlternatives(
+                            moveHint.Notation,
+                            engine.CurrentPlayer.Color,
+                            availableDice);
 
-                    var sequence = new MoveSequenceEvaluation
+                        var moves = alternatives.FirstOrDefault() ?? new List<Move>();
+
+                        _logger?.LogInformation(
+                            "Parsed {Count} moves from notation '{Notation}': [{Moves}], alternatives: {AltCount}",
+                            moves.Count,
+                            moveHint.Notation,
+                            string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})")),
+                            alternatives.Count);
+
+                        var moveEvaluation = new PositionEvaluation
+                        {
+                            Equity = moveHint.Equity,
+                            Features = new PositionFeatures()
+                        };
+
+                        var sequence = new MoveSequenceEvaluation
+                        {
+                            Moves = moves,
+                            Alternatives = alternatives,
+                            FinalEvaluation = moveEvaluation,
+                            EquityGain = moveHint.Equity - initialEvaluation.Equity
+                        };
+
+                        topMoves.Add(sequence);
+                    }
+                    catch (Exception parseEx)
                     {
-                        Moves = moves,
-                        FinalEvaluation = moveEvaluation,
-                        EquityGain = moveHint.Equity - initialEvaluation.Equity
-                    };
-
-                    topMoves.Add(sequence);
+                        _logger?.LogWarning(
+                            parseEx,
+                            "Failed to parse gnubg notation '{Notation}' for {Player}",
+                            moveHint.Notation,
+                            engine.CurrentPlayer.Color);
+                    }
                 }
             }
 
@@ -256,5 +305,27 @@ public class HttpGnubgEvaluator : IPositionEvaluator
         public double DoublePassEq { get; set; }
 
         public string? Recommendation { get; set; }
+    }
+
+    private sealed class NativeEvalRequest
+    {
+        public string Position { get; set; } = string.Empty;
+
+        public int[] Dice { get; set; } = Array.Empty<int>();
+
+        public string Player { get; set; } = "O";
+
+        public int Plies { get; set; } = 2;
+    }
+
+    private sealed class NativeHintRequest
+    {
+        public string Position { get; set; } = string.Empty;
+
+        public int[] Dice { get; set; } = Array.Empty<int>();
+
+        public string Player { get; set; } = "O";
+
+        public int Plies { get; set; } = 2;
     }
 }

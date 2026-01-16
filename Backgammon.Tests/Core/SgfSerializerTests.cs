@@ -178,9 +178,9 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        // Use different points that don't overlap - White 'a' = point 1, Red 'a' = point 24
-        // So we use White on point 1 ('a') and Red on point 1 ('x' for Red)
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])"; // Both on points that map to different locations
+        // SGF uses board coordinates: 'a'=1, 'x'=24, same for both colors
+        // White on point 1 ('a'), Red on point 24 ('x')
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -194,7 +194,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];DI[35])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];DI[35])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -211,7 +211,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];PL[B])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];PL[B])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -254,13 +254,13 @@ public class SgfSerializerTests
         // Arrange
         var engine = new GameEngine();
         engine.StartNewGame(); // Sets up initial position
-        // 'a' for White = point 1, 'a' for Red = point 24 (different points)
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])";
+        // SGF uses board coordinates: 'a'=1, 'x'=24, same for both colors
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
 
-        // Assert - White 'a' maps to point 1, Red 'a' maps to point 24
+        // Assert
         Assert.Equal(2, engine.Board.GetPoint(1).Count);  // White on point 1
         Assert.Equal(2, engine.Board.GetPoint(24).Count); // Red on point 24
     }
@@ -350,7 +350,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "  (;FF[4]GM[6];AW[a][a];AB[a][a])  ";
+        var sgf = "  (;FF[4]GM[6];AW[a][a];AB[x][x])  ";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -364,7 +364,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];CO[W])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];CO[W])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -378,7 +378,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];CV[2])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];CV[2])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -393,7 +393,7 @@ public class SgfSerializerTests
         // Arrange
         var engine = new GameEngine();
         // Using numeric characters instead of letters - should be skipped
-        var sgf = "(;FF[4]GM[6];AW[a][a][123];AB[a][a])";
+        var sgf = "(;FF[4]GM[6];AW[a][a][123];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -438,7 +438,7 @@ public class SgfSerializerTests
         engine.StartNewGame(); // Game already started
         engine.SetGameStarted(true);
 
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -452,7 +452,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];PL[W])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];PL[W])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -466,7 +466,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];DI[33])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];DI[33])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -541,7 +541,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];DI[3])"; // Only 1 digit die value
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];DI[3])"; // Only 1 digit die value
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -555,7 +555,7 @@ public class SgfSerializerTests
     {
         // Arrange
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a];PL[])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x];PL[])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -570,7 +570,7 @@ public class SgfSerializerTests
         // Arrange - Test nested bracket handling in parser
         var engine = new GameEngine();
         // Using values that don't contain nested brackets but test the parser
-        var sgf = "(;FF[4]GM[6];AW[a][b];AB[a][b])";
+        var sgf = "(;FF[4]GM[6];AW[a][b];AB[x][w])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -597,7 +597,7 @@ public class SgfSerializerTests
         // Arrange
         var engine = new GameEngine();
         // No GM property at all
-        var sgf = "(;FF[4];AW[a][a];AB[a][a])";
+        var sgf = "(;FF[4];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -661,7 +661,7 @@ public class SgfSerializerTests
     {
         // Arrange - SGF starting with "(" instead of "(;" (test line 266)
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -676,7 +676,7 @@ public class SgfSerializerTests
         // Arrange - Test nested bracket parsing (lines 330-346)
         var engine = new GameEngine();
         // Standard SGF with normal values
-        var sgf = "(;FF[4]GM[6];AW[a][b][c];AB[a][b])";
+        var sgf = "(;FF[4]GM[6];AW[a][b][c];AB[x][w])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -690,7 +690,7 @@ public class SgfSerializerTests
     {
         // Arrange - Empty property key (line 307)
         var engine = new GameEngine();
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -705,7 +705,7 @@ public class SgfSerializerTests
         // Arrange - Property with no values (line 360)
         var engine = new GameEngine();
         // FF has value, but add test to ensure empty value list is handled
-        var sgf = "(;FF[4]GM[6];AW[a][a];AB[a][a])";
+        var sgf = "(;FF[4]GM[6];AW[a][a];AB[x][x])";
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);
@@ -717,10 +717,10 @@ public class SgfSerializerTests
     [Fact]
     public void ImportPosition_RedOnPoint24_MapsToCorrectPoint()
     {
-        // Arrange - Test Red coordinate mapping (line 236-239)
+        // Arrange - Test Red coordinate mapping
         var engine = new GameEngine();
-        // For Red, 'a' maps to point 24 (24 - ('a' - 'a') = 24)
-        var sgf = "(;FF[4]GM[6];AW[b][b];AB[a][a])"; // Red 'a' = point 24
+        // SGF uses board coordinates: 'a'=1, 'x'=24, same for both colors
+        var sgf = "(;FF[4]GM[6];AW[b][b];AB[x][x])"; // Red 'x' = point 24
 
         // Act
         SgfSerializer.ImportPosition(engine, sgf);

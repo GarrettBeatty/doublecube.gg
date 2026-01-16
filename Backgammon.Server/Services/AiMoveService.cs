@@ -1,48 +1,53 @@
-using Backgammon.AI;
-using Backgammon.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Service for handling AI opponent moves in backgammon games.
-/// Supports both GreedyAI and RandomAI with realistic delays between actions.
+/// Delegates to IGameBot implementations via IBotResolver.
 /// </summary>
 public class AiMoveService : IAiMoveService
 {
-    private const string GreedyAiPrefix = "ai_greedy_";
-    private const string RandomAiPrefix = "ai_random_";
     private const int DelayBeforeRoll = 500;      // ms before rolling dice
     private const int DelayAfterRoll = 800;       // ms after rolling to show dice
     private const int DelayPerMove = 600;         // ms per move executed
 
+    private readonly IBotResolver _botResolver;
     private readonly ILogger<AiMoveService> _logger;
 
-    public AiMoveService(ILogger<AiMoveService> logger)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AiMoveService"/> class.
+    /// </summary>
+    /// <param name="botResolver">The bot resolver for looking up bots by player ID.</param>
+    /// <param name="logger">The logger.</param>
+    public AiMoveService(IBotResolver botResolver, ILogger<AiMoveService> logger)
     {
+        _botResolver = botResolver;
         _logger = logger;
     }
 
-    public bool IsAiPlayer(string? playerId)
-    {
-        if (playerId == null)
-        {
-            return false;
-        }
+    /// <inheritdoc/>
+    public bool IsAiPlayer(string? playerId) => _botResolver.IsBot(playerId);
 
-        return playerId.StartsWith(GreedyAiPrefix) || playerId.StartsWith(RandomAiPrefix);
-    }
-
+    /// <inheritdoc/>
     public string GenerateAiPlayerId(string aiType = "greedy")
     {
-        var prefix = aiType.ToLowerInvariant() == "random" ? RandomAiPrefix : GreedyAiPrefix;
+        var prefix = aiType.ToLowerInvariant() switch
+        {
+            "random" => "ai_random_",
+            "gnubg" => "ai_gnubg_",
+            _ => "ai_greedy_"
+        };
         return $"{prefix}{Guid.NewGuid()}";
     }
 
+    /// <inheritdoc/>
     public async Task ExecuteAiTurnAsync(GameSession session, string aiPlayerId, Func<Task> broadcastUpdate)
     {
+        var bot = _botResolver.GetBot(aiPlayerId)
+            ?? throw new InvalidOperationException($"No bot found for player ID: {aiPlayerId}");
+
         var engine = session.Engine;
-        var ai = CreateAI(aiPlayerId);
 
         // Guard: Don't execute full AI turn during opening roll phase
         if (engine.IsOpeningRoll)
@@ -53,7 +58,7 @@ public class AiMoveService : IAiMoveService
             return;
         }
 
-        _logger.LogInformation("AI {AiPlayerId} starting turn in game {GameId}", aiPlayerId, session.Id);
+        _logger.LogInformation("Bot {BotId} starting turn in game {GameId}", bot.BotId, session.Id);
 
         try
         {
@@ -62,12 +67,12 @@ public class AiMoveService : IAiMoveService
 
             if (!diceAlreadySet)
             {
-                // Delay before rolling dice (AI "thinking")
+                // Delay before rolling dice (bot "thinking")
                 await Task.Delay(DelayBeforeRoll);
 
                 // Roll dice
                 engine.RollDice();
-                _logger.LogInformation("AI rolled {Die1} and {Die2}", engine.Dice.Die1, engine.Dice.Die2);
+                _logger.LogInformation("Bot rolled {Die1} and {Die2}", engine.Dice.Die1, engine.Dice.Die2);
 
                 // Broadcast dice roll to clients
                 await broadcastUpdate();
@@ -78,7 +83,7 @@ public class AiMoveService : IAiMoveService
             else
             {
                 _logger.LogInformation(
-                    "AI using opening roll dice: {Die1} and {Die2}",
+                    "Bot using opening roll dice: {Die1} and {Die2}",
                     engine.Dice.Die1,
                     engine.Dice.Die2);
 
@@ -89,117 +94,64 @@ public class AiMoveService : IAiMoveService
                 await Task.Delay(DelayAfterRoll);
             }
 
-            // Execute AI moves
-            var validMoves = engine.GetValidMoves();
-            int moveCount = 0;
+            // Capture expected moves before bot executes
+            var expectedMoveCount = engine.RemainingMoves.Count;
+            var originalDice = new List<int>(engine.RemainingMoves);
 
-            while (engine.RemainingMoves.Count > 0 && validMoves.Count > 0)
+            // Execute bot moves - single unified async path
+            var moves = await bot.ChooseMovesAsync(engine);
+            _logger.LogInformation("Bot chose {MoveCount} moves", moves.Count);
+
+            // Detect if bot failed to use all dice (potential bug)
+            if (engine.RemainingMoves.Count > 0)
             {
-                var move = SelectBestMove(validMoves, engine, ai);
-
-                if (engine.ExecuteMove(move))
+                var validMoves = engine.GetValidMoves();
+                if (validMoves.Count > 0)
                 {
-                    moveCount++;
-                    _logger.LogDebug("AI executed move: {From} -> {To}", move.From, move.To);
-
-                    // Broadcast each move to clients
-                    await broadcastUpdate();
-
-                    // Delay between moves for visual effect
-                    await Task.Delay(DelayPerMove);
+                    // There are still valid moves - this is a bug!
+                    _logger.LogError(
+                        "Bot {BotId} failed to use all dice! Original dice: [{OriginalDice}], " +
+                        "Remaining: [{Remaining}], Valid moves still available: [{ValidMoves}]",
+                        bot.BotId,
+                        string.Join(", ", originalDice),
+                        string.Join(", ", engine.RemainingMoves),
+                        string.Join(", ", validMoves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})")));
+                    throw new InvalidOperationException(
+                        $"Bot {bot.BotId} failed to execute all available moves. " +
+                        $"This indicates a bug in move parsing or execution.");
                 }
                 else
                 {
-                    _logger.LogWarning("AI failed to execute move: {From} -> {To}", move.From, move.To);
-                    break;
+                    // No valid moves remain - player is blocked (legitimate)
+                    _logger.LogInformation(
+                        "Bot {BotId} could not use all dice - no valid moves available. " +
+                        "Original dice: [{OriginalDice}], Remaining unused: [{Remaining}]",
+                        bot.BotId,
+                        string.Join(", ", originalDice),
+                        string.Join(", ", engine.RemainingMoves));
                 }
-
-                validMoves = engine.GetValidMoves();
             }
 
-            _logger.LogInformation("AI completed {MoveCount} moves", moveCount);
+            // Broadcast each move with delay for animation
+            foreach (var move in moves)
+            {
+                _logger.LogDebug("Bot executed move: {From} -> {To}", move.From, move.To);
+                await broadcastUpdate();
+                await Task.Delay(DelayPerMove);
+            }
 
-            // End the AI's turn (with timer management)
-            engine.EndTurnTimer();  // End AI's timer, consume reserve if needed
-            engine.EndTurn();       // Switch to next player
+            // End the bot's turn (with timer management)
+            engine.EndTurnTimer();   // End bot's timer, consume reserve if needed
+            engine.EndTurn();        // Switch to next player
             engine.StartTurnTimer(); // Start next player's timer
             await broadcastUpdate();
 
-            _logger.LogInformation("AI turn completed in game {GameId}", session.Id);
+            _logger.LogInformation("Bot turn completed in game {GameId}", session.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during AI turn in game {GameId}", session.Id);
+            _logger.LogError(ex, "Error during bot turn in game {GameId}", session.Id);
             throw;
-        }
-    }
-
-    /// <summary>
-    /// Creates an AI instance based on the player ID prefix.
-    /// </summary>
-    private IBackgammonAI CreateAI(string playerId)
-    {
-        if (playerId.StartsWith(RandomAiPrefix))
-        {
-            return new RandomAI("RandomBot");
-        }
-
-        return new GreedyAI("GreedyBot");
-    }
-
-    /// <summary>
-    /// Selects the best move using the AI's strategy.
-    /// For RandomAI: selects randomly.
-    /// For GreedyAI: uses priority-based strategy (bear off > hit > advance).
-    /// </summary>
-    private Move SelectBestMove(List<Move> validMoves, GameEngine engine, IBackgammonAI ai)
-    {
-        // For RandomAI, select randomly
-        if (ai is RandomAI)
-        {
-            var random = new Random();
-            return validMoves[random.Next(validMoves.Count)];
-        }
-
-        // For GreedyAI (or any other AI), use greedy strategy
-        // Priority 1: Bear off if possible
-        var bearOffMoves = validMoves.Where(m => m.IsBearOff).ToList();
-        if (bearOffMoves.Any())
-        {
-            // Prefer bearing off from the furthest point
-            return bearOffMoves.OrderByDescending(m =>
-                engine.CurrentPlayer.Color == CheckerColor.White ? m.From : 25 - m.From).First();
-        }
-
-        // Priority 2: Hit opponent's blot if possible
-        var hitMoves = new List<Move>();
-        foreach (var move in validMoves)
-        {
-            if (move.From == 0)
-            {
-                continue; // Skip bar entry for this check
-            }
-
-            var toPoint = engine.Board.GetPoint(move.To);
-            if (toPoint.IsBlot && toPoint.Color != engine.CurrentPlayer.Color)
-            {
-                hitMoves.Add(move);
-            }
-        }
-
-        if (hitMoves.Any())
-        {
-            return hitMoves.First();
-        }
-
-        // Priority 3: Move checker that's furthest from home
-        if (engine.CurrentPlayer.Color == CheckerColor.White)
-        {
-            return validMoves.OrderByDescending(m => m.From).First();
-        }
-        else
-        {
-            return validMoves.OrderBy(m => m.From).First();
         }
     }
 }

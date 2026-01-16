@@ -33,13 +33,11 @@ public class AiPlayerManager : IAiPlayerManager
             aiType = aiInfo.AiType;
         }
 
-        return aiType switch
+        return aiType.ToLowerInvariant() switch
         {
-            "Random" => "Random Bot",
             "random" => "Random Bot",
-            "Greedy" => "Greedy Bot",
-            "greedy" => "Greedy Bot",
-            _ => "Computer"
+            "gnubg" => "Expert Bot (GNUBG)",
+            _ => "Greedy Bot"
         };
     }
 
