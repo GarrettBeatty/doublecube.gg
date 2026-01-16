@@ -30,7 +30,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [targetScore, setTargetScore] = useState<number>(1)
   const [timeControlType, setTimeControlType] = useState<'None' | 'ChicagoPoint'>('None')
   const [isRated, setIsRated] = useState<boolean>(true)
-  const [aiType, setAiType] = useState<'greedy' | 'random' | 'gnubg'>('greedy')
+  const [aiType, setAiType] = useState<'greedy' | 'random' | 'gnubg_easy' | 'gnubg_medium' | 'gnubg_hard' | 'gnubg_expert'>('greedy')
   const [isCreating, setIsCreating] = useState(false)
   const isAuthenticated = authService.isAuthenticated()
 
@@ -128,12 +128,12 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
           {opponentType === 'AI' && (
             <div className="space-y-3">
               <Label>AI Difficulty</Label>
-              <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random' | 'gnubg')}>
+              <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random' | 'gnubg_easy' | 'gnubg_medium' | 'gnubg_hard' | 'gnubg_expert')}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="greedy" id="ai-greedy" />
                   <Label htmlFor="ai-greedy" className="font-normal cursor-pointer">
                     <div className="flex flex-col">
-                      <span>Greedy Bot (Recommended)</span>
+                      <span>Greedy Bot</span>
                       <span className="text-sm text-muted-foreground">Strategic play: prioritizes hitting and bearing off</span>
                     </div>
                   </Label>
@@ -147,12 +147,42 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
                     </div>
                   </Label>
                 </div>
+                <div className="border-t pt-3 mt-2">
+                  <span className="text-sm font-medium text-muted-foreground">GNU Backgammon (Neural Network AI)</span>
+                </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="gnubg" id="ai-gnubg" />
-                  <Label htmlFor="ai-gnubg" className="font-normal cursor-pointer">
+                  <RadioGroupItem value="gnubg_easy" id="ai-gnubg-easy" />
+                  <Label htmlFor="ai-gnubg-easy" className="font-normal cursor-pointer">
                     <div className="flex flex-col">
-                      <span>Expert Bot (GNUBG)</span>
-                      <span className="text-sm text-muted-foreground">World-class neural network AI - very strong play</span>
+                      <span>Easy (GNUBG)</span>
+                      <span className="text-sm text-muted-foreground">0-ply analysis (~1200 ELO) - instant moves, makes mistakes</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="gnubg_medium" id="ai-gnubg-medium" />
+                  <Label htmlFor="ai-gnubg-medium" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Medium (GNUBG)</span>
+                      <span className="text-sm text-muted-foreground">1-ply analysis (~1600 ELO) - fast, decent play</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="gnubg_hard" id="ai-gnubg-hard" />
+                  <Label htmlFor="ai-gnubg-hard" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Hard (GNUBG) (Recommended)</span>
+                      <span className="text-sm text-muted-foreground">2-ply analysis (~1900 ELO) - strong play</span>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="gnubg_expert" id="ai-gnubg-expert" />
+                  <Label htmlFor="ai-gnubg-expert" className="font-normal cursor-pointer">
+                    <div className="flex flex-col">
+                      <span>Expert (GNUBG)</span>
+                      <span className="text-sm text-muted-foreground">3-ply analysis (~2100 ELO) - world-class play, slower</span>
                     </div>
                   </Label>
                 </div>

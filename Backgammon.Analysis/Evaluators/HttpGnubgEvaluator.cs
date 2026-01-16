@@ -14,7 +14,7 @@ namespace Backgammon.Analysis.Evaluators;
 /// <summary>
 /// Position evaluator using GNU Backgammon via HTTP service.
 /// </summary>
-public class HttpGnubgEvaluator : IPositionEvaluator
+public class HttpGnubgEvaluator : IPositionEvaluator, IPliesConfigurable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -51,6 +51,12 @@ public class HttpGnubgEvaluator : IPositionEvaluator
     /// <inheritdoc/>
     public bool RequiresExternalResources => true;
 
+    /// <summary>
+    /// Optional override for evaluation plies. When set, this takes precedence over settings.
+    /// Used to support different difficulty levels (e.g., 0-ply for easy, 3-ply for expert).
+    /// </summary>
+    public int? PliesOverride { get; set; }
+
     /// <inheritdoc/>
     public async Task<PositionEvaluation> EvaluateAsync(GameEngine engine, CancellationToken ct = default)
     {
@@ -70,7 +76,7 @@ public class HttpGnubgEvaluator : IPositionEvaluator
                 Position = positionId,
                 Dice = new[] { engine.Dice.Die1, engine.Dice.Die2 },
                 Player = player,
-                Plies = _settings.EvaluationPlies
+                Plies = PliesOverride ?? _settings.EvaluationPlies
             };
 
             var response = await _httpClient.PostAsJsonAsync("/eval-native", request, JsonOptions, ct);
@@ -121,7 +127,7 @@ public class HttpGnubgEvaluator : IPositionEvaluator
                 Position = positionId,
                 Dice = new[] { engine.Dice.Die1, engine.Dice.Die2 },
                 Player = player,
-                Plies = _settings.EvaluationPlies
+                Plies = PliesOverride ?? _settings.EvaluationPlies
             };
 
             var response = await _httpClient.PostAsJsonAsync("/hint-native", request, JsonOptions, ct);
@@ -224,7 +230,7 @@ public class HttpGnubgEvaluator : IPositionEvaluator
             var request = new CubeRequest
             {
                 Sgf = sgf,
-                Plies = _settings.EvaluationPlies
+                Plies = PliesOverride ?? _settings.EvaluationPlies
             };
 
             var response = await _httpClient.PostAsJsonAsync("/cube", request, JsonOptions, ct);

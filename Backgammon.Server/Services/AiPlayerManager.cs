@@ -36,7 +36,11 @@ public class AiPlayerManager : IAiPlayerManager
         return aiType.ToLowerInvariant() switch
         {
             "random" => "Random Bot",
-            "gnubg" => "Expert Bot (GNUBG)",
+            "gnubg" => "Hard Bot (GNUBG)",           // Default gnubg maps to hard
+            "gnubg_easy" => "Easy Bot (GNUBG)",
+            "gnubg_medium" => "Medium Bot (GNUBG)",
+            "gnubg_hard" => "Hard Bot (GNUBG)",
+            "gnubg_expert" => "Expert Bot (GNUBG)",
             _ => "Greedy Bot"
         };
     }

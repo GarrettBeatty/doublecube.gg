@@ -24,6 +24,12 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
     public IPositionEvaluator Evaluator { get; }
 
     /// <summary>
+    /// Optional override for evaluation plies. When set, configures the evaluator
+    /// to use this ply depth instead of its default. Used for difficulty levels.
+    /// </summary>
+    public int? PliesOverride { get; set; }
+
+    /// <summary>
     /// Unique identifier for this bot type
     /// </summary>
     public abstract string BotId { get; }
@@ -66,6 +72,13 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
         }
 
         ct.ThrowIfCancellationRequested();
+
+        // Apply plies override to the evaluator if set
+        ApplyPliesOverride();
+        if (PliesOverride.HasValue)
+        {
+            _logger?.LogInformation("Using PliesOverride: {Plies}", PliesOverride.Value);
+        }
 
         // Find the best moves for current position (query once for the full dice roll)
         var analysis = await Evaluator.FindBestMovesAsync(engine, ct);
@@ -147,6 +160,7 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
         GameEngine engine,
         CancellationToken ct = default)
     {
+        ApplyPliesOverride();
         var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, ct);
         return cubeDecision.Recommendation is "Take" or "Beaver";
     }
@@ -159,8 +173,20 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
         GameEngine engine,
         CancellationToken ct = default)
     {
+        ApplyPliesOverride();
         var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, ct);
         return cubeDecision.Recommendation == "Double";
+    }
+
+    /// <summary>
+    /// Applies the PliesOverride to the evaluator if it supports it.
+    /// </summary>
+    private void ApplyPliesOverride()
+    {
+        if (PliesOverride.HasValue && Evaluator is IPliesConfigurable configurable)
+        {
+            configurable.PliesOverride = PliesOverride;
+        }
     }
 
     /// <summary>

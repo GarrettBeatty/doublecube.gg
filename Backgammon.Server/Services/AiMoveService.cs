@@ -35,7 +35,11 @@ public class AiMoveService : IAiMoveService
         var prefix = aiType.ToLowerInvariant() switch
         {
             "random" => "ai_random_",
-            "gnubg" => "ai_gnubg_",
+            "gnubg" => "ai_gnubg_hard_",           // Default gnubg to hard (2-ply)
+            "gnubg_easy" => "ai_gnubg_easy_",     // 0-ply
+            "gnubg_medium" => "ai_gnubg_medium_", // 1-ply
+            "gnubg_hard" => "ai_gnubg_hard_",     // 2-ply
+            "gnubg_expert" => "ai_gnubg_expert_", // 3-ply
             _ => "ai_greedy_"
         };
         return $"{prefix}{Guid.NewGuid()}";
