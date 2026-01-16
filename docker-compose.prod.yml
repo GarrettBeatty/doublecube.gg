@@ -22,6 +22,26 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  gnubg-service:
+    image: ${ECR_REGISTRY}/backgammon-gnubg-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
+    container_name: backgammon-gnubg
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - backgammon-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   server:
     image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
     container_name: backgammon-server
@@ -38,10 +58,13 @@ services:
       - Jwt__ExpirationDays=7
       - DOMAIN=${DOMAIN:-localhost}
       - Redis__ConnectionString=redis:6379
+      - Gnubg__ServiceUrl=http://gnubg-service:8080
     networks:
       - backgammon-net
     depends_on:
       redis:
+        condition: service_healthy
+      gnubg-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "-O", "/dev/null", "http://localhost:5000/health"]

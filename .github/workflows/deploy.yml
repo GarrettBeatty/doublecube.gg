@@ -88,8 +88,45 @@ jobs:
           -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest \
           .
 
+  build-gnubg:
+    runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      image-tag: ${{ github.sha }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push gnubg-service image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker buildx build \
+          --platform linux/arm64 \
+          --push \
+          -f gnubg-service/Dockerfile \
+          -t $ECR_REGISTRY/backgammon-gnubg-$ENVIRONMENT:$IMAGE_TAG \
+          -t $ECR_REGISTRY/backgammon-gnubg-$ENVIRONMENT:latest \
+          gnubg-service
+
   deploy:
-    needs: [build-server, build-webclient]
+    needs: [build-server, build-webclient, build-gnubg]
     runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
     permissions:
       id-token: write
@@ -166,6 +203,16 @@ jobs:
           done
 
           for i in {1..60}; do
+            GNUBG_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-gnubg 2>/dev/null || echo "unknown")
+            if [ "$GNUBG_HEALTH" = "healthy" ]; then
+              echo "✓ gnubg-service is healthy"
+              break
+            fi
+            echo "Attempt $i/60: gnubg-service status = $GNUBG_HEALTH"
+            sleep 2
+          done
+
+          for i in {1..60}; do
             SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "unknown")
             if [ "$SERVER_HEALTH" = "healthy" ]; then
               echo "✓ Server is healthy"
@@ -215,9 +262,11 @@ jobs:
           SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "not found")
           WEBCLIENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "not found")
           REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "not found")
+          GNUBG_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-gnubg 2>/dev/null || echo "not found")
           CADDY_STATUS=$(docker inspect --format='{{.State.Status}}' backgammon-caddy 2>/dev/null || echo "not found")
 
           echo "  Redis: $REDIS_HEALTH"
+          echo "  gnubg-service: $GNUBG_HEALTH"
           echo "  Server: $SERVER_HEALTH"
           echo "  WebClient: $WEBCLIENT_HEALTH"
           echo "  Caddy: $CADDY_STATUS"
@@ -233,7 +282,7 @@ jobs:
           fi
 
           # Final status
-          if [ "$SERVER_HEALTH" = "healthy" ] && [ "$WEBCLIENT_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ]; then
+          if [ "$SERVER_HEALTH" = "healthy" ] && [ "$WEBCLIENT_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ] && [ "$GNUBG_HEALTH" = "healthy" ]; then
             echo ""
             echo "✓ All services healthy!"
           else
