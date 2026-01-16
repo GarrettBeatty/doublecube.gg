@@ -41,7 +41,7 @@ export function Footer() {
     <footer className="bg-muted/50 border-t mt-12">
       <div className="container mx-auto px-4 py-8">
         {/* News Updates Section */}
-        <Card className="mb-8">
+        {/* <Card className="mb-8">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Latest Updates</h3>
@@ -65,7 +65,7 @@ export function Footer() {
               ))}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Links Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
