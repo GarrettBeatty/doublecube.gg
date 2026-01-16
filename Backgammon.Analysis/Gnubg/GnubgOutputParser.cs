@@ -363,6 +363,12 @@ public static class GnubgOutputParser
                                     moves.Add(new Move(from, bearOffTarget, higherDie));
                                     remainingDice.Remove(higherDie);
                                 }
+                                else
+                                {
+                                    // No single die works - try combining dice
+                                    ExpandAbbreviatedBearOff(
+                                        from, gnubgFrom, bearOffTarget, direction, remainingDice, moves);
+                                }
                             }
                         }
                     }
@@ -722,6 +728,170 @@ public static class GnubgOutputParser
                     remainingDice.Remove(die);
 
                     return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Expands an abbreviated bear-off move (e.g., "6/off" with dice [2, 4]).
+    /// When no single die equals or exceeds the distance, combines multiple dice
+    /// to create intermediate moves through the home board before bearing off.
+    /// </summary>
+    private static bool ExpandAbbreviatedBearOff(
+        int from,
+        int gnubgFrom,
+        int bearOffTarget,
+        int direction,
+        List<int> remainingDice,
+        List<Move> moves)
+    {
+        // The gnubgFrom is the distance needed to bear off
+        // We need to find dice that sum to at least gnubgFrom
+        var sortedDice = remainingDice.OrderByDescending(d => d).ToList();
+
+        // Try pairs of dice
+        for (int i = 0; i < sortedDice.Count; i++)
+        {
+            for (int j = 0; j < sortedDice.Count; j++)
+            {
+                if (i == j)
+                {
+                    continue;
+                }
+
+                var die1 = sortedDice[i];
+                var die2 = sortedDice[j];
+
+                // The first die moves within the home board, second die bears off
+                // For the combination to work:
+                // - First move: from -> from + (direction * die1) must stay on board
+                // - Second move: bears off (die2 >= remaining distance)
+                int intermediate = from + (direction * die1);
+
+                // Check intermediate is still on the board
+                // White (direction -1): intermediate must be >= 1
+                // Red (direction +1): intermediate must be <= 24
+                bool intermediateValid = direction > 0
+                    ? intermediate >= 1 && intermediate <= 24
+                    : intermediate >= 1 && intermediate <= 24;
+
+                if (!intermediateValid)
+                {
+                    continue;
+                }
+
+                // Calculate remaining distance to bear off after first move
+                // For White: remaining = intermediate (distance to point 0)
+                // For Red: remaining = 25 - intermediate (distance to point 25)
+                int remainingDistance = direction > 0 ? 25 - intermediate : intermediate;
+
+                // Second die must be able to bear off (>= remaining distance)
+                if (die2 >= remainingDistance && die1 + die2 >= gnubgFrom)
+                {
+                    // Add intermediate move
+                    moves.Add(new Move(from, intermediate, die1));
+
+                    // Add bear-off move
+                    moves.Add(new Move(intermediate, bearOffTarget, die2));
+
+                    // Remove used dice
+                    remainingDice.Remove(die1);
+                    remainingDice.Remove(die2);
+
+                    return true;
+                }
+            }
+        }
+
+        // Try using same die twice (for doubles)
+        for (int i = 0; i < remainingDice.Count; i++)
+        {
+            var die = remainingDice[i];
+            if (remainingDice.Count(d => d == die) >= 2)
+            {
+                int intermediate = from + (direction * die);
+
+                bool intermediateValid = direction > 0
+                    ? intermediate >= 1 && intermediate <= 24
+                    : intermediate >= 1 && intermediate <= 24;
+
+                if (!intermediateValid)
+                {
+                    continue;
+                }
+
+                int remainingDistance = direction > 0 ? 25 - intermediate : intermediate;
+
+                if (die >= remainingDistance && die + die >= gnubgFrom)
+                {
+                    moves.Add(new Move(from, intermediate, die));
+                    moves.Add(new Move(intermediate, bearOffTarget, die));
+
+                    remainingDice.Remove(die);
+                    remainingDice.Remove(die);
+
+                    return true;
+                }
+            }
+        }
+
+        // Try triples (for doubles like "6/off" with dice [2, 2, 2, 2])
+        for (int i = 0; i < remainingDice.Count; i++)
+        {
+            var die = remainingDice[i];
+            if (remainingDice.Count(d => d == die) >= 3 && die * 3 >= gnubgFrom)
+            {
+                int inter1 = from + (direction * die);
+                int inter2 = inter1 + (direction * die);
+
+                bool inter1Valid = direction > 0
+                    ? inter1 >= 1 && inter1 <= 24
+                    : inter1 >= 1 && inter1 <= 24;
+
+                bool inter2Valid = direction > 0
+                    ? inter2 >= 1 && inter2 <= 24
+                    : inter2 >= 1 && inter2 <= 24;
+
+                // For bear-off, inter2 could be at or past the bear-off point
+                // In that case, the second move would be the bear-off
+                if (inter1Valid)
+                {
+                    int remainingAfterInter1 = direction > 0 ? 25 - inter1 : inter1;
+
+                    if (die * 2 >= remainingAfterInter1)
+                    {
+                        // Can bear off with 2 moves after first intermediate
+                        moves.Add(new Move(from, inter1, die));
+
+                        if (inter2Valid)
+                        {
+                            int remainingAfterInter2 = direction > 0 ? 25 - inter2 : inter2;
+                            if (die >= remainingAfterInter2)
+                            {
+                                moves.Add(new Move(inter1, inter2, die));
+                                moves.Add(new Move(inter2, bearOffTarget, die));
+
+                                remainingDice.Remove(die);
+                                remainingDice.Remove(die);
+                                remainingDice.Remove(die);
+
+                                return true;
+                            }
+                        }
+                        else
+                        {
+                            // inter2 is past bear-off point, so second move bears off
+                            moves.Add(new Move(inter1, bearOffTarget, die));
+
+                            remainingDice.Remove(die);
+                            remainingDice.Remove(die);
+
+                            return true;
+                        }
+                    }
                 }
             }
         }

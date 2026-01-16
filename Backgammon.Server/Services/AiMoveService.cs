@@ -1,3 +1,4 @@
+using Backgammon.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
@@ -11,6 +12,7 @@ public class AiMoveService : IAiMoveService
     private const int DelayBeforeRoll = 500;      // ms before rolling dice
     private const int DelayAfterRoll = 800;       // ms after rolling to show dice
     private const int DelayPerMove = 600;         // ms per move executed
+    private const int DelayBeforeDouble = 800;    // ms before offering double
 
     private readonly IBotResolver _botResolver;
     private readonly ILogger<AiMoveService> _logger;
@@ -46,7 +48,11 @@ public class AiMoveService : IAiMoveService
     }
 
     /// <inheritdoc/>
-    public async Task ExecuteAiTurnAsync(GameSession session, string aiPlayerId, Func<Task> broadcastUpdate)
+    public async Task<bool> ExecuteAiTurnAsync(
+        GameSession session,
+        string aiPlayerId,
+        Func<Task> broadcastUpdate,
+        Func<int, int, Task>? notifyDoubleOffered = null)
     {
         var bot = _botResolver.GetBot(aiPlayerId)
             ?? throw new InvalidOperationException($"No bot found for player ID: {aiPlayerId}");
@@ -59,7 +65,7 @@ public class AiMoveService : IAiMoveService
             _logger.LogWarning(
                 "ExecuteAiTurnAsync called during opening roll phase for game {GameId}. This should not happen - opening roll should use RollDiceAsync instead.",
                 session.Id);
-            return;
+            return false;
         }
 
         _logger.LogInformation("Bot {BotId} starting turn in game {GameId}", bot.BotId, session.Id);
@@ -71,6 +77,41 @@ public class AiMoveService : IAiMoveService
 
             if (!diceAlreadySet)
             {
+                // BEFORE rolling: Check if AI should offer a double
+                var aiColor = engine.CurrentPlayer?.Color;
+                if (aiColor.HasValue && engine.DoublingCube.CanDouble(aiColor.Value) && !engine.IsCrawfordGame)
+                {
+                    // Small delay to make it feel natural
+                    await Task.Delay(DelayBeforeDouble);
+
+                    // Ask the bot if it wants to double
+                    var shouldDouble = await bot.ShouldOfferDoubleAsync(engine);
+
+                    if (shouldDouble)
+                    {
+                        var currentValue = engine.DoublingCube.Value;
+                        if (engine.OfferDouble())
+                        {
+                            var newValue = engine.DoublingCube.Value;
+                            _logger.LogInformation(
+                                "Bot {BotId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
+                                bot.BotId,
+                                session.Id,
+                                currentValue,
+                                newValue);
+
+                            // Notify the opponent about the double offer
+                            if (notifyDoubleOffered != null)
+                            {
+                                await notifyDoubleOffered(currentValue, newValue);
+                            }
+
+                            // Return true to indicate turn is paused waiting for human response
+                            return true;
+                        }
+                    }
+                }
+
                 // Delay before rolling dice (bot "thinking")
                 await Task.Delay(DelayBeforeRoll);
 
@@ -151,6 +192,7 @@ public class AiMoveService : IAiMoveService
             await broadcastUpdate();
 
             _logger.LogInformation("Bot turn completed in game {GameId}", session.Id);
+            return false; // Turn completed normally
         }
         catch (Exception ex)
         {

@@ -451,8 +451,8 @@ public class GameActionOrchestratorTests
         // Broadcast service is now mocked, no need for HubContext setup
 
         _mockAiMoveService
-            .Setup(s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>()))
-            .Returns(Task.CompletedTask);
+            .Setup(s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>(), It.IsAny<Func<int, int, Task>?>()))
+            .ReturnsAsync(false);
 
         // Act
         await _orchestrator.ExecuteAiTurnWithBroadcastAsync(session, "ai-player");
@@ -462,7 +462,7 @@ public class GameActionOrchestratorTests
 
         // Assert
         _mockAiMoveService.Verify(
-            s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>()),
+            s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>(), It.IsAny<Func<int, int, Task>?>()),
             Times.Once);
     }
 
@@ -478,7 +478,7 @@ public class GameActionOrchestratorTests
         // Broadcast service is now mocked, no need for HubContext setup
 
         _mockAiMoveService
-            .Setup(s => s.ExecuteAiTurnAsync(It.IsAny<GameSession>(), It.IsAny<string>(), It.IsAny<Func<Task>>()))
+            .Setup(s => s.ExecuteAiTurnAsync(It.IsAny<GameSession>(), It.IsAny<string>(), It.IsAny<Func<Task>>(), It.IsAny<Func<int, int, Task>?>()))
             .ThrowsAsync(new Exception("AI failed"));
 
         // Act
@@ -818,13 +818,13 @@ public class GameActionOrchestratorTests
         session.Engine.StartNewGame();
 
         _mockAiMoveService
-            .Setup(s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>()))
+            .Setup(s => s.ExecuteAiTurnAsync(session, "ai-player", It.IsAny<Func<Task>>(), It.IsAny<Func<int, int, Task>?>()))
             .Callback(() =>
             {
                 // Simulate game ending during AI turn
                 session.Engine.ForfeitGame(session.Engine.WhitePlayer);
             })
-            .Returns(Task.CompletedTask);
+            .ReturnsAsync(false);
 
         // Act
         await _orchestrator.ExecuteAiTurnWithBroadcastAsync(session, "ai-player");

@@ -692,8 +692,47 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             // Use broadcast service for updates
             async Task BroadcastUpdate() => await _broadcastService.BroadcastGameUpdateAsync(session);
 
-            await _aiMoveService.ExecuteAiTurnAsync(session, aiPlayerId, BroadcastUpdate);
+            // Callback to notify human opponent when AI offers a double
+            async Task NotifyDoubleOffered(int currentValue, int newValue)
+            {
+                // Determine human opponent's connections (the non-AI player)
+                var humanConnections = session.WhitePlayerId == aiPlayerId
+                    ? session.RedConnections
+                    : session.WhiteConnections;
+
+                foreach (var connectionId in humanConnections)
+                {
+                    await _hubContext.Clients.Client(connectionId).DoubleOffered(
+                        new Models.SignalR.DoubleOfferDto
+                        {
+                            CurrentStakes = currentValue,
+                            NewStakes = newValue
+                        });
+                }
+
+                _logger.LogInformation(
+                    "AI {AiPlayerId} offered double to {HumanConnectionCount} human connection(s) in game {GameId}",
+                    aiPlayerId,
+                    humanConnections.Count,
+                    session.Id);
+            }
+
+            var aiOfferedDouble = await _aiMoveService.ExecuteAiTurnAsync(
+                session,
+                aiPlayerId,
+                BroadcastUpdate,
+                NotifyDoubleOffered);
+
             await SaveGameStateAsync(session);
+
+            // If AI offered a double, don't check for completion yet - wait for human response
+            if (aiOfferedDouble)
+            {
+                _logger.LogInformation(
+                    "AI turn paused in game {GameId} - waiting for human response to double",
+                    session.Id);
+                return;
+            }
 
             // Handle game completion if there's a winner
             if (session.Engine.Winner != null)

@@ -433,6 +433,144 @@ public class GnubgOutputParserTests
         Assert.Equal(new[] { 4, 6 }, diceUsed);
     }
 
+    [Fact]
+    public void ParseMoveNotation_BearOffWithCombinedDice_ParsesCorrectly()
+    {
+        // Arrange
+        // "6/off" with dice [2, 4] - no single die equals or exceeds 6
+        // Need to combine: 2+4=6
+        // For White: gnubg point 6 = our point 6, bear off to 0
+        // Should expand to: 6->2 (die 4), then 2->0 (die 2, bear off)
+        var notation = "6/off";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 2, 4 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move: intermediate within home board
+        Assert.Equal(6, moves[0].From);
+
+        // Second move: bear off to point 0
+        Assert.Equal(0, moves[1].To);
+
+        // Both dice should be used
+        var diceUsed = new[] { moves[0].DieValue, moves[1].DieValue }.OrderBy(d => d).ToList();
+        Assert.Equal(new[] { 2, 4 }, diceUsed);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_BearOffWithCombinedDice_Red_ParsesCorrectly()
+    {
+        // Arrange
+        // "6/off" with dice [2, 4] for Red
+        // For Red: gnubg point 6 = our point 19 (25-6=19), bear off to 25
+        // Should expand to: 19->23 (die 4), then 23->25 (die 2, bear off)
+        // Or: 19->21 (die 2), then 21->25 (die 4, bear off)
+        var notation = "6/off";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 2, 4 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move starts from point 19
+        Assert.Equal(19, moves[0].From);
+
+        // Second move bears off to point 25
+        Assert.Equal(25, moves[1].To);
+
+        // Both dice should be used
+        var diceUsed = new[] { moves[0].DieValue, moves[1].DieValue }.OrderBy(d => d).ToList();
+        Assert.Equal(new[] { 2, 4 }, diceUsed);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_BearOffWithCombinedDice_Doubles_ParsesCorrectly()
+    {
+        // Arrange
+        // "4/off" with dice [2, 2] - using same die twice
+        // For White: gnubg point 4 = our point 4, bear off to 0
+        // Should expand to: 4->2 (die 2), then 2->0 (die 2, bear off)
+        var notation = "4/off";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 2, 2 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move: 4->2
+        Assert.Equal(4, moves[0].From);
+        Assert.Equal(2, moves[0].To);
+        Assert.Equal(2, moves[0].DieValue);
+
+        // Second move: 2->0 (bear off)
+        Assert.Equal(2, moves[1].From);
+        Assert.Equal(0, moves[1].To);
+        Assert.Equal(2, moves[1].DieValue);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_BearOffWithCombinedDice_FiveThree_ParsesCorrectly()
+    {
+        // Arrange
+        // "5/off" with dice [3, 5] for White
+        // The 5 is available, so it should use exact die, not combine
+        var notation = "5/off";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 3, 5 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        // Should use exact die (5), not combine
+        Assert.Single(moves);
+        Assert.Equal(5, moves[0].From);
+        Assert.Equal(0, moves[0].To);
+        Assert.Equal(5, moves[0].DieValue);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_BearOffWithHigherDie_UsesHigherDie()
+    {
+        // Arrange
+        // "3/off" with dice [5, 6] for White
+        // Higher die (5 or 6) should be used for overshoot bearing off
+        var notation = "3/off";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 5, 6 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        // Should use higher die for overshoot
+        Assert.Single(moves);
+        Assert.Equal(3, moves[0].From);
+        Assert.Equal(0, moves[0].To);
+        Assert.True(moves[0].DieValue >= 3); // Either 5 or 6
+    }
+
     // ===================
     // Alternatives Tests
     // ===================

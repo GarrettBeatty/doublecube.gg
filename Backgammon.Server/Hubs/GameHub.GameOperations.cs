@@ -446,6 +446,11 @@ public partial class GameHub
                 return;
             }
 
+            // Determine who offered the double (the current player - the one whose turn it is)
+            var doublingPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
+                ? session.WhitePlayerId
+                : session.RedPlayerId;
+
             // Accept the double
             await _doubleOfferService.AcceptDoubleAsync(session);
 
@@ -461,6 +466,20 @@ public partial class GameHub
                 },
                 _logger,
                 $"SaveGameState-{session.Id}");
+
+            // If the doubling player was an AI, resume their turn (they need to roll and move)
+            if (_aiMoveService.IsAiPlayer(doublingPlayerId))
+            {
+                _logger.LogInformation(
+                    "Human accepted AI double in game {GameId} - resuming AI turn",
+                    session.Id);
+
+                // Execute AI turn in background (roll dice and make moves)
+                BackgroundTaskHelper.FireAndForget(
+                    async () => await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, doublingPlayerId!),
+                    _logger,
+                    $"ResumeAiTurn-{session.Id}");
+            }
         }
         catch (Exception ex)
         {

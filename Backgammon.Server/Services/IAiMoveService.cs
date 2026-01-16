@@ -8,12 +8,19 @@ public interface IAiMoveService
     /// <summary>
     /// Executes an AI turn including rolling dice, making moves, and ending the turn.
     /// Includes realistic delays between actions for better UX.
+    /// If the AI offers a double, the turn pauses and returns true to indicate
+    /// the human must respond before the turn can continue.
     /// </summary>
     /// <param name="session">The game session where AI should play</param>
     /// <param name="aiPlayerId">The AI player's ID</param>
     /// <param name="broadcastUpdate">Callback to broadcast game state updates to clients</param>
-    /// <returns>Task that completes when the AI turn is finished</returns>
-    Task ExecuteAiTurnAsync(GameSession session, string aiPlayerId, Func<Task> broadcastUpdate);
+    /// <param name="notifyDoubleOffered">Callback to notify opponent of double offer</param>
+    /// <returns>True if AI offered a double and is waiting for response, false if turn completed normally</returns>
+    Task<bool> ExecuteAiTurnAsync(
+        GameSession session,
+        string aiPlayerId,
+        Func<Task> broadcastUpdate,
+        Func<int, int, Task>? notifyDoubleOffered = null);
 
     /// <summary>
     /// Checks if a player ID represents an AI opponent.
