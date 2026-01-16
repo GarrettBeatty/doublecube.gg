@@ -366,6 +366,8 @@ public partial class GameHub
             if (opponentConnections.Any(c => !string.IsNullOrEmpty(c)))
             {
                 await _gameService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
+                // Send full game state to both players so modals display correctly
+                await _gameService.BroadcastGameUpdateAsync(session);
             }
             else
             {
