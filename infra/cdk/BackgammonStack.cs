@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Amazon.CDK;
 using Amazon.CDK.AWS.EC2;
 using Amazon.CDK.AWS.IAM;
@@ -115,9 +116,11 @@ public class BackgammonStack : Stack
         var instance = new Instance_(this, "BackgammonInstance", new InstanceProps
         {
             InstanceType = InstanceType.Of(InstanceClass.BURSTABLE4_GRAVITON, InstanceSize.NANO),
-            MachineImage = MachineImage.LatestAmazonLinux2023(new AmazonLinux2023ImageSsmParameterProps
+            // Pin to specific AMI to prevent instance replacement on CDK deploy
+            // Amazon Linux 2023 ARM64 (us-east-1) - update manually when OS upgrade is needed
+            MachineImage = MachineImage.GenericLinux(new Dictionary<string, string>
             {
-                CpuType = AmazonLinuxCpuType.ARM_64
+                ["us-east-1"] = "ami-059afa9e3a9c7af0c"
             }),
             Vpc = vpc,
             VpcSubnets = new SubnetSelection { SubnetType = SubnetType.PUBLIC },
