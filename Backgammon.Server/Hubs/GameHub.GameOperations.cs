@@ -747,33 +747,53 @@ public partial class GameHub
     }
 
     /// <summary>
-    /// Export the current analysis position (base64-encoded SGF - used for URLs)
+    /// Export the current position (base64-encoded SGF - used for URLs).
+    /// Works for both analysis sessions and game sessions.
     /// </summary>
     public Task<string> ExportPosition()
     {
-        var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (session == null)
+        // Check analysis session first
+        var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
+        if (analysisSession != null)
         {
-            return Task.FromResult(string.Empty);
+            var sgf = SgfSerializer.ExportPosition(analysisSession.Engine);
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
+            return Task.FromResult(base64);
         }
 
-        var sgf = SgfSerializer.ExportPosition(session.Engine);
-        var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
-        return Task.FromResult(base64);
+        // Check game session
+        var gameSession = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+        if (gameSession != null)
+        {
+            var sgf = SgfSerializer.ExportPosition(gameSession.Engine);
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
+            return Task.FromResult(base64);
+        }
+
+        return Task.FromResult(string.Empty);
     }
 
     /// <summary>
-    /// Export full game SGF with move history
+    /// Export full game SGF with move history.
+    /// Works for both analysis sessions and game sessions.
     /// </summary>
     public Task<string> ExportGameSgf()
     {
-        var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (session == null)
+        // Check analysis session first
+        var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
+        if (analysisSession != null)
         {
-            return Task.FromResult(string.Empty);
+            return Task.FromResult(analysisSession.Engine.GameSgf);
         }
 
-        return Task.FromResult(session.Engine.GameSgf);
+        // Check game session
+        var gameSession = _sessionManager.GetGameByPlayer(Context.ConnectionId);
+        if (gameSession != null)
+        {
+            return Task.FromResult(gameSession.Engine.GameSgf);
+        }
+
+        return Task.FromResult(string.Empty);
     }
 
     /// <summary>

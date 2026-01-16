@@ -116,83 +116,6 @@ public partial class GameHub
         }
     }
 
-    // ==================== Analysis Session Operations ====================
-    // These methods work with the AnalysisSessionManager for dedicated analysis sessions
-
-    /// <summary>
-    /// Set dice values in an analysis session.
-    /// </summary>
-    private async Task SetAnalysisSessionDice(AnalysisSession session, int die1, int die2)
-    {
-        // Validate dice values
-        if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6)
-        {
-            await Clients.Caller.Error("Dice values must be between 1 and 6");
-            return;
-        }
-
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            session.Engine.Dice.SetDice(die1, die2);
-            session.Engine.RemainingMoves.Clear();
-            session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        // Broadcast update to all connections
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// Set the current player in an analysis session.
-    /// </summary>
-    private async Task SetAnalysisSessionCurrentPlayer(AnalysisSession session, CheckerColor color)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            session.Engine.SetCurrentPlayer(color);
-            session.Engine.RemainingMoves.Clear();
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// Move a checker directly in an analysis session (bypasses game rules).
-    /// </summary>
-    private async Task MoveAnalysisSessionCheckerDirectly(AnalysisSession session, int from, int to)
-    {
-        if (!IsValidDirectMove(session.Engine, from, to))
-        {
-            await Clients.Caller.Error("Invalid move: check piece placement rules");
-            return;
-        }
-
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            ExecuteDirectMove(session.Engine, from, to);
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
     /// <summary>
     /// Broadcast game state update to all connections in an analysis session.
     /// </summary>
@@ -203,14 +126,6 @@ public partial class GameHub
             var state = session.GetState(connectionId);
             await Clients.Client(connectionId).GameUpdate(state);
         }
-    }
-
-    /// <summary>
-    /// Get an analysis session for a connection.
-    /// </summary>
-    private AnalysisSession? GetAnalysisSessionForConnection(string connectionId)
-    {
-        return _analysisSessionManager.GetSessionByConnection(connectionId);
     }
 
     // ==================== Game Action Helpers for Analysis Sessions ====================
