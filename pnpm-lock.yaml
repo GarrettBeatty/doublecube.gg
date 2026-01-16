@@ -491,8 +491,8 @@ packages:
     resolution: {integrity: sha512-g7nH6P6dyDioJogAAGprGpCtVImJhpPk/roCzdb3fIh61/s/nPsfR6onyMwkCAR/OlC3yBC0lESvUoQEAssIrw==}
     engines: {node: '>= 0.8'}
 
-  diff@8.0.2:
-    resolution: {integrity: sha512-sSuxWU5j5SR9QQji/o2qMvqRNYRDOcBTgsJ/DeCf4iSN4gW+gNMXM7wFIP+fdXZxoNiAnHUTGjCr+TSWXdRDKg==}
+  diff@8.0.3:
+    resolution: {integrity: sha512-qejHi7bcSD4hQAZE0tNAawRK1ZtafHDmMTMkrrIGgSLl7hTnQHmKCeB45xAcbfTqK2zowkM3j3bHt/4b/ARbYQ==}
     engines: {node: '>=0.3.1'}
 
   dotenv@17.2.3:
@@ -1880,7 +1880,7 @@ snapshots:
 
   depd@2.0.0: {}
 
-  diff@8.0.2: {}
+  diff@8.0.3: {}
 
   dotenv@17.2.3: {}
 
@@ -2525,7 +2525,7 @@ snapshots:
       cosmiconfig: 9.0.0
       dedent: 1.7.1
       deepmerge: 4.3.1
-      diff: 8.0.2
+      diff: 8.0.3
       execa: 9.6.1
       fast-glob: 3.3.3
       fs-extra: 11.3.3
