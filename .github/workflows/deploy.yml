@@ -240,8 +240,9 @@ jobs:
           echo "Deployment complete! Final status:"
           docker ps --format 'table {{.Names}}\t{{.Status}}'
 
-          # Cleanup old images
-          docker image prune -af --filter "until=24h"
+          # Cleanup old/unused images immediately after deployment
+          echo "Cleaning up unused Docker images..."
+          docker image prune -af
 
           echo "Deployment complete!"
         ENDSSH
