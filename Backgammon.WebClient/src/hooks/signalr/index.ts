@@ -1,20 +1,11 @@
 /**
- * SignalR event hooks - split by domain concern
+ * SignalR event hooks
  *
- * Individual hooks can be imported directly for granular control:
- * - useGameStateEvents - GameUpdate, GameStart, GameOver, SpectatorJoined
- * - useMatchEvents - MatchCreated, MatchUpdate, OpponentJoinedMatch
- * - useDoubleEvents - DoubleOffered, DoubleAccepted
- * - useTimeEvents - TimeUpdate, PlayerTimedOut
- * - useChatEvents - ReceiveChatMessage
- * - useConnectionEvents - WaitingForOpponent, OpponentJoined, OpponentLeft, Error, Info
- * - useGameAudio - Sound effect utilities
+ * useTypedSignalRReceiver - Type-safe event handler registration using
+ * getReceiverRegister() to enforce compile-time type safety for all events.
+ *
+ * useGameAudio - Sound effect utilities (standalone, used outside of SignalR)
  */
 
-export { useGameStateEvents } from './useGameStateEvents'
-export { useMatchEvents } from './useMatchEvents'
-export { useDoubleEvents } from './useDoubleEvents'
-export { useTimeEvents } from './useTimeEvents'
-export { useChatEvents } from './useChatEvents'
-export { useConnectionEvents } from './useConnectionEvents'
+export { useTypedSignalRReceiver } from './useTypedSignalRReceiver'
 export { useGameAudio } from './useGameAudio'

@@ -1,39 +1,22 @@
 /**
- * Legacy useSignalREvents hook - provides backward compatibility
+ * useSignalREvents - Type-safe SignalR event handler registration
  *
- * This hook now composes the split SignalR event hooks.
- * For new code, prefer importing individual hooks directly from '@/hooks/signalr':
- * - useGameStateEvents - GameUpdate, GameStart, GameOver, SpectatorJoined
- * - useMatchEvents - MatchCreated, MatchUpdate, OpponentJoinedMatch
- * - useDoubleEvents - DoubleOffered, DoubleAccepted
- * - useTimeEvents - TimeUpdate, PlayerTimedOut
- * - useChatEvents - ReceiveChatMessage
- * - useConnectionEvents - WaitingForOpponent, OpponentJoined, OpponentLeft, Error, Info
+ * Uses the typed receiver pattern with getReceiverRegister() to ensure
+ * compile-time type safety for all event handlers. If the server changes
+ * an event signature, TypeScript will catch the mismatch at build time.
  */
 
 import { useEffect } from 'react'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { useGameStore } from '@/stores/gameStore'
-import {
-  useGameStateEvents,
-  useMatchEvents,
-  useDoubleEvents,
-  useTimeEvents,
-  useChatEvents,
-  useConnectionEvents,
-} from '@/hooks/signalr'
+import { useTypedSignalRReceiver } from '@/hooks/signalr'
 
 export const useSignalREvents = () => {
   const { connection } = useSignalR()
   const { setShowGameResultModal, setLastGameResult } = useGameStore()
 
-  // Register all event handlers via split hooks
-  useGameStateEvents(connection)
-  useMatchEvents(connection)
-  useDoubleEvents(connection)
-  useTimeEvents(connection)
-  useChatEvents(connection)
-  useConnectionEvents(connection)
+  // Register all event handlers via type-safe receiver
+  useTypedSignalRReceiver(connection)
 
   // Defensive check: If page refreshed during/after game completion in a match,
   // restore the game result modal so user can continue
