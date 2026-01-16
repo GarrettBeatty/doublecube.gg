@@ -285,6 +285,12 @@ export type IGameHub = {
     */
     searchPlayers(query: string): Promise<PlayerSearchResultDto[]>;
     /**
+    * Get all registered players sorted by rating
+    * @param limit Transpiled from int
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.PlayerSearchResultDto>>
+    */
+    getAllPlayers(limit: number): Promise<PlayerSearchResultDto[]>;
+    /**
     * Send a friend request
     * @param toUserId Transpiled from string
     * @returns Transpiled from System.Threading.Tasks.Task<bool>

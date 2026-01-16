@@ -124,6 +124,7 @@ public static class DynamoDbHelpers
             ["ratedGamesCount"] = new AttributeValue { N = user.RatedGamesCount.ToString() },
             ["isActive"] = new AttributeValue { BOOL = user.IsActive },
             ["isBanned"] = new AttributeValue { BOOL = user.IsBanned },
+            ["isAnonymous"] = new AttributeValue { BOOL = user.IsAnonymous },
             ["GSI1PK"] = new AttributeValue { S = $"USERNAME#{user.UsernameNormalized}" },
             ["GSI1SK"] = new AttributeValue { S = "PROFILE" },
             ["entityType"] = new AttributeValue { S = "USER" }
@@ -186,6 +187,7 @@ public static class DynamoDbHelpers
             LastSeenAt = GetDateTime(item, "lastSeenAt"),
             IsActive = GetBool(item, "isActive", true),
             IsBanned = GetBool(item, "isBanned", false),
+            IsAnonymous = GetBool(item, "isAnonymous", false),
             Email = GetStringOrNull(item, "email"),
             EmailNormalized = GetStringOrNull(item, "emailNormalized"),
             BannedReason = GetStringOrNull(item, "bannedReason"),

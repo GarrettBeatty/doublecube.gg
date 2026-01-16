@@ -320,25 +320,97 @@ public class DynamoDbUserRepository : IUserRepository
         {
             var normalizedQuery = query.ToLowerInvariant();
 
-            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            // Use Scan with filter since begins_with can only be used on sort keys, not partition keys
+            // Filter out anonymous users (username starts with "anonymous-")
+            var response = await _dynamoDbClient.ScanAsync(new ScanRequest
             {
                 TableName = _tableName,
-                IndexName = "GSI1",
-                KeyConditionExpression = "begins_with(GSI1PK, :prefix)",
-                FilterExpression = "GSI1SK = :sk",
+                FilterExpression = "SK = :sk AND begins_with(usernameNormalized, :prefix) AND (attribute_not_exists(isAnonymous) OR isAnonymous = :notAnon)",
                 ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                 {
-                    [":prefix"] = new AttributeValue { S = $"USERNAME#{normalizedQuery}" },
-                    [":sk"] = new AttributeValue { S = "PROFILE" }
+                    [":sk"] = new AttributeValue { S = "PROFILE" },
+                    [":prefix"] = new AttributeValue { S = normalizedQuery },
+                    [":notAnon"] = new AttributeValue { BOOL = false }
                 },
-                Limit = limit
+                Limit = limit * 2 // Request more since we filter in-memory
             });
 
-            return response.Items.Select(DynamoDbHelpers.UnmarshalUser).ToList();
+            var users = response.Items
+                .Select(DynamoDbHelpers.UnmarshalUser)
+                .Where(u => !u.Username.StartsWith("Anonymous-", StringComparison.OrdinalIgnoreCase))
+                .Take(limit)
+                .ToList();
+
+            return users;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to search users with query {Query}", query);
+            return new List<User>();
+        }
+    }
+
+    public async Task<List<User>> GetAllPlayersAsync(int limit = 50)
+    {
+        try
+        {
+            var users = new List<User>();
+            string? lastEvaluatedKey = null;
+
+            do
+            {
+                var request = new ScanRequest
+                {
+                    TableName = _tableName,
+                    // Filter for user profiles, excluding anonymous users
+                    // Handle records that may not have isAnonymous field (treat as non-anonymous)
+                    FilterExpression = "SK = :sk AND (attribute_not_exists(isAnonymous) OR isAnonymous = :notAnon)",
+                    ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                    {
+                        [":sk"] = new AttributeValue { S = "PROFILE" },
+                        [":notAnon"] = new AttributeValue { BOOL = false }
+                    },
+                    ProjectionExpression = "userId, username, displayName, rating, ratedGamesCount, stats, usernameNormalized"
+                };
+
+                if (lastEvaluatedKey != null)
+                {
+                    request.ExclusiveStartKey = new Dictionary<string, AttributeValue>
+                    {
+                        ["PK"] = new AttributeValue { S = lastEvaluatedKey },
+                        ["SK"] = new AttributeValue { S = "PROFILE" }
+                    };
+                }
+
+                var response = await _dynamoDbClient.ScanAsync(request);
+
+                // Filter out anonymous users by username pattern (for backward compatibility)
+                var filteredUsers = response.Items
+                    .Select(DynamoDbHelpers.UnmarshalUser)
+                    .Where(u => !u.Username.StartsWith("Anonymous-", StringComparison.OrdinalIgnoreCase));
+
+                users.AddRange(filteredUsers);
+
+                lastEvaluatedKey = response.LastEvaluatedKey?.GetValueOrDefault("PK")?.S;
+
+                // Stop if we have enough users
+                if (users.Count >= limit * 2)
+                {
+                    break;
+                }
+            }
+            while (lastEvaluatedKey != null);
+
+            // Sort by rating descending and take the limit
+            return users
+                .OrderByDescending(u => u.Rating)
+                .ThenByDescending(u => u.Stats?.TotalGames ?? 0)
+                .Take(limit)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve all players");
             return new List<User>();
         }
     }
@@ -401,14 +473,15 @@ public class DynamoDbUserRepository : IUserRepository
                 var request = new ScanRequest
                 {
                     TableName = _tableName,
-                    FilterExpression = "SK = :sk AND isAnonymous = :notAnon AND ratedGamesCount > :minGames",
+                    // Handle records that may not have isAnonymous field (treat as non-anonymous)
+                    FilterExpression = "SK = :sk AND (attribute_not_exists(isAnonymous) OR isAnonymous = :notAnon) AND ratedGamesCount > :minGames",
                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                     {
                         [":sk"] = new AttributeValue { S = "PROFILE" },
                         [":notAnon"] = new AttributeValue { BOOL = false },
                         [":minGames"] = new AttributeValue { N = "0" }
                     },
-                    ProjectionExpression = "userId, username, displayName, rating, ratedGamesCount, stats"
+                    ProjectionExpression = "userId, username, displayName, rating, ratedGamesCount, stats, usernameNormalized"
                 };
 
                 if (lastEvaluatedKey != null)
@@ -421,7 +494,13 @@ public class DynamoDbUserRepository : IUserRepository
                 }
 
                 var response = await _dynamoDbClient.ScanAsync(request);
-                users.AddRange(response.Items.Select(DynamoDbHelpers.UnmarshalUser));
+
+                // Filter out anonymous users by username pattern (for backward compatibility)
+                var filteredUsers = response.Items
+                    .Select(DynamoDbHelpers.UnmarshalUser)
+                    .Where(u => !u.Username.StartsWith("Anonymous-", StringComparison.OrdinalIgnoreCase));
+
+                users.AddRange(filteredUsers);
 
                 lastEvaluatedKey = response.LastEvaluatedKey?.GetValueOrDefault("PK")?.S;
             }
@@ -453,14 +532,15 @@ public class DynamoDbUserRepository : IUserRepository
                 var request = new ScanRequest
                 {
                     TableName = _tableName,
-                    FilterExpression = "SK = :sk AND isAnonymous = :notAnon AND ratedGamesCount > :minGames",
+                    // Handle records that may not have isAnonymous field (treat as non-anonymous)
+                    FilterExpression = "SK = :sk AND (attribute_not_exists(isAnonymous) OR isAnonymous = :notAnon) AND ratedGamesCount > :minGames",
                     ExpressionAttributeValues = new Dictionary<string, AttributeValue>
                     {
                         [":sk"] = new AttributeValue { S = "PROFILE" },
                         [":notAnon"] = new AttributeValue { BOOL = false },
                         [":minGames"] = new AttributeValue { N = "0" }
                     },
-                    ProjectionExpression = "rating"
+                    ProjectionExpression = "rating, username"
                 };
 
                 if (lastEvaluatedKey != null)
@@ -476,6 +556,13 @@ public class DynamoDbUserRepository : IUserRepository
 
                 foreach (var item in response.Items)
                 {
+                    // Filter out anonymous users by username pattern (for backward compatibility)
+                    var username = item.TryGetValue("username", out var usernameAttr) ? usernameAttr.S : null;
+                    if (username != null && username.StartsWith("Anonymous-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     if (item.TryGetValue("rating", out var ratingAttr) && int.TryParse(ratingAttr.N, out var rating))
                     {
                         ratings.Add(rating);

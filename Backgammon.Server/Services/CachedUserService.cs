@@ -281,6 +281,12 @@ public class CachedUserService : IUserRepository
         return _userRepository.GetTopPlayersByRatingAsync(limit);
     }
 
+    public Task<List<User>> GetAllPlayersAsync(int limit = 50)
+    {
+        // Player list queries don't need caching - they're dynamic and updated frequently
+        return _userRepository.GetAllPlayersAsync(limit);
+    }
+
     public Task<List<int>> GetAllRatingsAsync()
     {
         // Rating distribution queries don't need caching - they're aggregate stats

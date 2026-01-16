@@ -63,6 +63,13 @@ public interface IUserRepository
     Task<List<User>> SearchUsersAsync(string query, int limit = 10);
 
     /// <summary>
+    /// Get all registered (non-anonymous) players sorted by rating
+    /// </summary>
+    /// <param name="limit">Maximum number of players to return</param>
+    /// <returns>List of players sorted by rating descending</returns>
+    Task<List<User>> GetAllPlayersAsync(int limit = 50);
+
+    /// <summary>
     /// Get multiple users by their user IDs
     /// </summary>
     Task<List<User>> GetUsersByIdsAsync(IEnumerable<string> userIds);

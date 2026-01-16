@@ -176,6 +176,43 @@ public partial class GameHub
     }
 
     /// <summary>
+    /// Get all registered players sorted by rating
+    /// </summary>
+    public async Task<List<PlayerSearchResultDto>> GetAllPlayers(int limit = 50)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+
+            var users = await _userRepository.GetAllPlayersAsync(limit);
+            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
+
+            // Exclude the current user from results
+            var results = users
+                .Where(u => u.UserId != userId)
+                .Select(u => new PlayerSearchResultDto
+                {
+                    UserId = u.UserId,
+                    Username = u.Username,
+                    DisplayName = u.DisplayName ?? u.Username,
+                    Rating = u.Rating,
+                    IsOnline = onlinePlayerIds.Contains(u.UserId),
+                    TotalGames = u.Stats?.TotalGames ?? 0
+                })
+                .ToList();
+
+            _logger.LogDebug("Retrieved {Count} players for all players list", results.Count);
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all players");
+            await Clients.Caller.Error("Failed to get players");
+            return new List<PlayerSearchResultDto>();
+        }
+    }
+
+    /// <summary>
     /// Send a friend request to another user
     /// </summary>
     public async Task<bool> SendFriendRequest(string toUserId)

@@ -270,6 +270,11 @@ public interface IGameHub
     Task<List<PlayerSearchResultDto>> SearchPlayers(string query);
 
     /// <summary>
+    /// Get all registered players sorted by rating
+    /// </summary>
+    Task<List<PlayerSearchResultDto>> GetAllPlayers(int limit);
+
+    /// <summary>
     /// Send a friend request
     /// </summary>
     Task<bool> SendFriendRequest(string toUserId);

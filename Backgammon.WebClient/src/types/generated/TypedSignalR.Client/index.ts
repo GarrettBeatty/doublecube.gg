@@ -270,6 +270,10 @@ class IGameHub_HubProxy implements IGameHub {
         return await this.connection.invoke("SearchPlayers", query);
     }
 
+    public readonly getAllPlayers = async (limit: number): Promise<PlayerSearchResultDto[]> => {
+        return await this.connection.invoke("GetAllPlayers", limit);
+    }
+
     public readonly sendFriendRequest = async (toUserId: string): Promise<boolean> => {
         return await this.connection.invoke("SendFriendRequest", toUserId);
     }
