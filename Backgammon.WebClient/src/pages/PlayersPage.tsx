@@ -4,8 +4,9 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Users, Trophy, BarChart3, Bot, ArrowLeft } from 'lucide-react'
+import { Users, Trophy, BarChart3, Bot, ArrowLeft, Search } from 'lucide-react'
 import { OnlinePlayersList } from '@/components/players/OnlinePlayersList'
+import { AllPlayersList } from '@/components/players/AllPlayersList'
 import { Leaderboard } from '@/components/players/Leaderboard'
 import { RatingDistribution } from '@/components/players/RatingDistribution'
 import { OnlineBotsList } from '@/components/players/OnlineBotsList'
@@ -81,7 +82,7 @@ export const PlayersPage: React.FC = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="online" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Online</span>
@@ -90,6 +91,10 @@ export const PlayersPage: React.FC = () => {
                   {onlinePlayers.length}
                 </span>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="search" className="flex items-center gap-2">
+              <Search className="h-4 w-4" />
+              <span className="hidden sm:inline">All Players</span>
             </TabsTrigger>
             <TabsTrigger value="leaderboard" className="flex items-center gap-2">
               <Trophy className="h-4 w-4" />
@@ -121,8 +126,24 @@ export const PlayersPage: React.FC = () => {
                   players={onlinePlayers}
                   isLoading={isLoading}
                   onRefresh={handleRefresh}
-                  hub={hub}
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="search">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5 text-blue-500" />
+                  Find Players
+                </CardTitle>
+                <CardDescription>
+                  Search for any player by username, online or offline
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AllPlayersList hub={hub} />
               </CardContent>
             </Card>
           </TabsContent>
