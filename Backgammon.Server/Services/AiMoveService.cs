@@ -92,7 +92,7 @@ public class AiMoveService : IAiMoveService
                         var currentValue = engine.DoublingCube.Value;
                         if (engine.OfferDouble())
                         {
-                            var newValue = engine.DoublingCube.Value;
+                            var newValue = currentValue * 2;
                             _logger.LogInformation(
                                 "Bot {BotId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
                                 bot.BotId,
