@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 
 namespace Backgammon.AI.Bots;
 
@@ -63,15 +64,15 @@ public class RandomBot : IGameBot
         return Task.FromResult(chosenMoves);
     }
 
-    public Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, CancellationToken ct = default)
+    public Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
-        // Accept 50% of the time randomly
+        // Accept 50% of the time randomly (ignores match context)
         return Task.FromResult(_random.Next(2) == 0);
     }
 
-    public Task<bool> ShouldOfferDoubleAsync(GameEngine engine, CancellationToken ct = default)
+    public Task<bool> ShouldOfferDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
-        // Don't offer doubles for simplicity
+        // Don't offer doubles for simplicity (ignores match context)
         return Task.FromResult(false);
     }
 }

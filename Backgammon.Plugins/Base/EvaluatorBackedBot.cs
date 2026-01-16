@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Plugins.Base;
@@ -158,10 +159,11 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
     /// </summary>
     public virtual async Task<bool> ShouldAcceptDoubleAsync(
         GameEngine engine,
+        MatchContext matchContext,
         CancellationToken ct = default)
     {
         ApplyPliesOverride();
-        var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, ct);
+        var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, matchContext, ct);
         return cubeDecision.Recommendation is "Take" or "Beaver";
     }
 
@@ -171,10 +173,11 @@ public abstract class EvaluatorBackedBot : IEvaluatorBackedBot
     /// </summary>
     public virtual async Task<bool> ShouldOfferDoubleAsync(
         GameEngine engine,
+        MatchContext matchContext,
         CancellationToken ct = default)
     {
         ApplyPliesOverride();
-        var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, ct);
+        var cubeDecision = await Evaluator.AnalyzeCubeDecisionAsync(engine, matchContext, ct);
         return cubeDecision.Recommendation == "Double";
     }
 

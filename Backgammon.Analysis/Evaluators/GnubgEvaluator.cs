@@ -150,16 +150,24 @@ public class GnubgEvaluator : IPositionEvaluator
     /// <summary>
     /// Analyze the doubling cube decision for the current position
     /// </summary>
-    public async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default)
+    public async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
         try
         {
             // Export position to SGF
             var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.LogDebug("Evaluating cube decision with gnubg. SGF: {Sgf}", sgf);
+            _logger?.LogDebug(
+                "Evaluating cube decision with gnubg. SGF: {Sgf}, Match: {Target}-point, Score: {P1}-{P2}, Crawford: {Crawford}",
+                sgf,
+                matchContext.TargetScore,
+                matchContext.Player1Score,
+                matchContext.Player2Score,
+                matchContext.IsCrawfordGame);
 
-            // Build gnubg cube commands
-            var commands = GnubgCommandBuilder.BuildCubeCommand(_settings);
+            // Build gnubg commands - start with match context, then cube analysis
+            var commands = new List<string>();
+            commands.AddRange(GnubgCommandBuilder.BuildMatchContextCommands(matchContext));
+            commands.AddRange(GnubgCommandBuilder.BuildCubeCommand(_settings));
 
             // Execute gnubg with SGF file
             var output = await _processManager.ExecuteWithSgfFileAsync(sgf, commands, ct);

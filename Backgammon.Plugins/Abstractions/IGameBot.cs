@@ -1,4 +1,5 @@
 using Backgammon.Core;
+using Backgammon.Plugins.Models;
 
 namespace Backgammon.Plugins.Abstractions;
 
@@ -42,15 +43,17 @@ public interface IGameBot
     /// Decide whether to accept a double or resign
     /// </summary>
     /// <param name="engine">The game engine with current state</param>
+    /// <param name="matchContext">Match context for accurate equity calculations</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>True to accept the double, false to resign</returns>
-    Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, CancellationToken ct = default);
+    Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default);
 
     /// <summary>
     /// Decide whether to offer a double
     /// </summary>
     /// <param name="engine">The game engine with current state</param>
+    /// <param name="matchContext">Match context for accurate equity calculations</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>True to offer a double</returns>
-    Task<bool> ShouldOfferDoubleAsync(GameEngine engine, CancellationToken ct = default);
+    Task<bool> ShouldOfferDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default);
 }

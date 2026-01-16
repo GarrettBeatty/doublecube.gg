@@ -1,5 +1,6 @@
 using Backgammon.Core;
 using Backgammon.Plugins.Abstractions;
+using Backgammon.Plugins.Models;
 
 namespace Backgammon.AI.Bots;
 
@@ -48,10 +49,10 @@ public class GreedyBot : IGameBot
         return Task.FromResult(chosenMoves);
     }
 
-    public Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, CancellationToken ct = default)
+    public Task<bool> ShouldAcceptDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
         // Simple heuristic: accept if we've borne off at least some checkers
-        // or opponent hasn't borne off many
+        // or opponent hasn't borne off many (ignores match context for now)
         var opponent = engine.GetOpponent();
 
         if (engine.CurrentPlayer.CheckersBornOff >= 5)
@@ -67,9 +68,9 @@ public class GreedyBot : IGameBot
         return Task.FromResult(false);
     }
 
-    public Task<bool> ShouldOfferDoubleAsync(GameEngine engine, CancellationToken ct = default)
+    public Task<bool> ShouldOfferDoubleAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
-        // Offer double if we're ahead in bearing off
+        // Offer double if we're ahead in bearing off (ignores match context for now)
         var opponent = engine.GetOpponent();
         return Task.FromResult(engine.CurrentPlayer.CheckersBornOff > opponent.CheckersBornOff + 3);
     }

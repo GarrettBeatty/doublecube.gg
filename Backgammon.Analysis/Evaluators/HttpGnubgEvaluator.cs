@@ -220,17 +220,27 @@ public class HttpGnubgEvaluator : IPositionEvaluator, IPliesConfigurable
     }
 
     /// <inheritdoc/>
-    public async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default)
+    public async Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
         try
         {
             var sgf = SgfSerializer.ExportPosition(engine);
-            _logger?.LogDebug("Analyzing cube decision via HTTP. SGF: {Sgf}", sgf);
+            _logger?.LogDebug(
+                "Analyzing cube decision via HTTP. SGF: {Sgf}, Match: {Target}-point, Score: {P1}-{P2}, Crawford: {Crawford}",
+                sgf,
+                matchContext.TargetScore,
+                matchContext.Player1Score,
+                matchContext.Player2Score,
+                matchContext.IsCrawfordGame);
 
             var request = new CubeRequest
             {
                 Sgf = sgf,
-                Plies = PliesOverride ?? _settings.EvaluationPlies
+                Plies = PliesOverride ?? _settings.EvaluationPlies,
+                MatchLength = matchContext.TargetScore,
+                Player1Score = matchContext.Player1Score,
+                Player2Score = matchContext.Player2Score,
+                IsCrawford = matchContext.IsCrawfordGame
             };
 
             var response = await _httpClient.PostAsJsonAsync("/cube", request, JsonOptions, ct);
@@ -300,6 +310,14 @@ public class HttpGnubgEvaluator : IPositionEvaluator, IPliesConfigurable
         public string Sgf { get; set; } = string.Empty;
 
         public int Plies { get; set; } = 2;
+
+        public int MatchLength { get; set; }
+
+        public int Player1Score { get; set; }
+
+        public int Player2Score { get; set; }
+
+        public bool IsCrawford { get; set; }
     }
 
     private sealed class CubeResponse

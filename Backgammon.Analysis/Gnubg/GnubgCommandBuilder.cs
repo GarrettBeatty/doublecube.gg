@@ -1,4 +1,5 @@
 using Backgammon.Analysis.Configuration;
+using Backgammon.Plugins.Models;
 
 namespace Backgammon.Analysis.Gnubg;
 
@@ -88,6 +89,35 @@ public static class GnubgCommandBuilder
 
         // Evaluate cube decision
         commands.Add("hint cube");
+
+        return commands;
+    }
+
+    /// <summary>
+    /// Build gnubg commands for setting match context (score, target, Crawford).
+    /// These commands should be issued before cube analysis for accurate match equity calculations.
+    /// </summary>
+    /// <param name="context">Match context with score and Crawford information</param>
+    /// <returns>List of gnubg commands to set match context</returns>
+    public static List<string> BuildMatchContextCommands(MatchContext context)
+    {
+        var commands = new List<string>();
+
+        if (!context.IsMatchGame)
+        {
+            // Money game - no match context needed
+            commands.Add("set match 0");
+            return commands;
+        }
+
+        // Set match length (target score)
+        commands.Add($"set match {context.TargetScore}");
+
+        // Set current scores (gnubg uses "set score <player-on-roll> <opponent>")
+        commands.Add($"set score {context.Player1Score} {context.Player2Score}");
+
+        // Set Crawford state
+        commands.Add(context.IsCrawfordGame ? "set crawford on" : "set crawford off");
 
         return commands;
     }

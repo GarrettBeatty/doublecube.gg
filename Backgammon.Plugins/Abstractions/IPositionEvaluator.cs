@@ -46,7 +46,8 @@ public interface IPositionEvaluator
     /// Analyze the doubling cube decision for the current position
     /// </summary>
     /// <param name="engine">Game engine with the position to analyze</param>
+    /// <param name="matchContext">Match context for accurate equity calculations</param>
     /// <param name="ct">Cancellation token</param>
     /// <returns>Cube decision analysis with recommendations</returns>
-    Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default);
+    Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default);
 }

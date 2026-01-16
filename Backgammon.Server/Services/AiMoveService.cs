@@ -1,4 +1,5 @@
 using Backgammon.Core;
+using Backgammon.Plugins.Models;
 using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Server.Services;
@@ -70,6 +71,9 @@ public class AiMoveService : IAiMoveService
 
         _logger.LogInformation("Bot {BotId} starting turn in game {GameId}", bot.BotId, session.Id);
 
+        // Create match context for cube decisions
+        var matchContext = CreateMatchContext(session);
+
         try
         {
             // Check if dice are already set (from opening roll)
@@ -85,7 +89,7 @@ public class AiMoveService : IAiMoveService
                     await Task.Delay(DelayBeforeDouble);
 
                     // Ask the bot if it wants to double
-                    var shouldDouble = await bot.ShouldOfferDoubleAsync(engine);
+                    var shouldDouble = await bot.ShouldOfferDoubleAsync(engine, matchContext);
 
                     if (shouldDouble)
                     {
@@ -199,5 +203,23 @@ public class AiMoveService : IAiMoveService
             _logger.LogError(ex, "Error during bot turn in game {GameId}", session.Id);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Creates a MatchContext from the game session for cube decision analysis.
+    /// </summary>
+    private static MatchContext CreateMatchContext(GameSession session)
+    {
+        if (!session.TargetScore.HasValue || session.TargetScore.Value <= 0)
+        {
+            // No match context available, use money game defaults
+            return MatchContext.MoneyGame;
+        }
+
+        return new MatchContext(
+            TargetScore: session.TargetScore.Value,
+            Player1Score: session.Player1Score ?? 0,
+            Player2Score: session.Player2Score ?? 0,
+            IsCrawfordGame: session.IsCrawfordGame ?? false);
     }
 }

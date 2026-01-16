@@ -83,10 +83,14 @@ public class HeuristicEvaluator : IPositionEvaluator
     }
 
     /// <summary>
-    /// Analyze the doubling cube decision for the current position
+    /// Analyze the doubling cube decision for the current position.
+    /// Note: This heuristic evaluator currently uses money game thresholds.
+    /// Future enhancement: Adjust thresholds based on match score for proper match equity.
     /// </summary>
-    public Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, CancellationToken ct = default)
+    public Task<CubeDecision> AnalyzeCubeDecisionAsync(GameEngine engine, MatchContext matchContext, CancellationToken ct = default)
     {
+        // TODO: Use matchContext to adjust cube decision thresholds for match play
+        // For now, we use money game calculations regardless of match context
         var evaluation = Evaluate(engine);
         var cubeValue = engine.DoublingCube.Value;
         var currentPlayer = engine.CurrentPlayer.Color;
