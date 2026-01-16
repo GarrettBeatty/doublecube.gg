@@ -43,6 +43,23 @@ public class EcrConstruct : Construct
             ImageTagMutability = TagMutability.MUTABLE
         });
 
+        // GNUBG service repository
+        GnubgRepository = new Repository(this, "GnubgRepo", new RepositoryProps
+        {
+            RepositoryName = $"backgammon-gnubg-{environment}",
+            RemovalPolicy = environment == "prod" ? RemovalPolicy.RETAIN : RemovalPolicy.DESTROY,
+            LifecycleRules = new[]
+            {
+                new LifecycleRule
+                {
+                    MaxImageCount = 5,
+                    Description = "Keep last 5 images only"
+                }
+            },
+            ImageScanOnPush = true,
+            ImageTagMutability = TagMutability.MUTABLE
+        });
+
         // Outputs
         new CfnOutput(this, "ServerRepositoryUri", new CfnOutputProps
         {
@@ -57,9 +74,18 @@ public class EcrConstruct : Construct
             Description = "ECR repository URI for WebClient",
             ExportName = $"Backgammon-{environment}-WebClientRepoUri"
         });
+
+        new CfnOutput(this, "GnubgRepositoryUri", new CfnOutputProps
+        {
+            Value = GnubgRepository.RepositoryUri,
+            Description = "ECR repository URI for GNUBG service",
+            ExportName = $"Backgammon-{environment}-GnubgRepoUri"
+        });
     }
 
     public IRepository ServerRepository { get; }
 
     public IRepository WebClientRepository { get; }
+
+    public IRepository GnubgRepository { get; }
 }

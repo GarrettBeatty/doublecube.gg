@@ -29,6 +29,7 @@ public class BackgammonStack : Stack
         // Grant GitHub Actions role access to ECR repositories
         ecr.ServerRepository.GrantPullPush(githubOidc.DeployRole);
         ecr.WebClientRepository.GrantPullPush(githubOidc.DeployRole);
+        ecr.GnubgRepository.GrantPullPush(githubOidc.DeployRole);
 
         // Import default VPC (free, no cost)
         var vpc = Vpc.FromLookup(this, "DefaultVpc", new VpcLookupOptions { IsDefault = true });
@@ -64,6 +65,7 @@ public class BackgammonStack : Stack
         // Grant ECR pull access to EC2 instance
         ecr.ServerRepository.GrantPull(ec2Role);
         ecr.WebClientRepository.GrantPull(ec2Role);
+        ecr.GnubgRepository.GrantPull(ec2Role);
 
         // Grant ECR login permission (needed for docker login)
         ec2Role.AddManagedPolicy(ManagedPolicy.FromAwsManagedPolicyName("AmazonEC2ContainerRegistryReadOnly"));
