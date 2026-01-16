@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { HubConnection } from '@microsoft/signalr'
 import type { GameState } from '@/types/generated/Backgammon.Server.Models'
+import type { DoubleOfferDto } from '@/types/generated/Backgammon.Server.Models.SignalR'
 import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { HubEvents } from '@/types/signalr.types'
 import { useGameStore } from '@/stores/gameStore'
@@ -17,15 +18,15 @@ export function useDoubleEvents(connection: HubConnection | null) {
     if (!connection) return
 
     // DoubleOffered - Opponent offers to double stakes
-    const handleDoubleOffered = (currentStakes: number, newStakes: number) => {
-      console.log('[SignalR] DoubleOffered', { currentStakes, newStakes })
+    const handleDoubleOffered = (offer: DoubleOfferDto) => {
+      console.log('[SignalR] DoubleOffered', offer)
       playDoubleOfferSound()
 
       // Determine which player offered the double (opposite of your color)
       const offerFrom = myColor === CheckerColor.White ? CheckerColor.Red : CheckerColor.White
 
       // Update store to show the response modal
-      setPendingDoubleOffer(offerFrom, newStakes)
+      setPendingDoubleOffer(offerFrom, offer.newStakes)
     }
 
     // DoubleAccepted - Double was accepted
