@@ -321,6 +321,60 @@ public class GameEngineTests
     }
 
     [Fact]
+    public void UndoLastMove_RemovesFromCurrentTurnMoves()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.SetCurrentPlayer(CheckerColor.White);
+        engine.SetGameStarted(true);
+        engine.Dice.SetDice(4, 3);
+        engine.RemainingMoves.Clear();
+        engine.RemainingMoves.AddRange(engine.Dice.GetMoves());
+
+        // Initialize turn snapshot (simulating what RollDice does)
+        var bindingFlags = System.Reflection.BindingFlags.NonPublic
+            | System.Reflection.BindingFlags.Instance;
+        var currentTurnDiceField = typeof(GameEngine).GetField("_currentTurnDice", bindingFlags);
+        var currentTurnMovesField = typeof(GameEngine).GetField("_currentTurnMoves", bindingFlags);
+        var currentTurnField = typeof(GameEngine).GetField("_currentTurn", bindingFlags);
+
+        currentTurnDiceField!.SetValue(engine, (4, 3));
+        ((List<Move>)currentTurnMovesField!.GetValue(engine)!).Clear();
+
+        var turnSnapshot = new TurnSnapshot
+        {
+            TurnNumber = 1,
+            Player = CheckerColor.White,
+            DiceRolled = new[] { 4, 3 },
+            PositionSgf = SgfSerializer.ExportPosition(engine),
+            CubeValue = 1,
+            CubeOwner = null,
+            DoublingAction = null
+        };
+        currentTurnField!.SetValue(engine, turnSnapshot);
+
+        // Execute two moves
+        var move1 = new Move(13, 9, 4);
+        engine.ExecuteMove(move1);
+        var move2 = new Move(13, 10, 3);
+        engine.ExecuteMove(move2);
+
+        // Verify moves are tracked
+        Assert.Equal(2, engine.CurrentTurnMoves.Count);
+        Assert.Equal(2, turnSnapshot.Moves.Count);
+
+        // Act - Undo one move
+        engine.UndoLastMove();
+
+        // Assert - Move should be removed from both tracking lists
+        Assert.Single(engine.CurrentTurnMoves);
+        Assert.Single(turnSnapshot.Moves);
+        Assert.Equal(9, engine.CurrentTurnMoves[0].To);
+        Assert.Equal(9, turnSnapshot.Moves[0].To);
+    }
+
+    [Fact]
     public void GetValidMoves_ReturnsValidMoves()
     {
         // Arrange

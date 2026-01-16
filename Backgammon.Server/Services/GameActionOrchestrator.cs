@@ -728,6 +728,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             // Callback to notify human opponent when AI offers a double
             async Task NotifyDoubleOffered(int currentValue, int newValue)
             {
+                // Set pending double offer on the session so game state reflects it
+                session.SetPendingDoubleOffer(aiPlayerId);
+
                 // Determine human opponent's connections (the non-AI player)
                 var humanConnections = session.WhitePlayerId == aiPlayerId
                     ? session.RedConnections

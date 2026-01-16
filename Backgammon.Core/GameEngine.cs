@@ -285,6 +285,18 @@ public class GameEngine
         var move = MoveHistory[^1]; // Get last move
         MoveHistory.RemoveAt(MoveHistory.Count - 1);
 
+        // Also remove from current turn moves (for turn history tracking)
+        if (_currentTurnMoves.Count > 0)
+        {
+            _currentTurnMoves.RemoveAt(_currentTurnMoves.Count - 1);
+        }
+
+        // Remove from current turn snapshot as well
+        if (_currentTurn != null && _currentTurn.Moves.Count > 0)
+        {
+            _currentTurn.Moves.RemoveAt(_currentTurn.Moves.Count - 1);
+        }
+
         // Reverse the move based on type
         if (move.From == 0)
         {
