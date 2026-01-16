@@ -68,6 +68,7 @@ else
 
 builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
 builder.Services.AddSingleton<IGameSessionFactory, GameSessionFactory>();
+builder.Services.AddSingleton<AnalysisSessionManager>();
 
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();

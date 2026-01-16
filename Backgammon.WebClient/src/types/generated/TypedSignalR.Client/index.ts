@@ -86,10 +86,6 @@ class IGameHub_HubProxy implements IGameHub {
         return await this.connection.invoke("JoinGame", gameId);
     }
 
-    public readonly createAnalysisGame = async (): Promise<void> => {
-        return await this.connection.invoke("CreateAnalysisGame");
-    }
-
     public readonly createAiGame = async (): Promise<void> => {
         return await this.connection.invoke("CreateAiGame");
     }
@@ -204,6 +200,18 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly notifyCorrespondenceTurnComplete = async (matchId: string, nextPlayerId: string): Promise<void> => {
         return await this.connection.invoke("NotifyCorrespondenceTurnComplete", matchId, nextPlayerId);
+    }
+
+    public readonly createAnalysisSession = async (): Promise<string> => {
+        return await this.connection.invoke("CreateAnalysisSession");
+    }
+
+    public readonly joinAnalysisSession = async (sessionId: string): Promise<void> => {
+        return await this.connection.invoke("JoinAnalysisSession", sessionId);
+    }
+
+    public readonly leaveAnalysisSession = async (): Promise<void> => {
+        return await this.connection.invoke("LeaveAnalysisSession");
     }
 
     public readonly setDice = async (die1: number, die2: number): Promise<void> => {

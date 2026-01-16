@@ -21,11 +21,6 @@ public interface IGameService
     Task LeaveGameAsync(string connectionId);
 
     /// <summary>
-    /// Create an analysis/practice game where one player controls both sides
-    /// </summary>
-    Task CreateAnalysisGameAsync(string connectionId, string userId);
-
-    /// <summary>
     /// Create a new game against an AI opponent
     /// </summary>
     Task CreateAiGameAsync(string connectionId, string playerId, string? displayName);

@@ -67,8 +67,8 @@ export const AnalysisPage: React.FC = () => {
   const hasLoadedGameSgf = useRef(false)
 
   useEffect(() => {
-    // Auto-create an analysis game when the page loads
-    const createAnalysisGame = async () => {
+    // Auto-create an analysis session when the page loads
+    const createAnalysisSession = async () => {
       if (!isConnected) {
         return
       }
@@ -80,14 +80,14 @@ export const AnalysisPage: React.FC = () => {
       setIsCreating(true)
       hasCreatedGame.current = true
       try {
-        console.log('[AnalysisPage] Creating analysis game...')
-        await hub?.createAnalysisGame()
-        console.log('[AnalysisPage] Analysis game created')
+        console.log('[AnalysisPage] Creating analysis session...')
+        const sessionId = await hub?.createAnalysisSession()
+        console.log('[AnalysisPage] Analysis session created:', sessionId)
       } catch (error) {
-        console.error('[AnalysisPage] Failed to create analysis game:', error)
+        console.error('[AnalysisPage] Failed to create analysis session:', error)
         toast({
           title: 'Error',
-          description: 'Failed to create analysis game',
+          description: 'Failed to create analysis session',
           variant: 'destructive',
         })
         setIsCreating(false)
@@ -95,7 +95,7 @@ export const AnalysisPage: React.FC = () => {
       }
     }
 
-    createAnalysisGame()
+    createAnalysisSession()
   }, [isConnected, hub, toast, isCreating])
 
 

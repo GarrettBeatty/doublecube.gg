@@ -217,10 +217,7 @@ public class GameSessionManager : IGameSessionManager
     {
         lock (_lock)
         {
-            // Exclude analysis games from lobby
-            return _games.Values
-                .Where(g => !g.IsAnalysisMode)
-                .ToList();
+            return _games.Values.ToList();
         }
     }
 

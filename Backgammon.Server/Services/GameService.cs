@@ -403,52 +403,6 @@ public class GameService : IGameService
         }
     }
 
-    public async Task CreateAnalysisGameAsync(string connectionId, string userId)
-    {
-        // Create new session
-        var session = _sessionManager.CreateGame();
-
-        // Directly set same player for both sides (bypassing AddPlayer logic)
-        // This is necessary because AddPlayer() won't add the same player twice
-        session.AddPlayer(userId, connectionId); // Adds as White
-
-        // Manually set Red player to same user (analysis mode special case)
-        session.SetRedPlayer(userId, connectionId);
-
-        // Enable analysis mode
-        session.EnableAnalysisMode(userId);
-
-        // Register connection so game actions can find this game
-        _sessionManager.RegisterPlayerConnection(connectionId, session.Id);
-
-        // Start game immediately and skip opening roll for analysis mode
-        if (!session.Engine.GameStarted)
-        {
-            // Use ForceStartGame() to properly set Status = InProgress
-            session.ForceStartGame();
-
-            // Skip opening roll phase in analysis mode - user will set dice manually
-            // Force the game out of opening roll state
-            session.Engine.GetType()
-                .GetProperty("IsOpeningRoll")!
-                .SetValue(session.Engine, false);
-        }
-
-        await _hubContext.Groups.AddToGroupAsync(connectionId, session.Id);
-
-        var state = session.GetState(connectionId);
-        await _hubContext.Clients.Client(connectionId).GameStart(state);
-
-        // Analysis games are not persisted to database
-
-        _logger.LogInformation(
-            "Analysis game {GameId} created. Status={Status}, GameStarted={GameStarted}, IsOpeningRoll={IsOpeningRoll}",
-            session.Id,
-            session.Status,
-            session.Engine.GameStarted,
-            session.Engine.IsOpeningRoll);
-    }
-
     public async Task CreateAiGameAsync(string connectionId, string playerId, string? displayName)
     {
         _logger.LogDebug(

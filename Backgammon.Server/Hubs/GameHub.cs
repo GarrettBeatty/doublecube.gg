@@ -57,6 +57,7 @@ public partial class GameHub : Hub<IGameHubClient>
     private readonly IAuthService _authService;
     private readonly IDailyPuzzleService _dailyPuzzleService;
     private readonly IGameCompletionService _gameCompletionService;
+    private readonly AnalysisSessionManager _analysisSessionManager;
 
     public GameHub(
         IGameSessionManager sessionManager,
@@ -82,7 +83,8 @@ public partial class GameHub : Hub<IGameHubClient>
         ICorrespondenceGameService correspondenceGameService,
         IAuthService authService,
         IDailyPuzzleService dailyPuzzleService,
-        IGameCompletionService gameCompletionService)
+        IGameCompletionService gameCompletionService,
+        AnalysisSessionManager analysisSessionManager)
     {
         _sessionManager = sessionManager;
         _gameRepository = gameRepository;
@@ -108,6 +110,7 @@ public partial class GameHub : Hub<IGameHubClient>
         _authService = authService;
         _dailyPuzzleService = dailyPuzzleService;
         _gameCompletionService = gameCompletionService;
+        _analysisSessionManager = analysisSessionManager;
     }
 
     /// <summary>

@@ -37,21 +37,6 @@ public interface IGameActionHandler
     Task<Result> UndoLastMoveAsync(string connectionId);
 
     /// <summary>
-    /// Set dice values (analysis mode only).
-    /// </summary>
-    Task<Result> SetDiceAsync(string connectionId, int die1, int die2);
-
-    /// <summary>
-    /// Move a checker directly (analysis mode only, bypasses rules).
-    /// </summary>
-    Task<Result> MoveCheckerDirectlyAsync(string connectionId, int from, int to);
-
-    /// <summary>
-    /// Set the current player (analysis mode only).
-    /// </summary>
-    Task<Result> SetCurrentPlayerAsync(string connectionId, CheckerColor color);
-
-    /// <summary>
     /// Get valid source points for moves.
     /// </summary>
     List<int> GetValidSources(string connectionId);

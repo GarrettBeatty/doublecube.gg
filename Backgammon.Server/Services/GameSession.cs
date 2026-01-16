@@ -12,7 +12,7 @@ namespace Backgammon.Server.Services;
 /// Represents an active game session between two players.
 /// Wraps the GameEngine and manages player connection state.
 /// </summary>
-public class GameSession
+public class GameSession : IGameSession
 {
     private readonly HashSet<string> _spectatorConnections = new();
     private readonly HashSet<string> _whiteConnections = new();
@@ -84,8 +84,6 @@ public class GameSession
     /// Replaces computed status from Engine.Winner/GameStarted/IsFull.
     /// </summary>
     public SessionStatus Status { get; private set; } = SessionStatus.WaitingForOpponent;
-
-    public bool IsAnalysisMode => GameMode is AnalysisMode;
 
     public bool IsBotGame { get; set; } = false;
 
@@ -193,30 +191,6 @@ public class GameSession
             RedPlayerName = GenerateFriendlyName(playerId);
         }
 
-        LastActivityAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Enable analysis mode for this game session
-    /// </summary>
-    public void EnableAnalysisMode(string playerId)
-    {
-        GameMode = new AnalysisMode(playerId);
-        LastActivityAt = DateTime.UtcNow;
-    }
-
-    /// <summary>
-    /// Start the game engine and set status to InProgress.
-    /// Used by analysis mode which bypasses normal player addition flow.
-    /// </summary>
-    public void ForceStartGame()
-    {
-        if (!Engine.GameStarted)
-        {
-            Engine.StartNewGame();
-        }
-
-        Status = SessionStatus.InProgress;
         LastActivityAt = DateTime.UtcNow;
     }
 

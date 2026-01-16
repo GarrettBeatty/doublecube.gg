@@ -19,11 +19,6 @@ export type IGameHub = {
     */
     joinGame(gameId: string): Promise<void>;
     /**
-    * Create an analysis/practice game (single player controls both sides)
-    * @returns Transpiled from System.Threading.Tasks.Task
-    */
-    createAnalysisGame(): Promise<void>;
-    /**
     * Create a new game against an AI opponent
     * @returns Transpiled from System.Threading.Tasks.Task
     */
@@ -188,6 +183,23 @@ export type IGameHub = {
     * @returns Transpiled from System.Threading.Tasks.Task
     */
     notifyCorrespondenceTurnComplete(matchId: string, nextPlayerId: string): Promise<void>;
+    /**
+    * Create a new analysis session (replaces CreateAnalysisGame).
+    * Returns the session ID for sharing/reconnecting.
+    * @returns Transpiled from System.Threading.Tasks.Task<string>
+    */
+    createAnalysisSession(): Promise<string>;
+    /**
+    * Join an existing analysis session (for multi-tab support).
+    * @param sessionId Transpiled from string
+    * @returns Transpiled from System.Threading.Tasks.Task
+    */
+    joinAnalysisSession(sessionId: string): Promise<void>;
+    /**
+    * Leave the current analysis session.
+    * @returns Transpiled from System.Threading.Tasks.Task
+    */
+    leaveAnalysisSession(): Promise<void>;
     /**
     * Set dice values manually (analysis mode only)
     * @param die1 Transpiled from int

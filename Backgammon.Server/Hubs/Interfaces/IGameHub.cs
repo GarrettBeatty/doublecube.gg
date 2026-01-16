@@ -21,11 +21,6 @@ public interface IGameHub
     Task JoinGame(string? gameId);
 
     /// <summary>
-    /// Create an analysis/practice game (single player controls both sides)
-    /// </summary>
-    Task CreateAnalysisGame();
-
-    /// <summary>
     /// Create a new game against an AI opponent
     /// </summary>
     Task CreateAiGame();
@@ -177,6 +172,24 @@ public interface IGameHub
     /// Notify that a turn has been completed in a correspondence game
     /// </summary>
     Task NotifyCorrespondenceTurnComplete(string matchId, string nextPlayerId);
+
+    // ==================== Analysis Session Actions ====================
+
+    /// <summary>
+    /// Create a new analysis session (replaces CreateAnalysisGame).
+    /// Returns the session ID for sharing/reconnecting.
+    /// </summary>
+    Task<string> CreateAnalysisSession();
+
+    /// <summary>
+    /// Join an existing analysis session (for multi-tab support).
+    /// </summary>
+    Task JoinAnalysisSession(string sessionId);
+
+    /// <summary>
+    /// Leave the current analysis session.
+    /// </summary>
+    Task LeaveAnalysisSession();
 
     // ==================== Analysis Mode Actions ====================
 
