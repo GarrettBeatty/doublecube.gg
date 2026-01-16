@@ -140,6 +140,10 @@ export type GameState = {
     remainingMoves: number[];
     /** Transpiled from int */
     movesMadeThisTurn: number;
+    /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.TurnSnapshotDto> */
+    turnHistory: TurnSnapshotDto[];
+    /** Transpiled from System.Collections.Generic.List<string> */
+    currentTurnMoves: string[];
     /** Transpiled from System.Collections.Generic.List<Backgammon.Server.Models.MoveDto> */
     validMoves: MoveDto[];
     /** Transpiled from bool */
@@ -170,6 +174,14 @@ export type GameState = {
     doublingCubeOwner?: string;
     /** Transpiled from bool */
     canDouble: boolean;
+    /** Transpiled from bool */
+    hasPendingDoubleOffer: boolean;
+    /** Transpiled from bool */
+    isAwaitingDoubleResponse: boolean;
+    /** Transpiled from bool */
+    hasReceivedDoubleOffer: boolean;
+    /** Transpiled from int */
+    pendingDoubleNewValue: number;
     /** Transpiled from bool */
     isAnalysisMode: boolean;
     /** Transpiled from bool */

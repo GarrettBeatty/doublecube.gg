@@ -46,8 +46,8 @@ export const DoubleOfferModal: React.FC<DoubleOfferModalProps> = ({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+    <Dialog open={isOpen}>
+      <DialogContent hideCloseButton>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Dice6 className="h-6 w-6" />

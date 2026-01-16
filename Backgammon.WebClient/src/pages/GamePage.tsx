@@ -8,11 +8,13 @@ import { PlayerCard } from '@/components/game/PlayerCard'
 import { GameControls } from '@/components/game/GameControls'
 import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
+import { MoveLog } from '@/components/game/MoveLog'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
 import { GameCompletedOverlay } from '@/components/game/GameCompletedOverlay'
 import { CompletedGameBanner } from '@/components/game/CompletedGameBanner'
 import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
 import { DoubleOfferModal } from '@/components/modals/DoubleOfferModal'
+import { WaitingForDoubleResponseModal } from '@/components/modals/WaitingForDoubleResponseModal'
 import { NotFound } from '@/components/NotFound'
 import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
@@ -466,6 +468,14 @@ export const GamePage: React.FC = () => {
                   />
                   <GameCompletedOverlay />
                 </div>
+
+                {/* Move Log */}
+                <MoveLog
+                  turnHistory={currentGameState.turnHistory}
+                  currentTurnMoves={currentGameState.currentTurnMoves}
+                  currentPlayer={currentGameState.currentPlayer}
+                  dice={currentGameState.dice}
+                />
               </CardContent>
             </Card>
           </div>
@@ -483,13 +493,22 @@ export const GamePage: React.FC = () => {
         />
       )}
 
-      {/* Double Offer Modal - shown when opponent offers double */}
-      {currentGameState && doublingCube.pendingResponse && doublingCube.newValue && (
+      {/* Waiting for Double Response Modal - shown when we offered double and waiting for opponent */}
+      {currentGameState && currentGameState.isAwaitingDoubleResponse && (
+        <WaitingForDoubleResponseModal
+          isOpen={currentGameState.isAwaitingDoubleResponse}
+          currentValue={doublingCube.value}
+          newValue={currentGameState.pendingDoubleNewValue}
+        />
+      )}
+
+      {/* Double Offer Modal - shown when opponent offers double (using server state) */}
+      {currentGameState && currentGameState.hasReceivedDoubleOffer && (
         <DoubleOfferModal
-          isOpen={doublingCube.pendingResponse}
+          isOpen={currentGameState.hasReceivedDoubleOffer}
           onClose={clearPendingDoubleOffer}
           currentStakes={doublingCube.value}
-          newStakes={doublingCube.newValue}
+          newStakes={currentGameState.pendingDoubleNewValue}
         />
       )}
 

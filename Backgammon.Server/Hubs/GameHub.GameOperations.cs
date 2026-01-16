@@ -363,7 +363,7 @@ public partial class GameHub
                 ? session.RedConnections
                 : session.WhiteConnections;
 
-            if (opponentConnections.Any())
+            if (opponentConnections.Any(c => !string.IsNullOrEmpty(c)))
             {
                 await _gameService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
             }

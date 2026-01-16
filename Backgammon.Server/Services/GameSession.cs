@@ -102,6 +102,16 @@ public class GameSession : IGameSession
     public TimeControlConfig? TimeControl { get; set; }
 
     /// <summary>
+    /// Indicates if there is a pending double offer waiting for opponent response.
+    /// </summary>
+    public bool HasPendingDoubleOffer { get; private set; }
+
+    /// <summary>
+    /// The player ID who offered the double (null if no pending offer).
+    /// </summary>
+    public string? PendingDoubleOfferedBy { get; private set; }
+
+    /// <summary>
     /// Add a player to the game session
     /// </summary>
     public bool AddPlayer(string playerId, string connectionId)
@@ -358,6 +368,21 @@ public class GameSession : IGameSession
             Dice = new[] { Engine.Dice.Die1, Engine.Dice.Die2 },
             RemainingMoves = Engine.RemainingMoves.ToArray(),
             MovesMadeThisTurn = Engine.MoveHistory.Count,
+            TurnHistory = Engine.History.Turns.Select(TurnSnapshotDto.FromCore).ToList(),
+            CurrentTurnMoves = Engine.CurrentTurnMoves.Select(m =>
+            {
+                if (m.IsBearOff)
+                {
+                    return $"{m.From}/off";
+                }
+
+                if (m.From == 0)
+                {
+                    return $"bar/{m.To}";
+                }
+
+                return $"{m.From}/{m.To}";
+            }).ToList(),
             Board = GetBoardState(),
             WhiteCheckersOnBar = Engine.WhitePlayer.CheckersOnBar,
             RedCheckersOnBar = Engine.RedPlayer.CheckersOnBar,
@@ -379,8 +404,13 @@ public class GameSession : IGameSession
                 && IsFull
                 && !Engine.IsOpeningRoll
                 && !(IsCrawfordGame ?? false)
+                && !HasPendingDoubleOffer
                 && Engine.CurrentPlayer?.Color == playerColor.Value
                 && Engine.DoublingCube.CanDouble(playerColor.Value),
+            HasPendingDoubleOffer = HasPendingDoubleOffer,
+            IsAwaitingDoubleResponse = HasPendingDoubleOffer && GetPlayerIdForColor(playerColor) == PendingDoubleOfferedBy,
+            HasReceivedDoubleOffer = HasPendingDoubleOffer && GetPlayerIdForColor(playerColor) != PendingDoubleOfferedBy && playerColor.HasValue,
+            PendingDoubleNewValue = HasPendingDoubleOffer ? Engine.DoublingCube.Value * 2 : 0,
             IsAnalysisMode = features.ShowAnalysisBadge,
             IsRated = IsRated,
             MatchId = MatchId,
@@ -496,6 +526,25 @@ public class GameSession : IGameSession
     // ==================== Semantic Helper Methods ====================
 
     /// <summary>
+    /// Set a pending double offer.
+    /// </summary>
+    /// <param name="offeredByPlayerId">The player ID who offered the double.</param>
+    public void SetPendingDoubleOffer(string offeredByPlayerId)
+    {
+        HasPendingDoubleOffer = true;
+        PendingDoubleOfferedBy = offeredByPlayerId;
+    }
+
+    /// <summary>
+    /// Clear the pending double offer (after accept/decline).
+    /// </summary>
+    public void ClearPendingDoubleOffer()
+    {
+        HasPendingDoubleOffer = false;
+        PendingDoubleOfferedBy = null;
+    }
+
+    /// <summary>
     /// Check if a player can join this game session.
     /// </summary>
     public bool CanPlayerJoin() => Status == SessionStatus.WaitingForOpponent;
@@ -592,6 +641,19 @@ public class GameSession : IGameSession
         }
 
         return targetPoint.Color != Engine.CurrentPlayer?.Color && targetPoint.Count == 1;
+    }
+
+    /// <summary>
+    /// Get the player ID for a given checker color.
+    /// </summary>
+    private string? GetPlayerIdForColor(CheckerColor? color)
+    {
+        return color switch
+        {
+            CheckerColor.White => WhitePlayerId,
+            CheckerColor.Red => RedPlayerId,
+            _ => null
+        };
     }
 
     private int CalculatePipCount(CheckerColor color)

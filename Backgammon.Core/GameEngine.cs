@@ -62,6 +62,11 @@ public class GameEngine
     public GameHistory History { get; private set; }
 
     /// <summary>
+    /// Moves made during the current turn (before EndTurn is called)
+    /// </summary>
+    public IReadOnlyList<Move> CurrentTurnMoves => _currentTurnMoves;
+
+    /// <summary>
     /// Complete game record in SGF format (industry standard).
     /// This is the primary format for game history - updated after each turn.
     /// </summary>

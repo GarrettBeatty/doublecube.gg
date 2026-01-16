@@ -263,6 +263,15 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         }
 
         // Regular dice roll
+        if (session.HasPendingDoubleOffer)
+        {
+            _logger.LogWarning(
+                "RollDice failed: Double offer pending. Connection={ConnectionId}, Game={GameId}",
+                connectionId,
+                session.Id);
+            return ActionResult.Error("Cannot roll dice while waiting for double response");
+        }
+
         if (!session.IsPlayerTurn(connectionId))
         {
             _logger.LogWarning(
@@ -316,6 +325,15 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 session.Id,
                 session.Engine.Winner.Color);
             return ActionResult.Error("Game is already completed");
+        }
+
+        // Prevent moves while double is pending
+        if (session.HasPendingDoubleOffer)
+        {
+            _logger.LogWarning(
+                "Move rejected: Double offer pending. Game={GameId}",
+                session.Id);
+            return ActionResult.Error("Cannot move while waiting for double response");
         }
 
         if (!session.IsPlayerTurn(connectionId))
@@ -434,6 +452,15 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                 "Combined move rejected: Game already completed. Game={GameId}",
                 session.Id);
             return ActionResult.Error("Game is already completed");
+        }
+
+        // Prevent moves while double is pending
+        if (session.HasPendingDoubleOffer)
+        {
+            _logger.LogWarning(
+                "Combined move rejected: Double offer pending. Game={GameId}",
+                session.Id);
+            return ActionResult.Error("Cannot move while waiting for double response");
         }
 
         if (!session.IsPlayerTurn(connectionId))
@@ -561,6 +588,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
         if (session.Engine.Winner != null)
         {
             return ActionResult.Error("Game is already completed");
+        }
+
+        // Prevent end turn while double is pending
+        if (session.HasPendingDoubleOffer)
+        {
+            return ActionResult.Error("Cannot end turn while waiting for double response");
         }
 
         if (!session.IsPlayerTurn(connectionId))

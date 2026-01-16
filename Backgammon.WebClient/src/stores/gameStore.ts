@@ -32,6 +32,7 @@ interface DoublingCubeState {
   pendingResponse: boolean
   offerFrom: CheckerColor | null
   newValue: number | null
+  awaitingDoubleResponse: boolean // True when we sent a double offer and waiting for opponent
 }
 
 interface MatchState {
@@ -118,6 +119,7 @@ interface GameStore {
   setDoublingCubeState: (state: Partial<DoublingCubeState>) => void
   setPendingDoubleOffer: (from: CheckerColor, newValue: number) => void
   clearPendingDoubleOffer: () => void
+  setAwaitingDoubleResponse: (awaiting: boolean) => void
   resetGame: () => void
 }
 
@@ -140,6 +142,7 @@ export const useGameStore = create<GameStore>((set) => ({
     pendingResponse: false,
     offerFrom: null,
     newValue: null,
+    awaitingDoubleResponse: false,
   },
   isFreeMoveEnabled: false,
   isCustomDiceEnabled: false,
@@ -219,6 +222,7 @@ export const useGameStore = create<GameStore>((set) => ({
           pendingResponse: prevState.doublingCube.pendingResponse,
           offerFrom: prevState.doublingCube.offerFrom,
           newValue: prevState.doublingCube.newValue,
+          awaitingDoubleResponse: prevState.doublingCube.awaitingDoubleResponse,
         },
       }
     }),
@@ -333,6 +337,14 @@ export const useGameStore = create<GameStore>((set) => ({
       },
     })),
 
+  setAwaitingDoubleResponse: (awaiting) =>
+    set((prev) => ({
+      doublingCube: {
+        ...prev.doublingCube,
+        awaitingDoubleResponse: awaiting,
+      },
+    })),
+
   resetGame: () =>
     set({
       currentGameState: null,
@@ -352,6 +364,7 @@ export const useGameStore = create<GameStore>((set) => ({
         pendingResponse: false,
         offerFrom: null,
         newValue: null,
+        awaitingDoubleResponse: false,
       },
       isFreeMoveEnabled: false,
       isCustomDiceEnabled: false,

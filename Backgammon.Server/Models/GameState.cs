@@ -42,6 +42,16 @@ public class GameState
 
     public int MovesMadeThisTurn { get; set; }
 
+    /// <summary>
+    /// History of all completed turns in this game
+    /// </summary>
+    public List<TurnSnapshotDto> TurnHistory { get; set; } = new();
+
+    /// <summary>
+    /// Moves made so far in the current turn (before EndTurn)
+    /// </summary>
+    public List<string> CurrentTurnMoves { get; set; } = new();
+
     public List<MoveDto> ValidMoves { get; set; } = new();
 
     public bool HasValidMoves { get; set; }
@@ -71,6 +81,26 @@ public class GameState
     public string? DoublingCubeOwner { get; set; }
 
     public bool CanDouble { get; set; }
+
+    /// <summary>
+    /// Indicates if there is a pending double offer waiting for response.
+    /// </summary>
+    public bool HasPendingDoubleOffer { get; set; }
+
+    /// <summary>
+    /// True if this player offered a double and is waiting for opponent's response.
+    /// </summary>
+    public bool IsAwaitingDoubleResponse { get; set; }
+
+    /// <summary>
+    /// True if opponent offered a double and this player needs to respond.
+    /// </summary>
+    public bool HasReceivedDoubleOffer { get; set; }
+
+    /// <summary>
+    /// What the new cube value would be if the pending double is accepted.
+    /// </summary>
+    public int PendingDoubleNewValue { get; set; }
 
     public bool IsAnalysisMode { get; set; }
 

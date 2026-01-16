@@ -40,7 +40,15 @@ public class DoubleOfferService : IDoubleOfferService
             return (false, 0, 0, "Cannot offer double - opponent owns the cube");
         }
 
-        var newValue = session.Engine.DoublingCube.Value;
+        var newValue = currentValue * 2;
+
+        // Set pending double state - get player ID from connection
+        var playerColor = session.GetPlayerColor(connectionId);
+        var playerId = playerColor == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
+        if (!string.IsNullOrEmpty(playerId))
+        {
+            session.SetPendingDoubleOffer(playerId);
+        }
 
         _logger.LogInformation(
             "Player {ConnectionId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
@@ -55,6 +63,7 @@ public class DoubleOfferService : IDoubleOfferService
     public async Task<bool> AcceptDoubleAsync(GameSession session)
     {
         session.Engine.AcceptDouble();
+        session.ClearPendingDoubleOffer();
         session.UpdateActivity();
 
         _logger.LogInformation(
@@ -96,6 +105,9 @@ public class DoubleOfferService : IDoubleOfferService
             return (false, null, 0, "Game hasn't started yet");
         }
 
+        // Clear pending double state before forfeiting
+        session.ClearPendingDoubleOffer();
+
         // Forfeit game - opponent wins at current stakes
         session.Engine.ForfeitGame(opponentPlayer);
 
@@ -135,6 +147,7 @@ public class DoubleOfferService : IDoubleOfferService
         {
             _logger.LogInformation("AI {AiPlayerId} accepted the double", opponentPlayerId);
             session.Engine.AcceptDouble();
+            session.ClearPendingDoubleOffer();
             session.UpdateActivity();
 
             _logger.LogInformation(
@@ -147,6 +160,9 @@ public class DoubleOfferService : IDoubleOfferService
         else
         {
             _logger.LogInformation("AI {AiPlayerId} declined the double", opponentPlayerId);
+
+            // Clear pending double state before forfeiting
+            session.ClearPendingDoubleOffer();
 
             // Determine human player (we need to find who offered the double)
             // The human player is the one who's NOT the AI
