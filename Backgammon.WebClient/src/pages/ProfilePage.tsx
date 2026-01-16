@@ -9,8 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
-import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap, Eye } from 'lucide-react'
+import { User, Calendar, Trophy, TrendingUp, Target, Zap, Eye } from 'lucide-react'
 import { PerformanceGraph } from '@/components/home/PerformanceGraph'
 
 interface PlayerProfile {
@@ -19,6 +18,8 @@ interface PlayerProfile {
   displayName: string
   createdAt: string
   isPrivate: boolean
+  rating: number
+  peakRating: number
   stats?: {
     totalGames: number
     wins: number
@@ -54,12 +55,12 @@ export const ProfilePage: React.FC = () => {
   const navigate = useNavigate()
   const { hub, isConnected } = useSignalR()
   const { user } = useAuth()
-  const { stats: userStats, isLoading: userStatsLoading } = useUserStats()
+  const { stats: userStats } = useUserStats()
 
   const [profile, setProfile] = useState<PlayerProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('games')
 
   // Check if viewing own profile
   const isOwnProfile = user && profile && user.username === profile.username
@@ -85,6 +86,8 @@ export const ProfilePage: React.FC = () => {
         // Map PlayerProfileDto to local PlayerProfile type
         setProfile({
           ...profileData,
+          rating: profileData.rating ?? 1500,
+          peakRating: profileData.peakRating ?? 1500,
           createdAt: typeof profileData.createdAt === 'string'
             ? profileData.createdAt
             : profileData.createdAt.toISOString(),
@@ -201,71 +204,76 @@ export const ProfilePage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Personal Stats (Own Profile Only) */}
-        {isOwnProfile && (
+        {/* Rating & Performance Card (All Profiles) */}
+        {!profile.isPrivate && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-yellow-500" />
-                Your Stats
+                Rating & Performance
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {userStatsLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Rating */}
+                <div className="p-4 bg-accent rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Rating</p>
+                  </div>
+                  <span className="text-2xl font-bold">{profile.rating}</span>
                 </div>
-              ) : userStats ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Rating */}
-                  <div className="p-4 bg-accent rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Rating</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-3xl font-bold">{userStats.rating}</span>
-                    </div>
-                  </div>
 
-                  {/* Current Streak */}
-                  <div className="p-4 bg-accent rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Current Streak</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {userStats.streakType === 'win' ? (
-                        <TrendingUp className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <TrendingDown className="h-5 w-5 text-red-500" />
-                      )}
-                      <span className="text-2xl font-bold">
-                        {userStats.currentStreak} {userStats.streakType}
-                      </span>
-                    </div>
+                {/* Peak Rating */}
+                <div className="p-4 bg-accent rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Peak Rating</p>
                   </div>
+                  <span className="text-2xl font-bold">{profile.peakRating}</span>
+                </div>
 
-                  {/* Activity */}
-                  <div className="p-4 bg-accent rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="h-4 w-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">Recent Activity</p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm">
-                        Today: <span className="font-semibold">{userStats.gamesToday} games</span>
-                      </p>
-                      <p className="text-sm">
-                        This week: <span className="font-semibold">{userStats.gamesThisWeek} games</span>
-                      </p>
-                    </div>
+                {/* Win Rate */}
+                <div className="p-4 bg-accent rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Win Rate</p>
+                  </div>
+                  <span className="text-2xl font-bold">
+                    {profile.stats && profile.stats.totalGames > 0
+                      ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
+                      : '0.0'}%
+                  </span>
+                </div>
+
+                {/* Record */}
+                <div className="p-4 bg-accent rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Trophy className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Record</p>
+                  </div>
+                  <span className="text-2xl font-bold">
+                    {profile.stats ? `${profile.stats.wins}W - ${profile.stats.losses}L` : '0W - 0L'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Own profile activity section */}
+              {isOwnProfile && userStats && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-muted-foreground">Recent Activity</p>
+                  </div>
+                  <div className="flex gap-6">
+                    <p className="text-sm">
+                      Today: <span className="font-semibold">{userStats.gamesToday} games</span>
+                    </p>
+                    <p className="text-sm">
+                      This week: <span className="font-semibold">{userStats.gamesThisWeek} games</span>
+                    </p>
                   </div>
                 </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-4">Stats unavailable</p>
               )}
             </CardContent>
           </Card>
@@ -278,129 +286,12 @@ export const ProfilePage: React.FC = () => {
           </div>
         )}
 
-        {/* Statistics Cards */}
-        {profile.stats && !profile.isPrivate && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Games Played
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profile.stats.totalGames}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {profile.stats.wins}W - {profile.stats.losses}L
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Win Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {profile.stats.totalGames > 0
-                    ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
-                    : '0.0'}%
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  <TrendingUp className="h-3 w-3 inline mr-1" />
-                  {profile.stats.totalGames} games
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Win Streak
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{profile.stats.winStreak}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Best: {profile.stats.bestWinStreak}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Special Wins
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Gammon:</span>
-                    <span className="font-semibold">{profile.stats.gammonWins}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Backgammon:</span>
-                    <span className="font-semibold">{profile.stats.backgammonWins}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="games">Recent Games</TabsTrigger>
             <TabsTrigger value="stats">Statistics</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="overview" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Overview</CardTitle>
-                <CardDescription>
-                  Performance summary and recent activity
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {profile.stats && !profile.isPrivate ? (
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="font-semibold mb-2">Career Statistics</h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex justify-between p-3 bg-muted rounded-lg">
-                          <span className="text-sm">Total Games:</span>
-                          <span className="font-semibold">{profile.stats.totalGames}</span>
-                        </div>
-                        <div className="flex justify-between p-3 bg-muted rounded-lg">
-                          <span className="text-sm">Win Rate:</span>
-                          <span className="font-semibold">
-                            {profile.stats.totalGames > 0
-                              ? ((profile.stats.wins / profile.stats.totalGames) * 100).toFixed(1)
-                              : '0.0'}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between p-3 bg-muted rounded-lg">
-                          <span className="text-sm">Total Stakes:</span>
-                          <span className="font-semibold">{profile.stats.totalStakes}</span>
-                        </div>
-                        <div className="flex justify-between p-3 bg-muted rounded-lg">
-                          <span className="text-sm">Best Streak:</span>
-                          <span className="font-semibold">{profile.stats.bestWinStreak}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">Profile statistics are private</p>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="games" className="mt-6">
             <Card>
