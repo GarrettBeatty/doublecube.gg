@@ -4,7 +4,7 @@
 // @ts-nocheck
 import type { HubConnection, IStreamResult, Subject } from '@microsoft/signalr';
 import type { IGameHub, IGameHubClient } from './Backgammon.Server.Hubs.Interfaces';
-import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
+import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, RatingHistoryEntryDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
 import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, ChatHistoryDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
@@ -288,6 +288,10 @@ class IGameHub_HubProxy implements IGameHub {
 
     public readonly getPlayerProfile = async (username: string): Promise<PlayerProfileDto> => {
         return await this.connection.invoke("GetPlayerProfile", username);
+    }
+
+    public readonly getRatingHistory = async (limit: number): Promise<RatingHistoryEntryDto[]> => {
+        return await this.connection.invoke("GetRatingHistory", limit);
     }
 
     public readonly getDailyPuzzle = async (): Promise<DailyPuzzleDto> => {

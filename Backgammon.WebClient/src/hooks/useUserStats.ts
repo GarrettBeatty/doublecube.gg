@@ -27,7 +27,8 @@ export const useUserStats = () => {
         if (profile && profile.stats) {
           const s = profile.stats
           setStats({
-            rating: 1500, // Rating is not on stats, would need to come from leaderboard
+            rating: profile.rating,
+            peakRating: profile.peakRating,
             wins: s.wins,
             losses: s.losses,
             winRate: s.wins + s.losses > 0
@@ -46,6 +47,7 @@ export const useUserStats = () => {
         // Use mock data as fallback
         setStats({
           rating: 1500,
+          peakRating: 1500,
           wins: 0,
           losses: 0,
           winRate: 0,

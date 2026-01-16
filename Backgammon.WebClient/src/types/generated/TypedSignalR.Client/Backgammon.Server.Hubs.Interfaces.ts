@@ -3,7 +3,7 @@
 /* tslint:disable */
 // @ts-nocheck
 import type { IStreamResult, Subject } from '@microsoft/signalr';
-import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
+import type { MoveDto, MatchConfig, MatchStateDto, RecentOpponentDto, PositionEvaluationDto, BestMovesAnalysisDto, GameHistoryDto, FriendDto, PlayerSearchResultDto, PlayerProfileDto, RatingHistoryEntryDto, DailyPuzzleDto, PuzzleResultDto, PuzzleStreakInfo, PuzzleValidMovesRequest, LeaderboardEntryDto, OnlinePlayerDto, RatingDistributionDto, BotInfoDto, GameState } from '../Backgammon.Server.Models';
 import type { MatchResultsDto, MatchLobbyDto, ActiveGameDto, ActiveMatchDto, MatchGameDto, RecentGameDto, CheckerColorDto, DoubleOfferDto, ChatHistoryDto, MatchCreatedDto, OpponentJoinedMatchDto, MatchGameStartingDto, MatchUpdateDto, MatchContinuedDto, MatchStatusDto, MatchGameCompletedDto, MatchCompletedDto, MatchInviteDto, MatchSummaryDto, TimeUpdateDto, PlayerTimedOutDto, CorrespondenceMatchInviteDto, CorrespondenceTurnNotificationDto, CorrespondenceLobbyCreatedDto, LobbyCreatedDto } from '../Backgammon.Server.Models.SignalR';
 import type { CorrespondenceGamesResponse } from '../Backgammon.Server.Services';
 
@@ -314,6 +314,12 @@ export type IGameHub = {
     * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.PlayerProfileDto?>
     */
     getPlayerProfile(username: string): Promise<PlayerProfileDto>;
+    /**
+    * Get rating history for the current user
+    * @param limit Transpiled from int
+    * @returns Transpiled from System.Threading.Tasks.Task<System.Collections.Generic.List<Backgammon.Server.Models.RatingHistoryEntryDto>>
+    */
+    getRatingHistory(limit: number): Promise<RatingHistoryEntryDto[]>;
     /**
     * Get today's daily puzzle
     * @returns Transpiled from System.Threading.Tasks.Task<Backgammon.Server.Models.DailyPuzzleDto?>

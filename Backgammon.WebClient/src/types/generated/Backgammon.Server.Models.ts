@@ -392,6 +392,10 @@ export type PlayerProfileDto = {
     displayName: string;
     /** Transpiled from Backgammon.Server.Models.UserStats? */
     stats?: UserStats;
+    /** Transpiled from int */
+    rating: number;
+    /** Transpiled from int */
+    peakRating: number;
     /** Transpiled from System.DateTime */
     createdAt: (Date | string);
     /** Transpiled from bool */
@@ -418,6 +422,12 @@ export type PlayerSearchResultDto = {
     username: string;
     /** Transpiled from string */
     displayName: string;
+    /** Transpiled from int */
+    rating: number;
+    /** Transpiled from bool */
+    isOnline: boolean;
+    /** Transpiled from int */
+    totalGames: number;
 }
 
 /** Transpiled from Backgammon.Server.Models.PointState */
@@ -581,6 +591,22 @@ export type RatingDistributionDto = {
     averageRating: number;
     /** Transpiled from int */
     medianRating: number;
+}
+
+/** Transpiled from Backgammon.Server.Models.RatingHistoryEntryDto */
+export type RatingHistoryEntryDto = {
+    /** Transpiled from System.DateTime */
+    timestamp: (Date | string);
+    /** Transpiled from int */
+    rating: number;
+    /** Transpiled from int */
+    ratingChange: number;
+    /** Transpiled from string */
+    gameId: string;
+    /** Transpiled from string? */
+    opponentUsername?: string;
+    /** Transpiled from bool */
+    won: boolean;
 }
 
 /** Transpiled from Backgammon.Server.Models.RecentOpponentDto */

@@ -129,9 +129,9 @@ public class PlayerStatsService : IPlayerStatsService
                     game.WhiteRatingAfter = whiteFlooredRating;
                     game.RedRatingAfter = redFlooredRating;
 
-                    // Calculate deltas for logging
-                    var whiteDelta = whiteFlooredRating - game.WhiteRatingBefore;
-                    var redDelta = redFlooredRating - game.RedRatingBefore;
+                    // Calculate deltas for logging (use .Value since we just set them above)
+                    var whiteDelta = whiteFlooredRating - game.WhiteRatingBefore!.Value;
+                    var redDelta = redFlooredRating - game.RedRatingBefore!.Value;
 
                     _logger.LogInformation(
                         "Updated ratings for game {GameId}: White {WhiteBefore}→{WhiteAfter} ({WhiteDelta:+#;-#;0}), Red {RedBefore}→{RedAfter} ({RedDelta:+#;-#;0})",
@@ -142,6 +142,33 @@ public class PlayerStatsService : IPlayerStatsService
                         game.RedRatingBefore,
                         game.RedRatingAfter,
                         redDelta);
+
+                    // Save rating history for both players
+                    var now = DateTime.UtcNow;
+
+                    await _userRepository.SaveRatingHistoryAsync(new RatingHistoryEntry
+                    {
+                        UserId = whiteUser.UserId,
+                        Timestamp = now,
+                        Rating = whiteFlooredRating,
+                        RatingChange = whiteDelta,
+                        GameId = game.GameId,
+                        OpponentUserId = redUser.UserId,
+                        OpponentUsername = redUser.Username,
+                        Won = whiteWon
+                    });
+
+                    await _userRepository.SaveRatingHistoryAsync(new RatingHistoryEntry
+                    {
+                        UserId = redUser.UserId,
+                        Timestamp = now,
+                        Rating = redFlooredRating,
+                        RatingChange = redDelta,
+                        GameId = game.GameId,
+                        OpponentUserId = whiteUser.UserId,
+                        OpponentUsername = whiteUser.Username,
+                        Won = !whiteWon
+                    });
                 }
                 catch (Exception ex)
                 {

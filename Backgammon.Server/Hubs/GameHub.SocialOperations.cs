@@ -27,7 +27,7 @@ public partial class GameHub
     }
 
     /// <summary>
-    /// Leave current game
+    /// Get a player's public profile
     /// </summary>
     public async Task<PlayerProfileDto?> GetPlayerProfile(string username)
     {
@@ -49,6 +49,31 @@ public partial class GameHub
             _logger.LogError(ex, "Error getting player profile");
             await Clients.Caller.Error("Failed to load profile");
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Get rating history for the current user
+    /// </summary>
+    public async Task<List<RatingHistoryEntryDto>> GetRatingHistory(int limit = 30)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("GetRatingHistory called without authentication");
+                return new List<RatingHistoryEntryDto>();
+            }
+
+            var entries = await _userRepository.GetRatingHistoryAsync(userId, limit);
+            return entries.Select(RatingHistoryEntryDto.FromEntity).ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting rating history");
+            await Clients.Caller.Error("Failed to load rating history");
+            return new List<RatingHistoryEntryDto>();
         }
     }
 
@@ -124,6 +149,7 @@ public partial class GameHub
             }
 
             var users = await _userRepository.SearchUsersAsync(query);
+            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
 
             // Exclude the current user from search results
             var results = users
@@ -132,7 +158,10 @@ public partial class GameHub
                 {
                     UserId = u.UserId,
                     Username = u.Username,
-                    DisplayName = u.DisplayName ?? u.Username
+                    DisplayName = u.DisplayName ?? u.Username,
+                    Rating = u.Rating,
+                    IsOnline = onlinePlayerIds.Contains(u.UserId),
+                    TotalGames = u.Stats?.TotalGames ?? 0
                 })
                 .ToList();
 
@@ -495,6 +524,42 @@ public partial class GameHub
                 Difficulty = 3,
                 IsAvailable = true,
                 Icon = "target"
+            },
+            new BotInfoDto
+            {
+                Id = "gnubg_easy",
+                Name = "Easy Bot (GNUBG)",
+                Description = "Uses GNU Backgammon with 0-ply evaluation. Quick and approachable.",
+                Difficulty = 2,
+                IsAvailable = true,
+                Icon = "brain"
+            },
+            new BotInfoDto
+            {
+                Id = "gnubg_medium",
+                Name = "Medium Bot (GNUBG)",
+                Description = "Uses GNU Backgammon with 1-ply evaluation. A balanced challenge.",
+                Difficulty = 3,
+                IsAvailable = true,
+                Icon = "brain"
+            },
+            new BotInfoDto
+            {
+                Id = "gnubg_hard",
+                Name = "Hard Bot (GNUBG)",
+                Description = "Uses GNU Backgammon with 2-ply evaluation. Plays strong positional backgammon.",
+                Difficulty = 4,
+                IsAvailable = true,
+                Icon = "brain"
+            },
+            new BotInfoDto
+            {
+                Id = "gnubg_expert",
+                Name = "Expert Bot (GNUBG)",
+                Description = "Uses GNU Backgammon with 3-ply evaluation. Near world-class play.",
+                Difficulty = 5,
+                IsAvailable = true,
+                Icon = "brain"
             }
         };
 

@@ -56,3 +56,12 @@ export interface BotInfoDto {
   isAvailable: boolean
   icon: string
 }
+
+export interface PlayerSearchResultDto {
+  userId: string
+  username: string
+  displayName: string
+  rating: number
+  isOnline: boolean
+  totalGames: number
+}

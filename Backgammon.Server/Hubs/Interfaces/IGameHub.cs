@@ -296,6 +296,11 @@ public interface IGameHub
     /// </summary>
     Task<PlayerProfileDto?> GetPlayerProfile(string username);
 
+    /// <summary>
+    /// Get rating history for the current user
+    /// </summary>
+    Task<List<RatingHistoryEntryDto>> GetRatingHistory(int limit);
+
     // ==================== Daily Puzzle ====================
 
     /// <summary>

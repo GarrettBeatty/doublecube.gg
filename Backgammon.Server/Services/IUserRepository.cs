@@ -79,4 +79,17 @@ public interface IUserRepository
     /// </summary>
     /// <returns>List of all user ratings</returns>
     Task<List<int>> GetAllRatingsAsync();
+
+    /// <summary>
+    /// Save a rating history entry after a rated game
+    /// </summary>
+    Task SaveRatingHistoryAsync(RatingHistoryEntry entry);
+
+    /// <summary>
+    /// Get rating history for a user
+    /// </summary>
+    /// <param name="userId">The user ID</param>
+    /// <param name="limit">Maximum number of entries to return</param>
+    /// <returns>List of rating history entries, most recent first</returns>
+    Task<List<RatingHistoryEntry>> GetRatingHistoryAsync(string userId, int limit = 30);
 }

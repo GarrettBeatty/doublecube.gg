@@ -29,6 +29,16 @@ public class PlayerProfileDto
     public UserStats? Stats { get; set; }
 
     /// <summary>
+    /// User's current ELO rating
+    /// </summary>
+    public int Rating { get; set; }
+
+    /// <summary>
+    /// User's peak ELO rating
+    /// </summary>
+    public int PeakRating { get; set; }
+
+    /// <summary>
     /// When the account was created
     /// </summary>
     public DateTime CreatedAt { get; set; }
@@ -79,6 +89,8 @@ public class PlayerProfileDto
             Username = user.Username,
             DisplayName = user.DisplayName,
             CreatedAt = user.CreatedAt,
+            Rating = user.Rating,
+            PeakRating = user.PeakRating,
             ProfilePrivacy = user.ProfilePrivacy,
             GameHistoryPrivacy = user.GameHistoryPrivacy,
             FriendsListPrivacy = user.FriendsListPrivacy,

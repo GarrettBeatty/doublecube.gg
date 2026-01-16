@@ -494,4 +494,93 @@ public class DynamoDbUserRepository : IUserRepository
             return new List<int>();
         }
     }
+
+    public async Task SaveRatingHistoryAsync(RatingHistoryEntry entry)
+    {
+        try
+        {
+            // Use reversed timestamp for natural descending order in DynamoDB
+            var reversedTimestamp = DateTime.MaxValue.Ticks - entry.Timestamp.Ticks;
+
+            var item = new Dictionary<string, AttributeValue>
+            {
+                ["PK"] = new AttributeValue { S = $"USER#{entry.UserId}" },
+                ["SK"] = new AttributeValue { S = $"RATING#{reversedTimestamp:D19}" },
+                ["userId"] = new AttributeValue { S = entry.UserId },
+                ["timestamp"] = new AttributeValue { S = entry.Timestamp.ToString("O") },
+                ["rating"] = new AttributeValue { N = entry.Rating.ToString() },
+                ["ratingChange"] = new AttributeValue { N = entry.RatingChange.ToString() },
+                ["gameId"] = new AttributeValue { S = entry.GameId },
+                ["won"] = new AttributeValue { BOOL = entry.Won }
+            };
+
+            if (!string.IsNullOrEmpty(entry.OpponentUserId))
+            {
+                item["opponentUserId"] = new AttributeValue { S = entry.OpponentUserId };
+            }
+
+            if (!string.IsNullOrEmpty(entry.OpponentUsername))
+            {
+                item["opponentUsername"] = new AttributeValue { S = entry.OpponentUsername };
+            }
+
+            await _dynamoDbClient.PutItemAsync(new PutItemRequest
+            {
+                TableName = _tableName,
+                Item = item
+            });
+
+            _logger.LogDebug(
+                "Saved rating history entry for user {UserId}: {Rating} ({RatingChange:+#;-#;0})",
+                entry.UserId,
+                entry.Rating,
+                entry.RatingChange);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to save rating history for user {UserId}", entry.UserId);
+            throw;
+        }
+    }
+
+    public async Task<List<RatingHistoryEntry>> GetRatingHistoryAsync(string userId, int limit = 30)
+    {
+        try
+        {
+            var response = await _dynamoDbClient.QueryAsync(new QueryRequest
+            {
+                TableName = _tableName,
+                KeyConditionExpression = "PK = :pk AND begins_with(SK, :skPrefix)",
+                ExpressionAttributeValues = new Dictionary<string, AttributeValue>
+                {
+                    [":pk"] = new AttributeValue { S = $"USER#{userId}" },
+                    [":skPrefix"] = new AttributeValue { S = "RATING#" }
+                },
+                Limit = limit,
+                ScanIndexForward = true // Ascending by reversed timestamp = descending by actual timestamp (most recent first)
+            });
+
+            var entries = response.Items.Select(item => new RatingHistoryEntry
+            {
+                UserId = item.GetValueOrDefault("userId")?.S ?? userId,
+                Timestamp = item.TryGetValue("timestamp", out var ts) && DateTime.TryParse(ts.S, out var parsedTs)
+                    ? parsedTs
+                    : DateTime.UtcNow,
+                Rating = item.TryGetValue("rating", out var r) && int.TryParse(r.N, out var rating) ? rating : 1500,
+                RatingChange = item.TryGetValue("ratingChange", out var rc) && int.TryParse(rc.N, out var ratingChange) ? ratingChange : 0,
+                GameId = item.GetValueOrDefault("gameId")?.S ?? string.Empty,
+                OpponentUserId = item.GetValueOrDefault("opponentUserId")?.S,
+                OpponentUsername = item.GetValueOrDefault("opponentUsername")?.S,
+                Won = item.TryGetValue("won", out var w) && w.BOOL == true
+            }).ToList();
+
+            _logger.LogDebug("Retrieved {Count} rating history entries for user {UserId}", entries.Count, userId);
+            return entries;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve rating history for user {UserId}", userId);
+            return new List<RatingHistoryEntry>();
+        }
+    }
 }

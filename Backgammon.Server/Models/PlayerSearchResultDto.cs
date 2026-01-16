@@ -22,4 +22,19 @@ public class PlayerSearchResultDto
     /// User's display name
     /// </summary>
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// User's ELO rating
+    /// </summary>
+    public int Rating { get; set; }
+
+    /// <summary>
+    /// Whether the user is currently online
+    /// </summary>
+    public bool IsOnline { get; set; }
+
+    /// <summary>
+    /// Total number of games played
+    /// </summary>
+    public int TotalGames { get; set; }
 }

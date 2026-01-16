@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap } from 'lucide-react'
+import { User, Calendar, Trophy, TrendingUp, TrendingDown, Target, Zap, Eye } from 'lucide-react'
 import { PerformanceGraph } from '@/components/home/PerformanceGraph'
 
 interface PlayerProfile {
@@ -423,9 +423,19 @@ export const ProfilePage: React.FC = () => {
                               +{game.pointsScored} pts
                             </span>
                           </div>
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(game.datePlayed).toLocaleDateString()}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(game.datePlayed).toLocaleDateString()}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => navigate(`/match/${game.gameId}/results`)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                          </div>
                         </div>
                         {profile.recentGames && index < profile.recentGames.length - 1 && <Separator />}
                       </div>

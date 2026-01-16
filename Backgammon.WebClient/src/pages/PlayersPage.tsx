@@ -121,6 +121,7 @@ export const PlayersPage: React.FC = () => {
                   players={onlinePlayers}
                   isLoading={isLoading}
                   onRefresh={handleRefresh}
+                  hub={hub}
                 />
               </CardContent>
             </Card>

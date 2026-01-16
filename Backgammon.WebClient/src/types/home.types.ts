@@ -34,6 +34,7 @@ export interface ActiveGame {
 
 export interface UserStats {
   rating: number
+  peakRating: number
   wins: number
   losses: number
   winRate: number

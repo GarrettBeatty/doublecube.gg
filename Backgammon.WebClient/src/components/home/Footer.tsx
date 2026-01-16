@@ -1,23 +1,4 @@
-import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-
-interface NewsItem {
-  id: string
-  content: React.ReactNode
-  timeAgo: string
-}
-
-const newsItems: NewsItem[] = [
-  {
-    id: '1',
-    content: (
-      <>
-        Congratulations to team Saqochess & friends and fan club for winning the $10,000 ChessMood 20/20 Grand Prix Final with top scorers IM Reza Mahdavi, @catask, IM Jakub Pulpan, FM Semyon Puzyrevsky, GM Haik Martirosyan, and many others! Thanks to all participating streamers and 3,135 registered players, including 313 titled players!
-      </>
-    ),
-    timeAgo: '1 week ago',
-  }
-]
 
 const footerLinks = {
   about: [

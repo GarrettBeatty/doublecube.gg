@@ -287,6 +287,18 @@ public class CachedUserService : IUserRepository
         return _userRepository.GetAllRatingsAsync();
     }
 
+    public Task SaveRatingHistoryAsync(RatingHistoryEntry entry)
+    {
+        // Write operation - no caching needed
+        return _userRepository.SaveRatingHistoryAsync(entry);
+    }
+
+    public Task<List<RatingHistoryEntry>> GetRatingHistoryAsync(string userId, int limit = 30)
+    {
+        // Rating history is user-specific and frequently changing - no caching needed
+        return _userRepository.GetRatingHistoryAsync(userId, limit);
+    }
+
     /// <summary>
     /// Hash a cache key to avoid logging sensitive data.
     /// Returns a short hash that preserves diagnostic usefulness while protecting privacy.
