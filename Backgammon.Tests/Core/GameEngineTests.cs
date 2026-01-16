@@ -1881,4 +1881,125 @@ public class GameEngineTests
         Assert.False(result);
         Assert.Equal(originalCount, engine.Board.GetPoint(24).Count);
     }
+
+    [Fact]
+    public void RollOpening_InitializesTurnSnapshot_WhenOpeningRollCompletes()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Act - Complete the opening roll (may need multiple attempts to avoid a tie)
+        int whiteRoll = 0;
+        int redRoll = 0;
+
+        for (int i = 0; i < 100; i++)
+        {
+            engine.StartNewGame();
+            whiteRoll = engine.RollOpening(CheckerColor.White);
+            redRoll = engine.RollOpening(CheckerColor.Red);
+
+            if (redRoll != -1)
+            {
+                break;
+            }
+        }
+
+        // Skip test if we couldn't get a non-tie roll
+        if (engine.IsOpeningRoll)
+        {
+            return;
+        }
+
+        // Use reflection to check _currentTurn was initialized
+        var bindingFlags = System.Reflection.BindingFlags.NonPublic
+            | System.Reflection.BindingFlags.Instance;
+        var currentTurnField = typeof(GameEngine).GetField("_currentTurn", bindingFlags);
+        var currentTurn = currentTurnField!.GetValue(engine) as TurnSnapshot;
+
+        // Assert
+        Assert.NotNull(currentTurn);
+        Assert.Equal(1, currentTurn.TurnNumber);
+        Assert.Equal(engine.CurrentPlayer.Color, currentTurn.Player);
+        Assert.Contains(whiteRoll, currentTurn.DiceRolled);
+        Assert.Contains(redRoll, currentTurn.DiceRolled);
+    }
+
+    [Fact]
+    public void OpeningRoll_FullFlow_MovesNotOverwrittenByOpponent()
+    {
+        // This test simulates the full flow that was broken:
+        // 1. Opening roll
+        // 2. Winner makes moves, ends turn
+        // 3. Opponent rolls, makes moves, ends turn
+        // 4. Verify both turns are recorded correctly
+
+        // Arrange
+        var engine = new GameEngine();
+
+        // Keep trying until we get a valid game with non-tie opening roll
+        for (int attempt = 0; attempt < 100; attempt++)
+        {
+            engine = new GameEngine();
+            engine.StartNewGame();
+
+            var roll1 = engine.RollOpening(CheckerColor.White);
+            var roll2 = engine.RollOpening(CheckerColor.Red);
+
+            if (roll2 != -1 && !engine.IsOpeningRoll)
+            {
+                break;
+            }
+        }
+
+        // Skip if couldn't set up test
+        if (engine.IsOpeningRoll)
+        {
+            return;
+        }
+
+        // Act - Opening roll winner makes moves
+        var openingPlayer = engine.CurrentPlayer.Color;
+        var validMoves = engine.GetValidMoves();
+        int movesExecuted = 0;
+
+        while (validMoves.Count > 0 && engine.RemainingMoves.Count > 0)
+        {
+            engine.ExecuteMove(validMoves[0]);
+            validMoves = engine.GetValidMoves();
+            movesExecuted++;
+        }
+
+        engine.EndTurn();
+
+        // Assert - Turn 1 recorded
+        Assert.Single(engine.History.Turns);
+        Assert.Equal(1, engine.History.Turns[0].TurnNumber);
+        Assert.Equal(openingPlayer, engine.History.Turns[0].Player);
+        Assert.Equal(movesExecuted, engine.History.Turns[0].Moves.Count);
+
+        // Act - Opponent's turn
+        engine.RollDice();
+        var opponentColor = engine.CurrentPlayer.Color;
+        validMoves = engine.GetValidMoves();
+        int opponentMovesExecuted = 0;
+
+        while (validMoves.Count > 0 && engine.RemainingMoves.Count > 0)
+        {
+            engine.ExecuteMove(validMoves[0]);
+            validMoves = engine.GetValidMoves();
+            opponentMovesExecuted++;
+        }
+
+        engine.EndTurn();
+
+        // Assert - Both turns recorded correctly
+        Assert.Equal(2, engine.History.Turns.Count);
+        Assert.Equal(1, engine.History.Turns[0].TurnNumber);
+        Assert.Equal(openingPlayer, engine.History.Turns[0].Player);
+        Assert.Equal(movesExecuted, engine.History.Turns[0].Moves.Count);
+        Assert.Equal(2, engine.History.Turns[1].TurnNumber);
+        Assert.Equal(opponentColor, engine.History.Turns[1].Player);
+        Assert.Equal(opponentMovesExecuted, engine.History.Turns[1].Moves.Count);
+    }
 }

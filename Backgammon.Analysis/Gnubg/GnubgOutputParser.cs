@@ -283,16 +283,21 @@ public static class GnubgOutputParser
             foreach (var part in parts)
             {
                 // Handle bar entry: "bar/20" or "bar/24" or abbreviated "bar/17" (using multiple dice)
+                // Also handles repetition notation: "bar/20(4)" for doubles entering 4 times
                 // gnubg uses the current player's perspective for point numbers in hint notation
                 // For White (O): bar/20 means enter at gnubg point 20 = our point 20, die = 25-20 = 5
                 // For Red (X): bar/24 means enter at X's point 24 = our point 1, die = 25-24 = 1
                 // Abbreviated: bar/17 for Red with [3,5] means enter at 5, then move to 8 (total 8 = 3+5)
                 if (part.Contains("bar", StringComparison.OrdinalIgnoreCase))
                 {
-                    var moveParts = part.Split('/');
-                    if (moveParts.Length == 2 && moveParts[0].Contains("bar", StringComparison.OrdinalIgnoreCase))
+                    // Parse bar entry with optional repetition: "bar/20" or "bar/20(4)"
+                    var barMatch = Regex.Match(part, @"^bar/(\d+)(?:\((\d+)\))?$", RegexOptions.IgnoreCase);
+                    if (barMatch.Success)
                     {
-                        var gnubgTo = int.Parse(moveParts[1]);
+                        var gnubgTo = int.Parse(barMatch.Groups[1].Value);
+                        var repetitionCount = barMatch.Groups[2].Success
+                            ? int.Parse(barMatch.Groups[2].Value)
+                            : 1;
 
                         // For Red, gnubg shows X's perspective where point 24 = our point 1
                         var to = transformForRed ? 25 - gnubgTo : gnubgTo;
@@ -302,22 +307,26 @@ public static class GnubgOutputParser
                         // For White entering at our point N, total distance = 25 - N
                         var totalDistance = transformForRed ? to : 25 - to;
 
-                        // Try single die entry first
-                        if (remainingDice.Contains(totalDistance))
+                        // Execute bar entry for each repetition (for doubles like "bar/20(4)")
+                        for (int rep = 0; rep < repetitionCount; rep++)
                         {
-                            moves.Add(new Move(0, to, totalDistance));
-                            remainingDice.Remove(totalDistance);
-                        }
-                        else
-                        {
-                            // Abbreviated bar entry - need to expand using multiple dice
-                            // Find dice that sum to totalDistance and create intermediate moves
-                            bool expanded = ExpandAbbreviatedBarEntry(
-                                to, totalDistance, direction, remainingDice, moves);
-
-                            if (!expanded)
+                            // Try single die entry first
+                            if (remainingDice.Contains(totalDistance))
                             {
-                                // Couldn't expand - log but don't throw (move might not be valid)
+                                moves.Add(new Move(0, to, totalDistance));
+                                remainingDice.Remove(totalDistance);
+                            }
+                            else
+                            {
+                                // Abbreviated bar entry - need to expand using multiple dice
+                                // Find dice that sum to totalDistance and create intermediate moves
+                                bool expanded = ExpandAbbreviatedBarEntry(
+                                    to, totalDistance, direction, remainingDice, moves);
+
+                                if (!expanded)
+                                {
+                                    // Couldn't expand - log but don't throw (move might not be valid)
+                                }
                             }
                         }
                     }

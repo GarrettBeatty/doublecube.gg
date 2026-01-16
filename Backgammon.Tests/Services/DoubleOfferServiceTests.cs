@@ -127,8 +127,8 @@ public class DoubleOfferServiceTests
         // Assert
         Assert.True(result.Success);
         Assert.Equal(initialCubeValue, result.CurrentValue);
-        // OfferDouble just validates, doesn't change value. Value changes on Accept.
-        Assert.Equal(initialCubeValue, result.NewValue);
+        // NewValue should be double the current value (the proposed new stake)
+        Assert.Equal(initialCubeValue * 2, result.NewValue);
         Assert.Null(result.Error);
     }
 
@@ -342,5 +342,102 @@ public class DoubleOfferServiceTests
         Assert.NotNull(result.Winner);
         Assert.Equal(CheckerColor.White, result.Winner.Color);
         Assert.True(result.Stakes > 0);
+    }
+
+    [Fact]
+    public async Task OfferDoubleAsync_ReturnsCorrectNewValue_WhenCubeIsAt2()
+    {
+        // Arrange - set up a game where cube is already at 2
+        var session = new GameSession("game-123");
+        session.AddPlayer("white-player", "white-conn");
+        session.AddPlayer("red-player", "red-conn");
+        session.Engine.StartNewGame();
+        session.Engine.RemainingMoves.Clear();
+        session.Engine.Dice.SetDice(0, 0);
+
+        // First double to get cube to 2
+        var currentPlayer = session.Engine.CurrentPlayer?.Color;
+        if (currentPlayer == CheckerColor.White)
+        {
+            session.Engine.OfferDouble();
+            session.Engine.AcceptDouble();
+            // Now Red owns the cube at value 2, switch to Red's turn
+            session.Engine.EndTurn();
+            session.Engine.RemainingMoves.Clear();
+            session.Engine.Dice.SetDice(0, 0);
+        }
+        else
+        {
+            session.Engine.OfferDouble();
+            session.Engine.AcceptDouble();
+            // Now White owns the cube at value 2, switch to White's turn
+            session.Engine.EndTurn();
+            session.Engine.RemainingMoves.Clear();
+            session.Engine.Dice.SetDice(0, 0);
+        }
+
+        var connectionId = session.Engine.CurrentPlayer?.Color == CheckerColor.White ? "white-conn" : "red-conn";
+
+        // Act
+        var result = await _service.OfferDoubleAsync(session, connectionId);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(2, result.CurrentValue);
+        Assert.Equal(4, result.NewValue); // 2 * 2 = 4
+    }
+
+    [Fact]
+    public void GameSession_AiConnectionIsEmptyString()
+    {
+        // Arrange - AI opponent has empty connection ID
+        var session = new GameSession("game-123");
+        session.AddPlayer("human-player", "human-conn");
+        session.AddPlayer("ai-player", string.Empty);
+
+        // Assert - Red (AI) connections contain only empty string
+        Assert.Single(session.RedConnections);
+        Assert.Contains(string.Empty, session.RedConnections);
+
+        // The fix: filter out empty connections to detect AI
+        var hasRealRedConnections = session.RedConnections.Any(c => !string.IsNullOrEmpty(c));
+        Assert.False(hasRealRedConnections);
+
+        // White (human) has real connection
+        var hasRealWhiteConnections = session.WhiteConnections.Any(c => !string.IsNullOrEmpty(c));
+        Assert.True(hasRealWhiteConnections);
+    }
+
+    [Fact]
+    public void GameSession_HumanOpponentHasRealConnection()
+    {
+        // Arrange - both players are human with real connections
+        var session = new GameSession("game-123");
+        session.AddPlayer("player1", "conn-1");
+        session.AddPlayer("player2", "conn-2");
+
+        // Assert - both have real connections
+        var hasRealWhiteConnections = session.WhiteConnections.Any(c => !string.IsNullOrEmpty(c));
+        var hasRealRedConnections = session.RedConnections.Any(c => !string.IsNullOrEmpty(c));
+
+        Assert.True(hasRealWhiteConnections);
+        Assert.True(hasRealRedConnections);
+    }
+
+    [Fact]
+    public void GameSession_MultiTabHumanHasMultipleRealConnections()
+    {
+        // Arrange - human player with multiple browser tabs
+        var session = new GameSession("game-123");
+        session.AddPlayer("player1", "conn-1a");
+        session.AddPlayer("player1", "conn-1b"); // Same player, different tab
+        session.AddPlayer("player2", "conn-2");
+
+        // Assert - White has multiple real connections
+        Assert.Equal(2, session.WhiteConnections.Count);
+        Assert.True(session.WhiteConnections.All(c => !string.IsNullOrEmpty(c)));
+
+        var hasRealWhiteConnections = session.WhiteConnections.Any(c => !string.IsNullOrEmpty(c));
+        Assert.True(hasRealWhiteConnections);
     }
 }

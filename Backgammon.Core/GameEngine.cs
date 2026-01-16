@@ -581,6 +581,21 @@ public class GameEngine
 
             RemainingMoves = new List<int>(Dice.GetMoves());
             IsOpeningRoll = false;
+
+            // Initialize first turn snapshot for game history (mirrors RollDice behavior)
+            _currentTurnDice = (Dice.Die1, Dice.Die2);
+            _currentTurnMoves.Clear();
+
+            _currentTurn = new TurnSnapshot
+            {
+                TurnNumber = 1,
+                Player = CurrentPlayer.Color,
+                DiceRolled = Dice.GetMoves().ToArray(),
+                PositionSgf = SgfSerializer.ExportPosition(this),
+                CubeValue = DoublingCube.Value,
+                CubeOwner = DoublingCube.Owner?.ToString(),
+                DoublingAction = null
+            };
         }
 
         return roll;

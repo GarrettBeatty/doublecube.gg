@@ -88,6 +88,81 @@ public class GnubgOutputParserTests
         Assert.Equal(5, moves[0].DieValue);
     }
 
+    [Fact]
+    public void ParseMoveNotation_RedBarEntryWithDoubles_ParsesAllFour()
+    {
+        // Arrange
+        // GNUBG returns "bar/20(4)" for Red entering 4 times with double 5s
+        // gnubg point 20 for Red = our point 25-20 = 5
+        var notation = "bar/20(4)";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 5, 5, 5, 5 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(4, moves.Count);
+        foreach (var move in moves)
+        {
+            Assert.Equal(0, move.From);   // bar
+            Assert.Equal(5, move.To);     // our point 5
+            Assert.Equal(5, move.DieValue);
+        }
+    }
+
+    [Fact]
+    public void ParseMoveNotation_WhiteBarEntryWithDoubles_ParsesAllFour()
+    {
+        // Arrange
+        // GNUBG returns "bar/20(4)" for White entering 4 times with double 5s
+        // For White, gnubg point 20 = our point 20
+        var notation = "bar/20(4)";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 5, 5, 5, 5 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(4, moves.Count);
+        foreach (var move in moves)
+        {
+            Assert.Equal(0, move.From);   // bar
+            Assert.Equal(20, move.To);    // our point 20
+            Assert.Equal(5, move.DieValue);
+        }
+    }
+
+    [Fact]
+    public void ParseMoveNotation_RedBarEntryWithDoublesPartial_ParsesTwo()
+    {
+        // Arrange
+        // GNUBG returns "bar/20(2)" for Red entering 2 times with double 5s
+        // (e.g., only 2 checkers on bar)
+        var notation = "bar/20(2)";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 5, 5, 5, 5 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+        foreach (var move in moves)
+        {
+            Assert.Equal(0, move.From);   // bar
+            Assert.Equal(5, move.To);     // our point 5
+            Assert.Equal(5, move.DieValue);
+        }
+    }
+
     // ===================
     // Hit Notation Tests (asterisk *)
     // ===================
