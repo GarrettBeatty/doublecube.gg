@@ -85,4 +85,116 @@ public class TurnSnapshotTests
         // Assert
         Assert.Equal(sgf, snapshot.PositionSgf);
     }
+
+    // ==================== Die1/Die2 Computed Properties Tests ====================
+
+    [Fact]
+    public void Die1_RegularRoll_ReturnsFirstDie()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = new[] { 3, 5 }
+        };
+
+        // Act & Assert
+        Assert.Equal(3, snapshot.Die1);
+    }
+
+    [Fact]
+    public void Die2_RegularRoll_ReturnsSecondDie()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = new[] { 3, 5 }
+        };
+
+        // Act & Assert
+        Assert.Equal(5, snapshot.Die2);
+    }
+
+    [Fact]
+    public void Die1_Doubles_ReturnsFirstValue()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = new[] { 4, 4, 4, 4 }
+        };
+
+        // Act & Assert
+        Assert.Equal(4, snapshot.Die1);
+    }
+
+    [Fact]
+    public void Die2_Doubles_ReturnsSecondValue()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = new[] { 4, 4, 4, 4 }
+        };
+
+        // Act & Assert
+        Assert.Equal(4, snapshot.Die2);
+    }
+
+    [Fact]
+    public void Die1_EmptyDice_ReturnsZero()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = Array.Empty<int>()
+        };
+
+        // Act & Assert
+        Assert.Equal(0, snapshot.Die1);
+    }
+
+    [Fact]
+    public void Die2_EmptyDice_ReturnsZero()
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = Array.Empty<int>()
+        };
+
+        // Act & Assert
+        Assert.Equal(0, snapshot.Die2);
+    }
+
+    [Fact]
+    public void Die2_SingleDieOnly_ReturnsZero()
+    {
+        // Arrange - Edge case with only one die value
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = new[] { 6 }
+        };
+
+        // Act & Assert
+        Assert.Equal(6, snapshot.Die1);
+        Assert.Equal(0, snapshot.Die2);
+    }
+
+    [Theory]
+    [InlineData(new[] { 1, 6 }, 1, 6)]
+    [InlineData(new[] { 6, 1 }, 6, 1)]
+    [InlineData(new[] { 2, 3 }, 2, 3)]
+    [InlineData(new[] { 5, 5, 5, 5 }, 5, 5)]
+    public void Die1Die2_VariousRolls_ReturnsCorrectValues(int[] diceRolled, int expectedDie1, int expectedDie2)
+    {
+        // Arrange
+        var snapshot = new TurnSnapshot
+        {
+            DiceRolled = diceRolled
+        };
+
+        // Act & Assert
+        Assert.Equal(expectedDie1, snapshot.Die1);
+        Assert.Equal(expectedDie2, snapshot.Die2);
+    }
 }

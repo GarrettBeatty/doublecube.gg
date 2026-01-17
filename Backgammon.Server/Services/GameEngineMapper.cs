@@ -48,11 +48,7 @@ public static class GameEngineMapper
             RemainingMoves = new List<int>(engine.RemainingMoves),
             DoublingCubeValue = engine.DoublingCube.Value,
             DoublingCubeOwner = engine.DoublingCube.Owner?.ToString(),
-            Moves = engine.MoveHistory
-                .Select(m => m.IsBearOff ? $"{m.From}/off" :
-                             m.From == 0 ? $"bar/{m.To}" :
-                             $"{m.From}/{m.To}")
-                .ToList(),
+            Moves = engine.MoveHistory.Select(m => m.ToNotation()).ToList(),
             MoveCount = engine.MoveHistory.Count,
             GameSgf = engine.GameSgf,
             CreatedAt = session.CreatedAt,

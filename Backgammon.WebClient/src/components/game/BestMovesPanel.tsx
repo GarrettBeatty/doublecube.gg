@@ -58,16 +58,6 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
     )
   }
 
-  const formatMove = (move: Move): string => {
-    if (move.from === 0) return `bar/${move.to}`
-    if (move.to === 25) return `${move.from}/off`
-    return `${move.from}/${move.to}`
-  }
-
-  const formatMoveSequence = (sequence: MoveSequence): string => {
-    return sequence.moves.map(formatMove).join(' ')
-  }
-
   const isHighlighted = (sequence: MoveSequence): boolean => {
     if (highlightedMoves.length !== sequence.moves.length) return false
     return sequence.moves.every((move, i) => {
@@ -133,7 +123,7 @@ export const BestMovesPanel: React.FC<BestMovesPanelProps> = ({
                 </span>
               </div>
 
-              <div className="text-sm font-mono mb-1">{formatMoveSequence(moveSeq)}</div>
+              <div className="text-sm font-mono mb-1">{moveSeq.notation}</div>
 
               {index === 0 ? (
                 <Badge variant="default" className="text-xs">

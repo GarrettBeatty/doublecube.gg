@@ -33,51 +33,11 @@ public class MoveSequenceEvaluation
     /// <summary>
     /// Move notation string (e.g., "24/20 13/9")
     /// </summary>
-    public string Notation
-    {
-        get
-        {
-            return string.Join(" ", Moves.Select(m =>
-            {
-                if (m.IsBearOff)
-                {
-                    return $"{m.From}/off";
-                }
-
-                if (m.From == 0)
-                {
-                    return $"bar/{m.To}";
-                }
-
-                return $"{m.From}/{m.To}";
-            }));
-        }
-    }
+    public string Notation => string.Join(" ", Moves.Select(m => m.ToNotation()));
 
     /// <summary>
     /// Normalized notation with moves sorted for deduplication
     /// (e.g., "13/8 8/3" and "8/3 13/8" both become "8/3 13/8")
     /// </summary>
-    public string NormalizedNotation
-    {
-        get
-        {
-            var moveStrings = Moves.Select(m =>
-            {
-                if (m.IsBearOff)
-                {
-                    return $"{m.From}/off";
-                }
-
-                if (m.From == 0)
-                {
-                    return $"bar/{m.To}";
-                }
-
-                return $"{m.From}/{m.To}";
-            }).OrderBy(s => s).ToList();
-
-            return string.Join(" ", moveStrings);
-        }
-    }
+    public string NormalizedNotation => string.Join(" ", Moves.Select(m => m.ToNotation()).OrderBy(s => s));
 }

@@ -1000,7 +1000,7 @@ public partial class GameHub
         if (!string.IsNullOrEmpty(game.GameSgf))
         {
             var gameRecord = SgfSerializer.ParseGameSgf(game.GameSgf);
-            turnHistory = gameRecord.Turns.Select(TurnSnapshotDto.FromGameTurn).ToList();
+            turnHistory = gameRecord.Turns.Select(TurnSnapshotDto.FromCore).ToList();
         }
 
         return new GameHistoryDto
@@ -1036,7 +1036,7 @@ public partial class GameHub
             var gameRecord = SgfSerializer.ParseGameSgf(sgf);
 
             var turnHistory = gameRecord.Turns
-                .Select(TurnSnapshotDto.FromGameTurn)
+                .Select(TurnSnapshotDto.FromCore)
                 .ToList();
 
             var result = new GameHistoryDto

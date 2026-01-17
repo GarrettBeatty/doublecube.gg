@@ -24,6 +24,16 @@ public class TurnSnapshot
     public int[] DiceRolled { get; set; } = Array.Empty<int>();
 
     /// <summary>
+    /// First die value (1-6), for compatibility with GameTurn.
+    /// </summary>
+    public int Die1 => DiceRolled.Length > 0 ? DiceRolled[0] : 0;
+
+    /// <summary>
+    /// Second die value (1-6), for compatibility with GameTurn.
+    /// </summary>
+    public int Die2 => DiceRolled.Length > 1 ? DiceRolled[1] : 0;
+
+    /// <summary>
     /// Position in SGF format BEFORE any moves were made this turn.
     /// Allows instant position reconstruction without replaying from game start.
     /// </summary>

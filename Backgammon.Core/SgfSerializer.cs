@@ -365,7 +365,7 @@ public static class SgfSerializer
 
     /// <summary>
     /// Compute position SGF for each turn by replaying the game from start.
-    /// This populates PositionSgf on each GameTurn with the position BEFORE that turn's moves.
+    /// This populates PositionSgf on each TurnSnapshot with the position BEFORE that turn's moves.
     /// </summary>
     private static void ComputeTurnPositions(GameRecord record)
     {
@@ -384,7 +384,7 @@ public static class SgfSerializer
             turn.PositionSgf = ExportPosition(engine);
 
             // Skip cube-only actions (no moves to apply)
-            if (turn.CubeAction != null && turn.Moves.Count == 0)
+            if (turn.DoublingAction != null && turn.Moves.Count == 0)
             {
                 continue;
             }
@@ -776,9 +776,9 @@ public static class SgfSerializer
     /// <summary>
     /// Parse turn sequence from SGF (;W[...];B[...] nodes)
     /// </summary>
-    private static List<GameTurn> ParseTurns(string sgf)
+    private static List<TurnSnapshot> ParseTurns(string sgf)
     {
-        var turns = new List<GameTurn>();
+        var turns = new List<TurnSnapshot>();
         int turnNumber = 0;
 
         // Find all move nodes: ;W[...] or ;B[...]
@@ -791,7 +791,7 @@ public static class SgfSerializer
             var moveContent = match.Groups[2].Value;
             var player = playerChar == "W" ? CheckerColor.White : CheckerColor.Red;
 
-            var turn = new GameTurn
+            var turn = new TurnSnapshot
             {
                 TurnNumber = ++turnNumber,
                 Player = player
@@ -800,20 +800,25 @@ public static class SgfSerializer
             // Check if this is a cube action
             if (moveContent == "double" || moveContent == "take" || moveContent == "drop" || moveContent == "resign")
             {
-                turn.CubeAction = moveContent switch
+                turn.DoublingAction = moveContent switch
                 {
-                    "double" => CubeAction.Double,
-                    "take" => CubeAction.Take,
-                    "drop" => CubeAction.Drop,
-                    "resign" => CubeAction.Resign,
+                    "double" => DoublingAction.Offered,
+                    "take" => DoublingAction.Accepted,
+                    "drop" => DoublingAction.Declined,
+                    "resign" => DoublingAction.Declined, // Treat resign as declined
                     _ => null
                 };
             }
             else if (moveContent.Length >= 2)
             {
                 // Parse dice and moves
-                turn.Die1 = moveContent[0] - '0';
-                turn.Die2 = moveContent[1] - '0';
+                int die1 = moveContent[0] - '0';
+                int die2 = moveContent[1] - '0';
+
+                // Set DiceRolled array (doubles get 4 values)
+                turn.DiceRolled = die1 == die2
+                    ? new[] { die1, die1, die1, die1 }
+                    : new[] { die1, die2 };
 
                 // Parse move pairs (each move is 2 characters: source + destination)
                 for (int i = 2; i + 1 < moveContent.Length; i += 2)

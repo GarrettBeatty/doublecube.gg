@@ -325,10 +325,32 @@ public static class DynamoDbHelpers
             item["doublingCubeOwner"] = new AttributeValue { S = game.DoublingCubeOwner };
         }
 
-        // Move history
+        // Move history (flat list, for backward compatibility)
         if (game.Moves.Any())
         {
             item["moves"] = new AttributeValue { L = game.Moves.Select(m => new AttributeValue { S = m }).ToList() };
+        }
+
+        // Turn history (typed turn objects with dice, cube state, etc.)
+        if (game.Turns.Any())
+        {
+            item["turns"] = new AttributeValue
+            {
+                L = game.Turns.Select(t => new AttributeValue
+                {
+                    M = new Dictionary<string, AttributeValue>
+                    {
+                        ["turnNumber"] = new AttributeValue { N = t.TurnNumber.ToString() },
+                        ["player"] = new AttributeValue { S = t.Player },
+                        ["diceRolled"] = new AttributeValue { L = t.DiceRolled.Select(d => new AttributeValue { N = d.ToString() }).ToList() },
+                        ["positionSgf"] = string.IsNullOrEmpty(t.PositionSgf) ? new AttributeValue { NULL = true } : new AttributeValue { S = t.PositionSgf },
+                        ["moves"] = new AttributeValue { L = t.Moves.Select(m => new AttributeValue { S = m }).ToList() },
+                        ["cubeValue"] = new AttributeValue { N = t.CubeValue.ToString() },
+                        ["cubeOwner"] = t.CubeOwner != null ? new AttributeValue { S = t.CubeOwner } : new AttributeValue { NULL = true },
+                        ["doublingAction"] = t.DoublingAction != null ? new AttributeValue { S = t.DoublingAction } : new AttributeValue { NULL = true }
+                    }
+                }).ToList()
+            };
         }
 
         // Winner
@@ -462,13 +484,50 @@ public static class DynamoDbHelpers
             game.RemainingMoves = remainingMovesValue.L.Select(v => int.Parse(v.N)).ToList();
         }
 
-        // Move history
+        // Move history (flat list)
         if (item.TryGetValue("moves", out var movesValue) && movesValue.L != null)
         {
             game.Moves = movesValue.L.Select(v => v.S).ToList();
         }
 
+        // Turn history (typed turn objects)
+        if (item.TryGetValue("turns", out var turnsValue) && turnsValue.L != null)
+        {
+            game.Turns = turnsValue.L
+                .Where(v => v.M != null)
+                .Select(v => UnmarshalTurnSnapshot(v.M))
+                .ToList();
+        }
+
         return game;
+    }
+
+    // Unmarshal TurnSnapshotDto from AttributeValue map
+    public static TurnSnapshotDto UnmarshalTurnSnapshot(Dictionary<string, AttributeValue> turnMap)
+    {
+        var turn = new TurnSnapshotDto
+        {
+            TurnNumber = GetInt(turnMap, "turnNumber"),
+            Player = turnMap["player"].S,
+            CubeValue = GetInt(turnMap, "cubeValue", 1),
+            CubeOwner = GetStringOrNull(turnMap, "cubeOwner"),
+            DoublingAction = GetStringOrNull(turnMap, "doublingAction"),
+            PositionSgf = GetStringOrNull(turnMap, "positionSgf") ?? string.Empty
+        };
+
+        // Unmarshal dice rolled
+        if (turnMap.TryGetValue("diceRolled", out var diceValue) && diceValue.L != null)
+        {
+            turn.DiceRolled = diceValue.L.Select(d => int.Parse(d.N)).ToArray();
+        }
+
+        // Unmarshal moves
+        if (turnMap.TryGetValue("moves", out var movesVal) && movesVal.L != null)
+        {
+            turn.Moves = movesVal.L.Select(m => m.S).ToList();
+        }
+
+        return turn;
     }
 
     // Marshal Friendship to DynamoDB item

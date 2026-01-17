@@ -89,6 +89,24 @@ public class Move
     /// </summary>
     public bool IsBearOff => To == 0 || To == 25;
 
+    /// <summary>
+    /// Returns the move in standard backgammon notation (e.g., "24/20", "bar/21", "6/off").
+    /// </summary>
+    public string ToNotation()
+    {
+        if (IsBearOff)
+        {
+            return $"{From}/off";
+        }
+
+        if (From == 0)
+        {
+            return $"bar/{To}";
+        }
+
+        return $"{From}/{To}";
+    }
+
     public override string ToString()
     {
         var hitSuffix = IsHit ? " (hit)" : string.Empty;

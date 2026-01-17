@@ -300,4 +300,133 @@ public class MoveTests
         Assert.NotNull(move.DiceUsed);
         Assert.NotNull(move.IntermediatePoints);
     }
+
+    // ==================== ToNotation() Tests ====================
+
+    [Fact]
+    public void ToNotation_NormalMove_FormatsCorrectly()
+    {
+        // Arrange
+        var move = new Move(from: 24, to: 20, dieValue: 4);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("24/20", notation);
+    }
+
+    [Fact]
+    public void ToNotation_FromBar_FormatsAsBar()
+    {
+        // Arrange
+        var move = new Move(from: 0, to: 21, dieValue: 4);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("bar/21", notation);
+    }
+
+    [Fact]
+    public void ToNotation_BearOffToZero_FormatsAsOff()
+    {
+        // Arrange
+        var move = new Move(from: 6, to: 0, dieValue: 6);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("6/off", notation);
+    }
+
+    [Fact]
+    public void ToNotation_BearOffTo25_FormatsAsOff()
+    {
+        // Arrange (Red bearing off)
+        var move = new Move(from: 19, to: 25, dieValue: 6);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("19/off", notation);
+    }
+
+    [Fact]
+    public void ToNotation_FromBarWithHit_StillFormatsSimply()
+    {
+        // Arrange - ToNotation doesn't include hit info (kept simple for notation)
+        var move = new Move(from: 0, to: 20, dieValue: 5, isHit: true);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("bar/20", notation);
+    }
+
+    [Fact]
+    public void ToNotation_CombinedMove_FormatsAsSimpleNotation()
+    {
+        // Arrange - Combined move, but ToNotation shows final from/to
+        var move = new Move(from: 24, to: 17, diceUsed: new[] { 6, 1 }, intermediatePoints: new[] { 18 });
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal("24/17", notation);
+    }
+
+    [Theory]
+    [InlineData(1, 7, "1/7")]
+    [InlineData(13, 7, "13/7")]
+    [InlineData(24, 18, "24/18")]
+    public void ToNotation_VariousNormalMoves_FormatsCorrectly(int from, int to, string expected)
+    {
+        // Arrange
+        var move = new Move(from: from, to: to, dieValue: Math.Abs(to - from));
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal(expected, notation);
+    }
+
+    [Theory]
+    [InlineData(0, 24, "bar/24")]
+    [InlineData(0, 19, "bar/19")]
+    [InlineData(0, 1, "bar/1")]
+    public void ToNotation_VariousBarEntries_FormatsCorrectly(int from, int to, string expected)
+    {
+        // Arrange
+        var move = new Move(from: from, to: to, dieValue: to);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal(expected, notation);
+    }
+
+    [Theory]
+    [InlineData(1, 0, "1/off")]
+    [InlineData(6, 0, "6/off")]
+    [InlineData(24, 25, "24/off")]
+    [InlineData(19, 25, "19/off")]
+    public void ToNotation_VariousBearOffs_FormatsCorrectly(int from, int to, string expected)
+    {
+        // Arrange
+        var move = new Move(from: from, to: to, dieValue: from);
+
+        // Act
+        var notation = move.ToNotation();
+
+        // Assert
+        Assert.Equal(expected, notation);
+    }
 }

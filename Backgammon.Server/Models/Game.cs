@@ -162,16 +162,17 @@ public class Game
     /// <summary>
     /// Complete turn-by-turn history for game analysis and replay.
     /// Each turn includes position SGF, dice rolled, moves made, and doubling actions.
+    /// Replaces the flat Moves list with structured turn data.
     /// </summary>
-    [JsonPropertyName("turnHistory")]
-    [Obsolete("Use GameSgf instead. TurnHistory is kept for backwards compatibility.")]
-    public List<TurnSnapshotDto> TurnHistory { get; set; } = new();
+    [JsonPropertyName("turns")]
+    public List<TurnSnapshotDto> Turns { get; set; } = new();
 
     /// <summary>
     /// Complete game record in SGF format (industry standard).
     /// Contains all moves, dice rolls, cube actions, and result.
+    /// Used for export only, not persisted to database.
     /// </summary>
-    [JsonPropertyName("gameSgf")]
+    [JsonIgnore]
     public string GameSgf { get; set; } = string.Empty;
 
     // Timestamps

@@ -35,39 +35,6 @@ public class TurnSnapshotDto
     public string? CubeOwner { get; set; }
 
     /// <summary>
-    /// Convert from Core.GameTurn (parsed from SGF) to DTO
-    /// </summary>
-    public static TurnSnapshotDto FromGameTurn(GameTurn turn)
-    {
-        return new TurnSnapshotDto
-        {
-            TurnNumber = turn.TurnNumber,
-            Player = turn.Player.ToString(),
-            DiceRolled = turn.Die1 > 0 && turn.Die2 > 0
-                ? (turn.Die1 == turn.Die2 ? new[] { turn.Die1, turn.Die1, turn.Die1, turn.Die1 } : new[] { turn.Die1, turn.Die2 })
-                : Array.Empty<int>(),
-            PositionSgf = turn.PositionSgf ?? string.Empty,
-            Moves = turn.Moves.Select(m =>
-            {
-                if (m.IsBearOff)
-                {
-                    return $"{m.From}/off";
-                }
-
-                if (m.From == 0)
-                {
-                    return $"bar/{m.To}";
-                }
-
-                return $"{m.From}/{m.To}";
-            }).ToList(),
-            DoublingAction = turn.CubeAction?.ToString(),
-            CubeValue = 1, // Cube tracking would need separate state
-            CubeOwner = null
-        };
-    }
-
-    /// <summary>
     /// Convert from Core.TurnSnapshot to DTO
     /// </summary>
     public static TurnSnapshotDto FromCore(TurnSnapshot turn)
@@ -78,20 +45,7 @@ public class TurnSnapshotDto
             Player = turn.Player.ToString(),
             DiceRolled = turn.DiceRolled,
             PositionSgf = turn.PositionSgf,
-            Moves = turn.Moves.Select(m =>
-            {
-                if (m.IsBearOff)
-                {
-                    return $"{m.From}/off";
-                }
-
-                if (m.From == 0)
-                {
-                    return $"bar/{m.To}";
-                }
-
-                return $"{m.From}/{m.To}";
-            }).ToList(),
+            Moves = turn.Moves.Select(m => m.ToNotation()).ToList(),
             DoublingAction = turn.DoublingAction?.ToString(),
             CubeValue = turn.CubeValue,
             CubeOwner = turn.CubeOwner

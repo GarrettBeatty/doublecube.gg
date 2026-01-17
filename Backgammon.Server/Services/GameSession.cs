@@ -369,20 +369,7 @@ public class GameSession : IGameSession
             RemainingMoves = Engine.RemainingMoves.ToArray(),
             MovesMadeThisTurn = Engine.MoveHistory.Count,
             TurnHistory = Engine.History.Turns.Select(TurnSnapshotDto.FromCore).ToList(),
-            CurrentTurnMoves = Engine.CurrentTurnMoves.Select(m =>
-            {
-                if (m.IsBearOff)
-                {
-                    return $"{m.From}/off";
-                }
-
-                if (m.From == 0)
-                {
-                    return $"bar/{m.To}";
-                }
-
-                return $"{m.From}/{m.To}";
-            }).ToList(),
+            CurrentTurnMoves = Engine.CurrentTurnMoves.Select(m => m.ToNotation()).ToList(),
             Board = GetBoardState(),
             WhiteCheckersOnBar = Engine.WhitePlayer.CheckersOnBar,
             RedCheckersOnBar = Engine.RedPlayer.CheckersOnBar,

@@ -44,7 +44,7 @@ public class GameRecord
     /// <summary>
     /// Chronological list of turns in the game
     /// </summary>
-    public List<GameTurn> Turns { get; set; } = new();
+    public List<TurnSnapshot> Turns { get; set; } = new();
 
     /// <summary>
     /// Winning player color (null if game incomplete)
