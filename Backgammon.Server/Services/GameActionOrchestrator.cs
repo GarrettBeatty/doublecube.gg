@@ -746,6 +746,9 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                         });
                 }
 
+                // Send full game state so modals display correctly (matches human double flow)
+                await BroadcastUpdate();
+
                 _logger.LogInformation(
                     "AI {AiPlayerId} offered double to {HumanConnectionCount} human connection(s) in game {GameId}",
                     aiPlayerId,
