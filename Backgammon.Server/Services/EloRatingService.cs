@@ -63,10 +63,10 @@ public class EloRatingService : IEloRatingService
         bool whiteWon,
         int stakes = 1)
     {
-        // Validate stakes parameter
-        if (stakes < 1)
+        // Validate stakes parameter (max 192 = Backgammon win × 64 cube = 3 × 64)
+        if (stakes < 1 || stakes > 200)
         {
-            throw new ArgumentException($"Stakes must be at least 1, got {stakes}", nameof(stakes));
+            throw new ArgumentException($"Stakes must be between 1 and 200, got {stakes}", nameof(stakes));
         }
 
         // Calculate expected scores
