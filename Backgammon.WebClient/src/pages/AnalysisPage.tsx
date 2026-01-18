@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import { Card, CardContent } from '@/components/ui/card'
@@ -68,6 +68,24 @@ export const AnalysisPage: React.FC = () => {
   const isExecutingMoves = useRef(false)
   const analysisRequestCounter = useRef(0)
   const hasLoadedGameSgf = useRef(false)
+  // Track which player's turn is being viewed (for turn navigation)
+  const [viewedTurnPlayer, setViewedTurnPlayer] = useState<'White' | 'Red' | null>(null)
+
+  // Derived values for viewing state
+  const isViewingPastTurn = useMemo(() => {
+    // Game replay: always viewing history
+    if (gameHistory) return true
+    // Live analysis: viewing past turn when liveHistoryIndex is set
+    return liveHistoryIndex >= 0
+  }, [gameHistory, liveHistoryIndex])
+
+  // Use viewed turn player when navigating history, otherwise use current game state
+  const displayCurrentPlayer = useMemo(() => {
+    if (viewedTurnPlayer) {
+      return viewedTurnPlayer === 'White' ? CheckerColor.White : CheckerColor.Red
+    }
+    return currentGameState?.currentPlayer ?? CheckerColor.White
+  }, [viewedTurnPlayer, currentGameState?.currentPlayer])
 
   useEffect(() => {
     // Auto-create an analysis session when the page loads
@@ -307,6 +325,8 @@ export const AnalysisPage: React.FC = () => {
 
     try {
       const turn = gameHistory.turnHistory[index]
+      // Set the viewed turn player for correct UI highlighting
+      setViewedTurnPlayer(turn.player as 'White' | 'Red')
       console.log('[AnalysisPage] Turn data:', {
         turnNumber: turn.turnNumber,
         player: turn.player,
@@ -358,6 +378,8 @@ export const AnalysisPage: React.FC = () => {
 
     try {
       const turn = currentGameState.turnHistory[index]
+      // Set the viewed turn player for correct UI highlighting
+      setViewedTurnPlayer(turn.player as 'White' | 'Red')
 
       if (turn.positionSgf) {
         await hub?.importPosition(turn.positionSgf)
@@ -385,6 +407,8 @@ export const AnalysisPage: React.FC = () => {
     if (liveHistoryIndex < 0) return
 
     setLiveHistoryIndex(-1)
+    // Clear viewed turn player when returning to current
+    setViewedTurnPlayer(null)
     // Re-fetch current state by exporting and re-importing
     try {
       const currentSgf = await hub?.exportPosition()
@@ -549,7 +573,7 @@ export const AnalysisPage: React.FC = () => {
     playerName: currentGameState.whitePlayerName || 'White',
     username: currentGameState.whiteUsername,
     color: CheckerColor.White,
-    isYourTurn: currentGameState.currentPlayer === CheckerColor.White,
+    isYourTurn: displayCurrentPlayer === CheckerColor.White,
     isYou: currentGameState.yourColor === CheckerColor.White,
     pipCount: currentGameState.whitePipCount,
     checkersOnBar: currentGameState.whiteCheckersOnBar,
@@ -560,7 +584,7 @@ export const AnalysisPage: React.FC = () => {
     playerName: currentGameState.redPlayerName || 'Red',
     username: currentGameState.redUsername,
     color: CheckerColor.Red,
-    isYourTurn: currentGameState.currentPlayer === CheckerColor.Red,
+    isYourTurn: displayCurrentPlayer === CheckerColor.Red,
     isYou: currentGameState.yourColor === CheckerColor.Red,
     pipCount: currentGameState.redPipCount,
     checkersOnBar: currentGameState.redCheckersOnBar,
@@ -643,7 +667,7 @@ export const AnalysisPage: React.FC = () => {
               <CardContent className="p-2 relative">
                 {/* Board with overlay controls */}
                 <div className="relative">
-                  <GameBoardAdapter gameState={currentGameState} suppressButtons={isNavigating} />
+                  <GameBoardAdapter gameState={currentGameState} suppressButtons={isNavigating || isViewingPastTurn} />
                   <BoardOverlayControls
                     gameState={currentGameState}
                     isSpectator={false}
@@ -677,7 +701,7 @@ export const AnalysisPage: React.FC = () => {
                 <PositionEvaluationComponent
                   evaluation={currentEvaluation}
                   isAnalyzing={isAnalyzing}
-                  currentPlayer={currentGameState.currentPlayer}
+                  currentPlayer={displayCurrentPlayer}
                 />
               </TabsContent>
 
@@ -688,7 +712,7 @@ export const AnalysisPage: React.FC = () => {
                   onHighlightMoves={setHighlightedMoves}
                   highlightedMoves={highlightedMoves}
                   onExecuteMoves={handleExecuteMoves}
-                  currentPlayer={currentGameState.currentPlayer}
+                  currentPlayer={displayCurrentPlayer}
                 />
               </TabsContent>
             </Tabs>

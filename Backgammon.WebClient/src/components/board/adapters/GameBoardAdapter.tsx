@@ -66,42 +66,46 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
       return result
     }
 
-    // Highlight moveable sources (yellow)
-    for (const point of validSources) {
-      if (selectedChecker?.point !== point) {
-        result.push({ point, type: 'source' })
+    // Suppress source/destination highlights when viewing past turns (read-only view)
+    // but still allow analysis highlights to show
+    if (!suppressButtons) {
+      // Highlight moveable sources (yellow)
+      for (const point of validSources) {
+        if (selectedChecker?.point !== point) {
+          result.push({ point, type: 'source' })
+        }
       }
-    }
 
-    // Highlight selected point (green)
-    if (selectedChecker?.point !== undefined) {
-      result.push({ point: selectedChecker.point, type: 'selected' })
-    }
+      // Highlight selected point (green)
+      if (selectedChecker?.point !== undefined) {
+        result.push({ point: selectedChecker.point, type: 'selected' })
+      }
 
-    // Highlight valid destinations from selected piece
-    if (selectedChecker?.point !== undefined && gameState.validMoves) {
-      const movesFromSelected = gameState.validMoves.filter(
-        (m) => m.from === selectedChecker.point
-      )
+      // Highlight valid destinations from selected piece
+      if (selectedChecker?.point !== undefined && gameState.validMoves) {
+        const movesFromSelected = gameState.validMoves.filter(
+          (m) => m.from === selectedChecker.point
+        )
 
-      for (const move of movesFromSelected) {
-        const destPoint = gameState.board.find((p) => p.position === move.to)
-        const isCapture =
-          destPoint?.color !== null &&
-          destPoint?.color !== gameState.yourColor &&
-          destPoint?.count === 1
+        for (const move of movesFromSelected) {
+          const destPoint = gameState.board.find((p) => p.position === move.to)
+          const isCapture =
+            destPoint?.color !== null &&
+            destPoint?.color !== gameState.yourColor &&
+            destPoint?.count === 1
 
-        if (move.isCombinedMove) {
-          result.push({ point: move.to, type: 'combined' })
-        } else if (isCapture) {
-          result.push({ point: move.to, type: 'capture' })
-        } else {
-          result.push({ point: move.to, type: 'destination' })
+          if (move.isCombinedMove) {
+            result.push({ point: move.to, type: 'combined' })
+          } else if (isCapture) {
+            result.push({ point: move.to, type: 'capture' })
+          } else {
+            result.push({ point: move.to, type: 'destination' })
+          }
         }
       }
     }
 
-    // Highlight analysis suggested moves
+    // Highlight analysis suggested moves (always shown, even when viewing past turns)
     if (highlightedMoves && highlightedMoves.length > 0) {
       for (const move of highlightedMoves) {
         if (!result.some((h) => h.point === move.from && h.type === 'analysis')) {
@@ -120,6 +124,7 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
     selectedChecker,
     isFreeMoveEnabled,
     highlightedMoves,
+    suppressButtons,
   ])
 
   // Build dice state
