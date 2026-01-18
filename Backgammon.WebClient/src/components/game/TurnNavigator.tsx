@@ -10,6 +10,8 @@ interface TurnNavigatorProps {
   currentTurnIndex: number
   onTurnChange: (index: number) => void
   isLoading?: boolean
+  showCurrentButton?: boolean
+  onGoToCurrent?: () => void
 }
 
 export const TurnNavigator: React.FC<TurnNavigatorProps> = ({
@@ -17,6 +19,8 @@ export const TurnNavigator: React.FC<TurnNavigatorProps> = ({
   currentTurnIndex,
   onTurnChange,
   isLoading = false,
+  showCurrentButton = false,
+  onGoToCurrent,
 }) => {
   if (!turnHistory || turnHistory.length === 0) {
     return null
@@ -98,6 +102,18 @@ export const TurnNavigator: React.FC<TurnNavigatorProps> = ({
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
+
+          {showCurrentButton && onGoToCurrent && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onGoToCurrent}
+              disabled={isLoading}
+              className="ml-2"
+            >
+              Current
+            </Button>
+          )}
         </div>
 
         {/* Turn Info */}

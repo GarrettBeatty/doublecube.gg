@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, Settings, Dice6 } from "lucide-react";
+import { Clock, User, Dice6, Filter, Users, Plus } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -45,6 +45,14 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
   // Map backend lobbies to UI display format
   // Backend already filters to return only regular (non-correspondence) lobbies
   const lobbyGames: LobbyGame[] = lobbies.map(mapMatchLobbyToLobbyGame);
+
+  // Count active filters
+  const activeFilterCount = [
+    ratingRange[0] !== 1200 || ratingRange[1] !== 2400,
+    matchLengthFilter !== "all",
+    ratedFilter !== "all",
+    cubeFilter !== "all",
+  ].filter(Boolean).length;
 
   // Apply client-side filtering
   const filteredLobbies = lobbyGames.filter((game) => {
@@ -104,18 +112,56 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
           <CardDescription>Join an open game or create your own</CardDescription>
         </div>
         <Button
-          variant="ghost"
-          size="icon"
+          variant={showFilters ? "secondary" : "ghost"}
+          size="sm"
           onClick={() => setShowFilters(!showFilters)}
-          title="Filter games"
-          className={showFilters ? "bg-accent" : ""}
+          className="gap-2"
         >
-          <Settings className="h-4 w-4" />
+          <Filter className="h-4 w-4" />
+          <span>Filters</span>
+          {activeFilterCount > 0 && (
+            <Badge variant="default" className="h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full">
+              {activeFilterCount}
+            </Badge>
+          )}
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Quick Filter Chips - always visible */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setRatedFilter(ratedFilter === "rated" ? "all" : "rated")}
+            className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+              ratedFilter === "rated"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-accent border-border"
+            }`}
+          >
+            Rated Only
+          </button>
+          <button
+            onClick={() => setMatchLengthFilter(matchLengthFilter === "5" ? "all" : "5")}
+            className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+              matchLengthFilter === "5"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-accent border-border"
+            }`}
+          >
+            5-point
+          </button>
+          <button
+            onClick={() => setCubeFilter(cubeFilter === "with" ? "all" : "with")}
+            className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+              cubeFilter === "with"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background hover:bg-accent border-border"
+            }`}
+          >
+            With Cube
+          </button>
+        </div>
 
-        {/* Filter Panel */}
+        {/* Advanced Filter Panel */}
         {showFilters && (
           <div className="p-4 bg-accent rounded-lg space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -196,11 +242,50 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
 
         {/* Game List */}
         {filteredLobbies.length === 0 ? (
-          <div className="text-center py-8">
-            <p className="text-muted-foreground">No lobbies match your filters</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              {lobbyGames.length === 0 ? 'Create a game to get started!' : 'Try adjusting your filters'}
-            </p>
+          <div className="text-center py-12 space-y-4">
+            <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+            {lobbyGames.length === 0 ? (
+              <>
+                <div>
+                  <p className="font-medium text-lg">No open games yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Be the first to create a game and others will join!
+                  </p>
+                </div>
+                <Button onClick={onCreateGame} className="mt-4">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create a Game
+                </Button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="font-medium text-lg">No matching lobbies</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active. Try adjusting your filters or create a new game.
+                  </p>
+                </div>
+                <div className="flex gap-2 justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setRatingRange([1200, 2400]);
+                      setMatchLengthFilter("all");
+                      setRatedFilter("all");
+                      setCubeFilter("all");
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                  <Button onClick={onCreateGame}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Game
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -247,11 +332,16 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
                 </Button>
               </div>
             ))}
+            {/* Show count and create option after list */}
+            <div className="pt-4 flex items-center justify-between text-sm text-muted-foreground border-t mt-4">
+              <span>{filteredLobbies.length} game{filteredLobbies.length !== 1 ? 's' : ''} available</span>
+              <Button variant="ghost" size="sm" onClick={onCreateGame}>
+                <Plus className="h-4 w-4 mr-1" />
+                Create your own
+              </Button>
+            </div>
           </div>
         )}
-        <Button className="w-full" variant="outline" onClick={onCreateGame}>
-          New Game
-        </Button>
       </CardContent>
     </Card>
   );

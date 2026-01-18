@@ -65,16 +65,30 @@ export const MoveLog: React.FC<MoveLogProps> = ({
     return null
   }
 
+  // Get the last completed turn for preview
+  const lastTurn = turnHistory[turnHistory.length - 1]
+  const lastMovePreview = lastTurn
+    ? `${lastTurn.player === 'White' ? 'W' : 'R'}: ${lastTurn.moves.length > 0 ? lastTurn.moves.slice(0, 2).join(', ') : '(no moves)'}${lastTurn.moves.length > 2 ? '...' : ''}`
+    : currentTurnMoves.length > 0
+    ? `${currentPlayer === CheckerColor.White ? 'W' : 'R'}: ${currentTurnMoves.slice(0, 2).join(', ')}${currentTurnMoves.length > 2 ? '...' : ''}`
+    : null
+
   return (
     <Accordion type="single" collapsible defaultValue="move-log" className="mt-4">
       <AccordionItem value="move-log" className="border rounded-lg">
-        <AccordionTrigger className="px-4 py-2 hover:no-underline">
-          <div className="flex items-center gap-2 text-sm font-medium">
+        <AccordionTrigger className="px-4 py-2 hover:no-underline group">
+          <div className="flex items-center gap-2 text-sm font-medium flex-1">
             <List className="h-4 w-4" />
-            Move Log
-            <span className="text-muted-foreground text-xs">
-              ({turnHistory.length} turn{turnHistory.length !== 1 ? 's' : ''})
-            </span>
+            <span>Move Log</span>
+            <Badge variant="secondary" className="text-xs">
+              {turnHistory.length} turn{turnHistory.length !== 1 ? 's' : ''}
+            </Badge>
+            {/* Show last move preview when collapsed (indicated by group-data-[state=closed]) */}
+            {lastMovePreview && (
+              <span className="text-xs text-muted-foreground font-mono ml-auto mr-2 hidden group-data-[state=closed]:inline truncate max-w-[150px]">
+                Last: {lastMovePreview}
+              </span>
+            )}
           </div>
         </AccordionTrigger>
         <AccordionContent className="px-4 pb-3">

@@ -20,7 +20,7 @@ import { CheckerColor } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { authService } from '@/services/auth.service'
-import { Eye, BarChart3, Trophy, TrendingUp } from 'lucide-react'
+import { Eye, BarChart3, Trophy, TrendingUp, Clock, Loader2 } from 'lucide-react'
 
 export const GamePage: React.FC = () => {
   const { matchId, gameId } = useParams<{ matchId: string; gameId: string }>()
@@ -306,11 +306,18 @@ export const GamePage: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card>
+        <Card className="w-full max-w-md mx-4">
           <CardContent className="p-8">
-            <div className="text-center">
-              <div className="text-lg font-semibold mb-2">Loading game...</div>
-              <div className="text-sm text-muted-foreground">Game ID: {gameId}</div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold mb-1">Loading game...</div>
+                <div className="text-sm text-muted-foreground">Connecting to game session</div>
+              </div>
+              {/* Loading skeleton for board */}
+              <div className="w-full aspect-[1.5] bg-muted rounded-lg animate-pulse mt-4" />
             </div>
           </CardContent>
         </Card>
@@ -330,11 +337,20 @@ export const GamePage: React.FC = () => {
   if (!currentGameState) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card>
+        <Card className="w-full max-w-md mx-4">
           <CardContent className="p-8">
-            <div className="text-center">
-              <div className="text-lg font-semibold mb-2">Waiting for game data...</div>
-              <div className="text-sm text-muted-foreground">Game ID: {gameId}</div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <Clock className="h-12 w-12 text-muted-foreground animate-pulse" />
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-semibold mb-1">Waiting for game data...</div>
+                <div className="text-sm text-muted-foreground">
+                  The game board will appear shortly
+                </div>
+              </div>
+              {/* Loading skeleton for board */}
+              <div className="w-full aspect-[1.5] bg-muted rounded-lg animate-pulse mt-4" />
             </div>
           </CardContent>
         </Card>
@@ -371,9 +387,60 @@ export const GamePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-[1920px] mx-auto px-2 py-4">
+        {/* Mobile-first: board comes first on small screens */}
         <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
-          {/* Left Sidebar - Player Info & Controls */}
-          <div className="space-y-4">
+          {/* Mobile Condensed Header - Only shown on mobile */}
+          <div className="lg:hidden space-y-2">
+            {isSpectator && (
+              <Badge variant="secondary" className="w-full justify-center py-1 text-xs">
+                <Eye className="h-3 w-3 mr-1" />
+                Spectating
+              </Badge>
+            )}
+            {/* Condensed player info row */}
+            <div className="flex items-center justify-between gap-2 p-2 bg-card rounded-lg border">
+              {/* White player mini */}
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="w-4 h-4 rounded-full bg-gray-100 border flex-shrink-0" />
+                <div className="truncate">
+                  <div className="text-sm font-medium truncate">{whitePlayer.playerName}</div>
+                  {whitePlayer.isYou && <span className="text-xs text-muted-foreground">You</span>}
+                </div>
+                {whitePlayer.checkersOnBar && whitePlayer.checkersOnBar > 0 && (
+                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                    {whitePlayer.checkersOnBar} bar
+                  </Badge>
+                )}
+              </div>
+
+              {/* Match score if applicable */}
+              {currentGameState.matchId && currentGameState.targetScore && (
+                <div className="text-center px-3 flex-shrink-0">
+                  <div className="text-xs text-muted-foreground">Score</div>
+                  <div className="font-bold">
+                    {currentGameState.player1Score} - {currentGameState.player2Score}
+                  </div>
+                </div>
+              )}
+
+              {/* Red player mini */}
+              <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                {redPlayer.checkersOnBar && redPlayer.checkersOnBar > 0 && (
+                  <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+                    {redPlayer.checkersOnBar} bar
+                  </Badge>
+                )}
+                <div className="truncate text-right">
+                  <div className="text-sm font-medium truncate">{redPlayer.playerName}</div>
+                  {redPlayer.isYou && <span className="text-xs text-muted-foreground">You</span>}
+                </div>
+                <div className="w-4 h-4 rounded-full bg-red-600 flex-shrink-0" />
+              </div>
+            </div>
+          </div>
+
+          {/* Desktop Sidebar - Hidden on mobile */}
+          <div className="hidden lg:block space-y-4">
             {isSpectator && (
               <Badge variant="secondary" className="w-full justify-center py-2">
                 <Eye className="h-4 w-4 mr-2" />
@@ -430,6 +497,52 @@ export const GamePage: React.FC = () => {
           <div>
             <Card>
               <CardContent className="p-2 relative">
+                {/* Turn Indicator Banner - prominent display of whose turn it is */}
+                {currentGameState.winner === null && !isSpectator && !currentGameState.isAnalysisMode && (
+                  <div className={`mb-4 p-3 rounded-lg flex items-center justify-center gap-2 ${
+                    currentGameState.yourColor === currentGameState.currentPlayer
+                      ? 'bg-green-100 dark:bg-green-950/50 border border-green-300 dark:border-green-800'
+                      : 'bg-muted border border-border'
+                  }`}>
+                    {currentGameState.yourColor === currentGameState.currentPlayer ? (
+                      <>
+                        <div className="h-3 w-3 rounded-full bg-green-500 animate-pulse" />
+                        <span className="font-semibold text-green-800 dark:text-green-200">
+                          Your Turn
+                        </span>
+                        {currentGameState.dice[0] === 0 && currentGameState.dice[1] === 0 && (
+                          <span className="text-sm text-green-700 dark:text-green-300">
+                            — Roll the dice to start
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Waiting for {currentGameState.currentPlayer === CheckerColor.White
+                            ? currentGameState.whitePlayerName
+                            : currentGameState.redPlayerName}...
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Spectator turn indicator */}
+                {isSpectator && currentGameState.winner === null && (
+                  <div className="mb-4 p-3 rounded-lg bg-muted border border-border flex items-center justify-center gap-2">
+                    <div className={`h-3 w-3 rounded-full ${
+                      currentGameState.currentPlayer === CheckerColor.White ? 'bg-amber-200' : 'bg-red-500'
+                    }`} />
+                    <span className="text-muted-foreground">
+                      {currentGameState.currentPlayer === CheckerColor.White
+                        ? currentGameState.whitePlayerName
+                        : currentGameState.redPlayerName}'s turn
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex gap-2 mb-4">
                   {currentGameState.isAnalysisMode && (
                     <Badge variant="secondary">
@@ -478,6 +591,12 @@ export const GamePage: React.FC = () => {
                 />
               </CardContent>
             </Card>
+
+            {/* Mobile Game Controls - Only shown on mobile */}
+            <div className="lg:hidden mt-4 space-y-4">
+              <CompletedGameBanner gameState={currentGameState} />
+              <GameControls gameState={currentGameState} isSpectator={isSpectator} />
+            </div>
           </div>
         </div>
       </div>

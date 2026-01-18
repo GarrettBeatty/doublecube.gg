@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Play, Gamepad2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useActiveGames } from '@/hooks/useActiveGames'
 import { useCorrespondenceGames } from '@/hooks/useCorrespondenceGames'
@@ -157,8 +157,41 @@ export function GamesInPlay() {
     )
   }
 
+  // Get the first game needing attention for "Play Next" button
+  const firstYourTurnGame = sortedGames.find(g => g.isYourTurn)
+
   return (
     <div className="space-y-6">
+      {/* Your Turn Summary Card - shown when games need attention */}
+      {totalYourTurn > 0 && firstYourTurnGame && (
+        <Card className="bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-green-600 flex items-center justify-center">
+                  <Play className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-green-900 dark:text-green-100">
+                    {totalYourTurn} game{totalYourTurn !== 1 ? 's' : ''} need your attention
+                  </p>
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    vs {firstYourTurnGame.opponentName} is your oldest waiting game
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => handlePlayGame(firstYourTurnGame.gameId, firstYourTurnGame.matchId)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                Play Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Active Games (individual in-progress games) */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -176,11 +209,16 @@ export function GamesInPlay() {
         </CardHeader>
         <CardContent className="space-y-4">
           {sortedGames.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No active games</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Join a game from the Lobby or Correspondence tabs
-              </p>
+            <div className="text-center py-12 space-y-4">
+              <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <Gamepad2 className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-lg">No active games</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Join a game from the Lobby tab or challenge a friend to get started!
+                </p>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-6">

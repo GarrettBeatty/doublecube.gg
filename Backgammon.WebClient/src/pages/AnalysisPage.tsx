@@ -4,6 +4,7 @@ import { useSignalR } from '@/contexts/SignalRContext'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BarChart3 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useGameStore } from '@/stores/gameStore'
@@ -57,6 +58,8 @@ export const AnalysisPage: React.FC = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [currentTurnIndex, setCurrentTurnIndex] = useState(0)
   const [isNavigating, setIsNavigating] = useState(false)
+  // Track index when navigating through live turn history (-1 = at current/live position)
+  const [liveHistoryIndex, setLiveHistoryIndex] = useState(-1)
   const hasCreatedGame = useRef(false)
   const lastImportedSgf = useRef<string | null>(null)
   const lastExportedSgf = useRef<string | null>(null)
@@ -105,6 +108,18 @@ export const AnalysisPage: React.FC = () => {
       setCurrentGameId(currentGameState.gameId)
     }
   }, [currentGameState, setCurrentGameId])
+
+  // Debug: Log turn history changes
+  useEffect(() => {
+    console.log('[AnalysisPage] Turn history debug:', {
+      hasGameHistory: !!gameHistory,
+      gameHistoryTurnCount: gameHistory?.turnHistory?.length ?? 0,
+      currentGameStateTurnCount: currentGameState?.turnHistory?.length ?? 0,
+      turnHistory: currentGameState?.turnHistory,
+      showTurnNavigator: (gameHistory?.turnHistory?.length ?? 0) > 0 ||
+        (!gameHistory && (currentGameState?.turnHistory?.length ?? 0) > 0),
+    })
+  }, [currentGameState?.turnHistory, gameHistory])
 
   // Import position from URL if present (only when SGF parameter changes and is different)
   useEffect(() => {
@@ -216,6 +231,11 @@ export const AnalysisPage: React.FC = () => {
         return
       }
 
+      // Skip URL updates when navigating live history (viewing past positions)
+      if (liveHistoryIndex >= 0) {
+        return
+      }
+
       // Skip URL updates while loading game history (prevents replacing full game SGF with position)
       if (isLoadingHistory || hasLoadedGameSgf.current) {
         return
@@ -255,7 +275,7 @@ export const AnalysisPage: React.FC = () => {
     }
 
     updateUrl()
-  }, [currentGameState, hub, navigate, sgf, gameHistory, isLoadingHistory])
+  }, [currentGameState, hub, navigate, sgf, gameHistory, isLoadingHistory, liveHistoryIndex])
 
   // Cleanup when leaving the page
   useEffect(() => {
@@ -326,6 +346,53 @@ export const AnalysisPage: React.FC = () => {
       })
     } finally {
       setIsNavigating(false)
+    }
+  }
+
+  // Navigate through live analysis history
+  const handleLiveHistoryNavigation = async (index: number) => {
+    if (!currentGameState?.turnHistory || isNavigating) return
+
+    setIsNavigating(true)
+    setLiveHistoryIndex(index)
+
+    try {
+      const turn = currentGameState.turnHistory[index]
+
+      if (turn.positionSgf) {
+        await hub?.importPosition(turn.positionSgf)
+        lastImportedSgf.current = turn.positionSgf
+        lastExportedSgf.current = turn.positionSgf
+      }
+
+      if (turn.diceRolled && turn.diceRolled.length >= 2) {
+        await hub?.setDice(turn.diceRolled[0], turn.diceRolled[1])
+      }
+    } catch (error) {
+      console.error('[AnalysisPage] Failed to navigate live history:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load position',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsNavigating(false)
+    }
+  }
+
+  // Return to current/live position
+  const handleGoToCurrent = async () => {
+    if (liveHistoryIndex < 0) return
+
+    setLiveHistoryIndex(-1)
+    // Re-fetch current state by exporting and re-importing
+    try {
+      const currentSgf = await hub?.exportPosition()
+      if (currentSgf) {
+        await hub?.importPosition(currentSgf)
+      }
+    } catch (error) {
+      console.error('[AnalysisPage] Failed to return to current:', error)
     }
   }
 
@@ -507,7 +574,10 @@ export const AnalysisPage: React.FC = () => {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Badge variant="secondary" className="text-lg py-2 px-4">
             <BarChart3 className="h-5 w-5 mr-2" />
-            {gameHistory ? 'Game Replay' : 'Analysis Mode - Control Both Sides'}
+            {gameHistory ? 'Game Replay' :
+              (currentGameState?.turnHistory?.length ?? 0) > 0
+                ? `Analysis Mode (${currentGameState?.turnHistory?.length} turns)`
+                : 'Analysis Mode - Control Both Sides'}
           </Badge>
           {gameHistory && (
             <Badge variant="outline" className="text-sm py-1 px-3">
@@ -554,13 +624,18 @@ export const AnalysisPage: React.FC = () => {
 
           {/* Main Board Area */}
           <div className="space-y-3">
-            {/* Turn Navigator - only shown when viewing game history */}
-            {gameHistory && gameHistory.turnHistory && gameHistory.turnHistory.length > 0 && (
+            {/* Turn Navigator - shown for game replay OR live analysis with history */}
+            {((gameHistory?.turnHistory?.length ?? 0) > 0 ||
+              (!gameHistory && (currentGameState?.turnHistory?.length ?? 0) > 0)) && (
               <TurnNavigator
-                turnHistory={gameHistory.turnHistory}
-                currentTurnIndex={currentTurnIndex}
-                onTurnChange={handleTurnChange}
+                turnHistory={gameHistory?.turnHistory ?? currentGameState?.turnHistory ?? []}
+                currentTurnIndex={gameHistory
+                  ? currentTurnIndex
+                  : (liveHistoryIndex >= 0 ? liveHistoryIndex : (currentGameState?.turnHistory?.length ?? 1) - 1)}
+                onTurnChange={gameHistory ? handleTurnChange : handleLiveHistoryNavigation}
                 isLoading={isNavigating || isLoadingHistory}
+                showCurrentButton={!gameHistory && liveHistoryIndex >= 0}
+                onGoToCurrent={handleGoToCurrent}
               />
             )}
 
@@ -591,22 +666,32 @@ export const AnalysisPage: React.FC = () => {
               disabled={isAnalyzing}
             />
 
-            {/* Position Evaluation */}
-            <PositionEvaluationComponent
-              evaluation={currentEvaluation}
-              isAnalyzing={isAnalyzing}
-              currentPlayer={currentGameState.currentPlayer}
-            />
+            {/* Tabbed Analysis Panels */}
+            <Tabs defaultValue="evaluation" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="evaluation">Evaluation</TabsTrigger>
+                <TabsTrigger value="moves">Best Moves</TabsTrigger>
+              </TabsList>
 
-            {/* Best Moves Panel */}
-            <BestMovesPanel
-              analysis={bestMoves}
-              isAnalyzing={isAnalyzing}
-              onHighlightMoves={setHighlightedMoves}
-              highlightedMoves={highlightedMoves}
-              onExecuteMoves={handleExecuteMoves}
-              currentPlayer={currentGameState.currentPlayer}
-            />
+              <TabsContent value="evaluation" className="mt-3">
+                <PositionEvaluationComponent
+                  evaluation={currentEvaluation}
+                  isAnalyzing={isAnalyzing}
+                  currentPlayer={currentGameState.currentPlayer}
+                />
+              </TabsContent>
+
+              <TabsContent value="moves" className="mt-3">
+                <BestMovesPanel
+                  analysis={bestMoves}
+                  isAnalyzing={isAnalyzing}
+                  onHighlightMoves={setHighlightedMoves}
+                  highlightedMoves={highlightedMoves}
+                  onExecuteMoves={handleExecuteMoves}
+                  currentPlayer={currentGameState.currentPlayer}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

@@ -166,7 +166,9 @@ public class AnalysisSession : IGameSession
             WhiteIsInDelay = null,
             RedIsInDelay = null,
             WhiteDelayRemaining = null,
-            RedDelayRemaining = null
+            RedDelayRemaining = null,
+            TurnHistory = Engine.History.Turns.Select(TurnSnapshotDto.FromCore).ToList(),
+            CurrentTurnMoves = Engine.CurrentTurnMoves.Select(m => m.ToNotation()).ToList()
         };
 
         // Get valid moves for current player

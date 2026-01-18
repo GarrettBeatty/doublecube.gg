@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { cn } from '@/lib/utils'
+import { AlertCircle } from 'lucide-react'
 
 interface PlayerCardProps {
   playerName: string
@@ -63,17 +64,60 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-sm mt-3">
-          <div className="text-center">
+          {/* Pip Count */}
+          <div
+            className="text-center cursor-help"
+            title="Total moves needed to bear off all checkers. Lower is better."
+          >
             <div className="text-muted-foreground text-xs">Pip Count</div>
             <div className="font-semibold">{pipCount || 0}</div>
           </div>
-          <div className="text-center">
-            <div className="text-muted-foreground text-xs">On Bar</div>
-            <div className="font-semibold">{checkersOnBar || 0}</div>
+
+          {/* On Bar - highlighted when > 0 */}
+          <div
+            className={cn(
+              "text-center cursor-help rounded-md py-1 -my-1 transition-colors",
+              checkersOnBar && checkersOnBar > 0 && "bg-orange-100 dark:bg-orange-950/50"
+            )}
+            title={checkersOnBar && checkersOnBar > 0
+              ? "Checkers on the bar must re-enter before any other moves!"
+              : "No checkers captured. You can move freely."}
+          >
+            <div className={cn(
+              "text-xs flex items-center justify-center gap-1",
+              checkersOnBar && checkersOnBar > 0 ? "text-orange-700 dark:text-orange-400 font-medium" : "text-muted-foreground"
+            )}>
+              {checkersOnBar && checkersOnBar > 0 && <AlertCircle className="h-3 w-3" />}
+              On Bar
+            </div>
+            <div className={cn(
+              "font-semibold",
+              checkersOnBar && checkersOnBar > 0 && "text-orange-700 dark:text-orange-400 text-lg"
+            )}>
+              {checkersOnBar || 0}
+            </div>
           </div>
-          <div className="text-center">
-            <div className="text-muted-foreground text-xs">Born Off</div>
-            <div className="font-semibold">{bornOff || 0}</div>
+
+          {/* Born Off - highlighted when > 0 */}
+          <div
+            className={cn(
+              "text-center cursor-help rounded-md py-1 -my-1 transition-colors",
+              bornOff && bornOff > 0 && "bg-green-50 dark:bg-green-950/30"
+            )}
+            title="Bear off all 15 checkers to win!"
+          >
+            <div className={cn(
+              "text-xs",
+              bornOff && bornOff > 0 ? "text-green-700 dark:text-green-400" : "text-muted-foreground"
+            )}>
+              Born Off
+            </div>
+            <div className={cn(
+              "font-semibold",
+              bornOff && bornOff > 0 && "text-green-700 dark:text-green-400"
+            )}>
+              {bornOff || 0}/15
+            </div>
           </div>
         </div>
       </CardContent>

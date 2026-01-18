@@ -13,8 +13,11 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
   isFlipped = false,
 }: DoublingCubeDisplayProps) {
   const colors = useThemeColors()
-  const cubeX = BOARD_CONFIG.viewBox.width - BOARD_CONFIG.padding - 35
-  const cubeSize = 50
+  const cubeSize = 36
+  // Center cube in the bearoff area
+  const bearoffStartX =
+    BOARD_CONFIG.barX + BOARD_CONFIG.barWidth + 6 * BOARD_CONFIG.pointWidth
+  const cubeX = bearoffStartX + BOARD_CONFIG.bearoffWidth / 2
   const centerY = BOARD_CONFIG.viewBox.height / 2
 
   // Determine Y position based on ownership
@@ -46,7 +49,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
         y={cubeY - cubeSize / 2 + 2}
         width={cubeSize}
         height={cubeSize}
-        rx={8}
+        rx={6}
         fill="rgba(0, 0, 0, 0.2)"
         style={{ filter: 'blur(4px)' }}
       />
@@ -57,7 +60,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
         y={cubeY - cubeSize / 2}
         width={cubeSize}
         height={cubeSize}
-        rx={8}
+        rx={6}
         fill={colors.doublingCubeBackground}
         stroke={colors.doublingCubeStroke}
         strokeWidth={2}
@@ -69,7 +72,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
         y={cubeY}
         textAnchor="middle"
         dominantBaseline="middle"
-        fontSize={28}
+        fontSize={20}
         fontWeight="bold"
         fill={colors.doublingCubeText}
         style={{ userSelect: 'none', pointerEvents: 'none' }}
@@ -83,7 +86,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
           <circle
             cx={cubeX + cubeSize / 2 - 8}
             cy={cubeY - cubeSize / 2 + 8}
-            r={10}
+            r={7}
             fill="#ef4444"
           />
           <text
@@ -91,7 +94,7 @@ export const DoublingCubeDisplay = memo(function DoublingCubeDisplay({
             y={cubeY - cubeSize / 2 + 8}
             textAnchor="middle"
             dominantBaseline="middle"
-            fontSize={10}
+            fontSize={8}
             fontWeight="bold"
             fill="white"
             style={{ userSelect: 'none', pointerEvents: 'none' }}

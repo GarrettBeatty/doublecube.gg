@@ -242,7 +242,18 @@ public partial class GameHub
         await session.GameActionLock.WaitAsync();
         try
         {
+            _logger.LogInformation(
+                "[Analysis EndTurn] Before EndTurn - History.Turns.Count: {TurnCount}, Dice: [{Die1}, {Die2}]",
+                session.Engine.History.Turns.Count,
+                session.Engine.Dice.Die1,
+                session.Engine.Dice.Die2);
+
             session.Engine.EndTurn();
+
+            _logger.LogInformation(
+                "[Analysis EndTurn] After EndTurn - History.Turns.Count: {TurnCount}",
+                session.Engine.History.Turns.Count);
+
             session.UpdateActivity();
         }
         finally

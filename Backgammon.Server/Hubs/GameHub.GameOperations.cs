@@ -88,17 +88,19 @@ public partial class GameHub
                     return;
                 }
 
-                // Set the dice (now atomic with validation)
-                session.Engine.Dice.SetDice(die1, die2);
-                session.Engine.RemainingMoves.Clear();
-                session.Engine.RemainingMoves.AddRange(session.Engine.Dice.GetMoves());
+                // Start a turn with the dice (creates turn snapshot for history tracking)
+                _logger.LogInformation(
+                    "[SetDice] Before StartTurnWithDice - History.Turns.Count: {TurnCount}",
+                    session.Engine.History.Turns.Count);
+
+                session.Engine.StartTurnWithDice(die1, die2);
                 session.UpdateActivity();
 
                 _logger.LogInformation(
-                    "Set dice to [{Die1}, {Die2}] in analysis session {SessionId}",
+                    "[SetDice] After StartTurnWithDice - History.Turns.Count: {TurnCount}, Dice: [{Die1}, {Die2}]",
+                    session.Engine.History.Turns.Count,
                     die1,
-                    die2,
-                    session.Id);
+                    die2);
             }
             finally
             {

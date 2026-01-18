@@ -173,6 +173,41 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Start a turn with manually-set dice (for analysis mode).
+    /// This is similar to RollDice but uses provided dice values instead of random rolls.
+    /// </summary>
+    public void StartTurnWithDice(int die1, int die2)
+    {
+        if (!GameStarted || GameOver)
+        {
+            throw new InvalidOperationException("Game is not in progress");
+        }
+
+        Dice.SetDice(die1, die2);
+        RemainingMoves = new List<int>(Dice.GetMoves());
+        MoveHistory.Clear(); // Clear history for new turn
+
+        // Store dice for SGF generation (will be appended at EndTurn)
+        _currentTurnDice = (Dice.Die1, Dice.Die2);
+        _currentTurnMoves.Clear();
+
+        // Start new turn snapshot for game history
+        _currentTurn = new TurnSnapshot
+        {
+            TurnNumber = History.Turns.Count + 1,
+            Player = CurrentPlayer.Color,
+            DiceRolled = Dice.GetMoves().ToArray(),
+            PositionSgf = SgfSerializer.ExportPosition(this),
+            CubeValue = DoublingCube.Value,
+            CubeOwner = DoublingCube.Owner?.ToString(),
+            DoublingAction = _pendingDoublingAction
+        };
+
+        // Clear pending doubling action after recording
+        _pendingDoublingAction = null;
+    }
+
+    /// <summary>
     /// Execute a move (single or combined).
     /// </summary>
     public bool ExecuteMove(Move move)

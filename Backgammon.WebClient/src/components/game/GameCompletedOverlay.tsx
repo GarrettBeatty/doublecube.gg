@@ -6,7 +6,8 @@ import { CheckerColor } from '@/types/generated/Backgammon.Core'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
-import { Trophy, Target, BarChart3, Home, ArrowRight } from 'lucide-react'
+import { Trophy, Target, BarChart3, Home, ArrowRight, Sparkles, RotateCcw, Medal } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export const GameCompletedOverlay: React.FC = () => {
   const navigate = useNavigate()
@@ -96,13 +97,39 @@ export const GameCompletedOverlay: React.FC = () => {
 
   return (
     <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-      <Card className="w-full max-w-md mx-4 shadow-lg border-2">
-        <CardHeader className="text-center pb-2">
+      <Card className={cn(
+        "w-full max-w-md mx-4 shadow-lg border-2 transition-all",
+        isWinner && "border-yellow-400 shadow-yellow-200/50"
+      )}>
+        <CardHeader className={cn(
+          "text-center pb-2 relative overflow-hidden",
+          isWinner && "bg-gradient-to-b from-yellow-50 to-transparent dark:from-yellow-950/30"
+        )}>
+          {/* Celebration sparkles for winners */}
+          {isWinner && (
+            <>
+              <Sparkles className="absolute top-2 left-4 h-5 w-5 text-yellow-400 animate-pulse" />
+              <Sparkles className="absolute top-4 right-6 h-4 w-4 text-yellow-500 animate-pulse delay-75" />
+              <Sparkles className="absolute bottom-0 left-8 h-3 w-3 text-yellow-300 animate-pulse delay-150" />
+            </>
+          )}
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Trophy className={`h-8 w-8 ${isWinner ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+            {isWinner ? (
+              <div className="relative">
+                <Trophy className="h-12 w-12 text-yellow-500" />
+                <Medal className="absolute -right-1 -bottom-1 h-5 w-5 text-yellow-600" />
+              </div>
+            ) : (
+              <Trophy className="h-10 w-10 text-muted-foreground" />
+            )}
           </div>
-          <CardTitle className="text-2xl">{getTitle()}</CardTitle>
-          <p className="text-muted-foreground">
+          <CardTitle className={cn("text-2xl", isWinner && "text-yellow-700 dark:text-yellow-400")}>
+            {getTitle()}
+          </CardTitle>
+          <p className={cn(
+            "text-muted-foreground",
+            isWinner && "text-yellow-700 dark:text-yellow-300 font-medium"
+          )}>
             {isWinner ? 'Congratulations! You won!' : 'Better luck next time!'}
           </p>
         </CardHeader>
@@ -179,47 +206,70 @@ export const GameCompletedOverlay: React.FC = () => {
           )}
         </CardContent>
 
-        <CardFooter className="flex flex-wrap gap-2 justify-center pt-2">
+        <CardFooter className="flex flex-col gap-3 pt-2">
           {isMatchGame ? (
             matchState.matchComplete ? (
               <>
-                <Button variant="outline" onClick={handleViewAnalysis}>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View in Analysis
-                </Button>
-                <Button onClick={handleViewMatchResults}>
-                  <Trophy className="h-4 w-4 mr-2" />
+                {/* Primary action */}
+                <Button onClick={handleViewMatchResults} className="w-full" size="lg">
+                  <Trophy className="h-5 w-5 mr-2" />
                   View Match Results
                 </Button>
+                {/* Secondary actions */}
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" onClick={handleViewAnalysis} className="flex-1">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Analysis
+                  </Button>
+                  <Button variant="outline" onClick={handlePlayAgain} className="flex-1">
+                    <Home className="h-4 w-4 mr-2" />
+                    Home
+                  </Button>
+                </div>
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={handleViewAnalysis} disabled={isContinuing}>
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  View in Analysis
-                </Button>
-                <Button onClick={handleContinueMatch} disabled={isContinuing}>
+                {/* Primary action for match continuation */}
+                <Button
+                  onClick={handleContinueMatch}
+                  disabled={isContinuing}
+                  className={cn("w-full", isWinner && "bg-green-600 hover:bg-green-700")}
+                  size="lg"
+                >
                   {isContinuing ? (
                     'Starting next game...'
                   ) : (
                     <>
-                      <ArrowRight className="h-4 w-4 mr-2" />
+                      <ArrowRight className="h-5 w-5 mr-2" />
                       Continue to Next Game
                     </>
                   )}
+                </Button>
+                {/* Secondary action */}
+                <Button variant="outline" onClick={handleViewAnalysis} disabled={isContinuing} className="w-full">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  View Game Analysis
                 </Button>
               </>
             )
           ) : (
             <>
-              <Button variant="outline" onClick={handleViewAnalysis}>
-                <BarChart3 className="h-4 w-4 mr-2" />
-                View in Analysis
+              {/* Non-match game footer with Rematch prominent */}
+              <Button onClick={handlePlayAgain} className="w-full" size="lg">
+                <RotateCcw className="h-5 w-5 mr-2" />
+                {isWinner ? 'Play Again' : 'Rematch'}
               </Button>
-              <Button onClick={handlePlayAgain}>
-                <Home className="h-4 w-4 mr-2" />
-                Play Again
-              </Button>
+              {/* Secondary actions */}
+              <div className="flex gap-2 w-full">
+                <Button variant="outline" onClick={handleViewAnalysis} className="flex-1">
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Analysis
+                </Button>
+                <Button variant="outline" onClick={handlePlayAgain} className="flex-1">
+                  <Home className="h-4 w-4 mr-2" />
+                  Home
+                </Button>
+              </div>
             </>
           )}
         </CardFooter>
