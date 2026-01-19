@@ -164,6 +164,135 @@ public class GnubgOutputParserTests
     }
 
     // ===================
+    // Compound Bar Entry Tests
+    // ===================
+
+    [Fact]
+    public void ParseMoveNotation_CompoundBarEntry_ParsesTwoMoves()
+    {
+        // Arrange
+        // gnubg returns "bar/23/22" for Red with dice [2, 1]
+        // This is a compound bar entry: enter to 23, then move to 22
+        // For Red: gnubg 23 = our point 2 (25-23), gnubg 22 = our point 3 (25-22)
+        // Move 1: bar->2 (die 2), Move 2: 2->3 (die 1)
+        var notation = "bar/23/22";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 2, 1 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move: bar -> point 2 (gnubg 23 = 25-23 = 2) with die 2
+        Assert.Equal(0, moves[0].From);   // bar
+        Assert.Equal(2, moves[0].To);     // our point 2
+        Assert.Equal(2, moves[0].DieValue);
+
+        // Second move: point 2 -> point 3 (gnubg 22 = 25-22 = 3) with die 1
+        Assert.Equal(2, moves[1].From);
+        Assert.Equal(3, moves[1].To);
+        Assert.Equal(1, moves[1].DieValue);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_CompoundBarEntryWhite_ParsesTwoMoves()
+    {
+        // Arrange
+        // gnubg returns "bar/23/22" for White with dice [2, 1]
+        // For White: gnubg point 23 = our point 23, gnubg point 22 = our point 22
+        // Move 1: bar->23 (die 2, since 25-23=2), Move 2: 23->22 (die 1)
+        var notation = "bar/23/22";
+        var color = CheckerColor.White;
+        var availableDice = new List<int> { 2, 1 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move: bar -> point 23 with die 2 (25-23=2)
+        Assert.Equal(0, moves[0].From);   // bar
+        Assert.Equal(23, moves[0].To);    // our point 23
+        Assert.Equal(2, moves[0].DieValue);
+
+        // Second move: point 23 -> point 22 with die 1
+        Assert.Equal(23, moves[1].From);
+        Assert.Equal(22, moves[1].To);
+        Assert.Equal(1, moves[1].DieValue);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_CompoundBarEntryWithHits_ParsesCorrectly()
+    {
+        // Arrange
+        // gnubg returns "bar/23*/22*" - compound bar entry with hits (asterisks stripped)
+        // After stripping * markers, we have "bar/23/22"
+        var notation = "bar/23*/22*";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 2, 1 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(2, moves.Count);
+
+        // First move: bar -> point 2 with die 2
+        Assert.Equal(0, moves[0].From);
+        Assert.Equal(2, moves[0].To);
+        Assert.Equal(2, moves[0].DieValue);
+
+        // Second move: point 2 -> point 3 with die 1
+        Assert.Equal(2, moves[1].From);
+        Assert.Equal(3, moves[1].To);
+        Assert.Equal(1, moves[1].DieValue);
+    }
+
+    [Fact]
+    public void ParseMoveNotation_CompoundBarEntryTriple_ParsesThreeMoves()
+    {
+        // Arrange
+        // gnubg returns "bar/22/20/17" for Red with dice [3, 2, 3] (doubles scenario)
+        // For Red: gnubg 22=3, 20=5, 17=8
+        // Move 1: bar->3 (die 3), Move 2: 3->5 (die 2), Move 3: 5->8 (die 3)
+        var notation = "bar/22/20/17";
+        var color = CheckerColor.Red;
+        var availableDice = new List<int> { 3, 2, 3 };
+
+        // Act
+        var moves = GnubgOutputParser.ParseMoveNotation(notation, color, availableDice);
+
+        // Assert
+        _output.WriteLine($"Parsed moves: {string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})"))}");
+
+        Assert.Equal(3, moves.Count);
+
+        // First move: bar -> point 3 with die 3
+        Assert.Equal(0, moves[0].From);
+        Assert.Equal(3, moves[0].To);
+        Assert.Equal(3, moves[0].DieValue);
+
+        // Second move: point 3 -> point 5 with die 2
+        Assert.Equal(3, moves[1].From);
+        Assert.Equal(5, moves[1].To);
+        Assert.Equal(2, moves[1].DieValue);
+
+        // Third move: point 5 -> point 8 with die 3
+        Assert.Equal(5, moves[2].From);
+        Assert.Equal(8, moves[2].To);
+        Assert.Equal(3, moves[2].DieValue);
+    }
+
+    // ===================
     // Hit Notation Tests (asterisk *)
     // ===================
 

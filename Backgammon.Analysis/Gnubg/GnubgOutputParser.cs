@@ -301,6 +301,7 @@ public static class GnubgOutputParser
 
                 // Handle bar entry: "bar/20" or "bar/24" or abbreviated "bar/17" (using multiple dice)
                 // Also handles repetition notation: "bar/20(4)" for doubles entering 4 times
+                // Also handles compound bar entry: "bar/23/22" (enter to 23, then move to 22)
                 // gnubg uses the current player's perspective for point numbers in hint notation
                 // For White (O): bar/20 means enter at gnubg point 20 = our point 20, die = 25-20 = 5
                 // For Red (X): bar/24 means enter at X's point 24 = our point 1, die = 25-24 = 1
@@ -309,7 +310,65 @@ public static class GnubgOutputParser
                 {
                     logger?.LogInformation("BAR ENTRY detected: '{Part}'", part);
 
-                    // Parse bar entry with optional repetition: "bar/20" or "bar/20(4)"
+                    // Check for compound bar entry like "bar/23/22" (bar entry followed by additional moves)
+                    var barSlashParts = part.Split('/');
+                    if (barSlashParts.Length > 2 && barSlashParts[0].Equals("bar", StringComparison.OrdinalIgnoreCase))
+                    {
+                        logger?.LogInformation(
+                            "COMPOUND BAR ENTRY detected: {Count} segments: [{Segments}]",
+                            barSlashParts.Length,
+                            string.Join(", ", barSlashParts));
+
+                        // First segment is "bar", remaining segments are point numbers
+                        // bar/23/22 means: bar->23 (first die), 23->22 (second die)
+                        for (int i = 1; i < barSlashParts.Length; i++)
+                        {
+                            var gnubgTo = int.Parse(barSlashParts[i]);
+                            var to = transformForRed ? 25 - gnubgTo : gnubgTo;
+
+                            int from;
+                            int dieValue;
+
+                            if (i == 1)
+                            {
+                                // First move is from bar
+                                from = 0;
+                                // Die value for bar entry: distance from bar to entry point
+                                dieValue = transformForRed ? to : 25 - to;
+                            }
+                            else
+                            {
+                                // Subsequent moves are between points
+                                var gnubgFrom = int.Parse(barSlashParts[i - 1]);
+                                from = transformForRed ? 25 - gnubgFrom : gnubgFrom;
+                                dieValue = Math.Abs(to - from);
+                            }
+
+                            logger?.LogInformation(
+                                "Compound bar entry segment {Index}: {From} -> {To} (die={Die})",
+                                i,
+                                from,
+                                to,
+                                dieValue);
+
+                            if (remainingDice.Contains(dieValue))
+                            {
+                                moves.Add(new Move(from, to, dieValue));
+                                remainingDice.Remove(dieValue);
+                            }
+                            else
+                            {
+                                logger?.LogWarning(
+                                    "Compound bar entry: die {Die} not available in [{Dice}]",
+                                    dieValue,
+                                    string.Join(", ", remainingDice));
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    // Parse simple bar entry with optional repetition: "bar/20" or "bar/20(4)"
                     var barMatch = Regex.Match(part, @"^bar/(\d+)(?:\((\d+)\))?$", RegexOptions.IgnoreCase);
                     if (barMatch.Success)
                     {
@@ -319,7 +378,7 @@ public static class GnubgOutputParser
                             : 1;
 
                         logger?.LogInformation(
-                            "Bar entry parsed: gnubgTo={GnubgTo}, repetitionCount={RepCount}",
+                            "Simple bar entry parsed: gnubgTo={GnubgTo}, repetitionCount={RepCount}",
                             gnubgTo,
                             repetitionCount);
 
