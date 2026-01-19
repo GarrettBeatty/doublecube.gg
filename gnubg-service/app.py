@@ -3,6 +3,7 @@ GNU Backgammon HTTP Service.
 Provides REST API endpoints for position evaluation, move hints, and cube decisions.
 """
 
+import logging
 import os
 from dataclasses import asdict
 from flask import Flask, request, jsonify
@@ -18,6 +19,13 @@ from output_parser import (
     parse_move_analysis,
     parse_cube_decision
 )
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -236,8 +244,11 @@ def hint_native():
     """
     try:
         data = request.get_json()
+        logger.info("=== HINT-NATIVE REQUEST ===")
+        logger.info("Request data: %s", data)
 
         if not data:
+            logger.error("Missing request body")
             return jsonify({"error": "Missing request body"}), 400
 
         position = data.get("position")
@@ -245,7 +256,13 @@ def hint_native():
         player = data.get("player", "O")
         plies = data.get("plies", 2)
 
+        logger.info("Position: %s", position)
+        logger.info("Dice: %s", dice)
+        logger.info("Player: %s", player)
+        logger.info("Plies: %d", plies)
+
         if not position or not dice:
+            logger.error("Missing 'position' or 'dice' field")
             return jsonify({"error": "Missing 'position' or 'dice' field"}), 400
 
         # Build commands using Position ID format (handles bar correctly)
@@ -261,18 +278,36 @@ def hint_native():
             "hint"
         ]
 
+        logger.info("=== GNUBG COMMANDS ===")
+        for i, cmd in enumerate(commands):
+            logger.info("  [%d] %s", i, cmd)
+
         output = runner.execute_commands(commands)
+
+        logger.info("=== GNUBG RAW OUTPUT ===")
+        logger.info("%s", output)
 
         # Parse output
         moves = parse_move_analysis(output)
 
-        return jsonify({
-            "moves": [asdict(m) for m in moves]
-        })
+        logger.info("=== PARSED MOVES ===")
+        for m in moves:
+            logger.info("  Rank %d: notation='%s', equity=%.4f", m.rank, m.notation, m.equity)
+
+        if not moves:
+            logger.warning("NO MOVES PARSED from gnubg output!")
+
+        result = {"moves": [asdict(m) for m in moves]}
+        logger.info("=== RETURNING RESPONSE ===")
+        logger.info("%s", result)
+
+        return jsonify(result)
 
     except TimeoutError as e:
+        logger.error("Timeout error: %s", e)
         return jsonify({"error": str(e)}), 504
     except Exception as e:
+        logger.exception("Exception in hint-native: %s", e)
         return jsonify({"error": str(e)}), 500
 
 

@@ -130,13 +130,25 @@ public class HttpGnubgEvaluator : IPositionEvaluator, IPliesConfigurable
                 Plies = PliesOverride ?? _settings.EvaluationPlies
             };
 
+            _logger?.LogInformation(
+                "=== HTTP HINT REQUEST === Position: {Position}, Dice: [{Die1}, {Die2}], Player: {Player}, Plies: {Plies}",
+                request.Position,
+                request.Dice[0],
+                request.Dice[1],
+                request.Player,
+                request.Plies);
+
             var response = await _httpClient.PostAsJsonAsync("/hint-native", request, JsonOptions, ct);
             response.EnsureSuccessStatusCode();
 
-            var result = await response.Content.ReadFromJsonAsync<HintResponse>(JsonOptions, ct)
+            // Read raw JSON for logging
+            var rawJson = await response.Content.ReadAsStringAsync(ct);
+            _logger?.LogInformation("=== HTTP HINT RAW RESPONSE ===\n{RawJson}", rawJson);
+
+            var result = JsonSerializer.Deserialize<HintResponse>(rawJson, JsonOptions)
                 ?? throw new Exception("Null response from gnubg service");
 
-            _logger?.LogDebug("HTTP hint returned {Count} moves", result.Moves?.Count ?? 0);
+            _logger?.LogInformation("HTTP hint returned {Count} moves", result.Moves?.Count ?? 0);
 
             // Convert to BestMovesAnalysis format
             var topMoves = new List<MoveSequenceEvaluation>();
@@ -165,7 +177,8 @@ public class HttpGnubgEvaluator : IPositionEvaluator, IPliesConfigurable
                         var alternatives = GnubgOutputParser.ParseMoveNotationWithAlternatives(
                             moveHint.Notation,
                             engine.CurrentPlayer.Color,
-                            availableDice);
+                            availableDice,
+                            _logger);
 
                         var moves = alternatives.FirstOrDefault() ?? new List<Move>();
 

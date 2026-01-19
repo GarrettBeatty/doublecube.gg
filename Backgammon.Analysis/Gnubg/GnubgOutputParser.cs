@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Backgammon.Core;
 using Backgammon.Plugins.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Backgammon.Analysis.Gnubg;
 
@@ -261,27 +262,43 @@ public static class GnubgOutputParser
     /// Gnubg uses * to indicate hits (e.g., "6/5*" means move to 5 and hit).
     /// We strip the * since we only need coordinates.
     /// </remarks>
-    public static List<Move> ParseMoveNotation(string notation, CheckerColor color, List<int> availableDice)
+    public static List<Move> ParseMoveNotation(string notation, CheckerColor color, List<int> availableDice, ILogger? logger = null)
     {
+        logger?.LogInformation(
+            "=== ParseMoveNotation START === notation='{Notation}', color={Color}, availableDice=[{Dice}]",
+            notation,
+            color,
+            string.Join(", ", availableDice));
+
         var moves = new List<Move>();
 
         // Determine move direction: Red moves ascending (+), White moves descending (-)
         int direction = color == CheckerColor.Red ? 1 : -1;
         bool transformForRed = color == CheckerColor.Red;
 
+        logger?.LogDebug("Direction: {Direction}, TransformForRed: {Transform}", direction, transformForRed);
+
         try
         {
             // Remove hit indicators (*) - we only need the coordinates
+            var originalNotation = notation;
             notation = notation.Replace("*", string.Empty);
+            if (notation != originalNotation)
+            {
+                logger?.LogDebug("Removed hit indicators: '{Original}' -> '{Clean}'", originalNotation, notation);
+            }
 
             // Split notation by spaces: "24/20 13/9" -> ["24/20", "13/9"]
             var parts = notation.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            logger?.LogDebug("Split into {Count} parts: [{Parts}]", parts.Length, string.Join(", ", parts));
 
             // Track which dice we've used
             var remainingDice = new List<int>(availableDice);
 
             foreach (var part in parts)
             {
+                logger?.LogDebug("Processing part: '{Part}', remainingDice=[{Dice}]", part, string.Join(", ", remainingDice));
+
                 // Handle bar entry: "bar/20" or "bar/24" or abbreviated "bar/17" (using multiple dice)
                 // Also handles repetition notation: "bar/20(4)" for doubles entering 4 times
                 // gnubg uses the current player's perspective for point numbers in hint notation
@@ -290,6 +307,8 @@ public static class GnubgOutputParser
                 // Abbreviated: bar/17 for Red with [3,5] means enter at 5, then move to 8 (total 8 = 3+5)
                 if (part.Contains("bar", StringComparison.OrdinalIgnoreCase))
                 {
+                    logger?.LogInformation("BAR ENTRY detected: '{Part}'", part);
+
                     // Parse bar entry with optional repetition: "bar/20" or "bar/20(4)"
                     var barMatch = Regex.Match(part, @"^bar/(\d+)(?:\((\d+)\))?$", RegexOptions.IgnoreCase);
                     if (barMatch.Success)
@@ -299,6 +318,11 @@ public static class GnubgOutputParser
                             ? int.Parse(barMatch.Groups[2].Value)
                             : 1;
 
+                        logger?.LogInformation(
+                            "Bar entry parsed: gnubgTo={GnubgTo}, repetitionCount={RepCount}",
+                            gnubgTo,
+                            repetitionCount);
+
                         // For Red, gnubg shows X's perspective where point 24 = our point 1
                         var to = transformForRed ? 25 - gnubgTo : gnubgTo;
 
@@ -307,28 +331,57 @@ public static class GnubgOutputParser
                         // For White entering at our point N, total distance = 25 - N
                         var totalDistance = transformForRed ? to : 25 - to;
 
+                        logger?.LogInformation(
+                            "Bar entry computed: to={To}, totalDistance={TotalDistance}, transformForRed={Transform}",
+                            to,
+                            totalDistance,
+                            transformForRed);
+
                         // Execute bar entry for each repetition (for doubles like "bar/20(4)")
                         for (int rep = 0; rep < repetitionCount; rep++)
                         {
+                            logger?.LogDebug("Bar entry rep {Rep}/{Total}", rep + 1, repetitionCount);
+
                             // Try single die entry first
                             if (remainingDice.Contains(totalDistance))
                             {
+                                logger?.LogInformation(
+                                    "Single die bar entry: 0 -> {To} (die={Die})",
+                                    to,
+                                    totalDistance);
                                 moves.Add(new Move(0, to, totalDistance));
                                 remainingDice.Remove(totalDistance);
                             }
                             else
                             {
+                                logger?.LogInformation(
+                                    "Abbreviated bar entry - need to expand. totalDistance={TotalDistance}, remainingDice=[{Dice}]",
+                                    totalDistance,
+                                    string.Join(", ", remainingDice));
+
                                 // Abbreviated bar entry - need to expand using multiple dice
                                 // Find dice that sum to totalDistance and create intermediate moves
                                 bool expanded = ExpandAbbreviatedBarEntry(
-                                    to, totalDistance, direction, remainingDice, moves);
+                                    to, totalDistance, direction, remainingDice, moves, logger);
 
                                 if (!expanded)
                                 {
-                                    // Couldn't expand - log but don't throw (move might not be valid)
+                                    logger?.LogWarning(
+                                        "Failed to expand abbreviated bar entry: to={To}, totalDistance={TotalDistance}, remainingDice=[{Dice}]",
+                                        to,
+                                        totalDistance,
+                                        string.Join(", ", remainingDice));
+                                }
+                                else
+                                {
+                                    logger?.LogInformation("Abbreviated bar entry expanded successfully");
                                 }
                             }
                         }
+                    }
+                    else
+                    {
+                        logger?.LogWarning("Bar entry regex did not match for part: '{Part}'", part);
                     }
 
                     continue;
@@ -452,8 +505,14 @@ public static class GnubgOutputParser
         }
         catch (Exception ex)
         {
+            logger?.LogError(ex, "Exception parsing move notation '{Notation}'", notation);
             throw new Exception($"Failed to parse move notation '{notation}': {ex.Message}", ex);
         }
+
+        logger?.LogInformation(
+            "=== ParseMoveNotation COMPLETE === {Count} moves: [{Moves}]",
+            moves.Count,
+            string.Join(", ", moves.Select(m => $"{m.From}->{m.To}(die:{m.DieValue})")));
 
         return moves;
     }
@@ -472,10 +531,16 @@ public static class GnubgOutputParser
     public static List<List<Move>> ParseMoveNotationWithAlternatives(
         string notation,
         CheckerColor color,
-        List<int> availableDice)
+        List<int> availableDice,
+        ILogger? logger = null)
     {
+        logger?.LogInformation(
+            "=== ParseMoveNotationWithAlternatives START === notation='{Notation}', color={Color}",
+            notation,
+            color);
+
         // Get the primary parsing result
-        var primaryMoves = ParseMoveNotation(notation, color, new List<int>(availableDice));
+        var primaryMoves = ParseMoveNotation(notation, color, new List<int>(availableDice), logger);
 
         var result = new List<List<Move>> { primaryMoves };
 
@@ -508,6 +573,10 @@ public static class GnubgOutputParser
                 break;
             }
         }
+
+        logger?.LogInformation(
+            "=== ParseMoveNotationWithAlternatives COMPLETE === {Count} alternatives",
+            result.Count);
 
         return result;
     }
@@ -672,13 +741,22 @@ public static class GnubgOutputParser
         int totalDistance,
         int direction,
         List<int> remainingDice,
-        List<Move> moves)
+        List<Move> moves,
+        ILogger? logger = null)
     {
+        logger?.LogDebug(
+            "ExpandAbbreviatedBarEntry: finalTo={FinalTo}, totalDistance={TotalDistance}, direction={Direction}, remainingDice=[{Dice}]",
+            finalTo,
+            totalDistance,
+            direction,
+            string.Join(", ", remainingDice));
+
         // For bar entry, the first die determines the entry point
         // Red enters at points 1-6, White enters at points 19-24
         // direction: +1 for Red (ascending), -1 for White (descending)
         // Try larger dice first for entry (often safer entry points)
         var sortedDice = remainingDice.OrderByDescending(d => d).ToList();
+        logger?.LogDebug("Sorted dice (descending): [{Dice}]", string.Join(", ", sortedDice));
 
         // Try pairs of different dice
         for (int i = 0; i < sortedDice.Count; i++)
@@ -693,6 +771,8 @@ public static class GnubgOutputParser
                 var die1 = sortedDice[i];
                 var die2 = sortedDice[j];
 
+                logger?.LogDebug("Trying dice pair: die1={Die1}, die2={Die2}, sum={Sum}", die1, die2, die1 + die2);
+
                 if (die1 + die2 == totalDistance)
                 {
                     // For bar entry, die1 determines initial entry point
@@ -700,9 +780,23 @@ public static class GnubgOutputParser
                     int entryPoint = direction > 0 ? die1 : 25 - die1;
                     int afterEntry = entryPoint + (direction * die2);
 
+                    logger?.LogDebug(
+                        "Sum matches! entryPoint={Entry}, afterEntry={After}, finalTo={FinalTo}",
+                        entryPoint,
+                        afterEntry,
+                        finalTo);
+
                     // Verify the final position matches
                     if (afterEntry == finalTo)
                     {
+                        logger?.LogInformation(
+                            "Bar entry expanded: 0 -> {Entry} (die={Die1}), {Entry} -> {FinalTo} (die={Die2})",
+                            entryPoint,
+                            die1,
+                            entryPoint,
+                            finalTo,
+                            die2);
+
                         // First move: bar -> entry point
                         moves.Add(new Move(0, entryPoint, die1));
 
@@ -715,9 +809,15 @@ public static class GnubgOutputParser
 
                         return true;
                     }
+                    else
+                    {
+                        logger?.LogDebug("afterEntry {After} != finalTo {FinalTo}, trying next pair", afterEntry, finalTo);
+                    }
                 }
             }
         }
+
+        logger?.LogDebug("No dice pair found, trying doubles");
 
         // Try using same die twice (for doubles)
         for (int i = 0; i < remainingDice.Count; i++)
@@ -728,8 +828,22 @@ public static class GnubgOutputParser
                 int entryPoint = direction > 0 ? die : 25 - die;
                 int afterEntry = entryPoint + (direction * die);
 
+                logger?.LogDebug(
+                    "Trying doubles: die={Die}, entryPoint={Entry}, afterEntry={After}",
+                    die,
+                    entryPoint,
+                    afterEntry);
+
                 if (afterEntry == finalTo)
                 {
+                    logger?.LogInformation(
+                        "Bar entry expanded (doubles): 0 -> {Entry} (die={Die}), {Entry} -> {FinalTo} (die={Die})",
+                        entryPoint,
+                        die,
+                        entryPoint,
+                        finalTo,
+                        die);
+
                     moves.Add(new Move(0, entryPoint, die));
                     moves.Add(new Move(entryPoint, finalTo, die));
 
@@ -740,6 +854,11 @@ public static class GnubgOutputParser
                 }
             }
         }
+
+        logger?.LogWarning(
+            "ExpandAbbreviatedBarEntry FAILED: could not find dice combination for finalTo={FinalTo}, totalDistance={TotalDistance}",
+            finalTo,
+            totalDistance);
 
         return false;
     }
