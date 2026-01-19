@@ -83,6 +83,12 @@ public class GameEngine
 
     public string? MatchId { get; set; }
 
+    /// <summary>
+    /// Whether the game ended because a player declined a double.
+    /// When true, the win is always Normal (1x multiplier) regardless of board position.
+    /// </summary>
+    public bool EndedByDeclinedDouble { get; private set; }
+
     // Opening roll properties
     public bool IsOpeningRoll { get; private set; }
 
@@ -462,7 +468,27 @@ public class GameEngine
     }
 
     /// <summary>
-    /// Calculate game result (normal, gammon, or backgammon)
+    /// End the game because a player declined a double.
+    /// The winner scores only the current cube value (no gammon/backgammon multiplier).
+    /// </summary>
+    /// <param name="winner">The player who wins (the one who offered the double)</param>
+    public void DeclineDouble(Player winner)
+    {
+        if (!GameStarted || GameOver)
+        {
+            throw new InvalidOperationException("Cannot decline double - game is not in progress");
+        }
+
+        EndedByDeclinedDouble = true;
+        Winner = winner;
+        GameOver = true;
+
+        // Finalize SGF with result
+        FinalizeGameSgf();
+    }
+
+    /// <summary>
+    /// Calculate game result (points scored = multiplier × cube value)
     /// </summary>
     public int GetGameResult()
     {
@@ -471,32 +497,14 @@ public class GameEngine
             return 0;
         }
 
-        var loser = Winner.Color == CheckerColor.White ? RedPlayer : WhitePlayer;
-
-        // Backgammon (3x) - loser has checkers on bar or in winner's home board
-        if (loser.CheckersBornOff == 0)
+        var multiplier = DetermineWinType() switch
         {
-            if (loser.CheckersOnBar > 0)
-            {
-                return 3 * DoublingCube.Value;
-            }
+            WinType.Backgammon => 3,
+            WinType.Gammon => 2,
+            _ => 1
+        };
 
-            var (winnerHomeStart, winnerHomeEnd) = Winner.GetHomeBoardRange();
-            for (int i = winnerHomeStart; i <= winnerHomeEnd; i++)
-            {
-                var point = Board.GetPoint(i);
-                if (point.Color == loser.Color && point.Count > 0)
-                {
-                    return 3 * DoublingCube.Value;
-                }
-            }
-
-            // Gammon (2x) - loser has not borne off any checkers
-            return 2 * DoublingCube.Value;
-        }
-
-        // Normal win (1x)
-        return DoublingCube.Value;
+        return multiplier * DoublingCube.Value;
     }
 
     /// <summary>
@@ -507,6 +515,12 @@ public class GameEngine
         if (!GameOver || Winner == null)
         {
             throw new InvalidOperationException("Game is not over yet");
+        }
+
+        // Declining a double is always a Normal win (just the cube value)
+        if (EndedByDeclinedDouble)
+        {
+            return WinType.Normal;
         }
 
         var loser = Winner.Color == CheckerColor.White ? RedPlayer : WhitePlayer;

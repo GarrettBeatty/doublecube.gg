@@ -19,6 +19,8 @@ public class DoublingHandler : IDoublingHandler
     private readonly IGameRepository _gameRepository;
     private readonly IPlayerStatsService _playerStatsService;
     private readonly IAiMoveService _aiMoveService;
+    private readonly IMatchService _matchService;
+    private readonly IGameBroadcastService _broadcastService;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly ILogger<DoublingHandler> _logger;
 
@@ -29,6 +31,8 @@ public class DoublingHandler : IDoublingHandler
         IGameRepository gameRepository,
         IPlayerStatsService playerStatsService,
         IAiMoveService aiMoveService,
+        IMatchService matchService,
+        IGameBroadcastService broadcastService,
         IHubContext<GameHub, IGameHubClient> hubContext,
         ILogger<DoublingHandler> logger)
     {
@@ -38,6 +42,8 @@ public class DoublingHandler : IDoublingHandler
         _gameRepository = gameRepository;
         _playerStatsService = playerStatsService;
         _aiMoveService = aiMoveService;
+        _matchService = matchService;
+        _broadcastService = broadcastService;
         _hubContext = hubContext;
         _logger = logger;
     }
@@ -114,6 +120,22 @@ public class DoublingHandler : IDoublingHandler
                     var finalState = session.GetState(connectionId);
                     await _hubContext.Clients.Client(connectionId).GameOver(finalState);
 
+                    // Handle match score update if this is a match game
+                    if (!string.IsNullOrEmpty(session.MatchId) && winner != null)
+                    {
+                        var winnerId = winner.Color == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
+                        var winType = session.Engine.DetermineWinType(); // Now correctly returns Normal for declined double
+                        var result = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
+
+                        await _matchService.CompleteGameAsync(session.Id, result);
+
+                        var match = await _matchService.GetMatchAsync(session.MatchId);
+                        if (match != null)
+                        {
+                            await _broadcastService.BroadcastMatchUpdateAsync(match, session.Id);
+                        }
+                    }
+
                     _sessionManager.RemoveGame(session.Id);
                 }
             }
@@ -180,6 +202,22 @@ public class DoublingHandler : IDoublingHandler
         }
 
         await _gameService.BroadcastGameOverAsync(session);
+
+        // Handle match score update if this is a match game
+        if (!string.IsNullOrEmpty(session.MatchId))
+        {
+            var winnerId = winner?.Color == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
+            var winType = session.Engine.DetermineWinType(); // Now correctly returns Normal for declined double
+            var result = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
+
+            await _matchService.CompleteGameAsync(session.Id, result);
+
+            var match = await _matchService.GetMatchAsync(session.MatchId);
+            if (match != null)
+            {
+                await _broadcastService.BroadcastMatchUpdateAsync(match, session.Id);
+            }
+        }
 
         _sessionManager.RemoveGame(session.Id);
         _logger.LogInformation("Removed completed game {GameId} from memory (declined double)", session.Id);

@@ -2056,4 +2056,217 @@ public class GameEngineTests
         Assert.Equal(opponentColor, engine.History.Turns[1].Player);
         Assert.Equal(opponentMovesExecuted, engine.History.Turns[1].Moves.Count);
     }
+
+    // DeclineDouble Tests
+
+    [Fact]
+    public void DeclineDouble_SetsEndedByDeclinedDoubleFlag()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+
+        // Assert
+        Assert.True(engine.EndedByDeclinedDouble);
+    }
+
+    [Fact]
+    public void DeclineDouble_SetsWinnerAndGameOver()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+
+        // Assert
+        Assert.True(engine.GameOver);
+        Assert.Equal(engine.WhitePlayer, engine.Winner);
+    }
+
+    [Fact]
+    public void DeclineDouble_WhenGameNotStarted_ThrowsException()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        // Don't start game
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(() => engine.DeclineDouble(engine.WhitePlayer));
+        Assert.Contains("not in progress", ex.Message);
+    }
+
+    [Fact]
+    public void DeclineDouble_WhenGameAlreadyOver_ThrowsException()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.ForfeitGame(engine.WhitePlayer); // End game first
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(() => engine.DeclineDouble(engine.RedPlayer));
+        Assert.Contains("not in progress", ex.Message);
+    }
+
+    [Fact]
+    public void DetermineWinType_AfterDeclineDouble_ReturnsNormal()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+        var winType = engine.DetermineWinType();
+
+        // Assert - Declining a double is always Normal win
+        Assert.Equal(WinType.Normal, winType);
+    }
+
+    [Fact]
+    public void DetermineWinType_AfterDeclineDouble_ReturnsNormal_EvenWithBackgammonPosition()
+    {
+        // Arrange - Set up a backgammon position (loser has checkers on bar)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        // Put red checkers on bar (potential backgammon)
+        engine.RedPlayer.CheckersOnBar = 2;
+
+        // Act - White declines double, Red wins
+        engine.DeclineDouble(engine.RedPlayer);
+        var winType = engine.DetermineWinType();
+
+        // Assert - Even though it's a backgammon position, declining a double is always Normal
+        Assert.Equal(WinType.Normal, winType);
+    }
+
+    [Fact]
+    public void GetGameResult_AfterDeclineDouble_ReturnsOnlyCubeValue()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        // Cube is at 1
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+        var result = engine.GetGameResult();
+
+        // Assert - 1x multiplier * cube value 1 = 1
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void GetGameResult_AfterDeclineDouble_WithCubeAt2_Returns2()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.DoublingCube.Double(CheckerColor.White); // Cube now at 2
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+        var result = engine.GetGameResult();
+
+        // Assert - 1x multiplier * cube value 2 = 2
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void GetGameResult_AfterDeclineDouble_WithCubeAt4_Returns4()
+    {
+        // Arrange
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.DoublingCube.Double(CheckerColor.White); // Cube now at 2
+        engine.DoublingCube.Double(CheckerColor.Red);   // Cube now at 4
+
+        // Act
+        engine.DeclineDouble(engine.WhitePlayer);
+        var result = engine.GetGameResult();
+
+        // Assert - 1x multiplier * cube value 4 = 4
+        Assert.Equal(4, result);
+    }
+
+    [Fact]
+    public void GetGameResult_AfterDeclineDouble_WithBackgammonPosition_StillReturnsOnlyCubeValue()
+    {
+        // Arrange - Set up a backgammon position (loser has checkers on bar)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        engine.DoublingCube.Double(CheckerColor.White); // Cube now at 2
+        // Put white checkers on bar (would be backgammon if forfeited)
+        engine.WhitePlayer.CheckersOnBar = 2;
+
+        // Act - White declines double (giving up), Red wins
+        engine.DeclineDouble(engine.RedPlayer);
+        var result = engine.GetGameResult();
+
+        // Assert - Still just 2 points (1x * cube value 2), NOT 6 points (3x * 2)
+        Assert.Equal(2, result);
+    }
+
+    [Fact]
+    public void DetermineWinType_AfterForfeit_UsesboardState_ReturnsGammon()
+    {
+        // Arrange - Set up a gammon position (loser has not borne off any checkers,
+        // but has no checkers on bar or in winner's home board)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+
+        // Clear red checkers from White's home board (points 1-6) to make it gammon not backgammon
+        // Initial position has red checkers on points 1 (2 checkers)
+        engine.Board.GetPoint(1).Checkers.Clear();
+        // Move those checkers to point 7 (outside White's home board)
+        engine.Board.GetPoint(7).AddChecker(CheckerColor.Red);
+        engine.Board.GetPoint(7).AddChecker(CheckerColor.Red);
+
+        // Act - Regular forfeit, NOT declined double
+        engine.ForfeitGame(engine.WhitePlayer);
+        var winType = engine.DetermineWinType();
+
+        // Assert - Regular forfeit uses board state, loser has no checkers borne off = gammon
+        Assert.Equal(WinType.Gammon, winType);
+    }
+
+    [Fact]
+    public void DetermineWinType_AfterForfeit_UsesboardState_ReturnsBackgammon()
+    {
+        // Arrange - Set up a backgammon position (loser has checkers on bar)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        // Put red checkers on bar (backgammon)
+        engine.RedPlayer.CheckersOnBar = 1;
+
+        // Act - Regular forfeit, NOT declined double
+        engine.ForfeitGame(engine.WhitePlayer);
+        var winType = engine.DetermineWinType();
+
+        // Assert - Regular forfeit uses board state, so this is a backgammon
+        Assert.Equal(WinType.Backgammon, winType);
+    }
+
+    [Fact]
+    public void GetGameResult_AfterForfeit_UsesMultiplier()
+    {
+        // Arrange - Set up a backgammon position (loser has checkers on bar)
+        var engine = new GameEngine();
+        engine.StartNewGame();
+        // Put red checkers on bar (backgammon = 3x)
+        engine.RedPlayer.CheckersOnBar = 1;
+        engine.DoublingCube.Double(CheckerColor.White); // Cube at 2
+
+        // Act - Regular forfeit (resignation), NOT declined double
+        engine.ForfeitGame(engine.WhitePlayer);
+        var result = engine.GetGameResult();
+
+        // Assert - 3x (backgammon) * cube value 2 = 6
+        Assert.Equal(6, result);
+    }
 }

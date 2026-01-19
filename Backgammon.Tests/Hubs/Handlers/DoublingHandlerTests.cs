@@ -19,6 +19,8 @@ public class DoublingHandlerTests
     private readonly Mock<IGameRepository> _mockGameRepository;
     private readonly Mock<IPlayerStatsService> _mockPlayerStatsService;
     private readonly Mock<IAiMoveService> _mockAiMoveService;
+    private readonly Mock<IMatchService> _mockMatchService;
+    private readonly Mock<IGameBroadcastService> _mockBroadcastService;
     private readonly Mock<IHubContext<GameHub, IGameHubClient>> _mockHubContext;
     private readonly Mock<ILogger<DoublingHandler>> _mockLogger;
     private readonly DoublingHandler _handler;
@@ -31,6 +33,8 @@ public class DoublingHandlerTests
         _mockGameRepository = new Mock<IGameRepository>();
         _mockPlayerStatsService = new Mock<IPlayerStatsService>();
         _mockAiMoveService = new Mock<IAiMoveService>();
+        _mockMatchService = new Mock<IMatchService>();
+        _mockBroadcastService = new Mock<IGameBroadcastService>();
         _mockHubContext = new Mock<IHubContext<GameHub, IGameHubClient>>();
         _mockLogger = new Mock<ILogger<DoublingHandler>>();
 
@@ -41,6 +45,8 @@ public class DoublingHandlerTests
             _mockGameRepository.Object,
             _mockPlayerStatsService.Object,
             _mockAiMoveService.Object,
+            _mockMatchService.Object,
+            _mockBroadcastService.Object,
             _mockHubContext.Object,
             _mockLogger.Object);
     }

@@ -101,8 +101,9 @@ public class DoubleOfferServiceTests
         Assert.True(success);
         Assert.NotNull(winner);
         Assert.Equal(CheckerColor.Red, winner.Color);
-        // Starting position is a backgammon (loser has checkers in winner's home board)
-        Assert.Equal(3, stakes);
+        // Declining a double is always a Normal win (1x multiplier) regardless of board position
+        // The cube is at 1, so stakes = 1 * 1 = 1
+        Assert.Equal(1, stakes);
     }
 
     [Fact]

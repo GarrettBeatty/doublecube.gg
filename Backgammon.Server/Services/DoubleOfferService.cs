@@ -105,13 +105,13 @@ public class DoubleOfferService : IDoubleOfferService
             return (false, null, 0, "Game hasn't started yet");
         }
 
-        // Clear pending double state before forfeiting
+        // Clear pending double state before ending game
         session.ClearPendingDoubleOffer();
 
-        // Forfeit game - opponent wins at current stakes
-        session.Engine.ForfeitGame(opponentPlayer);
+        // Decline double - opponent wins at current stakes (no gammon/backgammon multiplier)
+        session.Engine.DeclineDouble(opponentPlayer);
 
-        // Get stakes from current cube value (before the proposed double)
+        // Get stakes from current cube value (just 1x multiplier for declined double)
         var stakes = session.Engine.GetGameResult();
 
         _logger.LogInformation(
@@ -161,7 +161,7 @@ public class DoubleOfferService : IDoubleOfferService
         {
             _logger.LogInformation("AI {AiPlayerId} declined the double", opponentPlayerId);
 
-            // Clear pending double state before forfeiting
+            // Clear pending double state before ending game
             session.ClearPendingDoubleOffer();
 
             // Determine human player (we need to find who offered the double)
@@ -174,8 +174,8 @@ public class DoubleOfferService : IDoubleOfferService
                 ? session.Engine.WhitePlayer
                 : session.Engine.RedPlayer;
 
-            // AI declines - human wins at current stakes
-            session.Engine.ForfeitGame(humanPlayer);
+            // AI declines - human wins at current stakes (no gammon/backgammon multiplier)
+            session.Engine.DeclineDouble(humanPlayer);
             var stakes = session.Engine.GetGameResult();
 
             _logger.LogInformation(
