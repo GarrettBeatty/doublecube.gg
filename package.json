@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "docs:dev": "cd documentation && pnpm start",
+    "docs:build": "cd documentation && pnpm build",
+    "docs:serve": "cd documentation && pnpm serve"
+  },
   "devDependencies": {
     "shadcn": "^3.6.2"
   }

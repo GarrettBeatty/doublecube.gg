@@ -57,12 +57,17 @@ doublecube.gg/
 │   ├── Gnubg/                  # GNU Backgammon evaluator
 │   ├── Models/                 # Evaluation models
 │   └── HeuristicEvaluator.cs   # Built-in heuristic evaluator
+├── Backgammon.Plugins/         # Plugin system for bots and evaluators
 ├── Backgammon.Tests/           # xUnit test project
+├── Backgammon.IntegrationTests/ # Integration tests
 ├── infra/                      # AWS CDK infrastructure
+├── documentation/              # Docusaurus documentation site
 └── docs/                       # Additional documentation
 ```
 
 ## Features
+
+### Core Game
 - ✅ Standard board setup with initial checker positions
 - ✅ Dice rolling and turn management
 - ✅ Checker movement in correct directions
@@ -74,6 +79,23 @@ doublecube.gg/
 - ✅ Doubling cube for stakes
 - ✅ Gammon and Backgammon detection
 - ✅ Win condition checking
+
+### Multiplayer & Social
+- ✅ Real-time multiplayer via SignalR
+- ✅ Correspondence games (asynchronous play)
+- ✅ Friend system with add/remove/block
+- ✅ Match chat with spectator support
+- ✅ ELO rating system with leaderboards
+
+### Analysis & AI
+- ✅ GNU Backgammon integration for expert analysis
+- ✅ Daily puzzles with difficulty levels
+- ✅ Move hints and position evaluation
+- ✅ AI opponents (Random, Greedy, Plugin-based)
+
+### Customization
+- ✅ Board themes and customization
+- ✅ Match play with Crawford rule
 
 ### Game Rules Overview
 
@@ -123,7 +145,7 @@ Server runs on `http://localhost:5000`
 **Terminal 2 - Start Web Client:**
 ```bash
 cd Backgammon.WebClient
-npm run dev
+pnpm dev
 ```
 Web UI runs on `http://localhost:3000`
 
@@ -182,7 +204,7 @@ cd Backgammon.AppHost && dotnet run
 cd Backgammon.Server && dotnet run
 
 # Terminal 2: Start web client
-cd Backgammon.WebClient && npm run dev
+cd Backgammon.WebClient && pnpm dev
 ```
 
 ### Game Controls (Console)
@@ -273,6 +295,11 @@ if (game.GameOver)
 - **HeuristicEvaluator**: Built-in position scoring
 - Move analysis and best move suggestions
 
+### Backgammon.Plugins (Plugin System)
+- **IPlugin**: Interface for creating custom bots and evaluators
+- Hot-reload plugin support
+- Sandboxed plugin execution
+
 ## Getting Started
 
 ### Play Human vs Human
@@ -307,7 +334,12 @@ Potential additions to the project:
 - [x] Match play with Crawford rule
 - [x] Statistics tracking (ELO rating system)
 - [x] Undo/redo moves
+- [x] Friend system and social features
+- [x] Correspondence games (asynchronous play)
+- [x] Daily puzzles
+- [x] Board themes and customization
 - [ ] Optional rules (automatic doubles, beavers, Jacoby rule)
+- [ ] Tournament support
 
 ## Technical Details
 

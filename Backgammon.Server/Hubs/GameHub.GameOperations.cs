@@ -1063,7 +1063,4 @@ public partial class GameHub
     }
 
     // ==================== Correspondence Game Methods ====================
-
-    /// <summary>
-    /// Get all correspondence games for the current user
 }

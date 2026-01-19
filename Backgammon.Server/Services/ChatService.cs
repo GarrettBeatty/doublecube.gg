@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Net;
 using Backgammon.Core;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Hubs.Interfaces;
@@ -158,14 +157,15 @@ public class ChatService : IChatService
     }
 
     /// <summary>
-    /// Sanitizes a message to prevent XSS attacks.
+    /// Sanitizes a message by trimming whitespace.
+    /// Note: XSS prevention is handled by React's automatic escaping when rendering text in JSX.
+    /// HTML encoding here would cause double-encoding (e.g., ' becomes &#39; displayed literally).
     /// </summary>
     /// <param name="message">The raw message.</param>
     /// <returns>The sanitized message.</returns>
     private static string SanitizeMessage(string message)
     {
-        // HTML encode to prevent XSS (React also escapes by default, but defense in depth)
-        return WebUtility.HtmlEncode(message);
+        return message.Trim();
     }
 
     /// <summary>

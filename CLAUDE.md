@@ -108,10 +108,10 @@ Before committing C# code:
 dotnet build
 
 # Build frontend
-cd Backgammon.WebClient && npm run build
+cd Backgammon.WebClient && pnpm build
 
 # Regenerate TypedSignalR client (after changing IGameHub or IGameHubClient interfaces)
-cd Backgammon.WebClient && npm run generate:signalr
+cd Backgammon.WebClient && pnpm generate:signalr
 
 # Run all tests
 dotnet test
@@ -119,7 +119,7 @@ dotnet test
 # Run tests with detailed output
 dotnet test --verbosity normal
 
-# Run with Aspire (all-in-one: DynamoDB Local + Backend + Frontend)
+# Run with Aspire (all-in-one: DynamoDB Local + Redis + Backend + Frontend)
 cd Backgammon.AppHost && dotnet run
 
 # Run console game
@@ -127,27 +127,34 @@ cd Backgammon.Console && dotnet run
 
 # Run web multiplayer (manual)
 cd Backgammon.Server && dotnet run            # Server on http://localhost:5000
-cd Backgammon.WebClient && npm run dev        # Client dev server on http://localhost:3000
+cd Backgammon.WebClient && pnpm dev           # Client dev server on http://localhost:3000
 
 # Quick start web (script)
 ./start-web.sh
 
 # Run AI simulations
 cd Backgammon.AI && dotnet run
+
+# Build/run documentation site
+pnpm docs:dev                                  # Start docs dev server
+pnpm docs:build                                # Build docs for production
 ```
 
 ## Architecture
 
 **Multi-project solution** for a Backgammon game with console UI, web multiplayer, and AI framework:
 
-- **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`, `Match`.
+- **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`, `Match`, `GameHistory`, `TurnSnapshot`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
-- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`, `MatchService`, `EloRatingService`.
+- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`, `MatchService`, `EloRatingService`, `CorrespondenceGameService`, `DailyPuzzleService`, `ChatService`, `AnalysisService`.
 - **Backgammon.WebClient** - React + TypeScript + Vite frontend with real-time SignalR communication. Uses shadcn/ui, TailwindCSS, Zustand for state management.
-- **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI` and `GreedyAI`.
+- **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI`, `GreedyAI`, and heuristic-based bots.
 - **Backgammon.Analysis** - Position evaluation and analysis. Integrates with GNU Backgammon (`GnubgEvaluator`) and provides `HeuristicEvaluator`.
-- **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, services)
+- **Backgammon.Plugins** - Plugin registry for bots and evaluators. Provides `IPluginRegistry`, `BotMetadata`, `EvaluatorMetadata`.
+- **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, Redis, services)
+- **Backgammon.ServiceDefaults** - Shared Aspire configuration for observability and health checks
 - **Backgammon.Tests** - xUnit test project
+- **Backgammon.IntegrationTests** - Integration test suite
 
 ## Database: DynamoDB
 
@@ -160,16 +167,22 @@ The application uses **AWS DynamoDB** with a **single-table design** pattern for
 - Table name: `backgammon-local`
 
 ### Single-Table Design
-All entities (Users, Games, Friendships) stored in one table with composite PK/SK:
+All entities stored in one table with composite PK/SK:
 - **Users**: `PK=USER#{userId}`, `SK=PROFILE`
 - **Games**: `PK=GAME#{gameId}`, `SK=METADATA`
 - **Player-Game Index**: `PK=USER#{playerId}`, `SK=GAME#{reversedTimestamp}#{gameId}`
+- **Matches**: `PK=MATCH#{matchId}`, `SK=METADATA`
+- **Player-Match Index**: `PK=USER#{playerId}`, `SK=MATCH#{reversedTimestamp}#{matchId}`
 - **Friendships**: `PK=USER#{userId}`, `SK=FRIEND#{status}#{friendUserId}`
+- **Themes**: `PK=THEME#{themeId}`, `SK=PROFILE`
+- **Puzzles**: `PK=PUZZLE#{puzzleId}`, `SK=METADATA`
+- **Match Chat**: `PK=MATCH#{matchId}`, `SK=MESSAGE#{timestamp}#{messageId}`
 
 ### Global Secondary Indexes (GSIs)
 1. **GSI1**: Username lookups - `GSI1PK=USERNAME#{normalized}`, `GSI1SK=PROFILE`
 2. **GSI2**: Email lookups - `GSI2PK=EMAIL#{normalized}`, `GSI2SK=PROFILE`
-3. **GSI3**: Game status queries - `GSI3PK=GAME_STATUS#{status}`, `GSI3SK={timestamp}`
+3. **GSI3**: Game/Match status queries - `GSI3PK=GAME_STATUS#{status}`, `GSI3SK={timestamp}`
+4. **GSI4**: Correspondence "My Turn" index - `GSI4PK=PLAYER#{playerId}`, `GSI4SK=CORRESPONDENCE#{reversed_timestamp}`
 
 ### AWS Production Deployment
 - Infrastructure managed by AWS CDK (see `infra/cdk/`)
@@ -195,20 +208,24 @@ All entities (Users, Games, Friendships) stored in one table with composite PK/S
 Backgammon.WebClient/
 ├── src/                      # Source code (NOT committed build outputs)
 │   ├── components/           # React components
-│   │   ├── game/            # Game-specific components (BoardSVG, PlayerCard, etc.)
+│   │   ├── board/           # Board rendering (BoardSVG, checkers)
+│   │   ├── game/            # Game components (GameStatus, PlayerCard, MoveList)
+│   │   ├── puzzle/          # Daily puzzle (DailyPuzzleBoard, PuzzleStats)
+│   │   ├── players/         # Player list and profiles
 │   │   ├── friends/         # Friend list and social features
 │   │   ├── home/            # Home page components
+│   │   ├── themes/          # Theme selector and customization
 │   │   ├── layout/          # Layout components
 │   │   ├── modals/          # Modal dialogs
-│   │   └── ui/              # shadcn/ui components
-│   ├── contexts/            # React contexts (SignalRContext, etc.)
+│   │   └── ui/              # shadcn/ui components (30+)
+│   ├── contexts/            # React contexts (SignalRContext, AuthContext, MatchContext)
 │   ├── hooks/               # Custom React hooks (useSignalREvents)
 │   ├── lib/                 # Utility libraries
-│   ├── pages/               # Route pages (HomePage, GamePage)
-│   ├── services/            # Service layer (signalr.service, audio.service, etc.)
-│   ├── stores/              # Zustand stores (gameStore)
+│   ├── pages/               # Route pages (17 pages including Analysis, Puzzle, Profile)
+│   ├── services/            # Service layer (signalr, auth, api, theme, audio)
+│   ├── stores/              # Zustand stores (game, match, analysis, puzzle, theme, chat, etc.)
 │   ├── styles/              # Global styles
-│   ├── types/               # TypeScript type definitions
+│   ├── types/               # TypeScript type definitions (includes generated types)
 │   ├── utils/               # Utility functions
 │   └── main.tsx             # App entry point
 ├── wwwroot/                 # Build output directory (gitignored)
@@ -216,7 +233,7 @@ Backgammon.WebClient/
 ├── vite.config.ts           # Vite configuration
 ├── tailwind.config.js       # TailwindCSS configuration
 ├── components.json          # shadcn/ui configuration
-└── package.json             # npm dependencies
+└── package.json             # pnpm dependencies
 ```
 
 **Key Patterns:**
@@ -225,7 +242,14 @@ Backgammon.WebClient/
 
 2. **SignalR Event Handling** - `useSignalREvents` hook registers event handlers once on mount and uses refs to avoid constant cleanup/re-registration. Events are filtered by game ID to prevent cross-game interference.
 
-3. **State Management** - Zustand store (`gameStore`) manages global game state. Component-local state uses React hooks (useState, useRef).
+3. **State Management** - Multiple Zustand stores for different concerns:
+   - `gameStore` - Current game state and player color
+   - `matchStore` - Match-level state (scores, Crawford)
+   - `analysisStore` - Position analysis results
+   - `puzzleStore` - Daily puzzle state
+   - `themeStore` - Theme preferences
+   - `chatStore` - Chat messages
+   - `boardInteractionStore` - User interactions (selected point, drag state)
 
 4. **Real-time Communication Flow:**
    - Client → `invoke(HubMethods.MakeMove, ...)` → Server
@@ -397,6 +421,105 @@ The Analysis project provides move evaluation and suggestions:
 The server's `AnalysisService` exposes evaluation through SignalR for real-time hints.
 
 See `docs/GNUBG_SETUP.md` for GNU Backgammon configuration.
+
+## Correspondence Games
+
+The server supports turn-based asynchronous games:
+
+**Key Components:**
+- `CorrespondenceGameService` - Manages correspondence match lifecycle
+- `CorrespondenceTimeoutService` - Background service checking for expired turns
+- `GSI4` - "My Turn" index for efficient turn-based queries
+
+**Flow:**
+1. Player creates correspondence match via `CreateCorrespondenceMatch()`
+2. Game state persisted to DynamoDB after each turn
+3. Opponent notified via `CorrespondenceTurnNotification` event
+4. `GetCorrespondenceGames()` returns games awaiting player's turn
+
+## Daily Puzzle System
+
+Daily puzzles using GNU Backgammon for position generation:
+
+**Components:**
+- `DailyPuzzleService` - Retrieves/validates daily puzzles
+- `DailyPuzzleGenerationService` - Background service generating puzzles
+- `RandomPositionGenerator` - Creates random positions for evaluation
+- `DynamoDbPuzzleRepository` - Puzzle persistence
+
+**Puzzle Flow:**
+1. Background service generates puzzle at configured time
+2. Position evaluated by GNU Backgammon for optimal moves
+3. Players solve via `SubmitPuzzleAnswer()` with move comparison
+4. Streak tracking via `PuzzleStreakInfo`
+
+## Caching Strategy
+
+HybridCache with two-tier architecture:
+
+**Configuration** (`CacheSettings`):
+```json
+{
+  "CacheSettings": {
+    "UserProfile": { "Expiration": "00:05:00", "LocalCacheExpiration": "00:01:00" },
+    "PlayerStats": { "Expiration": "00:15:00", "LocalCacheExpiration": "00:03:00" },
+    "FriendsList": { "Expiration": "00:05:00", "LocalCacheExpiration": "00:01:00" }
+  }
+}
+```
+
+**Layers:**
+- **L1 (Local)**: In-memory cache per server instance
+- **L2 (Distributed)**: Redis for cross-server sharing
+
+**Usage Pattern:**
+```csharp
+var user = await _cache.GetOrCreateAsync(
+    $"user:{userId}",
+    async ct => await _userRepo.GetByUserIdAsync(userId),
+    new HybridCacheEntryOptions { ... },
+    tags: [$"player:{userId}"]);
+```
+
+## Plugin System
+
+Bots and evaluators registered via plugin architecture:
+
+**Components:**
+- `IPluginRegistry` - Central registry for plugins
+- `BotMetadata` / `EvaluatorMetadata` - Plugin descriptors
+- `IBotResolver` - Creates bot instances by ID
+
+**Registration:**
+```csharp
+// In Program.cs
+builder.Services.AddBackgammonPlugins(builder.Configuration);
+builder.Services.AddStandardBots();      // Random, Greedy
+builder.Services.AddHeuristicBot();      // Heuristic evaluator
+builder.Services.AddAnalysisPlugins();   // GNU Backgammon (if available)
+```
+
+**Available Bots:**
+- `random` - Random valid moves (~800 ELO)
+- `greedy` - Prioritizes bearing off/hitting (~1100 ELO)
+- `heuristic` - Position evaluation (~1300 ELO)
+- `gnubg` - GNU Backgammon neural network (~1800+ ELO)
+
+## Feature Flags
+
+Runtime feature toggles in configuration:
+
+```json
+{
+  "Features": {
+    "BotGamesEnabled": false,
+    "MaxBotGames": 5,
+    "BotGameRestartDelaySeconds": 30
+  }
+}
+```
+
+Accessed via `IOptions<FeatureFlags>` injection.
 
 ## Aspire Development
 

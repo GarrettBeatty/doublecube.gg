@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using Backgammon.AI.Extensions;
@@ -240,6 +241,23 @@ builder.Services.Configure<Backgammon.Server.Configuration.FeatureFlags>(builder
 // Bot game background service
 builder.Services.AddHostedService<BotGameService>();
 
+// ========== SWAGGER/OPENAPI CONFIGURATION ==========
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Add SignalR hub documentation
+    options.AddSignalRSwaggerGen();
+
+    // Include XML comments for API documentation
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+});
+// ========== END SWAGGER CONFIGURATION ==========
+
 // JWT Authentication configuration
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret not configured");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "BackgammonServer";
@@ -322,6 +340,14 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Enable Swagger UI in development and production (read-only documentation)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Backgammon API v1");
+    c.RoutePrefix = "swagger";
+});
 
 // Initialize DynamoDB table if needed (local development only)
 if (!string.IsNullOrEmpty(awsEndpointUrl))

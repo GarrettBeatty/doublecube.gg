@@ -1,6 +1,7 @@
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services;
+using SignalRSwaggerGen.Attributes;
 using Tapper;
 using TypedSignalR.Client;
 
@@ -10,6 +11,7 @@ namespace Backgammon.Server.Hubs.Interfaces;
 /// Defines methods that clients can invoke on the server hub.
 /// This interface is used by TypedSignalR to generate TypeScript client code.
 /// </summary>
+[SignalRHub("/gamehub")]
 [Hub]
 public interface IGameHub
 {
