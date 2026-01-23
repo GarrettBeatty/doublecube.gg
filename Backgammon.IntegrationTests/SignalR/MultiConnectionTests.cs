@@ -66,7 +66,7 @@ public class MultiConnectionTests : GameHubTestBase
         var (hub2, connection2, _) = CreateHubForUser(playerId, "DualTabPlayer");
 
         // Create analysis game from first tab
-        await hub1.CreateAnalysisGame();
+        await hub1.CreateAnalysisSession();
         await Task.Delay(100);
 
         // First tab should be in a game session now
@@ -131,7 +131,7 @@ public class MultiConnectionTests : GameHubTestBase
         var (hub2, connection2, _) = CreateHubForUser(playerId, "DisconnectTabPlayer");
 
         // Create analysis game from first tab
-        await hub1.CreateAnalysisGame();
+        await hub1.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Act - Leave game from first tab
@@ -139,7 +139,7 @@ public class MultiConnectionTests : GameHubTestBase
 
         // Second tab should still be able to work (create new game)
         ClearCapturedBroadcasts();
-        await hub2.CreateAnalysisGame();
+        await hub2.CreateAnalysisSession();
 
         // Assert
         CapturedErrors.Should().BeEmpty();
@@ -156,11 +156,11 @@ public class MultiConnectionTests : GameHubTestBase
         var (hub2, connection2, _) = CreateHubForUser(playerId, "TwoGamesPlayer");
 
         // Act - Create game from first tab
-        await hub1.CreateAnalysisGame();
+        await hub1.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Create another game from second tab
-        await hub2.CreateAnalysisGame();
+        await hub2.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Assert - Both should succeed (each tab in own analysis game)
@@ -222,7 +222,7 @@ public class MultiConnectionTests : GameHubTestBase
         var (hub, connectionId, _) = CreateHubForUser(playerId, "SessionTrackPlayer");
 
         // Create and join game
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Act - Check session manager
@@ -242,7 +242,7 @@ public class MultiConnectionTests : GameHubTestBase
 
         var (hub, connectionId, _) = CreateHubForUser(playerId, "LeaveTrackPlayer");
 
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Verify in session

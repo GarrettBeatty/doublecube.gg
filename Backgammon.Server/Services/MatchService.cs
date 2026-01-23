@@ -96,7 +96,11 @@ public class MatchService : IMatchService
                 Player1Name = player1Name,
                 Player1DisplayName = player1DisplayName,
                 OpponentType = opponentType,
-                TimeControl = timeControl ?? new TimeControlConfig(), // Default to None if not specified
+                TimeControl = timeControl ?? new TimeControlConfig
+                {
+                    Type = TimeControlType.ChicagoPoint,
+                    DelaySeconds = 12
+                }, // Default to ChicagoPoint if not specified
                 IsRated = isRated // Set from parameter
             };
 

@@ -121,6 +121,7 @@ public abstract class GameHubTestBase : IClassFixture<WebApplicationFixture>
         var authService = _fixture.Services.GetRequiredService<IAuthService>();
         var dailyPuzzleService = _fixture.Services.GetRequiredService<IDailyPuzzleService>();
         var gameCompletionService = _fixture.Services.GetRequiredService<IGameCompletionService>();
+        var analysisSessionManager = _fixture.Services.GetRequiredService<AnalysisSessionManager>();
 
         // Create the hub with real services
         var hub = new GameHub(
@@ -147,7 +148,8 @@ public abstract class GameHubTestBase : IClassFixture<WebApplicationFixture>
             correspondenceGameService,
             authService,
             dailyPuzzleService,
-            gameCompletionService);
+            gameCompletionService,
+            analysisSessionManager);
 
         // Mock the HubCallerContext with user claims
         var mockContext = new Mock<HubCallerContext>();

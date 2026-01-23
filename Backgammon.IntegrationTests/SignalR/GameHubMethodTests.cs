@@ -288,7 +288,7 @@ public class GameHubMethodTests : GameHubTestBase
     // ==================== Analysis Mode Tests ====================
 
     [Fact]
-    public async Task CreateAnalysisGame_CreatesGameWithSinglePlayer()
+    public async Task CreateAnalysisSession_CreatesSessionWithSinglePlayer()
     {
         // Arrange
         ClearCapturedBroadcasts();
@@ -296,7 +296,7 @@ public class GameHubMethodTests : GameHubTestBase
         var (hub, connectionId, _) = CreateHubForUser(playerId, "AnalysisPlayer");
 
         // Act
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
 
         // Assert
         CapturedErrors.Should().BeEmpty();
@@ -311,7 +311,7 @@ public class GameHubMethodTests : GameHubTestBase
         var playerId = await CreateTestUserAsync("AnalysisDicePlayer");
         var (hub, connectionId, _) = CreateHubForUser(playerId, "AnalysisDicePlayer");
 
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
 
         // Wait for game to be created
         await Task.Delay(100);
@@ -332,7 +332,7 @@ public class GameHubMethodTests : GameHubTestBase
         var playerId = await CreateTestUserAsync("InvalidDicePlayer");
         var (hub, connectionId, _) = CreateHubForUser(playerId, "InvalidDicePlayer");
 
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
         await Task.Delay(100);
         ClearCapturedBroadcasts();
 
@@ -397,7 +397,7 @@ public class GameHubMethodTests : GameHubTestBase
         var playerId = await CreateTestUserAsync("GetStatePlayer");
         var (hub, connectionId, _) = CreateHubForUser(playerId, "GetStatePlayer");
 
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
         await Task.Delay(100);
         ClearCapturedBroadcasts();
 
@@ -419,7 +419,7 @@ public class GameHubMethodTests : GameHubTestBase
         var playerId = await CreateTestUserAsync("LeaveGamePlayer");
         var (hub, connectionId, _) = CreateHubForUser(playerId, "LeaveGamePlayer");
 
-        await hub.CreateAnalysisGame();
+        await hub.CreateAnalysisSession();
         await Task.Delay(100);
 
         // Act

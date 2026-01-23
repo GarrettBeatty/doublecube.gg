@@ -29,9 +29,10 @@ public class MatchConfig
     public string? DisplayName { get; set; }
 
     /// <summary>
-    /// Time control type: "None", "ChicagoPoint" (defaults to "None")
+    /// Time control type: "None", "ChicagoPoint" (defaults to "ChicagoPoint")
+    /// All lobby and AI games use ChicagoPoint time control
     /// </summary>
-    public string TimeControlType { get; set; } = "None";
+    public string TimeControlType { get; set; } = "ChicagoPoint";
 
     /// <summary>
     /// Whether the match affects player ratings (defaults to true)

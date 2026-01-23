@@ -46,7 +46,7 @@ export interface CreateMatchRequest {
   opponentType: OpponentType
   targetScore: number
   friendUserId?: string
-  timeControlType?: 'None' | 'ChicagoPoint'
+  timeControlType: 'ChicagoPoint' // All lobby games now use ChicagoPoint time control
   isCorrespondence?: boolean
   timePerMoveDays?: number
 }
