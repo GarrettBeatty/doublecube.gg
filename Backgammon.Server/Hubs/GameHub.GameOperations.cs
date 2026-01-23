@@ -531,9 +531,50 @@ public partial class GameHub
             // Broadcast game over AFTER database is updated
             await _gameService.BroadcastGameOverAsync(session);
 
-            // Remove from memory to prevent memory leak
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Removed completed game {GameId} from memory (declined double)", session.Id);
+            // Handle match score update if this is a match game
+            if (!string.IsNullOrEmpty(session.MatchId))
+            {
+                var winnerId = winner?.Color == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
+                var winType = session.Engine.DetermineWinType();
+                var gameResult = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
+
+                await _matchService.CompleteGameAsync(session.Id, gameResult);
+
+                var match = await _matchService.GetMatchAsync(session.MatchId);
+                if (match != null)
+                {
+                    // Broadcast match score update
+                    await Clients.Group(session.Id).MatchUpdate(new MatchUpdateDto
+                    {
+                        MatchId = match.MatchId,
+                        Player1Score = match.Player1Score,
+                        Player2Score = match.Player2Score,
+                        TargetScore = match.TargetScore,
+                        IsCrawfordGame = match.IsCrawfordGame,
+                        MatchComplete = match.Status == "Completed",
+                        MatchWinner = match.WinnerId,
+                        NextGameId = match.CurrentGameId
+                    });
+
+                    _logger.LogInformation(
+                        "Updated match {MatchId} scores after declined double in game {GameId}. Score: {P1Score}-{P2Score}",
+                        match.MatchId,
+                        session.Id,
+                        match.Player1Score,
+                        match.Player2Score);
+                }
+
+                // Keep match game in memory for continuation
+                _logger.LogInformation(
+                    "Keeping match game {GameId} in memory for continuation (declined double)",
+                    session.Id);
+            }
+            else
+            {
+                // Remove from memory only for non-match games
+                _sessionManager.RemoveGame(session.Id);
+                _logger.LogInformation("Removed completed game {GameId} from memory (declined double)", session.Id);
+            }
         }
         catch (Exception ex)
         {
