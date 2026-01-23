@@ -286,7 +286,21 @@ public class GameSessionManager : IGameSessionManager
             {
                 try
                 {
+                    // DEFENSIVE: Skip games that are completed or abandoned (shouldn't be in active games, but just in case)
+                    if (gameData.Status == "Completed" || gameData.Status == "Abandoned")
+                    {
+                        Console.WriteLine($"  ⊘ Skipping completed/abandoned game {gameData.GameId} (Status: {gameData.Status})");
+                        continue;
+                    }
+
                     var session = GameEngineMapper.FromGame(gameData);
+
+                    // DEFENSIVE: Skip games with invalid state (e.g., GameOver=true for "InProgress" status)
+                    if (session.Engine.GameOver)
+                    {
+                        Console.WriteLine($"  ⊘ Skipping game {gameData.GameId}: Status is InProgress but game engine reports GameOver=true");
+                        continue;
+                    }
 
                     // Add to in-memory storage
                     _games[session.Id] = session;
@@ -300,10 +314,15 @@ public class GameSessionManager : IGameSessionManager
                                     $"Red={session.RedPlayerName ?? "waiting"}, " +
                                     $"Current={session.Engine.CurrentPlayer?.Name ?? "unknown"}");
                 }
-                catch (Exception ex)
+                catch (InvalidOperationException ex)
                 {
                     failureCount++;
                     Console.WriteLine($"  ✗ Failed to load game {gameData.GameId}: {ex.Message}");
+                }
+                catch (Exception ex)
+                {
+                    failureCount++;
+                    Console.WriteLine($"  ✗ Failed to load game {gameData.GameId}: Unexpected error - {ex.GetType().Name}: {ex.Message}");
                 }
             }
 

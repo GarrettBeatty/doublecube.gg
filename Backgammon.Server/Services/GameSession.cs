@@ -491,7 +491,20 @@ public class GameSession : IGameSession
         {
             _timeUpdateTimer?.Dispose();
             _timeUpdateTimer = new System.Threading.Timer(
-                async _ => await BroadcastTimeUpdate(hubContext),
+                async _ =>
+                {
+                    try
+                    {
+                        await BroadcastTimeUpdate(hubContext);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[TIME DEBUG] CRITICAL ERROR: Game {Id}: Unhandled exception in time update loop - {ex.GetType().Name}: {ex.Message}");
+                        Console.WriteLine($"[TIME DEBUG] Stack trace: {ex.StackTrace}");
+                        Console.WriteLine($"[TIME DEBUG] Stopping time updates to prevent server crash.");
+                        StopTimeUpdates();
+                    }
+                },
                 null,
                 TimeSpan.FromSeconds(1),
                 TimeSpan.FromSeconds(1));
@@ -680,8 +693,26 @@ public class GameSession : IGameSession
     /// </summary>
     private async Task BroadcastTimeUpdate(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
     {
+        // DEFENSIVE: Stop time updates if game is already over
+        if (Engine.GameOver)
+        {
+            Console.WriteLine($"[TIME DEBUG] Game {Id}: Time update called but game is over. Stopping time updates.");
+            StopTimeUpdates();
+            return;
+        }
+
         if (Engine.WhiteTimeState == null || Engine.RedTimeState == null || TimeControl == null)
         {
+            Console.WriteLine($"[TIME DEBUG] Game {Id}: Time update called but time state or time control is null. Stopping updates.");
+            StopTimeUpdates();
+            return;
+        }
+
+        // DEFENSIVE: Don't run time updates for games without time control
+        if (TimeControl.Type == TimeControlType.None)
+        {
+            Console.WriteLine($"[TIME DEBUG] Game {Id}: No time control enabled. Stopping time updates.");
+            StopTimeUpdates();
             return;
         }
 
@@ -730,19 +761,50 @@ public class GameSession : IGameSession
     /// </summary>
     private async Task HandleTimeout(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
     {
+        // DEFENSIVE: Don't try to forfeit if game is already over
+        if (Engine.GameOver)
+        {
+            Console.WriteLine($"[TIME DEBUG] Game {Id}: Timeout triggered but game already over. Skipping forfeit.");
+            return;
+        }
+
+        // DEFENSIVE: Additional safety check for time control
+        if (TimeControl == null || TimeControl.Type == TimeControlType.None)
+        {
+            Console.WriteLine($"[TIME DEBUG] Game {Id}: Timeout called but no time control enabled. Skipping forfeit.");
+            return;
+        }
+
         var losingPlayer = Engine.CurrentPlayer;
         var winningPlayer = Engine.GetOpponent();
 
         if (losingPlayer == null || winningPlayer == null)
         {
-            Console.WriteLine("[TIME DEBUG] ERROR: Cannot handle timeout - player is null");
+            Console.WriteLine($"[TIME DEBUG] ERROR: Game {Id}: Cannot handle timeout - player is null (CurrentPlayer: {losingPlayer?.Color.ToString() ?? "null"}, Opponent: {winningPlayer?.Color.ToString() ?? "null"})");
             return;
         }
 
-        Console.WriteLine($"[TIME DEBUG] TIMEOUT! {losingPlayer.Color} ran out of time. {winningPlayer.Color} wins!");
+        Console.WriteLine($"[TIME DEBUG] Game {Id}: TIMEOUT! {losingPlayer.Color} ran out of time. {winningPlayer.Color} wins by forfeit.");
 
-        // Mark game as over using ForfeitGame
-        Engine.ForfeitGame(winningPlayer);
+        try
+        {
+            // Mark game as over using ForfeitGame
+            Engine.ForfeitGame(winningPlayer);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Game state was invalid - log and return without crashing
+            Console.WriteLine($"[TIME DEBUG] ERROR: Game {Id}: Failed to forfeit game on timeout - {ex.Message}. Game may already be over or in invalid state.");
+            StopTimeUpdates();
+            return;
+        }
+        catch (Exception ex)
+        {
+            // Unexpected exception - log and return without crashing the server
+            Console.WriteLine($"[TIME DEBUG] ERROR: Game {Id}: Unexpected error while handling timeout - {ex.GetType().Name}: {ex.Message}");
+            StopTimeUpdates();
+            return;
+        }
 
         // Broadcast timeout event
         var timeoutEvent = new PlayerTimedOutDto
