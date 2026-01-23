@@ -16,7 +16,7 @@ import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
 import { DoubleOfferModal } from '@/components/modals/DoubleOfferModal'
 import { WaitingForDoubleResponseModal } from '@/components/modals/WaitingForDoubleResponseModal'
 import { NotFound } from '@/components/NotFound'
-import { CheckerColor } from '@/types/game.types'
+import { CheckerColor, GameStatus } from '@/types/game.types'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { authService } from '@/services/auth.service'
@@ -456,7 +456,7 @@ export const GamePage: React.FC = () => {
                 reserveSeconds={currentGameState.whiteReserveSeconds ?? null}
                 isInDelay={currentGameState.whiteIsInDelay ?? null}
                 delayRemaining={currentGameState.whiteDelayRemaining ?? null}
-                isActive={!currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.White}
+                isActive={currentGameState.status === GameStatus.InProgress && !currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.White}
                 color={CheckerColor.White}
               />
             )}
@@ -483,7 +483,7 @@ export const GamePage: React.FC = () => {
                 reserveSeconds={currentGameState.redReserveSeconds ?? null}
                 isInDelay={currentGameState.redIsInDelay ?? null}
                 delayRemaining={currentGameState.redDelayRemaining ?? null}
-                isActive={!currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.Red}
+                isActive={currentGameState.status === GameStatus.InProgress && !currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.Red}
                 color={CheckerColor.Red}
               />
             )}

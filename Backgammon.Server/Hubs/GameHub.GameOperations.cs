@@ -579,6 +579,17 @@ public partial class GameHub
                 // Remove game completely from session manager (no DB update needed - game was never persisted)
                 _sessionManager.RemoveGame(gameId);
 
+                // If this is a match game, abandon the match as well
+                if (!string.IsNullOrEmpty(session.MatchId))
+                {
+                    var playerId = GetAuthenticatedUserId()!;
+                    await _matchService.AbandonMatchAsync(session.MatchId, playerId);
+                    _logger.LogInformation(
+                        "Match {MatchId} abandoned by player {PlayerId} while waiting for opponent",
+                        session.MatchId,
+                        playerId);
+                }
+
                 _logger.LogInformation("Game {GameId} cancelled by player while waiting for opponent (removed from memory)", gameId);
 
                 return;
