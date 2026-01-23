@@ -1,13 +1,25 @@
 #!/bin/bash
-# Script to clear all data from DynamoDB EXCEPT user profiles and themes
+# Script to clear data from DynamoDB
 # Usage:
 #   Local: ./clear-database.sh local
 #   Dev: ./clear-database.sh dev
 #   Production: ./clear-database.sh prod
+#
+# Options:
+#   --all    Clear ALL data including user profiles and themes (complete reset)
+#   (default) Clear game data but preserve user profiles and themes
 
 set -e
 
 ENVIRONMENT=${1:-local}
+CLEAR_ALL=false
+
+# Check for --all flag
+for arg in "$@"; do
+    if [ "$arg" == "--all" ]; then
+        CLEAR_ALL=true
+    fi
+done
 
 # Color output
 RED='\033[0;31m'
@@ -17,27 +29,49 @@ NC='\033[0m' # No Color
 
 echo -e "${YELLOW}Database Cleanup Script${NC}"
 echo "Environment: $ENVIRONMENT"
+if [ "$CLEAR_ALL" == "true" ]; then
+    echo -e "${RED}Mode: COMPLETE RESET (clearing ALL data including users)${NC}"
+else
+    echo "Mode: Game data only (preserving user profiles)"
+fi
 echo ""
 
 if [ "$ENVIRONMENT" == "prod" ]; then
     echo -e "${RED}WARNING: You are about to clear the PRODUCTION database!${NC}"
-    echo -e "${RED}This will delete ALL data except user profiles and themes.${NC}"
-    read -p "Type 'DELETE PRODUCTION' to confirm: " confirmation
-    if [ "$confirmation" != "DELETE PRODUCTION" ]; then
-        echo "Cancelled."
-        exit 1
+    if [ "$CLEAR_ALL" == "true" ]; then
+        echo -e "${RED}This will delete ALL data including user accounts!${NC}"
+        read -p "Type 'DELETE ALL PRODUCTION' to confirm: " confirmation
+        if [ "$confirmation" != "DELETE ALL PRODUCTION" ]; then
+            echo "Cancelled."
+            exit 1
+        fi
+    else
+        echo -e "${RED}This will delete ALL game data except user profiles and themes.${NC}"
+        read -p "Type 'DELETE PRODUCTION' to confirm: " confirmation
+        if [ "$confirmation" != "DELETE PRODUCTION" ]; then
+            echo "Cancelled."
+            exit 1
+        fi
     fi
 
     TABLE_NAME="backgammon-prod"
     ENDPOINT_ARGS=""
     REGION="us-east-1"
 elif [ "$ENVIRONMENT" == "dev" ]; then
-    echo "Clearing dev database..."
+    if [ "$CLEAR_ALL" == "true" ]; then
+        echo -e "${YELLOW}Clearing ALL data from dev database...${NC}"
+    else
+        echo "Clearing game data from dev database..."
+    fi
     TABLE_NAME="backgammon-dev"
     ENDPOINT_ARGS=""
     REGION="us-east-1"
 else
-    echo "Clearing local database..."
+    if [ "$CLEAR_ALL" == "true" ]; then
+        echo -e "${YELLOW}Clearing ALL data from local database...${NC}"
+    else
+        echo "Clearing game data from local database..."
+    fi
     TABLE_NAME="backgammon-local"
     ENDPOINT_ARGS="--endpoint-url http://localhost:8000"
     REGION="us-east-1"
@@ -99,7 +133,7 @@ delete_by_pk_prefix() {
     echo -e "  ${GREEN}Deleted $deleted items${NC}"
 }
 
-# Function to delete USER# items with specific SK prefix (preserving PROFILE)
+# Function to delete USER# items with specific SK prefix (preserving PROFILE unless --all)
 delete_user_items_by_sk() {
     local sk_prefix=$1
     local description=$2
@@ -176,6 +210,47 @@ delete_user_items_by_sk "PUZZLE#" "puzzle completion records"
 # Delete daily puzzles (PUZZLE#* primary keys)
 delete_by_pk_prefix "PUZZLE#" "daily puzzles"
 
+# Delete chat messages (MATCH#* with SK starting with MESSAGE#)
+echo -e "${YELLOW}Deleting chat messages...${NC}"
+items=$(aws dynamodb scan \
+    --table-name "$TABLE_NAME" \
+    --filter-expression "begins_with(PK, :pk_prefix) AND begins_with(SK, :sk_prefix)" \
+    --expression-attribute-values "{\":pk_prefix\":{\"S\":\"MATCH#\"},\":sk_prefix\":{\"S\":\"MESSAGE#\"}}" \
+    --region "$REGION" \
+    $ENDPOINT_ARGS \
+    --output json 2>/dev/null || echo '{"Items":[]}')
+count=$(echo "$items" | jq -r '.Items | length')
+if [ "$count" -gt 0 ]; then
+    echo "  Found $count chat messages to delete..."
+    keys=$(echo "$items" | jq -c '[.Items[] | {PK: .PK, SK: .SK}]')
+    for ((i=0; i<count; i+=25)); do
+        batch=$(echo "$keys" | jq -c ".[${i}:${i}+25]")
+        request=$(echo "$batch" | jq -c "{\"$TABLE_NAME\": [.[] | {DeleteRequest: {Key: .}}]}")
+        aws dynamodb batch-write-item --request-items "$request" --region "$REGION" $ENDPOINT_ARGS > /dev/null 2>&1
+    done
+    echo -e "  ${GREEN}Deleted $count chat messages${NC}"
+else
+    echo "  No chat messages found."
+fi
+
+# If --all flag is set, also delete user profiles and themes
+if [ "$CLEAR_ALL" == "true" ]; then
+    echo ""
+    echo -e "${RED}Clearing user profiles and themes...${NC}"
+
+    # Delete user profiles (USER#* with SK = PROFILE)
+    delete_user_items_by_sk "PROFILE" "user profiles"
+
+    # Delete themes (THEME#* primary keys)
+    delete_by_pk_prefix "THEME#" "themes"
+
+    # Delete username index entries (USERNAME#*)
+    delete_by_pk_prefix "USERNAME#" "username index entries"
+
+    # Delete email index entries (EMAIL#*)
+    delete_by_pk_prefix "EMAIL#" "email index entries"
+fi
+
 echo ""
 echo -e "${GREEN}Database cleanup complete!${NC}"
 echo ""
@@ -187,19 +262,28 @@ echo "  - All player-match index entries"
 echo "  - All friendships"
 echo "  - All rating history"
 echo "  - All puzzle data"
+echo "  - All chat messages"
+if [ "$CLEAR_ALL" == "true" ]; then
+    echo -e "  ${RED}- All user profiles${NC}"
+    echo -e "  ${RED}- All themes${NC}"
+    echo -e "  ${RED}- All username/email indexes${NC}"
+    echo ""
+    echo -e "${GREEN}Database is now completely empty.${NC}"
+else
+    echo ""
+    echo "What was preserved:"
+    echo "  - User accounts (profiles)"
+    echo "  - Board themes"
+    echo ""
+    echo -e "${YELLOW}Note: User stats (wins/losses/rating) are stored in the profile and preserved.${NC}"
+    echo -e "${YELLOW}To reset user stats, use the --all flag to clear everything.${NC}"
+fi
 echo ""
-echo "What was preserved:"
-echo "  - User accounts (profiles)"
-echo "  - Board themes"
-echo ""
-echo -e "${YELLOW}Note: User stats (wins/losses/rating) are stored in the profile and preserved.${NC}"
-echo -e "${YELLOW}You may want to reset stats manually if needed.${NC}"
-echo ""
-echo -e "${YELLOW}Tip: If you have stale WebSocket connections, restart the server:${NC}"
+echo -e "${YELLOW}Tip: Restart the server to clear in-memory state:${NC}"
 if [ "$ENVIRONMENT" == "local" ]; then
     echo "   cd Backgammon.AppHost && dotnet run"
 elif [ "$ENVIRONMENT" == "dev" ]; then
-    echo "   docker compose -f docker-compose.dev.yml restart server"
+    echo "   Redeploy the service or restart the container"
 else
-    echo "   docker compose -f docker-compose.prod.yml restart server"
+    echo "   Redeploy the service or restart the container"
 fi

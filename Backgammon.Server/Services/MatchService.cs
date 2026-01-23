@@ -260,15 +260,17 @@ public class MatchService : IMatchService
 
             if (string.IsNullOrEmpty(game.MatchId))
             {
-                _logger.LogWarning("Game {GameId} has no MatchId", gameId);
-                return;
+                throw new InvalidOperationException(
+                    $"Game {gameId} has no MatchId. This indicates data corruption - " +
+                    "all match games must have MatchId set when created.");
             }
 
             var match = await _matchRepository.GetMatchByIdAsync(game.MatchId);
             if (match == null)
             {
-                _logger.LogWarning("Match {MatchId} not found for game {GameId}", game.MatchId, gameId);
-                return;
+                throw new InvalidOperationException(
+                    $"Match {game.MatchId} not found for game {gameId}. " +
+                    "Match record may have been deleted.");
             }
 
             _logger.LogInformation(

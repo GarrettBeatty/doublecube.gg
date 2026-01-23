@@ -65,6 +65,15 @@ public static class GameEngineMapper
         game.MatchId = session.MatchId;
         game.IsCrawfordGame = session.IsCrawfordGame ?? false;
 
+        // Validate: if session has match context (TargetScore set) but no MatchId, fail fast
+        // This indicates a programming error - MatchId should always be set for match games
+        if (session.TargetScore.HasValue && session.TargetScore > 0 && string.IsNullOrEmpty(session.MatchId))
+        {
+            throw new InvalidOperationException(
+                $"Game {session.Id} has TargetScore={session.TargetScore} but MatchId is null. " +
+                "MatchId must be set on the session before saving match games.");
+        }
+
         // If game is completed, add completion data
         if (engine.Winner != null)
         {
