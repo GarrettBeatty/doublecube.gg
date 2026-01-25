@@ -10,6 +10,7 @@ import { MatchInfo } from '@/components/game/MatchInfo'
 import { BoardOverlayControls } from '@/components/game/BoardOverlayControls'
 import { MoveLog } from '@/components/game/MoveLog'
 import { TimeDisplay } from '@/components/game/TimeDisplay'
+import { CorrespondenceDeadline } from '@/components/game/CorrespondenceDeadline'
 import { GameCompletedOverlay } from '@/components/game/GameCompletedOverlay'
 import { CompletedGameBanner } from '@/components/game/CompletedGameBanner'
 import { DoubleConfirmModal } from '@/components/modals/DoubleConfirmModal'
@@ -474,6 +475,15 @@ export const GamePage: React.FC = () => {
                   player2Name={currentGameState.redPlayerName}
                 />
               )}
+
+            {/* Correspondence Game Deadline */}
+            {currentGameState.isCorrespondence && (
+              <CorrespondenceDeadline
+                turnDeadline={currentGameState.turnDeadline}
+                timePerMoveDays={currentGameState.timePerMoveDays}
+                isYourTurn={currentGameState.isYourTurn}
+              />
+            )}
 
             <PlayerCard {...redPlayer} />
 

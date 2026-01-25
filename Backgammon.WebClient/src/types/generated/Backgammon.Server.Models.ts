@@ -226,6 +226,12 @@ export type GameState = {
     whiteDelayRemaining?: number;
     /** Transpiled from double */
     redDelayRemaining?: number;
+    /** Transpiled from bool */
+    isCorrespondence: boolean;
+    /** Transpiled from int */
+    timePerMoveDays?: number;
+    /** Transpiled from System.DateTime */
+    turnDeadline?: (Date | string);
 }
 
 /** Transpiled from Backgammon.Server.Models.GameStatus */

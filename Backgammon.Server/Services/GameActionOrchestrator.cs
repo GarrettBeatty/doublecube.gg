@@ -152,7 +152,8 @@ public class GameActionOrchestrator : IGameActionOrchestrator
                     session.Engine.StartTurnTimer();
 
                     // Start broadcasting time updates (only after opening roll completes)
-                    session.StartTimeUpdates(_hubContext);
+                    // Pass completion service so timeout handler can persist game result
+                    session.StartTimeUpdates(_hubContext, _completionService);
 
                     // For correspondence games, update turn tracking with the actual first player
                     var firstPlayerId = GetCurrentPlayerId(session);
@@ -637,8 +638,12 @@ public class GameActionOrchestrator : IGameActionOrchestrator
             session.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown");
 
         // Handle correspondence game turn tracking
-        if (!string.IsNullOrEmpty(session.MatchId))
+        if (!string.IsNullOrEmpty(session.MatchId) && session.IsCorrespondence)
         {
+            // Update session's TurnDeadline immediately for the UI
+            var newDeadline = DateTime.UtcNow.AddDays(session.TimePerMoveDays ?? 3);
+            session.TurnDeadline = newDeadline;
+
             BackgroundTaskHelper.FireAndForget(
                 async () =>
                 {

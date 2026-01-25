@@ -73,12 +73,21 @@ public class GameSessionFactory : IGameSessionFactory
         // Set rated/unrated flag (AI matches are always unrated)
         session.IsRated = match.OpponentType == "AI" ? false : match.IsRated;
 
+        // Configure correspondence game settings
+        if (match.IsCorrespondence)
+        {
+            session.IsCorrespondence = true;
+            session.TimePerMoveDays = match.TimePerMoveDays;
+            session.TurnDeadline = match.TurnDeadline;
+        }
+
         _logger.LogInformation(
-            "Created match game session {GameId} for match {MatchId} (Crawford: {IsCrawford}, Rated: {IsRated})",
+            "Created match game session {GameId} for match {MatchId} (Crawford: {IsCrawford}, Rated: {IsRated}, Correspondence: {IsCorrespondence})",
             gameId,
             match.MatchId,
             match.IsCrawfordGame,
-            session.IsRated);
+            session.IsRated,
+            session.IsCorrespondence);
 
         return session;
     }

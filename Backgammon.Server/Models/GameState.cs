@@ -151,4 +151,11 @@ public class GameState
     public double? WhiteDelayRemaining { get; set; }
 
     public double? RedDelayRemaining { get; set; }
+
+    // Correspondence game information
+    public bool IsCorrespondence { get; set; }
+
+    public int? TimePerMoveDays { get; set; }
+
+    public DateTime? TurnDeadline { get; set; }
 }

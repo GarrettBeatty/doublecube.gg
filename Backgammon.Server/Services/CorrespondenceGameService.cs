@@ -205,6 +205,9 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             session.Player2Score = match.Player2Score;
             session.IsCrawfordGame = match.IsCrawfordGame;
             session.IsRated = isRated;
+            session.IsCorrespondence = true;
+            session.TimePerMoveDays = match.TimePerMoveDays;
+            session.TurnDeadline = match.TurnDeadline;
 
             _logger.LogInformation(
                 "Created first game {GameId} for correspondence match {MatchId}",

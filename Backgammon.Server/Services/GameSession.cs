@@ -20,6 +20,7 @@ public class GameSession : IGameSession
     private readonly object _timerLock = new();
     private readonly SemaphoreSlim _gameActionLock = new(1, 1);
     private System.Threading.Timer? _timeUpdateTimer;
+    private IGameCompletionService? _completionService;
 
     public GameSession(string id)
     {
@@ -100,6 +101,13 @@ public class GameSession : IGameSession
     public IReadOnlySet<string> SpectatorConnections => _spectatorConnections;
 
     public TimeControlConfig? TimeControl { get; set; }
+
+    // Correspondence game properties
+    public bool IsCorrespondence { get; set; }
+
+    public int? TimePerMoveDays { get; set; }
+
+    public DateTime? TurnDeadline { get; set; }
 
     /// <summary>
     /// Indicates if there is a pending double offer waiting for opponent response.
@@ -418,7 +426,12 @@ public class GameSession : IGameSession
             WhiteIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState != null && Engine.WhiteTimeState.TurnStartTime != null && Engine.WhiteTimeState.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
             RedIsInDelay = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState != null && Engine.RedTimeState.TurnStartTime != null && Engine.RedTimeState.CalculateIsInDelay(TimeControl?.DelaySeconds ?? 0),
             WhiteDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.White && Engine.WhiteTimeState?.TurnStartTime != null ? Engine.WhiteTimeState.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds : 0,
-            RedDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState?.TurnStartTime != null ? Engine.RedTimeState.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds : 0
+            RedDelayRemaining = !Engine.IsOpeningRoll && Engine.CurrentPlayer?.Color == CheckerColor.Red && Engine.RedTimeState?.TurnStartTime != null ? Engine.RedTimeState.GetDelayRemaining(TimeControl?.DelaySeconds ?? 0).TotalSeconds : 0,
+
+            // Correspondence game info
+            IsCorrespondence = IsCorrespondence,
+            TimePerMoveDays = TimePerMoveDays,
+            TurnDeadline = TurnDeadline
         };
 
         // Log time state calculations
@@ -474,12 +487,15 @@ public class GameSession : IGameSession
     /// <summary>
     /// Start broadcasting time updates every second
     /// </summary>
-    public void StartTimeUpdates(IHubContext<Hubs.GameHub, IGameHubClient> hubContext)
+    public void StartTimeUpdates(IHubContext<Hubs.GameHub, IGameHubClient> hubContext, IGameCompletionService? completionService = null)
     {
         if (TimeControl == null || TimeControl.Type == TimeControlType.None)
         {
             return;
         }
+
+        // Store completion service for use in HandleTimeout
+        _completionService = completionService;
 
         Console.WriteLine($"[TIME DEBUG] StartTimeUpdates called for game {Id}");
         Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {Engine.IsOpeningRoll}");
@@ -821,6 +837,26 @@ public class GameSession : IGameSession
         {
             var state = GetState(connectionId);
             await hubContext.Clients.Client(connectionId).GameUpdate(state);
+        }
+
+        // CRITICAL: Call game completion service to persist the result to database
+        // This was previously missing, causing timed-out games to remain "InProgress" in DB
+        if (_completionService != null)
+        {
+            try
+            {
+                Console.WriteLine($"[TIME DEBUG] Game {Id}: Calling HandleGameCompletionAsync to persist timeout result");
+                await _completionService.HandleGameCompletionAsync(this);
+                Console.WriteLine($"[TIME DEBUG] Game {Id}: HandleGameCompletionAsync completed successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[TIME DEBUG] ERROR: Game {Id}: Failed to complete game after timeout - {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[TIME DEBUG] WARNING: Game {Id}: No completion service available - game result will not be persisted");
         }
     }
 }
