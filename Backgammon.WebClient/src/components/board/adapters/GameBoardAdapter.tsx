@@ -275,9 +275,9 @@ export const GameBoardAdapter = memo(function GameBoardAdapter({
   // Handle move attempt
   const handleMoveAttempt = useCallback(
     async (from: number, to: number) => {
-      // In free move mode, allow any move
+      // In free move mode, bypass game rules entirely
       if (gameState.isAnalysisMode && isFreeMoveEnabled) {
-        await hub?.makeMove(from, to)
+        await hub?.moveCheckerDirectly(from, to)
         selectChecker(null) // Clear selection after move
         return
       }

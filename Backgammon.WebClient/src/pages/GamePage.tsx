@@ -462,6 +462,16 @@ export const GamePage: React.FC = () => {
               />
             )}
 
+            {/* White Correspondence Deadline */}
+            {currentGameState.isCorrespondence && (
+              <CorrespondenceDeadline
+                turnDeadline={currentGameState.turnDeadline}
+                timePerMoveDays={currentGameState.timePerMoveDays}
+                isActive={currentGameState.currentPlayer === CheckerColor.White}
+                color={CheckerColor.White}
+              />
+            )}
+
             {currentGameState.matchId &&
               currentGameState.targetScore &&
               currentGameState.player1Score !== undefined &&
@@ -476,15 +486,6 @@ export const GamePage: React.FC = () => {
                 />
               )}
 
-            {/* Correspondence Game Deadline */}
-            {currentGameState.isCorrespondence && (
-              <CorrespondenceDeadline
-                turnDeadline={currentGameState.turnDeadline}
-                timePerMoveDays={currentGameState.timePerMoveDays}
-                isYourTurn={currentGameState.isYourTurn}
-              />
-            )}
-
             <PlayerCard {...redPlayer} />
 
             {/* Red Player Timer */}
@@ -494,6 +495,16 @@ export const GamePage: React.FC = () => {
                 isInDelay={currentGameState.redIsInDelay ?? null}
                 delayRemaining={currentGameState.redDelayRemaining ?? null}
                 isActive={currentGameState.status === GameStatus.InProgress && !currentGameState.isOpeningRoll && currentGameState.currentPlayer === CheckerColor.Red}
+                color={CheckerColor.Red}
+              />
+            )}
+
+            {/* Red Correspondence Deadline */}
+            {currentGameState.isCorrespondence && (
+              <CorrespondenceDeadline
+                turnDeadline={currentGameState.turnDeadline}
+                timePerMoveDays={currentGameState.timePerMoveDays}
+                isActive={currentGameState.currentPlayer === CheckerColor.Red}
                 color={CheckerColor.Red}
               />
             )}

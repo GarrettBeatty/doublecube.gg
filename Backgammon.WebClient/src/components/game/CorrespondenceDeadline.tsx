@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { Clock, AlertTriangle } from 'lucide-react'
+import { CheckerColor } from '@/types/game.types'
 import { cn } from '@/lib/utils'
 
 interface CorrespondenceDeadlineProps {
   turnDeadline: Date | string | null | undefined
   timePerMoveDays: number | null | undefined
-  isYourTurn: boolean
+  isActive: boolean
+  color: CheckerColor
 }
 
 export const CorrespondenceDeadline: React.FC<CorrespondenceDeadlineProps> = ({
   turnDeadline,
   timePerMoveDays,
-  isYourTurn,
+  isActive,
+  color,
 }) => {
   const [timeRemaining, setTimeRemaining] = useState<string>('')
   const [isUrgent, setIsUrgent] = useState(false)
@@ -64,27 +67,30 @@ export const CorrespondenceDeadline: React.FC<CorrespondenceDeadlineProps> = ({
   }
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium',
-        isYourTurn ? 'bg-primary/10' : 'bg-muted/50',
-        isCritical && isYourTurn && 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 animate-pulse',
-        isUrgent && isYourTurn && 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'
-      )}
-    >
-      {isCritical && isYourTurn ? (
-        <AlertTriangle className="h-4 w-4" />
-      ) : (
-        <Clock className="h-4 w-4 text-muted-foreground" />
-      )}
-      <span>
-        {timeRemaining || `${timePerMoveDays}d/move`}
-      </span>
-      {isYourTurn && timeRemaining && (
-        <span className="text-xs text-muted-foreground">
-          (your turn)
+    <div className="flex flex-col items-center gap-1">
+      <div
+        className={cn(
+          'flex items-center justify-center gap-2 rounded-lg px-4 py-2 min-w-[100px] text-sm font-semibold transition-all',
+          // Base colors matching TimeDisplay
+          color === CheckerColor.White ? 'bg-slate-100 text-slate-900' : 'bg-slate-800 text-slate-100',
+          // Active state
+          isActive && 'ring-2 ring-offset-2',
+          isActive && color === CheckerColor.White && 'ring-blue-500',
+          isActive && color === CheckerColor.Red && 'ring-red-500',
+          // Urgency overrides (only when active)
+          isCritical && isActive && 'bg-red-100 text-red-900 ring-red-500 animate-pulse',
+          isUrgent && isActive && 'bg-orange-100 text-orange-900 ring-orange-500'
+        )}
+      >
+        {isCritical && isActive ? (
+          <AlertTriangle className="h-4 w-4" />
+        ) : (
+          <Clock className="h-4 w-4 opacity-60" />
+        )}
+        <span>
+          {timeRemaining || `${timePerMoveDays}d/move`}
         </span>
-      )}
+      </div>
     </div>
   )
 }

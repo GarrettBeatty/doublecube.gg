@@ -5,7 +5,7 @@ import { useGameStore } from '@/stores/gameStore'
 import { Settings2 } from 'lucide-react'
 
 export const AnalysisModeToggles: React.FC = () => {
-  const { isFreeMoveEnabled, isCustomDiceEnabled, setFreeMoveEnabled, setCustomDiceEnabled } =
+  const { isFreeMoveEnabled, setFreeMoveEnabled } =
     useGameStore()
 
   return (
@@ -31,19 +31,6 @@ export const AnalysisModeToggles: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center justify-between space-x-2">
-          <Label htmlFor="custom-dice" className="flex flex-col gap-1 cursor-pointer">
-            <span className="font-medium">Custom Dice</span>
-            <span className="font-normal text-xs text-muted-foreground">
-              Manually set dice values instead of rolling
-            </span>
-          </Label>
-          <Switch
-            id="custom-dice"
-            checked={isCustomDiceEnabled}
-            onCheckedChange={setCustomDiceEnabled}
-          />
-        </div>
       </CardContent>
     </Card>
   )
