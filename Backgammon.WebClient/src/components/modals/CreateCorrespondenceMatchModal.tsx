@@ -126,8 +126,8 @@ export const CreateCorrespondenceMatchModal: React.FC<CreateCorrespondenceMatchM
 
           {/* Friend selection warning */}
           {opponentType === 'Friend' && !friendUserId && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-              <p className="text-sm text-amber-800">
+            <div className="p-3 bg-muted border rounded-md">
+              <p className="text-sm text-muted-foreground">
                 Please select a friend from your friends list to challenge them.
               </p>
             </div>

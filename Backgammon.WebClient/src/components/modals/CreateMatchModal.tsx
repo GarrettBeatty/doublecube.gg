@@ -31,6 +31,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [isRated, setIsRated] = useState<boolean>(true)
   const [aiType, setAiType] = useState<'greedy' | 'random' | 'gnubg_easy' | 'gnubg_medium' | 'gnubg_hard' | 'gnubg_expert'>('greedy')
   const [isCreating, setIsCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const isAuthenticated = authService.isAuthenticated()
 
   // Reset to default when modal opens
@@ -40,6 +41,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       setTargetScore(1)
       setIsRated(true)
       setAiType('greedy')
+      setError(null)
     }
   }, [isOpen, defaultOpponentType])
 
@@ -52,6 +54,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
 
   const handleCreate = async () => {
     setIsCreating(true)
+    setError(null)
     try {
       // Determine if game can be rated
       const canBeRated = isAuthenticated && opponentType !== 'AI'
@@ -71,8 +74,9 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       await hub?.createMatch(config)
       console.log('[CreateMatchModal] CreateMatch completed')
       onClose()
-    } catch (error) {
-      console.error('[CreateMatchModal] Failed to create match:', error)
+    } catch (err) {
+      console.error('[CreateMatchModal] Failed to create match:', err)
+      setError('Failed to create game. Please try again.')
     } finally {
       setIsCreating(false)
     }
@@ -80,7 +84,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {opponentType === 'AI' ? 'Play vs Computer' : 'Play Online'}
@@ -125,63 +129,42 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
           {/* AI Type - Only show for AI opponents */}
           {opponentType === 'AI' && (
             <div className="space-y-3">
-              <Label>AI Difficulty</Label>
+              <Label>Difficulty</Label>
               <RadioGroup value={aiType} onValueChange={(value) => setAiType(value as 'greedy' | 'random' | 'gnubg_easy' | 'gnubg_medium' | 'gnubg_hard' | 'gnubg_expert')}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="greedy" id="ai-greedy" />
-                  <Label htmlFor="ai-greedy" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Greedy Bot</span>
-                      <span className="text-sm text-muted-foreground">Strategic play: prioritizes hitting and bearing off</span>
-                    </div>
-                  </Label>
-                </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="random" id="ai-random" />
                   <Label htmlFor="ai-random" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Random Bot</span>
-                      <span className="text-sm text-muted-foreground">Makes random valid moves - good for practice</span>
-                    </div>
+                    Beginner <span className="text-muted-foreground">- random moves</span>
                   </Label>
                 </div>
-                <div className="border-t pt-3 mt-2">
-                  <span className="text-sm font-medium text-muted-foreground">GNU Backgammon (Neural Network AI)</span>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="greedy" id="ai-greedy" />
+                  <Label htmlFor="ai-greedy" className="font-normal cursor-pointer">
+                    Easy <span className="text-muted-foreground">- basic strategy</span>
+                  </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="gnubg_easy" id="ai-gnubg-easy" />
                   <Label htmlFor="ai-gnubg-easy" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Easy (GNUBG)</span>
-                      <span className="text-sm text-muted-foreground">0-ply analysis (~1200 ELO) - instant moves, makes mistakes</span>
-                    </div>
+                    Intermediate <span className="text-muted-foreground">- ~1200 ELO</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="gnubg_medium" id="ai-gnubg-medium" />
                   <Label htmlFor="ai-gnubg-medium" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Medium (GNUBG)</span>
-                      <span className="text-sm text-muted-foreground">1-ply analysis (~1600 ELO) - fast, decent play</span>
-                    </div>
+                    Advanced <span className="text-muted-foreground">- ~1600 ELO</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="gnubg_hard" id="ai-gnubg-hard" />
                   <Label htmlFor="ai-gnubg-hard" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Hard (GNUBG) (Recommended)</span>
-                      <span className="text-sm text-muted-foreground">2-ply analysis (~1900 ELO) - strong play</span>
-                    </div>
+                    Hard <span className="text-muted-foreground">- ~1900 ELO</span>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="gnubg_expert" id="ai-gnubg-expert" />
                   <Label htmlFor="ai-gnubg-expert" className="font-normal cursor-pointer">
-                    <div className="flex flex-col">
-                      <span>Expert (GNUBG)</span>
-                      <span className="text-sm text-muted-foreground">3-ply analysis (~2100 ELO) - world-class play, slower</span>
-                    </div>
+                    Expert <span className="text-muted-foreground">- ~2100 ELO</span>
                   </Label>
                 </div>
               </RadioGroup>
@@ -189,19 +172,25 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
           )}
 
           {/* Time Control - Always ChicagoPoint */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="p-3 bg-muted border rounded-md">
             <div className="space-y-1">
-              <p className="text-sm font-medium text-blue-900">Time Control: Chicago Point</p>
-              <p className="text-sm text-blue-800">
+              <p className="text-sm font-medium">Time Control: Chicago Point</p>
+              <p className="text-sm text-muted-foreground">
                 12-second delay + {2 * targetScore}-minute reserve time
               </p>
-              <p className="text-xs text-blue-700">
+              <p className="text-xs text-muted-foreground">
                 Reserve time adjusts as match progresses: 2min per point remaining
               </p>
             </div>
           </div>
 
           {/* Rated/Unrated - Only show for authenticated users playing online */}
+          {error && (
+            <div className="text-sm text-red-500 bg-red-50 p-3 rounded-md">
+              {error}
+            </div>
+          )}
+
           {isAuthenticated && opponentType !== 'AI' && (
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
