@@ -1,4 +1,5 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSignalR } from '@/contexts/SignalRContext'
 import {
   Dialog,
@@ -21,11 +22,13 @@ export const ForfeitConfirmModal: React.FC<ForfeitConfirmModalProps> = ({
   onClose,
 }) => {
   const { hub } = useSignalR()
+  const navigate = useNavigate()
 
   const handleConfirm = async () => {
     try {
       await hub?.abandonGame()
       onClose()
+      navigate('/')
     } catch (error) {
       console.error('Failed to forfeit game:', error)
     }

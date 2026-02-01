@@ -617,8 +617,11 @@ public partial class GameHub
                 // Remove player from group
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
 
-                // Remove game completely from session manager (no DB update needed - game was never persisted)
+                // Remove game completely from session manager
                 _sessionManager.RemoveGame(gameId);
+
+                // Update game status in DynamoDB (game was persisted at match creation)
+                await _gameRepository.UpdateGameStatusAsync(gameId, "Abandoned");
 
                 // If this is a match game, abandon the match as well
                 if (!string.IsNullOrEmpty(session.MatchId))
@@ -632,6 +635,9 @@ public partial class GameHub
                 }
 
                 _logger.LogInformation("Game {GameId} cancelled by player while waiting for opponent (removed from memory)", gameId);
+
+                // Notify the caller so the client can navigate away
+                await Clients.Caller.Info("Game cancelled");
 
                 return;
             }
