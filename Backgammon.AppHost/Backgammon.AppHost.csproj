@@ -12,12 +12,12 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.1.0" />
-    <PackageReference Include="Aspire.Hosting.AWS" Version="9.3.0" />
+    <PackageReference Include="Aspire.Hosting.AWS" Version="9.3.1" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.1.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AWSSDK.Core" Version="4.0.3.3" />
+    <PackageReference Include="AWSSDK.Core" Version="4.0.3.12" />
     <ProjectReference Include="..\Backgammon.Server\Backgammon.Server.csproj" />
     <ProjectReference Include="..\Backgammon.WebClient\Backgammon.WebClient.csproj" />
     <ProjectReference Include="..\Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj" IsAspireProjectResource="false" />
