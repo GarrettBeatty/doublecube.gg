@@ -30,6 +30,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
   const [targetScore, setTargetScore] = useState<number>(1)
   const [isRated, setIsRated] = useState<boolean>(true)
   const [aiType, setAiType] = useState<'greedy' | 'random' | 'gnubg_easy' | 'gnubg_medium' | 'gnubg_hard' | 'gnubg_expert'>('greedy')
+  const [timeControl, setTimeControl] = useState<'ChicagoPoint' | 'None'>('ChicagoPoint')
   const [isCreating, setIsCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const isAuthenticated = authService.isAuthenticated()
@@ -41,6 +42,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
       setTargetScore(1)
       setIsRated(true)
       setAiType('greedy')
+      setTimeControl('ChicagoPoint')
       setError(null)
     }
   }, [isOpen, defaultOpponentType])
@@ -63,7 +65,7 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
         opponentType: opponentType,
         targetScore: targetScore,
         displayName: authService.getDisplayName(),
-        timeControlType: 'ChicagoPoint', // All lobby games now use ChicagoPoint time control
+        timeControlType: timeControl, // Use selected time control
         isRated: canBeRated ? isRated : false, // Only rated if authenticated and not AI
         isCorrespondence: false,
         timePerMoveDays: 0,
@@ -171,18 +173,39 @@ export const CreateMatchModal: React.FC<CreateMatchModalProps> = ({
             </div>
           )}
 
-          {/* Time Control - Always ChicagoPoint */}
-          <div className="p-3 bg-muted border rounded-md">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Time Control: Chicago Point</p>
-              <p className="text-sm text-muted-foreground">
-                12-second delay + {2 * targetScore}-minute reserve time
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Reserve time adjusts as match progresses: 2min per point remaining
-              </p>
-            </div>
+          {/* Time Control Selection */}
+          <div className="space-y-3">
+            <Label>Time Control</Label>
+            <RadioGroup value={timeControl} onValueChange={(value) => setTimeControl(value as 'ChicagoPoint' | 'None')}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="ChicagoPoint" id="time-chicago" />
+                <Label htmlFor="time-chicago" className="font-normal cursor-pointer">
+                  Chicago Point
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="None" id="time-none" />
+                <Label htmlFor="time-none" className="font-normal cursor-pointer">
+                  No Time Control
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
+
+          {/* Time Control Details - Only show when ChicagoPoint is selected */}
+          {timeControl === 'ChicagoPoint' && (
+            <div className="p-3 bg-muted border rounded-md">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Time Control: Chicago Point</p>
+                <p className="text-sm text-muted-foreground">
+                  12-second delay + {2 * targetScore}-minute reserve time
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Reserve time adjusts as match progresses: 2min per point remaining
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Rated/Unrated - Only show for authenticated users playing online */}
           {error && (
