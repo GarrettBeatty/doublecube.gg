@@ -816,27 +816,21 @@ public partial class GameHub
         {
             var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
 
-            // Force ChicagoPoint for all lobby and AI games
-            if (string.IsNullOrEmpty(config.TimeControlType) || config.TimeControlType == "None")
-            {
-                config.TimeControlType = "ChicagoPoint";
-                _logger.LogInformation(
-                    "Time control set to ChicagoPoint (was None or empty) for {OpponentType} match",
-                    config.OpponentType);
-            }
-
             // Parse time control type
-            Core.TimeControlConfig? timeControl = null;
-            if (!string.IsNullOrEmpty(config.TimeControlType) && config.TimeControlType != "None")
+            Core.TimeControlConfig timeControl;
+            if (!string.IsNullOrEmpty(config.TimeControlType)
+                && config.TimeControlType != "None"
+                && Enum.TryParse<Core.TimeControlType>(config.TimeControlType, out var timeControlType))
             {
-                if (Enum.TryParse<Core.TimeControlType>(config.TimeControlType, out var timeControlType))
+                timeControl = new Core.TimeControlConfig
                 {
-                    timeControl = new Core.TimeControlConfig
-                    {
-                        Type = timeControlType,
-                        DelaySeconds = timeControlType == Core.TimeControlType.ChicagoPoint ? 12 : 0
-                    };
-                }
+                    Type = timeControlType,
+                    DelaySeconds = timeControlType == Core.TimeControlType.ChicagoPoint ? 12 : 0
+                };
+            }
+            else
+            {
+                timeControl = new Core.TimeControlConfig { Type = Core.TimeControlType.None };
             }
 
             // Create match and first game immediately

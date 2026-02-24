@@ -199,4 +199,34 @@ public class MatchServiceTimeControlTests
         Assert.Equal(TimeControlType.ChicagoPoint, match.TimeControl.Type);
         Assert.Equal(12, match.TimeControl.DelaySeconds);
     }
+
+    [Fact]
+    public async Task CreateMatch_ExplicitNoneTimeControl_IsPreserved()
+    {
+        // Arrange
+        var playerId = "player1";
+        var targetScore = 5;
+        var noneTimeControl = new TimeControlConfig
+        {
+            Type = TimeControlType.None
+        };
+
+        _mockUserRepo.Setup(x => x.GetByUserIdAsync(playerId))
+            .ReturnsAsync(new User { UserId = playerId, Username = "TestPlayer", DisplayName = "Test Player" });
+
+        // Act
+        var (match, game) = await _matchService.CreateMatchAsync(
+            playerId,
+            targetScore,
+            "OpenLobby",
+            "Test Player",
+            null,
+            noneTimeControl,
+            true,
+            "greedy");
+
+        // Assert - None should NOT be overridden to ChicagoPoint
+        Assert.NotNull(match.TimeControl);
+        Assert.Equal(TimeControlType.None, match.TimeControl.Type);
+    }
 }
