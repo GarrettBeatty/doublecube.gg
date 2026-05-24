@@ -32,7 +32,7 @@ var apiService = builder.AddProject<Projects.Backgammon_Server>("backgammon-api"
     .WaitFor(redis)
     .WaitFor(gnubgService);
 
-// Blazor WebAssembly frontend - gets API URL via service discovery
+// React + Vite frontend served by an ASP.NET host project; API URL is wired via service discovery.
 builder.AddProject<Projects.Backgammon_WebClient>("backgammon-webclient")
     .WithExternalHttpEndpoints()
     .WithReference(apiService)

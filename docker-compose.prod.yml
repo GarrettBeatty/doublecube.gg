@@ -49,7 +49,7 @@ services:
         max-file: "3"
 
   gnubg-service:
-    image: ${ECR_REGISTRY}/backgammon-gnubg-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
+    image: ghcr.io/garrettbeatty/backgammon-gnubg:${IMAGE_TAG:-latest}
     container_name: backgammon-gnubg
     restart: unless-stopped
     expose:
@@ -69,7 +69,7 @@ services:
         max-file: "3"
 
   server:
-    image: ${ECR_REGISTRY}/backgammon-server-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
+    image: ghcr.io/garrettbeatty/backgammon-server:${IMAGE_TAG:-latest}
     container_name: backgammon-server
     restart: unless-stopped
     expose:
@@ -107,7 +107,7 @@ services:
         max-file: "3"
 
   webclient:
-    image: ${ECR_REGISTRY}/backgammon-webclient-${ENVIRONMENT:-dev}:${IMAGE_TAG:-latest}
+    image: ghcr.io/garrettbeatty/backgammon-webclient:${IMAGE_TAG:-latest}
     container_name: backgammon-webclient
     restart: unless-stopped
     ports:

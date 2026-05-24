@@ -185,10 +185,10 @@ All entities stored in one table with composite PK/SK:
 4. **GSI4**: Correspondence "My Turn" index - `GSI4PK=PLAYER#{playerId}`, `GSI4SK=CORRESPONDENCE#{reversed_timestamp}`
 
 ### AWS Production Deployment
-- Infrastructure managed by AWS CDK (see `infra/cdk/`)
-- Deploy: `cd infra/cdk && cdk deploy`
-- On-demand billing (pay-per-request)
-- Point-in-time recovery enabled
+- Deployed to AWS Lightsail Instance running `docker-compose` (see `DEPLOYMENT.md`)
+- Images published to GitHub Container Registry (`ghcr.io/garrettbeatty/backgammon-*`)
+- Postgres + Redis run as containers on the instance; data persists in Docker volumes
+- Snapshots scheduled via Lightsail console
 
 ## Frontend Architecture (WebClient)
 

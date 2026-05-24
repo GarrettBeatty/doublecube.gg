@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Deploy to Lightsail
 
 on:
   push:
@@ -10,285 +10,162 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: us-east-1
-  ENVIRONMENT: dev
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: garrettbeatty
 
 jobs:
   build-server:
-    runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
+    runs-on: ubuntu-24.04-arm
     permissions:
-      id-token: write
       contents: read
-    outputs:
-      image-tag: ${{ github.sha }}
+      packages: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and push Server image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        docker buildx build \
-          --platform linux/arm64 \
-          --push \
-          -f Backgammon.Server/Dockerfile \
-          -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:$IMAGE_TAG \
-          -t $ECR_REGISTRY/backgammon-server-$ENVIRONMENT:latest \
-          .
+      - name: Build and push Server image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            -f Backgammon.Server/Dockerfile \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-server:$IMAGE_TAG \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-server:latest \
+            .
 
   build-webclient:
-    runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
+    runs-on: ubuntu-24.04-arm
     permissions:
-      id-token: write
       contents: read
-    outputs:
-      image-tag: ${{ github.sha }}
+      packages: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and push WebClient image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        docker buildx build \
-          --platform linux/arm64 \
-          --push \
-          -f Backgammon.WebClient/Dockerfile \
-          -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:$IMAGE_TAG \
-          -t $ECR_REGISTRY/backgammon-webclient-$ENVIRONMENT:latest \
-          .
+      - name: Build and push WebClient image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            -f Backgammon.WebClient/Dockerfile \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-webclient:$IMAGE_TAG \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-webclient:latest \
+            .
 
   build-gnubg:
-    runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
+    runs-on: ubuntu-24.04-arm
     permissions:
-      id-token: write
       contents: read
-    outputs:
-      image-tag: ${{ github.sha }}
+      packages: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Build and push gnubg-service image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        docker buildx build \
-          --platform linux/arm64 \
-          --push \
-          -f gnubg-service/Dockerfile \
-          -t $ECR_REGISTRY/backgammon-gnubg-$ENVIRONMENT:$IMAGE_TAG \
-          -t $ECR_REGISTRY/backgammon-gnubg-$ENVIRONMENT:latest \
-          gnubg-service
+      - name: Build and push gnubg-service image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx build \
+            --platform linux/arm64 \
+            --push \
+            -f gnubg-service/Dockerfile \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-gnubg:$IMAGE_TAG \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-gnubg:latest \
+            gnubg-service
 
   deploy:
     needs: [build-server, build-webclient, build-gnubg]
-    runs-on: ubuntu-24.04-arm  # Native ARM64 runner for faster builds
-    permissions:
-      id-token: write
-      contents: read
-
+    runs-on: ubuntu-24.04-arm
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-        aws-region: ${{ env.AWS_REGION }}
+      - name: Deploy to Lightsail
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.LIGHTSAIL_SSH_PRIVATE_KEY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$LIGHTSAIL_HOST" >> ~/.ssh/known_hosts
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:~/backgammon/"
+          scp -i ~/.ssh/deploy_key Caddyfile "$LIGHTSAIL_USER@$LIGHTSAIL_HOST:~/backgammon/"
 
-    - name: Deploy to EC2
-      env:
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-      run: |
-        # Setup SSH
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
-        chmod 600 ~/.ssh/deploy_key
+          ssh -i ~/.ssh/deploy_key "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" \
+            "cd ~/backgammon && IMAGE_TAG=$IMAGE_TAG docker compose -f docker-compose.prod.yml pull && IMAGE_TAG=$IMAGE_TAG docker compose -f docker-compose.prod.yml up -d && docker image prune -af"
 
-        # Add EC2 host to known_hosts
-        ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+      - name: Wait for services to become healthy
+        env:
+          LIGHTSAIL_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          LIGHTSAIL_USER: ${{ secrets.LIGHTSAIL_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key "$LIGHTSAIL_USER@$LIGHTSAIL_HOST" << 'ENDSSH'
+            set -e
+            cd ~/backgammon
 
-        # Copy docker-compose and Caddyfile to EC2
-        scp -i ~/.ssh/deploy_key docker-compose.prod.yml ec2-user@$EC2_HOST:~/backgammon/
-        scp -i ~/.ssh/deploy_key Caddyfile ec2-user@$EC2_HOST:~/backgammon/
+            check_health() {
+              local name=$1
+              local max=$2
+              for i in $(seq 1 $max); do
+                status=$(docker inspect --format='{{.State.Health.Status}}' "$name" 2>/dev/null || echo "missing")
+                if [ "$status" = "healthy" ]; then
+                  echo "✓ $name healthy"
+                  return 0
+                fi
+                echo "  $name attempt $i/$max: $status"
+                sleep 2
+              done
+              echo "✗ $name failed to become healthy"
+              return 1
+            }
 
-        # Deploy on EC2
-        ssh -i ~/.ssh/deploy_key ec2-user@$EC2_HOST << 'ENDSSH'
-          set -e
-          cd ~/backgammon
+            check_health backgammon-postgres 30
+            check_health backgammon-redis 30
+            check_health backgammon-gnubg 60
+            check_health backgammon-server 60
+            check_health backgammon-webclient 60
 
-          # Login to ECR
-          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
+            docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
 
-          # Export environment variables
-          export ECR_REGISTRY=${{ env.ECR_REGISTRY }}
-          export IMAGE_TAG=latest
-          export ENVIRONMENT=dev
-          export AWS_REGION=us-east-1
-          export DYNAMODB_TABLE_NAME=$(aws ssm get-parameter --name /backgammon/dev/table-name --query Parameter.Value --output text)
-          export JWT_SECRET=$(aws ssm get-parameter --name /backgammon/dev/jwt-secret --with-decryption --query Parameter.Value --output text)
-          export DOMAIN=$(aws ssm get-parameter --name /backgammon/dev/domain --query Parameter.Value --output text)
-          export TLS_EMAIL=$(aws ssm get-parameter --name /backgammon/dev/tls-email --query Parameter.Value --output text)
-
-          # Pull new images
-          docker-compose -f docker-compose.prod.yml pull
-
-          # Start all services
-          echo "Starting services..."
-          docker-compose -f docker-compose.prod.yml up -d
-
-          # Wait for all services to be healthy
-          echo "Waiting for services to become healthy..."
-
-          for i in {1..30}; do
-            REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "unknown")
-            if [ "$REDIS_HEALTH" = "healthy" ]; then
-              echo "✓ Redis is healthy"
-              break
-            fi
-            echo "Attempt $i/30: Redis status = $REDIS_HEALTH"
-            sleep 2
-          done
-
-          for i in {1..60}; do
-            GNUBG_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-gnubg 2>/dev/null || echo "unknown")
-            if [ "$GNUBG_HEALTH" = "healthy" ]; then
-              echo "✓ gnubg-service is healthy"
-              break
-            fi
-            echo "Attempt $i/60: gnubg-service status = $GNUBG_HEALTH"
-            sleep 2
-          done
-
-          for i in {1..60}; do
-            SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "unknown")
-            if [ "$SERVER_HEALTH" = "healthy" ]; then
-              echo "✓ Server is healthy"
-              break
-            fi
-            echo "Attempt $i/60: Server status = $SERVER_HEALTH"
-            sleep 2
-          done
-
-          for i in {1..60}; do
-            WEBCLIENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "unknown")
-            if [ "$WEBCLIENT_HEALTH" = "healthy" ]; then
-              echo "✓ WebClient is healthy"
-              break
-            fi
-            echo "Attempt $i/60: WebClient status = $WEBCLIENT_HEALTH"
-            sleep 2
-          done
-
-          # Reload Caddy config
-          echo "Reloading Caddy configuration..."
-          docker exec backgammon-caddy caddy reload --config /etc/caddy/Caddyfile || true
-
-          # Final health check
-          echo "Deployment complete! Final status:"
-          docker ps --format 'table {{.Names}}\t{{.Status}}'
-
-          # Cleanup old/unused images immediately after deployment
-          echo "Cleaning up unused Docker images..."
-          docker image prune -af
-
-          echo "Deployment complete!"
-        ENDSSH
-
-    - name: Verify deployment
-      env:
-        EC2_HOST: ${{ secrets.EC2_HOST }}
-        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-      run: |
-        # Check if services are running
-        ssh -i ~/.ssh/deploy_key ec2-user@$EC2_HOST << 'ENDSSH'
-          echo "Container status:"
-          docker ps --format 'table {{.Names}}\t{{.Status}}'
-          echo ""
-          echo "Health checks:"
-
-          # Check container health status via Docker
-          SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-server 2>/dev/null || echo "not found")
-          WEBCLIENT_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-webclient 2>/dev/null || echo "not found")
-          REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-redis 2>/dev/null || echo "not found")
-          GNUBG_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backgammon-gnubg 2>/dev/null || echo "not found")
-          CADDY_STATUS=$(docker inspect --format='{{.State.Status}}' backgammon-caddy 2>/dev/null || echo "not found")
-
-          echo "  Redis: $REDIS_HEALTH"
-          echo "  gnubg-service: $GNUBG_HEALTH"
-          echo "  Server: $SERVER_HEALTH"
-          echo "  WebClient: $WEBCLIENT_HEALTH"
-          echo "  Caddy: $CADDY_STATUS"
-
-          # Verify via Caddy (internal network check)
-          echo ""
-          echo "Endpoint check via Caddy:"
-          DOMAIN=$(aws ssm get-parameter --name /backgammon/dev/domain --query Parameter.Value --output text)
-          if curl -sf --max-time 10 "https://${DOMAIN}/api/health" > /dev/null 2>&1; then
-            echo "  API health endpoint: OK"
-          else
-            echo "  API health endpoint: FAILED (may need DNS propagation)"
-          fi
-
-          # Final status
-          if [ "$SERVER_HEALTH" = "healthy" ] && [ "$WEBCLIENT_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ] && [ "$GNUBG_HEALTH" = "healthy" ]; then
-            echo ""
-            echo "✓ All services healthy!"
-          else
-            echo ""
-            echo "⚠ Some services may not be healthy yet"
-            exit 1
-          fi
-        ENDSSH
+            echo
+            echo "Final container status:"
+            docker ps --format 'table {{.Names}}\t{{.Status}}'
+          ENDSSH
