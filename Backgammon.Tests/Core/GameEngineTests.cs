@@ -336,11 +336,9 @@ public class GameEngineTests
         var bindingFlags = System.Reflection.BindingFlags.NonPublic
             | System.Reflection.BindingFlags.Instance;
         var currentTurnDiceField = typeof(GameEngine).GetField("_currentTurnDice", bindingFlags);
-        var currentTurnMovesField = typeof(GameEngine).GetField("_currentTurnMoves", bindingFlags);
         var currentTurnField = typeof(GameEngine).GetField("_currentTurn", bindingFlags);
 
         currentTurnDiceField!.SetValue(engine, (4, 3));
-        ((List<Move>)currentTurnMovesField!.GetValue(engine)!).Clear();
 
         var turnSnapshot = new TurnSnapshot
         {

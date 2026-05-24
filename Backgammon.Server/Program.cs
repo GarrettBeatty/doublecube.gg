@@ -2,6 +2,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using Backgammon.AI;
 using Backgammon.AI.Extensions;
 using Backgammon.Analysis.Extensions;
 using Backgammon.Core;
@@ -206,13 +207,10 @@ builder.Services.AddSingleton<AnalysisService>();
 // Register the plugin system infrastructure
 builder.Services.AddBackgammonPlugins(builder.Configuration);
 
-// Register standard bots from AI package (Random, Greedy)
-builder.Services.AddStandardBots();
+// Register all bots — add new bots in Backgammon.AI/BotRegistrations.cs
+builder.Services.AddAllBots();
 
-// Register heuristic bot (uses heuristic evaluator)
-builder.Services.AddHeuristicBot();
-
-// Register analysis evaluators and bots (includes Gnubg if available)
+// Register analysis evaluators (heuristic always; gnubg when service is available)
 builder.Services.AddAnalysisPlugins(includeGnubg: true);
 // ========== END PLUGIN SYSTEM CONFIGURATION ==========
 

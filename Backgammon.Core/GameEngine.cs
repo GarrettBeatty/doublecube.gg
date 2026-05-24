@@ -20,11 +20,6 @@ public class GameEngine
     /// </summary>
     private (int Die1, int Die2)? _currentTurnDice;
 
-    /// <summary>
-    /// Moves made during the current turn (stored for SGF generation)
-    /// </summary>
-    private List<Move> _currentTurnMoves = new();
-
     public GameEngine(string whiteName = "White", string redName = "Red")
     {
         Board = new Board();
@@ -62,9 +57,10 @@ public class GameEngine
     public GameHistory History { get; private set; }
 
     /// <summary>
-    /// Moves made during the current turn (before EndTurn is called)
+    /// Moves made during the current turn (before EndTurn is called).
+    /// Identical to <see cref="MoveHistory"/> — exposed separately for API clarity.
     /// </summary>
-    public IReadOnlyList<Move> CurrentTurnMoves => _currentTurnMoves;
+    public IReadOnlyList<Move> CurrentTurnMoves => MoveHistory;
 
     /// <summary>
     /// Complete game record in SGF format (industry standard).
@@ -135,7 +131,7 @@ public class GameEngine
             blackScore: 0,
             isCrawford: IsCrawfordGame);
         _currentTurnDice = null;
-        _currentTurnMoves.Clear();
+        MoveHistory.Clear();
 
         // Start with opening roll phase
         IsOpeningRoll = true;
@@ -155,27 +151,7 @@ public class GameEngine
         }
 
         Dice.Roll();
-        RemainingMoves = new List<int>(Dice.GetMoves());
-        MoveHistory.Clear(); // Clear history for new turn
-
-        // Store dice for SGF generation (will be appended at EndTurn)
-        _currentTurnDice = (Dice.Die1, Dice.Die2);
-        _currentTurnMoves.Clear();
-
-        // Start new turn snapshot for game history
-        _currentTurn = new TurnSnapshot
-        {
-            TurnNumber = History.Turns.Count + 1,
-            Player = CurrentPlayer.Color,
-            DiceRolled = Dice.GetMoves().ToArray(),
-            PositionSgf = SgfSerializer.ExportPosition(this),
-            CubeValue = DoublingCube.Value,
-            CubeOwner = DoublingCube.Owner?.ToString(),
-            DoublingAction = _pendingDoublingAction
-        };
-
-        // Clear pending doubling action after recording
-        _pendingDoublingAction = null;
+        InitializeTurn();
     }
 
     /// <summary>
@@ -190,27 +166,7 @@ public class GameEngine
         }
 
         Dice.SetDice(die1, die2);
-        RemainingMoves = new List<int>(Dice.GetMoves());
-        MoveHistory.Clear(); // Clear history for new turn
-
-        // Store dice for SGF generation (will be appended at EndTurn)
-        _currentTurnDice = (Dice.Die1, Dice.Die2);
-        _currentTurnMoves.Clear();
-
-        // Start new turn snapshot for game history
-        _currentTurn = new TurnSnapshot
-        {
-            TurnNumber = History.Turns.Count + 1,
-            Player = CurrentPlayer.Color,
-            DiceRolled = Dice.GetMoves().ToArray(),
-            PositionSgf = SgfSerializer.ExportPosition(this),
-            CubeValue = DoublingCube.Value,
-            CubeOwner = DoublingCube.Owner?.ToString(),
-            DoublingAction = _pendingDoublingAction
-        };
-
-        // Clear pending doubling action after recording
-        _pendingDoublingAction = null;
+        InitializeTurn();
     }
 
     /// <summary>
@@ -301,9 +257,8 @@ public class GameEngine
                 CurrentPlayer.Color,
                 _currentTurnDice.Value.Die1,
                 _currentTurnDice.Value.Die2,
-                _currentTurnMoves);
+                MoveHistory);
             _currentTurnDice = null;
-            _currentTurnMoves.Clear();
         }
 
         RemainingMoves.Clear();
@@ -325,12 +280,6 @@ public class GameEngine
 
         var move = MoveHistory[^1]; // Get last move
         MoveHistory.RemoveAt(MoveHistory.Count - 1);
-
-        // Also remove from current turn moves (for turn history tracking)
-        if (_currentTurnMoves.Count > 0)
-        {
-            _currentTurnMoves.RemoveAt(_currentTurnMoves.Count - 1);
-        }
 
         // Remove from current turn snapshot as well
         if (_currentTurn != null && _currentTurn.Moves.Count > 0)
@@ -645,7 +594,7 @@ public class GameEngine
 
             // Initialize first turn snapshot for game history (mirrors RollDice behavior)
             _currentTurnDice = (Dice.Die1, Dice.Die2);
-            _currentTurnMoves.Clear();
+            MoveHistory.Clear();
 
             _currentTurn = new TurnSnapshot
             {
@@ -696,20 +645,13 @@ public class GameEngine
             return;
         }
 
-        Console.WriteLine($"[TIME DEBUG] StartTurnTimer called");
-        Console.WriteLine($"[TIME DEBUG]   CurrentPlayer: {CurrentPlayer?.Color}");
-        Console.WriteLine($"[TIME DEBUG]   IsOpeningRoll: {IsOpeningRoll}");
-
         if (CurrentPlayer == null)
         {
-            Console.WriteLine($"[TIME DEBUG]   ERROR: CurrentPlayer is null, cannot start timer!");
             return;
         }
 
         var timeState = CurrentPlayer.Color == CheckerColor.White ? WhiteTimeState : RedTimeState;
         timeState?.StartTurn();
-
-        Console.WriteLine($"[TIME DEBUG]   TurnStartTime set to: {timeState?.TurnStartTime}");
     }
 
     /// <summary>
@@ -744,6 +686,31 @@ public class GameEngine
     }
 
     /// <summary>
+    /// Shared turn initialization called by <see cref="RollDice"/> and <see cref="StartTurnWithDice"/>.
+    /// Assumes dice have already been set on <see cref="Dice"/>.
+    /// </summary>
+    private void InitializeTurn()
+    {
+        RemainingMoves = new List<int>(Dice.GetMoves());
+        MoveHistory.Clear();
+
+        _currentTurnDice = (Dice.Die1, Dice.Die2);
+
+        _currentTurn = new TurnSnapshot
+        {
+            TurnNumber = History.Turns.Count + 1,
+            Player = CurrentPlayer.Color,
+            DiceRolled = Dice.GetMoves().ToArray(),
+            PositionSgf = SgfSerializer.ExportPosition(this),
+            CubeValue = DoublingCube.Value,
+            CubeOwner = DoublingCube.Owner?.ToString(),
+            DoublingAction = _pendingDoublingAction
+        };
+
+        _pendingDoublingAction = null;
+    }
+
+    /// <summary>
     /// Determine which player goes first by rolling dice
     /// </summary>
     private void DetermineFirstPlayer()
@@ -757,82 +724,11 @@ public class GameEngine
         while (whiteRoll == redRoll);
 
         CurrentPlayer = whiteRoll > redRoll ? WhitePlayer : RedPlayer;
-
-        // First player must manually roll dice to start their turn
-        // (Opening rolls only used to determine turn order)
-    }
-
-    /// <summary>
-    /// Check if bearing off from a point is valid
-    /// </summary>
-    private bool CanBearOff(int from, int dieValue)
-    {
-        // Must have all checkers in home board
-        if (!Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
-        {
-            return false;
-        }
-
-        var fromPoint = Board.GetPoint(from);
-        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-        {
-            return false;
-        }
-
-        var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
-
-        // Point must be in home board
-        if (CurrentPlayer.Color == CheckerColor.White)
-        {
-            if (from < homeStart || from > homeEnd)
-            {
-                return false;
-            }
-
-            // Exact die value match
-            if (from == dieValue)
-            {
-                return true;
-            }
-
-            // If die is higher than point, can bear off if no checkers on higher points
-            if (dieValue > from)
-            {
-                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
-                return from == highestPoint;
-            }
-        }
-
-        // Red
-        else
-        {
-            if (from < homeStart || from > homeEnd)
-            {
-                return false;
-            }
-
-            int normalizedPosition = 25 - from; // Convert to 1-6 range
-
-            // Exact die value match
-            if (normalizedPosition == dieValue)
-            {
-                return true;
-            }
-
-            // If die is higher than normalized position, can bear off if no checkers on higher points
-            if (dieValue > normalizedPosition)
-            {
-                int highestPoint = Board.GetHighestPoint(CurrentPlayer.Color);
-                return from == highestPoint;
-            }
-        }
-
-        return false;
     }
 
     private bool ExecuteSingleMoveInternal(Move move)
     {
-        if (!IsValidSingleMoveInternal(move))
+        if (!MoveValidator.IsValidSingleMove(Board, CurrentPlayer, RemainingMoves, move))
         {
             return false;
         }
@@ -890,21 +786,12 @@ public class GameEngine
         // Remove the used die from remaining moves
         RemainingMoves.Remove(move.DieValue);
 
-        // Track move in per-turn history
+        // Track move in per-turn history (also used by CurrentTurnMoves and SGF generation)
         MoveHistory.Add(move);
-
-        // Track move for SGF generation
-        _currentTurnMoves.Add(new Move(move.From, move.To, move.DieValue)
-        {
-            IsHit = move.IsHit,
-            OpponentCheckersOnBarBefore = move.OpponentCheckersOnBarBefore,
-            CurrentPlayerBornOffBefore = move.CurrentPlayerBornOffBefore
-        });
 
         // Track move in current turn snapshot for game history
         if (_currentTurn != null)
         {
-            // Create a copy of the move to avoid reference issues
             var moveCopy = new Move(move.From, move.To, move.DieValue)
             {
                 IsHit = move.IsHit,
@@ -928,9 +815,8 @@ public class GameEngine
                     CurrentPlayer.Color,
                     _currentTurnDice.Value.Die1,
                     _currentTurnDice.Value.Die2,
-                    _currentTurnMoves);
+                    MoveHistory);
                 _currentTurnDice = null;
-                _currentTurnMoves.Clear();
             }
 
             FinalizeGameSgf();
@@ -984,142 +870,11 @@ public class GameEngine
     }
 
     private bool IsValidSingleMoveInternal(Move move)
-    {
-        // Must have this die value available
-        if (!RemainingMoves.Contains(move.DieValue))
-        {
-            return false;
-        }
-
-        // If checkers on bar, must enter first
-        if (CurrentPlayer.CheckersOnBar > 0 && move.From != 0)
-        {
-            return false;
-        }
-
-        // Entering from bar
-        if (move.From == 0)
-        {
-            if (CurrentPlayer.CheckersOnBar == 0)
-            {
-                return false;
-            }
-
-            var destPoint = Board.GetPoint(move.To);
-            return destPoint.IsOpen(CurrentPlayer.Color);
-        }
-
-        // Bearing off
-        if (move.IsBearOff)
-        {
-            return CanBearOff(move.From, move.DieValue);
-        }
-
-        // Normal move
-        var fromPoint = Board.GetPoint(move.From);
-        if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-        {
-            return false;
-        }
-
-        var toPoint = Board.GetPoint(move.To);
-        return toPoint.IsOpen(CurrentPlayer.Color);
-    }
+        => MoveValidator.IsValidSingleMove(Board, CurrentPlayer, RemainingMoves, move);
 
     private bool IsValidCombinedMoveInternal(Move combinedMove)
-    {
-        if (combinedMove.DiceUsed == null || combinedMove.DiceUsed.Length < 2)
-        {
-            return false;
-        }
-
-        // Check all required dice are available
-        var availableDice = new List<int>(RemainingMoves);
-        foreach (var die in combinedMove.DiceUsed)
-        {
-            if (!availableDice.Contains(die))
-            {
-                return false;
-            }
-
-            availableDice.Remove(die);
-        }
-
-        // Validate by simulating execution (this recalculates combined moves to verify path is valid)
-        var calculator = new CombinedMoveCalculator(Board, CurrentPlayer, RemainingMoves);
-        var singleDestinations = GetSingleDieMovesInternal()
-            .Where(m => m.From == combinedMove.From)
-            .Select(m => m.To)
-            .ToHashSet();
-
-        var validCombinedMoves = calculator.Calculate(combinedMove.From, singleDestinations);
-        return validCombinedMoves.Any(m => m.From == combinedMove.From && m.To == combinedMove.To);
-    }
+        => MoveValidator.IsValidCombinedMove(Board, CurrentPlayer, RemainingMoves, combinedMove);
 
     private List<Move> GetSingleDieMovesInternal()
-    {
-        var validMoves = new List<Move>();
-
-        // If checkers on bar, must enter
-        if (CurrentPlayer.CheckersOnBar > 0)
-        {
-            foreach (var die in RemainingMoves.Distinct())
-            {
-                int entryPoint = CurrentPlayer.Color == CheckerColor.White ? 25 - die : die;
-                var move = new Move(0, entryPoint, die);
-                if (IsValidMove(move))
-                {
-                    validMoves.Add(move);
-                }
-            }
-
-            return validMoves;
-        }
-
-        // Check bearing off
-        if (Board.AreAllCheckersInHomeBoard(CurrentPlayer, CurrentPlayer.CheckersOnBar))
-        {
-            var (homeStart, homeEnd) = CurrentPlayer.GetHomeBoardRange();
-            for (int pos = homeStart; pos <= homeEnd; pos++)
-            {
-                var point = Board.GetPoint(pos);
-                if (point.Color == CurrentPlayer.Color && point.Count > 0)
-                {
-                    foreach (var die in RemainingMoves.Distinct())
-                    {
-                        var move = new Move(pos, 25, die);
-                        if (IsValidMove(move))
-                        {
-                            validMoves.Add(move);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Normal moves
-        for (int from = 1; from <= 24; from++)
-        {
-            var fromPoint = Board.GetPoint(from);
-            if (fromPoint.Color != CurrentPlayer.Color || fromPoint.Count == 0)
-            {
-                continue;
-            }
-
-            foreach (var die in RemainingMoves.Distinct())
-            {
-                int to = from + (CurrentPlayer.GetDirection() * die);
-                if (to >= 1 && to <= 24)
-                {
-                    var move = new Move(from, to, die);
-                    if (IsValidMove(move))
-                    {
-                        validMoves.Add(move);
-                    }
-                }
-            }
-        }
-
-        return validMoves;
-    }
+        => MoveValidator.GetValidSingleDieMoves(Board, CurrentPlayer, RemainingMoves);
 }
