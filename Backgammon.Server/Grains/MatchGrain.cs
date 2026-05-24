@@ -359,6 +359,20 @@ public class MatchGrain : Grain, IMatchGrain
     }
 
     /// <inheritdoc/>
+    public async Task<MatchJoinResult?> EnsurePlayerJoinedAsync(string playerId, string? displayName)
+    {
+        var s = _state.State;
+
+        if (!s.IsInitialized) return null;
+        if (playerId == s.Player1Id || playerId == s.Player2Id) return null;
+        if (!string.IsNullOrEmpty(s.Player2Id)) return null;
+        if (s.OpponentType != "OpenLobby" && s.OpponentType != "Friend") return null;
+        if (s.Status != MatchStatus.WaitingForPlayers) return null;
+
+        return await JoinAsync(playerId, displayName);
+    }
+
+    /// <inheritdoc/>
     public async Task<EnsureNextGameResult> EnsureNextGameAsync(string playerId)
     {
         var matchId = this.GetPrimaryKeyString();

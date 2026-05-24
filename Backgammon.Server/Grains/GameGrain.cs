@@ -227,8 +227,10 @@ public partial class GameGrain : Grain, IGameGrain
             return GetStateInternal(connectionId);
         }
 
-        // Try to add as new player
-        if (_whitePlayerId == null)
+        // Try to add as new player. Treat empty string the same as null — OpenLobby
+        // games are persisted with RedPlayerId = "" until Player 2 joins, so the
+        // slot-empty check must accept both.
+        if (string.IsNullOrEmpty(_whitePlayerId))
         {
             _whitePlayerId = playerId;
             _whiteConnections.Add(connectionId);
@@ -236,7 +238,7 @@ public partial class GameGrain : Grain, IGameGrain
             await SetPlayerDisplayNameAndRatingAsync(playerId, displayName);
             TryStartGameIfReady();
         }
-        else if (_redPlayerId == null)
+        else if (string.IsNullOrEmpty(_redPlayerId))
         {
             _redPlayerId = playerId;
             _redConnections.Add(connectionId);

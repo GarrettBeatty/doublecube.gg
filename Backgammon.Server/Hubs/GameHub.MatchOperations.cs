@@ -627,45 +627,7 @@ public partial class GameHub
             var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
             var result = await matchGrain.JoinAsync(playerId, displayName);
 
-            await Clients.Caller.MatchCreated(new MatchCreatedDto
-            {
-                MatchId = result.MatchId,
-                GameId = result.CurrentGameId ?? string.Empty,
-                TargetScore = result.TargetScore,
-                OpponentType = result.OpponentType,
-                Player1Id = result.Player1Id,
-                Player2Id = result.Player2Id,
-                Player1Name = result.Player1Name,
-                Player2Name = result.Player2Name,
-            });
-
-            // Notify creator that opponent joined
-            var creatorConnection = await GetPlayerConnectionAsync(result.Player1Id);
-            if (!string.IsNullOrEmpty(creatorConnection))
-            {
-                await Clients.Client(creatorConnection).OpponentJoinedMatch(new OpponentJoinedMatchDto
-                {
-                    MatchId = result.MatchId,
-                    Player2Id = result.Player2Id ?? string.Empty,
-                    Player2Name = result.Player2Name,
-                });
-            }
-
-            // For correspondence matches, notify Player1 it's their turn
-            if (result.IsCorrespondence)
-            {
-                var player1Connection = await GetPlayerConnectionAsync(result.Player1Id);
-                if (!string.IsNullOrEmpty(player1Connection))
-                {
-                    await Clients.Client(player1Connection).CorrespondenceTurnNotification(
-                        new CorrespondenceTurnNotificationDto
-                        {
-                            MatchId = result.MatchId,
-                            GameId = result.CurrentGameId,
-                            Message = "Opponent joined! It's your turn.",
-                        });
-                }
-            }
+            await BroadcastMatchJoinAsync(result);
 
             _logger.LogInformation("Player {PlayerId} joined match {MatchId}", playerId, matchId);
         }
@@ -673,6 +635,53 @@ public partial class GameHub
         {
             _logger.LogError(ex, "Error joining match {MatchId}", matchId);
             await Clients.Caller.Error(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Send the standard post-join match notifications: MatchCreated to the joining
+    /// player, OpponentJoinedMatch to the creator, and CorrespondenceTurnNotification
+    /// for correspondence matches. Shared between explicit JoinMatch and the JoinGame
+    /// auto-promotion path.
+    /// </summary>
+    internal async Task BroadcastMatchJoinAsync(MatchJoinResult result)
+    {
+        await Clients.Caller.MatchCreated(new MatchCreatedDto
+        {
+            MatchId = result.MatchId,
+            GameId = result.CurrentGameId ?? string.Empty,
+            TargetScore = result.TargetScore,
+            OpponentType = result.OpponentType,
+            Player1Id = result.Player1Id,
+            Player2Id = result.Player2Id,
+            Player1Name = result.Player1Name,
+            Player2Name = result.Player2Name,
+        });
+
+        var creatorConnection = await GetPlayerConnectionAsync(result.Player1Id);
+        if (!string.IsNullOrEmpty(creatorConnection))
+        {
+            await Clients.Client(creatorConnection).OpponentJoinedMatch(new OpponentJoinedMatchDto
+            {
+                MatchId = result.MatchId,
+                Player2Id = result.Player2Id ?? string.Empty,
+                Player2Name = result.Player2Name,
+            });
+        }
+
+        if (result.IsCorrespondence)
+        {
+            var player1Connection = await GetPlayerConnectionAsync(result.Player1Id);
+            if (!string.IsNullOrEmpty(player1Connection))
+            {
+                await Clients.Client(player1Connection).CorrespondenceTurnNotification(
+                    new CorrespondenceTurnNotificationDto
+                    {
+                        MatchId = result.MatchId,
+                        GameId = result.CurrentGameId,
+                        Message = "Opponent joined! It's your turn.",
+                    });
+            }
         }
     }
 }

@@ -50,6 +50,24 @@ public partial class GameHub
             {
                 await Clients.Caller.GameUpdate(state);
             }
+
+            // Backfill match membership for players who land on a game URL without
+            // first calling JoinMatch (direct URL, refresh, shared link). No-op for
+            // spectators (IsPlayerAsync false), creators (already Player1), and
+            // matches that don't accept new players.
+            if (!string.IsNullOrEmpty(state?.MatchId) && await grain.IsPlayerAsync(playerId))
+            {
+                var matchGrain = _grainFactory.GetGrain<IMatchGrain>(state.MatchId);
+                var joinResult = await matchGrain.EnsurePlayerJoinedAsync(playerId, displayName);
+                if (joinResult != null)
+                {
+                    await BroadcastMatchJoinAsync(joinResult);
+                    _logger.LogInformation(
+                        "Player {PlayerId} auto-promoted to Player2 of match {MatchId} via JoinGame",
+                        playerId,
+                        state.MatchId);
+                }
+            }
         }
         catch (Exception ex)
         {

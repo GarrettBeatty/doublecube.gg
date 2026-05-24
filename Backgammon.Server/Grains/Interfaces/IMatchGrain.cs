@@ -35,6 +35,15 @@ public interface IMatchGrain : IGrainWithStringKey
     Task<MatchJoinResult> JoinAsync(string player2Id, string? player2DisplayName);
 
     /// <summary>
+    /// Idempotently ensure a player is registered on the match. Backfills match
+    /// membership for the JoinGame flow when a player lands on a game URL without
+    /// first calling <c>JoinMatch</c> (direct URL, refresh, shared link).
+    /// Returns the join result if a promotion to Player2 occurred, or null if the
+    /// player is already a participant or the match doesn't accept new players.
+    /// </summary>
+    Task<MatchJoinResult?> EnsurePlayerJoinedAsync(string playerId, string? displayName);
+
+    /// <summary>
     /// Atomic "continue this match" entry point: if the current game is still
     /// playable (InProgress / WaitingForOpponent), return its ID to rejoin;
     /// otherwise create the next game and return its ID. The grain's
