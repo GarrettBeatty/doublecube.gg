@@ -104,7 +104,7 @@ else
     Console.WriteLine("=============================================\n");
 }
 
-builder.Services.AddSingleton<IAnalysisSessionManager, AnalysisSessionManager>();
+// Analysis sessions live on IAnalysisSessionGrain (per-user); no singleton needed.
 
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();
@@ -193,8 +193,7 @@ builder.Services.AddSingleton<IAiPlayerManager, AiPlayerManager>();
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
 
-builder.Services.AddSingleton<IMatchChatStorage, MatchChatStorage>();
-builder.Services.AddSingleton<IChatService, ChatService>();
+// Chat lives on IMatchChatGrain (per-match); no service registration needed.
 
 // ========== ANALYSIS CONFIGURATION ==========
 // Configure analysis settings

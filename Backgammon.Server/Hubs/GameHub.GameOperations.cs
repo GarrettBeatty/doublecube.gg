@@ -65,50 +65,11 @@ public partial class GameHub
     {
         try
         {
-            var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (session == null)
+            var dispatched = await TryDispatchAnalysisAsync((g, s) => g.SetDiceAsync(s, die1, die2));
+            if (!dispatched)
             {
                 await Clients.Caller.Error("Not in an analysis session");
-                return;
             }
-
-            // Validate dice values early (before acquiring lock)
-            if (die1 < 1 || die1 > 6 || die2 < 1 || die2 > 6)
-            {
-                await Clients.Caller.Error("Dice values must be between 1 and 6");
-                return;
-            }
-
-            // Acquire lock to prevent race conditions with multi-tab access
-            await session.GameActionLock.WaitAsync();
-            try
-            {
-                // Get initial dice count to detect if moves were made
-                var initialDiceCount = session.Engine.Dice.GetMoves().Count;
-                var currentRemainingCount = session.Engine.RemainingMoves.Count;
-
-                // Allow setting dice if:
-                // 1. No remaining moves (turn ended), OR
-                // 2. All moves still available (no moves made yet)
-                var noMovesLeft = currentRemainingCount == 0;
-                var noMovesMadeYet = currentRemainingCount == initialDiceCount;
-
-                if (!noMovesLeft && !noMovesMadeYet)
-                {
-                    await Clients.Caller.Error("End your turn or undo moves before setting new dice");
-                    return;
-                }
-
-                session.Engine.StartTurnWithDice(die1, die2);
-                session.UpdateActivity();
-            }
-            finally
-            {
-                session.GameActionLock.Release();
-            }
-
-            // Broadcast update to all connections
-            await BroadcastAnalysisSessionUpdate(session);
         }
         catch (Exception ex)
         {
@@ -216,13 +177,7 @@ public partial class GameHub
     {
         try
         {
-            // Check if in analysis session first
-            var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (analysisSession != null)
-            {
-                await RollDiceForAnalysisSession(analysisSession);
-                return;
-            }
+            if (await TryDispatchAnalysisAsync((g, s) => g.RollDiceAsync(s))) return;
 
             var grain = await GetGameGrainForCallerAsync();
             if (grain == null)
@@ -251,13 +206,7 @@ public partial class GameHub
     {
         try
         {
-            // Check if in analysis session first
-            var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (analysisSession != null)
-            {
-                await MakeMoveForAnalysisSession(analysisSession, from, to);
-                return;
-            }
+            if (await TryDispatchAnalysisAsync((g, s) => g.MakeMoveAsync(s, from, to))) return;
 
             var grain = await GetGameGrainForCallerAsync();
             if (grain == null)
@@ -290,13 +239,7 @@ public partial class GameHub
     {
         try
         {
-            // Check if in analysis session first
-            var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (analysisSession != null)
-            {
-                await MakeCombinedMoveForAnalysisSession(analysisSession, from, to, intermediatePoints);
-                return;
-            }
+            if (await TryDispatchAnalysisAsync((g, s) => g.MakeCombinedMoveAsync(s, from, to, intermediatePoints))) return;
 
             var grain = await GetGameGrainForCallerAsync();
             if (grain == null)
@@ -325,13 +268,7 @@ public partial class GameHub
     {
         try
         {
-            // Check if in analysis session first
-            var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (analysisSession != null)
-            {
-                await EndTurnForAnalysisSession(analysisSession);
-                return;
-            }
+            if (await TryDispatchAnalysisAsync((g, s) => g.EndTurnAsync(s))) return;
 
             var grain = await GetGameGrainForCallerAsync();
             if (grain == null)
@@ -360,13 +297,7 @@ public partial class GameHub
     {
         try
         {
-            // Check if in analysis session first
-            var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-            if (analysisSession != null)
-            {
-                await UndoLastMoveForAnalysisSession(analysisSession);
-                return;
-            }
+            if (await TryDispatchAnalysisAsync((g, s) => g.UndoLastMoveAsync(s))) return;
 
             var grain = await GetGameGrainForCallerAsync();
             if (grain == null)
@@ -533,12 +464,11 @@ public partial class GameHub
     /// </summary>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        // Remove from presence registry
+        // Remove from presence registry. (Chat rate-limit state lives inside each
+        // IMatchChatGrain; entries naturally expire after 1 minute and the grain
+        // deactivates when the match ends, so no per-disconnect cleanup is needed.)
         await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
             .SetOfflineAsync(Context.ConnectionId);
-
-        // Clean up chat rate limit history
-        _chatService.CleanupConnection(Context.ConnectionId);
 
         await HandleDisconnectionAsync(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
@@ -550,16 +480,13 @@ public partial class GameHub
     /// </summary>
     public async Task<string> ExportPosition()
     {
-        // Check analysis session first
-        var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (analysisSession != null)
+        var analysisGrain = GetAnalysisGrain();
+        var sessionId = await analysisGrain.GetSessionIdForConnectionAsync(Context.ConnectionId);
+        if (sessionId != null)
         {
-            var sgf = SgfSerializer.ExportPosition(analysisSession.Engine);
-            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
-            return base64;
+            return await analysisGrain.ExportPositionAsync(sessionId);
         }
 
-        // Check game grain
         var grain = await GetGameGrainForCallerAsync();
         if (grain != null)
         {
@@ -576,14 +503,13 @@ public partial class GameHub
     /// </summary>
     public async Task<string> ExportGameSgf()
     {
-        // Check analysis session first
-        var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (analysisSession != null)
+        var analysisGrain = GetAnalysisGrain();
+        var sessionId = await analysisGrain.GetSessionIdForConnectionAsync(Context.ConnectionId);
+        if (sessionId != null)
         {
-            return analysisSession.Engine.GameSgf;
+            return await analysisGrain.ExportGameSgfAsync(sessionId);
         }
 
-        // Check game grain
         var grain = await GetGameGrainForCallerAsync();
         if (grain != null)
         {
@@ -598,46 +524,10 @@ public partial class GameHub
     /// </summary>
     public async Task ImportPosition(string positionData)
     {
-        var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (session == null)
+        var dispatched = await TryDispatchAnalysisAsync((g, s) => g.ImportPositionAsync(s, positionData));
+        if (!dispatched)
         {
             await Clients.Caller.Error("Not in an analysis session");
-            return;
-        }
-
-        try
-        {
-            await session.GameActionLock.WaitAsync();
-            try
-            {
-                // Auto-detect format: base64-encoded or raw SGF
-                string sgf;
-                if (positionData.StartsWith("(;"))
-                {
-                    sgf = positionData;
-                }
-                else
-                {
-                    // Try base64 decode
-                    var bytes = Convert.FromBase64String(positionData);
-                    sgf = System.Text.Encoding.UTF8.GetString(bytes);
-                }
-
-                // Apply the position to the engine
-                SgfSerializer.ImportPosition(session.Engine, sgf);
-                session.UpdateActivity();
-            }
-            finally
-            {
-                session.GameActionLock.Release();
-            }
-
-            await BroadcastAnalysisSessionUpdate(session);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error importing position");
-            await Clients.Caller.Error("Failed to import position: invalid format");
         }
     }
 
@@ -646,41 +536,10 @@ public partial class GameHub
     /// </summary>
     public async Task MoveCheckerDirectly(int from, int to)
     {
-        var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (session == null)
+        var dispatched = await TryDispatchAnalysisAsync((g, s) => g.MoveCheckerDirectlyAsync(s, from, to));
+        if (!dispatched)
         {
             await Clients.Caller.Error("Not in an analysis session");
-            return;
-        }
-
-        // Validate basic constraints
-        if (!IsValidDirectMove(session.Engine, from, to))
-        {
-            await Clients.Caller.Error("Invalid move: check piece placement rules");
-            return;
-        }
-
-        try
-        {
-            await session.GameActionLock.WaitAsync();
-            try
-            {
-                // Execute move bypassing game rules
-                ExecuteDirectMove(session.Engine, from, to);
-                session.UpdateActivity();
-            }
-            finally
-            {
-                session.GameActionLock.Release();
-            }
-
-            // Broadcast update to all connections
-            await BroadcastAnalysisSessionUpdate(session);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error executing direct move in analysis mode");
-            await Clients.Caller.Error("Failed to move checker");
         }
     }
 
@@ -689,36 +548,10 @@ public partial class GameHub
     /// </summary>
     public async Task SetCurrentPlayer(CheckerColor color)
     {
-        var session = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
-        if (session == null)
+        var dispatched = await TryDispatchAnalysisAsync((g, s) => g.SetCurrentPlayerAsync(s, color));
+        if (!dispatched)
         {
             await Clients.Caller.Error("Not in an analysis session");
-            return;
-        }
-
-        try
-        {
-            await session.GameActionLock.WaitAsync();
-            try
-            {
-                // Update current player
-                session.Engine.SetCurrentPlayer(color);
-
-                // Clear remaining moves (reset turn state)
-                session.Engine.RemainingMoves.Clear();
-                session.UpdateActivity();
-            }
-            finally
-            {
-                session.GameActionLock.Release();
-            }
-
-            await BroadcastAnalysisSessionUpdate(session);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error setting current player in analysis mode");
-            await Clients.Caller.Error("Failed to set current player");
         }
     }
 
@@ -731,13 +564,13 @@ public partial class GameHub
     /// </summary>
     public async Task<PositionEvaluationDto> AnalyzePosition(string sessionId, string? evaluatorType)
     {
-        var session = _analysisSessionManager.GetSession(sessionId);
-        if (session == null)
+        var result = await GetAnalysisGrain().AnalyzePositionAsync(sessionId, evaluatorType);
+        if (result == null)
         {
             throw new HubException("Analysis session not found");
         }
 
-        return await _analysisService.EvaluatePositionAsync(session.Engine, evaluatorType);
+        return result;
     }
 
     /// <summary>
@@ -747,18 +580,13 @@ public partial class GameHub
     /// <param name="evaluatorType">Optional evaluator type ("Heuristic" or "Gnubg"). If null, uses default from settings.</param>
     public async Task<BestMovesAnalysisDto> FindBestMoves(string sessionId, string? evaluatorType)
     {
-        var session = _analysisSessionManager.GetSession(sessionId);
-        if (session == null)
+        var result = await GetAnalysisGrain().FindBestMovesAsync(sessionId, evaluatorType);
+        if (result == null)
         {
-            throw new HubException("Analysis session not found");
+            throw new HubException("Analysis session not found or no dice rolled");
         }
 
-        if (session.Engine.RemainingMoves.Count == 0)
-        {
-            throw new HubException("No dice rolled - cannot analyze moves");
-        }
-
-        return await _analysisService.FindBestMovesAsync(session.Engine, evaluatorType);
+        return result;
     }
 
     /// <summary>
@@ -860,7 +688,7 @@ public partial class GameHub
             }
 
             // Clean up analysis session if present
-            _analysisSessionManager.RemoveConnection(connectionId);
+            await GetAnalysisGrain().LeaveSessionAsync(connectionId);
         }
         catch (Exception ex)
         {

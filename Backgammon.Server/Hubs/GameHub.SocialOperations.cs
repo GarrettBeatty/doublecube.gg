@@ -32,17 +32,29 @@ public partial class GameHub
                 return;
             }
 
+            if (string.IsNullOrEmpty(state.MatchId))
+            {
+                // Chat is only supported for match games (the chat grain is keyed by matchId).
+                return;
+            }
+
             var senderName = state.YourColor == Backgammon.Core.CheckerColor.White
                 ? state.WhitePlayerName ?? "White"
                 : state.RedPlayerName ?? "Red";
 
-            await _chatService.SendChatMessageAsync(
-                Context.ConnectionId,
-                state.GameId,
-                state.MatchId,
-                senderName,
-                state.YourColor.Value,
-                message);
+            var chatGrain = _grainFactory.GetGrain<IMatchChatGrain>(state.MatchId);
+            var result = await chatGrain.TrySendMessageAsync(Context.ConnectionId, senderName, message);
+
+            if (!string.IsNullOrEmpty(result.Error))
+            {
+                await Clients.Caller.Error(result.Error);
+                return;
+            }
+
+            await Clients.Group(state.GameId)
+                .ReceiveChatMessage(senderName, result.Message!, Context.ConnectionId);
+
+            _logger.LogInformation("Chat message from {Sender} in game {GameId}", senderName, state.GameId);
         }
         catch (Exception ex)
         {

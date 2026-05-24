@@ -1,44 +1,54 @@
-using Backgammon.Core;
+using Backgammon.Server.Grains;
+using Backgammon.Server.Grains.Interfaces;
+using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
-using Backgammon.Server.Models.SignalR;
-using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Orleans;
 
 namespace Backgammon.Server.Hubs;
 
 /// <summary>
-/// GameHub partial class - Analysis Session Operations
-/// Handles dedicated analysis sessions (separate from game sessions)
+/// GameHub partial class - Analysis Session Operations.
+/// Thin SignalR adapter over <see cref="IAnalysisSessionGrain"/> (per-user grain).
 /// </summary>
 public partial class GameHub
 {
+    /// <summary>Resolve the analysis grain key for the current connection.</summary>
+    private string GetAnalysisGrainKey() => GetAuthenticatedUserId() ?? Context.ConnectionId;
+
+    /// <summary>Get the analysis grain for the current connection's user.</summary>
+    private IAnalysisSessionGrain GetAnalysisGrain() =>
+        _grainFactory.GetGrain<IAnalysisSessionGrain>(GetAnalysisGrainKey());
+
+    /// <summary>Broadcast a state update to every connection in an analysis SignalR group.</summary>
+    private Task BroadcastAnalysisAsync(string sessionId, GameState state) =>
+        Clients.Group($"analysis-{sessionId}").GameUpdate(state);
+
     /// <summary>
     /// Create a new analysis session.
-    /// Returns the session ID for sharing/reconnecting.
     /// </summary>
     public async Task<string> CreateAnalysisSession()
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var userId = GetAuthenticatedUserId() ?? connectionId;
+            var result = await GetAnalysisGrain().CreateSessionAsync(connectionId);
 
-            var session = _analysisSessionManager.CreateSession(userId, connectionId);
+            if (!string.IsNullOrEmpty(result.Error) || string.IsNullOrEmpty(result.SessionId))
+            {
+                throw new HubException(result.Error ?? "Failed to create analysis session");
+            }
 
-            // Add to SignalR group for broadcasting
-            await Groups.AddToGroupAsync(connectionId, $"analysis-{session.Id}");
+            await Groups.AddToGroupAsync(connectionId, $"analysis-{result.SessionId}");
+            await Clients.Caller.GameStart(result.State!);
 
-            _logger.LogInformation(
-                "Created analysis session {SessionId} for user {UserId}",
-                session.Id,
-                userId);
-
-            // Send initial state to client
-            var state = session.GetState(connectionId);
-            await Clients.Caller.GameStart(state);
-
-            return session.Id;
+            _logger.LogInformation("Created analysis session {SessionId}", result.SessionId);
+            return result.SessionId;
+        }
+        catch (HubException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -48,33 +58,24 @@ public partial class GameHub
     }
 
     /// <summary>
-    /// Join an existing analysis session (for multi-tab support).
+    /// Join an existing analysis session (multi-tab).
     /// </summary>
     public async Task JoinAnalysisSession(string sessionId)
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var userId = GetAuthenticatedUserId() ?? connectionId;
+            var result = await GetAnalysisGrain().JoinSessionAsync(sessionId, connectionId);
 
-            var session = _analysisSessionManager.JoinSession(sessionId, userId, connectionId);
-            if (session == null)
+            if (!string.IsNullOrEmpty(result.Error) || string.IsNullOrEmpty(result.SessionId))
             {
-                await Clients.Caller.Error("Analysis session not found or you don't have access");
+                await Clients.Caller.Error(result.Error ?? "Failed to join analysis session");
                 return;
             }
 
-            // Add to SignalR group
-            await Groups.AddToGroupAsync(connectionId, $"analysis-{session.Id}");
-
-            _logger.LogInformation(
-                "Connection {ConnectionId} joined analysis session {SessionId}",
-                connectionId,
-                sessionId);
-
-            // Send current state to the new connection
-            var state = session.GetState(connectionId);
-            await Clients.Caller.GameUpdate(state);
+            await Groups.AddToGroupAsync(connectionId, $"analysis-{result.SessionId}");
+            await Clients.Caller.GameUpdate(result.State!);
+            _logger.LogInformation("Connection {ConnectionId} joined analysis session {SessionId}", connectionId, sessionId);
         }
         catch (Exception ex)
         {
@@ -91,24 +92,11 @@ public partial class GameHub
         try
         {
             var connectionId = Context.ConnectionId;
-            var session = _analysisSessionManager.GetSessionByConnection(connectionId);
+            var sessionId = await GetAnalysisGrain().LeaveSessionAsync(connectionId);
+            if (sessionId == null) return;
 
-            if (session == null)
-            {
-                // Not in an analysis session, nothing to do
-                return;
-            }
-
-            // Remove from SignalR group
-            await Groups.RemoveFromGroupAsync(connectionId, $"analysis-{session.Id}");
-
-            // Remove connection from session
-            _analysisSessionManager.RemoveConnection(connectionId);
-
-            _logger.LogInformation(
-                "Connection {ConnectionId} left analysis session {SessionId}",
-                connectionId,
-                session.Id);
+            await Groups.RemoveFromGroupAsync(connectionId, $"analysis-{sessionId}");
+            _logger.LogInformation("Connection {ConnectionId} left analysis session {SessionId}", connectionId, sessionId);
         }
         catch (Exception ex)
         {
@@ -117,174 +105,25 @@ public partial class GameHub
     }
 
     /// <summary>
-    /// Broadcast game state update to all connections in an analysis session.
+    /// Dispatch an analysis-mode action: if the caller is in an analysis session, run
+    /// <paramref name="action"/> against it and broadcast; returns true if dispatched.
     /// </summary>
-    private async Task BroadcastAnalysisSessionUpdate(AnalysisSession session)
+    private async Task<bool> TryDispatchAnalysisAsync(Func<IAnalysisSessionGrain, string, Task<AnalysisActionResult>> action)
     {
-        foreach (var connectionId in session.Connections)
+        var grain = GetAnalysisGrain();
+        var sessionId = await grain.GetSessionIdForConnectionAsync(Context.ConnectionId);
+        if (sessionId == null) return false;
+
+        var result = await action(grain, sessionId);
+        if (!string.IsNullOrEmpty(result.Error))
         {
-            var state = session.GetState(connectionId);
-            await Clients.Client(connectionId).GameUpdate(state);
+            await Clients.Caller.Error(result.Error);
         }
-    }
-
-    // ==================== Game Action Helpers for Analysis Sessions ====================
-
-    /// <summary>
-    /// Roll dice in an analysis session.
-    /// </summary>
-    private async Task RollDiceForAnalysisSession(AnalysisSession session)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
+        else if (result.State != null)
         {
-            // Don't allow rolling if moves are remaining
-            if (session.Engine.RemainingMoves.Count > 0)
-            {
-                await Clients.Caller.Error("Complete or undo your moves before rolling again");
-                return;
-            }
-
-            session.Engine.RollDice();
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
+            await BroadcastAnalysisAsync(sessionId, result.State);
         }
 
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// Make a move in an analysis session.
-    /// </summary>
-    private async Task MakeMoveForAnalysisSession(AnalysisSession session, int from, int to)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            // Get valid moves
-            var validMoves = session.Engine.GetValidMoves();
-            var move = validMoves.FirstOrDefault(m => m.From == from && m.To == to);
-
-            if (move == null)
-            {
-                await Clients.Caller.Error("Invalid move");
-                return;
-            }
-
-            session.Engine.ExecuteMove(move);
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// Make a combined move in an analysis session.
-    /// </summary>
-    private async Task MakeCombinedMoveForAnalysisSession(
-        AnalysisSession session,
-        int from,
-        int to,
-        int[] intermediatePoints)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            // Build the sequence of moves
-            var sequence = new List<(int From, int To)>();
-            var currentFrom = from;
-
-            foreach (var intermediate in intermediatePoints)
-            {
-                sequence.Add((currentFrom, intermediate));
-                currentFrom = intermediate;
-            }
-
-            sequence.Add((currentFrom, to));
-
-            // Validate and execute each move in sequence
-            foreach (var (moveFrom, moveTo) in sequence)
-            {
-                var validMoves = session.Engine.GetValidMoves();
-                var move = validMoves.FirstOrDefault(m => m.From == moveFrom && m.To == moveTo);
-
-                if (move == null)
-                {
-                    await Clients.Caller.Error($"Invalid move from {moveFrom} to {moveTo}");
-                    return;
-                }
-
-                session.Engine.ExecuteMove(move);
-            }
-
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// End turn in an analysis session.
-    /// </summary>
-    private async Task EndTurnForAnalysisSession(AnalysisSession session)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            _logger.LogInformation(
-                "[Analysis EndTurn] Before EndTurn - History.Turns.Count: {TurnCount}, Dice: [{Die1}, {Die2}]",
-                session.Engine.History.Turns.Count,
-                session.Engine.Dice.Die1,
-                session.Engine.Dice.Die2);
-
-            session.Engine.EndTurn();
-
-            _logger.LogInformation(
-                "[Analysis EndTurn] After EndTurn - History.Turns.Count: {TurnCount}",
-                session.Engine.History.Turns.Count);
-
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
-    }
-
-    /// <summary>
-    /// Undo last move in an analysis session.
-    /// </summary>
-    private async Task UndoLastMoveForAnalysisSession(AnalysisSession session)
-    {
-        await session.GameActionLock.WaitAsync();
-        try
-        {
-            if (!session.Engine.UndoLastMove())
-            {
-                await Clients.Caller.Error("Nothing to undo");
-                return;
-            }
-
-            session.UpdateActivity();
-        }
-        finally
-        {
-            session.GameActionLock.Release();
-        }
-
-        await BroadcastAnalysisSessionUpdate(session);
+        return true;
     }
 }

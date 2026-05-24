@@ -24,7 +24,7 @@ public class MatchGrain : Grain, IMatchGrain
     private readonly IUserRepository _userRepository;
     private readonly IAiPlayerManager _aiPlayerManager;
     private readonly IPlayerStatsService _playerStatsService;
-    private readonly IChatService _chatService;
+    // Chat lives on IMatchChatGrain (Phase 6B); we resolve it from GrainFactory rather than DI.
     private readonly ILogger<MatchGrain> _logger;
 
     // ===== Orleans-persisted state =====
@@ -40,7 +40,6 @@ public class MatchGrain : Grain, IMatchGrain
         IUserRepository userRepository,
         IAiPlayerManager aiPlayerManager,
         IPlayerStatsService playerStatsService,
-        IChatService chatService,
         ILogger<MatchGrain> logger)
     {
         _state = state;
@@ -49,7 +48,6 @@ public class MatchGrain : Grain, IMatchGrain
         _userRepository = userRepository;
         _aiPlayerManager = aiPlayerManager;
         _playerStatsService = playerStatsService;
-        _chatService = chatService;
         _logger = logger;
     }
 
@@ -361,21 +359,43 @@ public class MatchGrain : Grain, IMatchGrain
     }
 
     /// <inheritdoc/>
-    public async Task<string> StartNextGameAsync()
+    public async Task<EnsureNextGameResult> EnsureNextGameAsync(string playerId)
     {
         var matchId = this.GetPrimaryKeyString();
         var s = _state.State;
 
         if (!s.IsInitialized)
         {
-            throw new InvalidOperationException($"Match {matchId} not found");
+            return new EnsureNextGameResult { Error = "Match not found" };
+        }
+
+        if (playerId != s.Player1Id && playerId != s.Player2Id)
+        {
+            return new EnsureNextGameResult { Error = "You are not a player in this match" };
+        }
+
+        // If the current game is still playable, hand it back so the caller rejoins it.
+        if (!string.IsNullOrEmpty(s.CurrentGameId))
+        {
+            var existingGrain = GrainFactory.GetGrain<IGameGrain>(s.CurrentGameId);
+            var status = await existingGrain.GetStatusAsync();
+            if (status == SessionStatus.InProgress || status == SessionStatus.WaitingForOpponent)
+            {
+                _logger.LogInformation(
+                    "EnsureNextGame: returning existing game {GameId} (status={Status}) for match {MatchId}",
+                    s.CurrentGameId,
+                    status,
+                    matchId);
+                return new EnsureNextGameResult { GameId = s.CurrentGameId };
+            }
         }
 
         if (s.Status != MatchStatus.InProgress)
         {
-            throw new InvalidOperationException($"Cannot start new game in completed match {matchId}");
+            return new EnsureNextGameResult { Error = "Cannot continue to next game" };
         }
 
+        // Create the next game.
         var gameId = Guid.NewGuid().ToString();
         var game = new ServerGame
         {
@@ -400,11 +420,11 @@ public class MatchGrain : Grain, IMatchGrain
         await _state.WriteStateAsync();
 
         _logger.LogInformation(
-            "Started next game {GameId} for match {MatchId}",
+            "EnsureNextGame: created next game {GameId} for match {MatchId}",
             gameId,
             matchId);
 
-        return gameId;
+        return new EnsureNextGameResult { GameId = gameId };
     }
 
     /// <inheritdoc/>
@@ -491,7 +511,7 @@ public class MatchGrain : Grain, IMatchGrain
             s.CompletedAt = DateTime.UtcNow;
 
             _aiPlayerManager.RemoveMatch(matchId);
-            _chatService.ClearMatchChat(matchId);
+            await GrainFactory.GetGrain<IMatchChatGrain>(matchId).ClearAsync();
 
             _logger.LogInformation(
                 "Match {MatchId} completed. Winner: {WinnerId}, Score: {P1}-{P2}",
@@ -556,7 +576,7 @@ public class MatchGrain : Grain, IMatchGrain
         await _matchRepository.UpdateMatchAsync(match);
         await _state.WriteStateAsync();
 
-        _chatService.ClearMatchChat(matchId);
+        await GrainFactory.GetGrain<IMatchChatGrain>(matchId).ClearAsync();
 
         _logger.LogInformation("Match {MatchId} abandoned by {PlayerId}", matchId, abandoningPlayerId);
     }

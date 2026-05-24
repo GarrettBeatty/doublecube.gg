@@ -32,7 +32,6 @@ public partial class GameGrain : Grain, IGameGrain
     private readonly IAiPlayerManager _aiPlayerManager;
     private readonly IMatchService _matchService;
     private readonly IPlayerStatsService _playerStatsService;
-    private readonly IChatService _chatService;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<GameGrain> _logger;
 
@@ -88,7 +87,6 @@ public partial class GameGrain : Grain, IGameGrain
         IAiPlayerManager aiPlayerManager,
         IMatchService matchService,
         IPlayerStatsService playerStatsService,
-        IChatService chatService,
         IUserRepository userRepository,
         ILogger<GameGrain> logger)
     {
@@ -99,7 +97,6 @@ public partial class GameGrain : Grain, IGameGrain
         _aiPlayerManager = aiPlayerManager;
         _matchService = matchService;
         _playerStatsService = playerStatsService;
-        _chatService = chatService;
         _userRepository = userRepository;
         _logger = logger;
     }
@@ -476,7 +473,8 @@ public partial class GameGrain : Grain, IGameGrain
     {
         if (string.IsNullOrEmpty(_matchId)) return;
 
-        var chatHistory = _chatService.GetMatchChatHistory(_matchId);
+        var chatGrain = GrainFactory.GetGrain<IMatchChatGrain>(_matchId);
+        var chatHistory = await chatGrain.GetHistoryAsync();
         if (chatHistory.Count == 0) return;
 
         var historyDto = new ChatHistoryDto

@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Backgammon.Core;
 using Backgammon.Server.Grains;
 using Backgammon.Server.Grains.Interfaces;
@@ -18,84 +17,27 @@ namespace Backgammon.Server.Hubs;
 public partial class GameHub
 {
     /// <summary>
-    /// Per-match locks to prevent race conditions when multiple ContinueMatch calls happen simultaneously.
-    /// </summary>
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _matchContinuationLocks = new();
-
-    /// <summary>
     /// Continue to the next game in a match after the current game is complete.
+    /// Race coordination across concurrent calls lives inside <see cref="IMatchGrain.EnsureNextGameAsync"/>;
+    /// the grain's single-threaded execution makes an external lock unnecessary.
     /// </summary>
     public async Task ContinueMatch(string matchId)
     {
         try
         {
-            _logger.LogInformation("========== ContinueMatch Request ==========");
-            _logger.LogInformation("MatchId: {MatchId}, ConnectionId: {ConnectionId}", matchId, Context.ConnectionId);
+            _logger.LogInformation("ContinueMatch: MatchId={MatchId}, ConnectionId={ConnectionId}", matchId, Context.ConnectionId);
 
             var playerId = GetAuthenticatedUserId()!;
+            var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+            var result = await matchGrain.EnsureNextGameAsync(playerId);
 
-            var matchLock = _matchContinuationLocks.GetOrAdd(matchId, _ => new SemaphoreSlim(1, 1));
-            if (!await matchLock.WaitAsync(TimeSpan.FromSeconds(5)))
+            if (!string.IsNullOrEmpty(result.Error) || string.IsNullOrEmpty(result.GameId))
             {
-                _logger.LogWarning("ContinueMatch: Timeout waiting for lock on match {MatchId}", matchId);
-                await Clients.Caller.Error("Please wait, match continuation in progress");
+                await Clients.Caller.Error(result.Error ?? "Cannot continue to next game");
                 return;
             }
 
-            try
-            {
-                var match = await _matchService.GetMatchAsync(matchId);
-                if (match == null)
-                {
-                    await Clients.Caller.Error("Match not found");
-                    return;
-                }
-
-                if (playerId != match.Player1Id && playerId != match.Player2Id)
-                {
-                    await Clients.Caller.Error("You are not a player in this match");
-                    return;
-                }
-
-                // Check if there is a current game that is still playable
-                if (!string.IsNullOrEmpty(match.CurrentGameId))
-                {
-                    var existingGrain = _grainFactory.GetGrain<IGameGrain>(match.CurrentGameId);
-                    var status = await existingGrain.GetStatusAsync();
-
-                    if (status == SessionStatus.InProgress || status == SessionStatus.WaitingForOpponent)
-                    {
-                        _logger.LogInformation(
-                            "ContinueMatch: Joining existing game {GameId} (status={Status}) for match {MatchId}",
-                            match.CurrentGameId,
-                            status,
-                            matchId);
-                        await JoinGame(match.CurrentGameId);
-                        return;
-                    }
-                }
-
-                // Check if match can continue to next game
-                if (!match.CoreMatch.CanContinueToNextGame())
-                {
-                    await Clients.Caller.Error("Cannot continue to next game");
-                    return;
-                }
-
-                // Create the next game
-                _logger.LogInformation("ContinueMatch: Player {PlayerId} creating next game for match {MatchId}", playerId, matchId);
-                var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
-                var nextGameId = await matchGrain.StartNextGameAsync();
-
-                _logger.LogInformation("ContinueMatch: Created next game {GameId} for match {MatchId}", nextGameId, matchId);
-
-                // Join the new game
-                await JoinGame(nextGameId);
-            }
-            finally
-            {
-                matchLock.Release();
-            }
+            await JoinGame(result.GameId);
         }
         catch (Exception ex)
         {

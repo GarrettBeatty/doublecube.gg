@@ -13,7 +13,6 @@ namespace Backgammon.Server.Services;
 public class AnalysisSession
 {
     private readonly HashSet<string> _connections = new();
-    private readonly SemaphoreSlim _gameActionLock = new(1, 1);
 
     /// <summary>
     /// Creates a new analysis session.
@@ -51,11 +50,6 @@ public class AnalysisSession
     /// Analysis sessions are always in progress (no waiting for opponent).
     /// </summary>
     public SessionStatus Status { get; set; } = SessionStatus.InProgress;
-
-    /// <summary>
-    /// Lock for game actions that modify state (prevents race conditions with multi-tab access).
-    /// </summary>
-    public SemaphoreSlim GameActionLock => _gameActionLock;
 
     /// <summary>
     /// When this session was created.

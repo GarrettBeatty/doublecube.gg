@@ -35,10 +35,15 @@ public interface IMatchGrain : IGrainWithStringKey
     Task<MatchJoinResult> JoinAsync(string player2Id, string? player2DisplayName);
 
     /// <summary>
-    /// Create the next game in this match after the previous one completed.
-    /// Returns the new game ID.
+    /// Atomic "continue this match" entry point: if the current game is still
+    /// playable (InProgress / WaitingForOpponent), return its ID to rejoin;
+    /// otherwise create the next game and return its ID. The grain's
+    /// single-threaded execution makes this race-free without an external lock,
+    /// which is why the old <c>_matchContinuationLocks</c> static dict could
+    /// be deleted.
     /// </summary>
-    Task<string> StartNextGameAsync();
+    /// <param name="playerId">The player invoking continuation (must be a match participant).</param>
+    Task<EnsureNextGameResult> EnsureNextGameAsync(string playerId);
 
     /// <summary>
     /// Update match scores after a game completes. Applies Core.Match business

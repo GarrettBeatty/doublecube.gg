@@ -36,14 +36,12 @@ public partial class GameHub : Hub<IGameHubClient>
     private readonly IGameRepository _gameRepository;
     private readonly IMatchService _matchService;
     private readonly IPlayerProfileService _playerProfileService;
-    private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
     private readonly IAnalysisService _analysisService;
     private readonly IUserRepository _userRepository;
     private readonly IFriendService _friendService;
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IDailyPuzzleService _dailyPuzzleService;
-    private readonly IAnalysisSessionManager _analysisSessionManager;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="GameHub"/> class.
@@ -53,27 +51,23 @@ public partial class GameHub : Hub<IGameHubClient>
         IGameRepository gameRepository,
         IMatchService matchService,
         IPlayerProfileService playerProfileService,
-        IChatService chatService,
         ILogger<GameHub> logger,
         IAnalysisService analysisService,
         IUserRepository userRepository,
         IFriendService friendService,
         ICorrespondenceGameService correspondenceGameService,
-        IDailyPuzzleService dailyPuzzleService,
-        IAnalysisSessionManager analysisSessionManager)
+        IDailyPuzzleService dailyPuzzleService)
     {
         _grainFactory = grainFactory;
         _gameRepository = gameRepository;
         _matchService = matchService;
         _playerProfileService = playerProfileService;
-        _chatService = chatService;
         _logger = logger;
         _analysisService = analysisService;
         _userRepository = userRepository;
         _friendService = friendService;
         _correspondenceGameService = correspondenceGameService;
         _dailyPuzzleService = dailyPuzzleService;
-        _analysisSessionManager = analysisSessionManager;
     }
 
     /// <summary>
@@ -262,188 +256,5 @@ public partial class GameHub : Hub<IGameHubClient>
     private Task<string?> GetPlayerConnectionAsync(string playerId)
     {
         return _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key).GetConnectionIdAsync(playerId);
-    }
-
-    // ==================== Analysis Mode Helper Methods ====================
-
-    /// <summary>
-    /// Validates if a direct move is valid (ignores game rules, only basic constraints)
-    /// </summary>
-    private bool IsValidDirectMove(GameEngine engine, int from, int to)
-    {
-        // Point ranges: 0=bar, 1-24=board, 25=bearoff
-        if (from < 0 || from > 25 || to < 0 || to > 25)
-        {
-            return false;
-        }
-
-        if (from == to)
-        {
-            return false;
-        }
-
-        // Must have checker at source
-        CheckerColor? sourceColor = GetCheckerColorAtPoint(engine, from);
-        if (sourceColor == null)
-        {
-            return false;
-        }
-
-        // Destination validation (board points only)
-        if (to >= 1 && to <= 24)
-        {
-            var destPoint = engine.Board.GetPoint(to);
-
-            // Can't place opposing colors on same point
-            if (destPoint.Color != null && destPoint.Color != sourceColor)
-            {
-                return false;
-            }
-        }
-
-        // Prevent exceeding 15 checkers per player
-        return CountCheckers(engine, sourceColor.Value) <= 15;
-    }
-
-    /// <summary>
-    /// Executes a direct move in analysis mode (bypasses game rules)
-    /// </summary>
-    private void ExecuteDirectMove(GameEngine engine, int from, int to)
-    {
-        // Remove from source
-        CheckerColor color = RemoveCheckerFrom(engine, from);
-
-        // Add to destination
-        AddCheckerTo(engine, to, color);
-
-        // Clear remaining moves (reset turn state)
-        engine.RemainingMoves.Clear();
-    }
-
-    /// <summary>
-    /// Gets the checker color at a specific point
-    /// </summary>
-    private CheckerColor? GetCheckerColorAtPoint(GameEngine engine, int point)
-    {
-        // Bar
-        if (point == 0)
-        {
-            if (engine.WhitePlayer.CheckersOnBar > 0)
-            {
-                return CheckerColor.White;
-            }
-
-            if (engine.RedPlayer.CheckersOnBar > 0)
-            {
-                return CheckerColor.Red;
-            }
-        }
-        else if (point >= 1 && point <= 24)
-        {
-            var boardPoint = engine.Board.GetPoint(point);
-            return boardPoint.Color;
-        }
-
-        // Bear-off
-        else if (point == 25)
-        {
-            if (engine.WhitePlayer.CheckersBornOff > 0)
-            {
-                return CheckerColor.White;
-            }
-
-            if (engine.RedPlayer.CheckersBornOff > 0)
-            {
-                return CheckerColor.Red;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Removes a checker from a point and returns its color
-    /// </summary>
-    private CheckerColor RemoveCheckerFrom(GameEngine engine, int point)
-    {
-        // Bar
-        if (point == 0)
-        {
-            if (engine.WhitePlayer.CheckersOnBar > 0)
-            {
-                engine.WhitePlayer.CheckersOnBar--;
-                return CheckerColor.White;
-            }
-            else
-            {
-                engine.RedPlayer.CheckersOnBar--;
-                return CheckerColor.Red;
-            }
-        }
-        else if (point >= 1 && point <= 24)
-        {
-            var boardPoint = engine.Board.GetPoint(point);
-            CheckerColor color = boardPoint.Color!.Value;
-            boardPoint.Checkers.RemoveAt(boardPoint.Checkers.Count - 1);
-            return color;
-        }
-
-        // Bear-off
-        else
-        {
-            if (engine.WhitePlayer.CheckersBornOff > 0)
-            {
-                engine.WhitePlayer.CheckersBornOff--;
-                return CheckerColor.White;
-            }
-            else
-            {
-                engine.RedPlayer.CheckersBornOff--;
-                return CheckerColor.Red;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Adds a checker to a point
-    /// </summary>
-    private void AddCheckerTo(GameEngine engine, int point, CheckerColor color)
-    {
-        // Bar
-        if (point == 0)
-        {
-            var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
-            player.CheckersOnBar++;
-        }
-        else if (point >= 1 && point <= 24)
-        {
-            engine.Board.GetPoint(point).AddChecker(color);
-        }
-
-        // Bear-off
-        else if (point == 25)
-        {
-            var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
-            player.CheckersBornOff++;
-        }
-    }
-
-    /// <summary>
-    /// Counts total checkers for a player (board + bar + borne off)
-    /// </summary>
-    private int CountCheckers(GameEngine engine, CheckerColor color)
-    {
-        int count = 0;
-        for (int i = 1; i <= 24; i++)
-        {
-            var point = engine.Board.GetPoint(i);
-            if (point.Color == color)
-            {
-                count += point.Count;
-            }
-        }
-
-        var player = color == CheckerColor.White ? engine.WhitePlayer : engine.RedPlayer;
-        return count + player.CheckersOnBar + player.CheckersBornOff;
     }
 }
