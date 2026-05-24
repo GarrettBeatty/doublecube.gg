@@ -1,4 +1,6 @@
 using Backgammon.Core;
+using Backgammon.Server.Grains;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
@@ -61,56 +63,60 @@ public partial class GameHub
                 throw new ArgumentException("TimePerMoveDays must be between 1 and 30");
             }
 
-            // Create correspondence match
-            var (match, firstGame) = await _correspondenceGameService.CreateCorrespondenceMatchAsync(
-                playerId,
-                config.TargetScore,
-                config.TimePerMoveDays,
-                config.OpponentType,
-                config.DisplayName,
-                config.OpponentId,
-                config.IsRated);
+            // Create correspondence match via grain
+            var matchId = Guid.NewGuid().ToString();
+            var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+            var result = await matchGrain.CreateCorrespondenceMatchAsync(new CorrespondenceMatchCreationRequest
+            {
+                Player1Id = playerId,
+                TargetScore = config.TargetScore,
+                TimePerMoveDays = config.TimePerMoveDays,
+                OpponentType = config.OpponentType,
+                Player1DisplayName = config.DisplayName,
+                Player2Id = config.OpponentId,
+                IsRated = config.IsRated,
+            });
 
             // Send MatchCreated event with game ID
             await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                MatchId = match.MatchId,
-                GameId = firstGame.GameId,
-                TargetScore = match.TargetScore,
-                OpponentType = match.OpponentType ?? string.Empty,
-                Player1Id = match.Player1Id,
-                Player2Id = match.Player2Id,
-                Player1Name = match.Player1Name ?? string.Empty,
-                Player2Name = match.Player2Name,
+                MatchId = result.MatchId,
+                GameId = result.FirstGameId,
+                TargetScore = result.TargetScore,
+                OpponentType = result.OpponentType,
+                Player1Id = result.Player1Id,
+                Player2Id = result.Player2Id,
+                Player1Name = result.Player1Name,
+                Player2Name = result.Player2Name,
                 IsCorrespondence = true,
-                TimePerMoveDays = match.TimePerMoveDays,
-                TurnDeadline = match.TurnDeadline
+                TimePerMoveDays = result.TimePerMoveDays,
+                TurnDeadline = result.TurnDeadline,
             });
 
             _logger.LogInformation(
                 "Correspondence match {MatchId} created for player {PlayerId}, time per move: {TimePerMove} days",
-                match.MatchId,
+                result.MatchId,
                 playerId,
-                match.TimePerMoveDays);
+                result.TimePerMoveDays);
 
             // For OpenLobby, broadcast to all clients that a new lobby is available
             if (config.OpponentType == "OpenLobby")
             {
                 await Clients.All.CorrespondenceLobbyCreated(new CorrespondenceLobbyCreatedDto
                 {
-                    MatchId = match.MatchId,
-                    GameId = firstGame.GameId,
-                    CreatorPlayerId = match.Player1Id,
-                    CreatorUsername = match.Player1Name ?? string.Empty,
-                    TargetScore = match.TargetScore,
-                    TimePerMoveDays = match.TimePerMoveDays,
-                    IsRated = match.IsRated
+                    MatchId = result.MatchId,
+                    GameId = result.FirstGameId,
+                    CreatorPlayerId = result.Player1Id,
+                    CreatorUsername = result.Player1Name,
+                    TargetScore = result.TargetScore,
+                    TimePerMoveDays = result.TimePerMoveDays,
+                    IsRated = result.IsRated,
                 });
 
                 _logger.LogInformation(
                     "Broadcast CorrespondenceLobbyCreated event for match {MatchId} (isRated: {IsRated})",
-                    match.MatchId,
-                    match.IsRated);
+                    result.MatchId,
+                    result.IsRated);
             }
 
             // For friend matches, notify the friend if they're online
@@ -124,12 +130,12 @@ public partial class GameHub
                     await Clients.Client(opponentConnection).CorrespondenceMatchInvite(
                         new CorrespondenceMatchInviteDto
                         {
-                            MatchId = match.MatchId,
-                            GameId = firstGame.GameId,
-                            TargetScore = match.TargetScore,
-                            ChallengerName = match.Player1Name ?? string.Empty,
-                            ChallengerId = match.Player1Id,
-                            TimePerMoveDays = match.TimePerMoveDays
+                            MatchId = result.MatchId,
+                            GameId = result.FirstGameId,
+                            TargetScore = result.TargetScore,
+                            ChallengerName = result.Player1Name,
+                            ChallengerId = result.Player1Id,
+                            TimePerMoveDays = result.TimePerMoveDays,
                         });
                 }
             }
@@ -150,7 +156,8 @@ public partial class GameHub
     {
         try
         {
-            await _correspondenceGameService.HandleTurnCompletedAsync(matchId, nextPlayerId);
+            var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+            await matchGrain.HandleTurnCompletedAsync(nextPlayerId);
 
             // Notify next player if they're online
             if (!string.IsNullOrEmpty(GetPlayerConnection(nextPlayerId)))

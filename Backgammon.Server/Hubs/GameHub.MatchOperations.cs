@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Backgammon.Core;
+using Backgammon.Server.Grains;
 using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
@@ -83,12 +84,13 @@ public partial class GameHub
 
                 // Create the next game
                 _logger.LogInformation("ContinueMatch: Player {PlayerId} creating next game for match {MatchId}", playerId, matchId);
-                var nextGame = await _matchService.StartNextGameAsync(matchId);
+                var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+                var nextGameId = await matchGrain.StartNextGameAsync();
 
-                _logger.LogInformation("ContinueMatch: Created next game {GameId} for match {MatchId}", nextGame.GameId, matchId);
+                _logger.LogInformation("ContinueMatch: Created next game {GameId} for match {MatchId}", nextGameId, matchId);
 
                 // Join the new game
-                await JoinGame(nextGame.GameId);
+                await JoinGame(nextGameId);
             }
             finally
             {
@@ -593,44 +595,48 @@ public partial class GameHub
                 timeControl = new Core.TimeControlConfig { Type = Core.TimeControlType.None };
             }
 
-            var (match, firstGame) = await _matchService.CreateMatchAsync(
-                playerId,
-                config.TargetScore,
-                config.OpponentType,
-                config.DisplayName,
-                config.OpponentId,
-                timeControl,
-                config.IsRated,
-                config.AiType);
+            var matchId = Guid.NewGuid().ToString();
+            var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+            var result = await matchGrain.CreateMatchAsync(new MatchCreationRequest
+            {
+                Player1Id = playerId,
+                TargetScore = config.TargetScore,
+                OpponentType = config.OpponentType,
+                Player1DisplayName = config.DisplayName,
+                Player2Id = config.OpponentId,
+                TimeControl = timeControl,
+                IsRated = config.IsRated,
+                AiType = config.AiType,
+            });
 
             await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                MatchId = match.MatchId,
-                GameId = firstGame.GameId,
-                TargetScore = match.TargetScore,
-                OpponentType = match.OpponentType ?? string.Empty,
-                Player1Id = match.Player1Id,
-                Player2Id = match.Player2Id,
-                Player1Name = match.Player1Name ?? string.Empty,
-                Player2Name = match.Player2Name
+                MatchId = result.MatchId,
+                GameId = result.FirstGameId,
+                TargetScore = result.TargetScore,
+                OpponentType = result.OpponentType,
+                Player1Id = result.Player1Id,
+                Player2Id = result.Player2Id,
+                Player1Name = result.Player1Name,
+                Player2Name = result.Player2Name,
             });
 
             _logger.LogInformation(
                 "Match {MatchId} created for player {PlayerId} (type: {OpponentType}), first game: {GameId}",
-                match.MatchId,
+                result.MatchId,
                 playerId,
                 config.OpponentType,
-                firstGame.GameId);
+                result.FirstGameId);
 
             if (config.OpponentType == "OpenLobby")
             {
                 await Clients.All.LobbyCreated(new LobbyCreatedDto
                 {
-                    MatchId = match.MatchId,
-                    GameId = firstGame.GameId,
-                    CreatorName = match.Player1Name ?? string.Empty,
-                    TargetScore = match.TargetScore,
-                    IsRated = match.IsRated
+                    MatchId = result.MatchId,
+                    GameId = result.FirstGameId,
+                    CreatorName = result.Player1Name,
+                    TargetScore = result.TargetScore,
+                    IsRated = result.IsRated,
                 });
             }
 
@@ -641,11 +647,11 @@ public partial class GameHub
                 {
                     await Clients.Client(opponentConnection).MatchInvite(new MatchInviteDto
                     {
-                        MatchId = match.MatchId,
-                        GameId = firstGame.GameId,
-                        TargetScore = match.TargetScore,
-                        ChallengerName = match.Player1Name ?? string.Empty,
-                        ChallengerId = match.Player1Id
+                        MatchId = result.MatchId,
+                        GameId = result.FirstGameId,
+                        TargetScore = result.TargetScore,
+                        ChallengerName = result.Player1Name,
+                        ChallengerId = result.Player1Id,
                     });
                 }
             }
@@ -678,44 +684,45 @@ public partial class GameHub
             // Track this player's connection
             _playerConnectionService.AddConnection(playerId, Context.ConnectionId);
 
-            var match = await _matchService.JoinMatchAsync(matchId, playerId, displayName);
+            var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
+            var result = await matchGrain.JoinAsync(playerId, displayName);
 
             await Clients.Caller.MatchCreated(new MatchCreatedDto
             {
-                MatchId = match.MatchId,
-                GameId = match.CurrentGameId ?? string.Empty,
-                TargetScore = match.TargetScore,
-                OpponentType = match.OpponentType ?? string.Empty,
-                Player1Id = match.Player1Id,
-                Player2Id = match.Player2Id,
-                Player1Name = match.Player1Name ?? string.Empty,
-                Player2Name = match.Player2Name
+                MatchId = result.MatchId,
+                GameId = result.CurrentGameId ?? string.Empty,
+                TargetScore = result.TargetScore,
+                OpponentType = result.OpponentType,
+                Player1Id = result.Player1Id,
+                Player2Id = result.Player2Id,
+                Player1Name = result.Player1Name,
+                Player2Name = result.Player2Name,
             });
 
             // Notify creator that opponent joined
-            var creatorConnection = GetPlayerConnection(match.Player1Id);
+            var creatorConnection = GetPlayerConnection(result.Player1Id);
             if (!string.IsNullOrEmpty(creatorConnection))
             {
                 await Clients.Client(creatorConnection).OpponentJoinedMatch(new OpponentJoinedMatchDto
                 {
-                    MatchId = match.MatchId,
-                    Player2Id = match.Player2Id ?? string.Empty,
-                    Player2Name = match.Player2Name ?? string.Empty
+                    MatchId = result.MatchId,
+                    Player2Id = result.Player2Id ?? string.Empty,
+                    Player2Name = result.Player2Name,
                 });
             }
 
             // For correspondence matches, notify Player1 it's their turn
-            if (match.IsCorrespondence)
+            if (result.IsCorrespondence)
             {
-                var player1Connection = GetPlayerConnection(match.Player1Id);
+                var player1Connection = GetPlayerConnection(result.Player1Id);
                 if (!string.IsNullOrEmpty(player1Connection))
                 {
                     await Clients.Client(player1Connection).CorrespondenceTurnNotification(
                         new CorrespondenceTurnNotificationDto
                         {
-                            MatchId = match.MatchId,
-                            GameId = match.CurrentGameId,
-                            Message = "Opponent joined! It's your turn."
+                            MatchId = result.MatchId,
+                            GameId = result.CurrentGameId,
+                            Message = "Opponent joined! It's your turn.",
                         });
                 }
             }

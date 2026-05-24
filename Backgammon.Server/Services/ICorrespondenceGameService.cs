@@ -3,7 +3,9 @@ using Backgammon.Server.Models;
 namespace Backgammon.Server.Services;
 
 /// <summary>
-/// Service interface for managing correspondence (async) games
+/// Read-only query facade for correspondence games. After Phase 4b, mutations
+/// (create match, handle turn/timeout/init) live on <see cref="Grains.Interfaces.IMatchGrain"/>;
+/// the methods left here just batch repository reads for the home/lobby pages.
 /// </summary>
 public interface ICorrespondenceGameService
 {
@@ -21,34 +23,4 @@ public interface ICorrespondenceGameService
     /// Get all correspondence games for a player (both turn types)
     /// </summary>
     Task<CorrespondenceGamesResponse> GetAllCorrespondenceGamesAsync(string playerId);
-
-    /// <summary>
-    /// Create a new correspondence match
-    /// </summary>
-    Task<(Match Match, Game FirstGame)> CreateCorrespondenceMatchAsync(
-        string player1Id,
-        int targetScore,
-        int timePerMoveDays,
-        string opponentType,
-        string? player1DisplayName = null,
-        string? player2Id = null,
-        bool isRated = true);
-
-    /// <summary>
-    /// Handle turn completion in a correspondence game
-    /// Updates the current turn player and deadline
-    /// </summary>
-    Task HandleTurnCompletedAsync(string matchId, string nextPlayerId);
-
-    /// <summary>
-    /// Handle timeout - forfeit the game for the player who ran out of time
-    /// </summary>
-    Task HandleTimeoutAsync(string matchId);
-
-    /// <summary>
-    /// Initialize turn tracking when a player joins an OpenLobby correspondence match.
-    /// Sets CurrentTurnPlayerId to Player1 and TurnDeadline based on timePerMoveDays.
-    /// </summary>
-    /// <param name="matchId">The match ID to initialize turn tracking for</param>
-    Task InitializeTurnTrackingAsync(string matchId);
 }

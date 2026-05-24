@@ -1,6 +1,7 @@
 using Backgammon.Core;
 using Backgammon.Plugins.Models;
 using Backgammon.Server.Extensions;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services;
@@ -56,15 +57,14 @@ public partial class GameGrain
 
                 // Update correspondence turn tracking
                 var firstPlayerId = GetCurrentPlayerId();
-                if (!string.IsNullOrEmpty(_matchId) && !string.IsNullOrEmpty(firstPlayerId))
+                if (!string.IsNullOrEmpty(_matchId) && !string.IsNullOrEmpty(firstPlayerId) && _isCorrespondence)
                 {
+                    var capturedMatchId = _matchId;
+                    var capturedPlayerId = firstPlayerId;
                     BackgroundTaskHelper.FireAndForget(async () =>
                     {
-                        var match = await _matchRepository.GetMatchByIdAsync(_matchId);
-                        if (match?.IsCorrespondence == true)
-                        {
-                            await _correspondenceGameService.HandleTurnCompletedAsync(_matchId, firstPlayerId);
-                        }
+                        var matchGrain = GrainFactory.GetGrain<IMatchGrain>(capturedMatchId);
+                        await matchGrain.HandleTurnCompletedAsync(capturedPlayerId);
                     }, _logger, $"CorrespondenceOpeningRoll-{gameId}");
                 }
 
@@ -228,16 +228,16 @@ public partial class GameGrain
             var newDeadline = DateTime.UtcNow.AddDays(_timePerMoveDays ?? 3);
             _turnDeadline = newDeadline;
 
-            BackgroundTaskHelper.FireAndForget(async () =>
+            var capturedMatchId = _matchId;
+            var capturedNextPlayerId = GetCurrentPlayerId();
+            if (!string.IsNullOrEmpty(capturedNextPlayerId))
             {
-                var match = await _matchRepository.GetMatchByIdAsync(_matchId);
-                if (match?.IsCorrespondence == true)
+                BackgroundTaskHelper.FireAndForget(async () =>
                 {
-                    var nextPlayerId = GetCurrentPlayerId();
-                    if (!string.IsNullOrEmpty(nextPlayerId))
-                        await _correspondenceGameService.HandleTurnCompletedAsync(_matchId, nextPlayerId);
-                }
-            }, _logger, $"CorrespondenceTurn-{this.GetPrimaryKeyString()}");
+                    var matchGrain = GrainFactory.GetGrain<IMatchGrain>(capturedMatchId);
+                    await matchGrain.HandleTurnCompletedAsync(capturedNextPlayerId);
+                }, _logger, $"CorrespondenceTurn-{this.GetPrimaryKeyString()}");
+            }
         }
 
         // Trigger AI turn if next player is AI
@@ -336,9 +336,18 @@ public partial class GameGrain
 
         var winnerId = winnerColor == CheckerColor.White ? _whitePlayerId : _redPlayerId;
         var winType = _engine.DetermineWinType();
-        var result = new GameResult(winnerId ?? string.Empty, winType, _engine.DoublingCube.Value);
+        var coreResult = new GameResult(winnerId ?? string.Empty, winType, _engine.DoublingCube.Value);
 
-        await _matchService.CompleteGameAsync(this.GetPrimaryKeyString(), result);
+        var completionInfo = new GameCompletionInfo
+        {
+            WinnerId = coreResult.WinnerId,
+            WinnerColor = winnerColor,
+            PointsWon = coreResult.PointsWon,
+            WinType = coreResult.WinType,
+        };
+
+        var matchGrain = GrainFactory.GetGrain<IMatchGrain>(_matchId!);
+        await matchGrain.CompleteGameAsync(this.GetPrimaryKeyString(), completionInfo);
 
         var match = await _matchService.GetMatchAsync(_matchId!);
         if (match != null)

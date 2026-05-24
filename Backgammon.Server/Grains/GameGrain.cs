@@ -31,9 +31,7 @@ public partial class GameGrain : Grain, IGameGrain
     private readonly IAiMoveService _aiMoveService;
     private readonly IAiPlayerManager _aiPlayerManager;
     private readonly IMatchService _matchService;
-    private readonly IMatchRepository _matchRepository;
     private readonly IPlayerStatsService _playerStatsService;
-    private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IChatService _chatService;
     private readonly IUserRepository _userRepository;
     private readonly ILogger<GameGrain> _logger;
@@ -89,9 +87,7 @@ public partial class GameGrain : Grain, IGameGrain
         IAiMoveService aiMoveService,
         IAiPlayerManager aiPlayerManager,
         IMatchService matchService,
-        IMatchRepository matchRepository,
         IPlayerStatsService playerStatsService,
-        ICorrespondenceGameService correspondenceGameService,
         IChatService chatService,
         IUserRepository userRepository,
         ILogger<GameGrain> logger)
@@ -102,9 +98,7 @@ public partial class GameGrain : Grain, IGameGrain
         _aiMoveService = aiMoveService;
         _aiPlayerManager = aiPlayerManager;
         _matchService = matchService;
-        _matchRepository = matchRepository;
         _playerStatsService = playerStatsService;
-        _correspondenceGameService = correspondenceGameService;
         _chatService = chatService;
         _userRepository = userRepository;
         _logger = logger;
