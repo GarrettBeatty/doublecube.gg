@@ -131,15 +131,19 @@ public partial class GameGrain : Grain, IGameGrain
                 {
                     LoadFromGame(game);
 
-                    // The Game record doesn't carry correspondence flags; fetch from the
-                    // owning MatchGrain so the client state DTO and correspondence callbacks
-                    // see the right values on the very first activation.
+                    // The Game record doesn't carry match-level flags (target score, running
+                    // scores, correspondence). Fetch from the owning MatchGrain so the
+                    // client state DTO, AI MatchContext, and correspondence callbacks see
+                    // the right values on the very first activation.
                     if (!string.IsNullOrEmpty(_matchId))
                     {
                         var info = await GrainFactory.GetGrain<IMatchGrain>(_matchId).GetCorrespondenceInfoAsync();
                         _isCorrespondence = info.IsCorrespondence;
                         _timePerMoveDays = info.TimePerMoveDays > 0 ? info.TimePerMoveDays : null;
                         _turnDeadline = info.TurnDeadline;
+                        _targetScore = info.TargetScore > 0 ? info.TargetScore : null;
+                        _player1Score = info.Player1Score;
+                        _player2Score = info.Player2Score;
                     }
 
                     CaptureToState();

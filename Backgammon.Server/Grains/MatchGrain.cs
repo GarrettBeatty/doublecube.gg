@@ -667,6 +667,9 @@ public class MatchGrain : Grain, IMatchGrain
             IsCorrespondence = s.IsCorrespondence,
             TimePerMoveDays = s.TimePerMoveDays,
             TurnDeadline = s.TurnDeadline,
+            TargetScore = s.TargetScore,
+            Player1Score = s.Player1Score,
+            Player2Score = s.Player2Score,
         });
     }
 
