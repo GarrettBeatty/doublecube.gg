@@ -642,7 +642,7 @@ public partial class GameHub
 
             if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
             {
-                var opponentConnection = GetPlayerConnection(config.OpponentId);
+                var opponentConnection = await GetPlayerConnectionAsync(config.OpponentId);
                 if (!string.IsNullOrEmpty(opponentConnection))
                 {
                     await Clients.Client(opponentConnection).MatchInvite(new MatchInviteDto
@@ -681,9 +681,7 @@ public partial class GameHub
             var playerId = GetAuthenticatedUserId()!;
             var displayName = GetAuthenticatedDisplayName();
 
-            // Track this player's connection
-            _playerConnectionService.AddConnection(playerId, Context.ConnectionId);
-
+            // Presence is registered in OnConnectedAsync; no extra tracking needed here.
             var matchGrain = _grainFactory.GetGrain<IMatchGrain>(matchId);
             var result = await matchGrain.JoinAsync(playerId, displayName);
 
@@ -700,7 +698,7 @@ public partial class GameHub
             });
 
             // Notify creator that opponent joined
-            var creatorConnection = GetPlayerConnection(result.Player1Id);
+            var creatorConnection = await GetPlayerConnectionAsync(result.Player1Id);
             if (!string.IsNullOrEmpty(creatorConnection))
             {
                 await Clients.Client(creatorConnection).OpponentJoinedMatch(new OpponentJoinedMatchDto
@@ -714,7 +712,7 @@ public partial class GameHub
             // For correspondence matches, notify Player1 it's their turn
             if (result.IsCorrespondence)
             {
-                var player1Connection = GetPlayerConnection(result.Player1Id);
+                var player1Connection = await GetPlayerConnectionAsync(result.Player1Id);
                 if (!string.IsNullOrEmpty(player1Connection))
                 {
                     await Clients.Client(player1Connection).CorrespondenceTurnNotification(

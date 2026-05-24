@@ -533,12 +533,9 @@ public partial class GameHub
     /// </summary>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        // Remove from player connections tracking
-        var playerId = GetAuthenticatedUserId();
-        if (!string.IsNullOrEmpty(playerId))
-        {
-            _playerConnectionService.RemoveConnection(playerId);
-        }
+        // Remove from presence registry
+        await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
+            .SetOfflineAsync(Context.ConnectionId);
 
         // Clean up chat rate limit history
         _chatService.CleanupConnection(Context.ConnectionId);
@@ -851,9 +848,8 @@ public partial class GameHub
             var userId = GetAuthenticatedUserId();
             if (string.IsNullOrEmpty(userId)) return;
 
-            // Tell the player grain to remove this connection
-            var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
-            var gameId = await playerGrain.GetGameIdForConnectionAsync(connectionId);
+            var presence = _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key);
+            var gameId = await presence.GetGameIdForConnectionAsync(connectionId);
 
             if (!string.IsNullOrEmpty(gameId))
             {

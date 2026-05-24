@@ -120,11 +120,9 @@ public partial class GameHub
             }
 
             // For friend matches, notify the friend if they're online
-            if (config.OpponentType == "Friend"
-                && !string.IsNullOrEmpty(config.OpponentId)
-                && !string.IsNullOrEmpty(GetPlayerConnection(config.OpponentId)))
+            if (config.OpponentType == "Friend" && !string.IsNullOrEmpty(config.OpponentId))
             {
-                var opponentConnection = GetPlayerConnection(config.OpponentId);
+                var opponentConnection = await GetPlayerConnectionAsync(config.OpponentId);
                 if (!string.IsNullOrEmpty(opponentConnection))
                 {
                     await Clients.Client(opponentConnection).CorrespondenceMatchInvite(
@@ -160,18 +158,15 @@ public partial class GameHub
             await matchGrain.HandleTurnCompletedAsync(nextPlayerId);
 
             // Notify next player if they're online
-            if (!string.IsNullOrEmpty(GetPlayerConnection(nextPlayerId)))
+            var nextPlayerConnection = await GetPlayerConnectionAsync(nextPlayerId);
+            if (!string.IsNullOrEmpty(nextPlayerConnection))
             {
-                var nextPlayerConnection = GetPlayerConnection(nextPlayerId);
-                if (!string.IsNullOrEmpty(nextPlayerConnection))
-                {
-                    await Clients.Client(nextPlayerConnection).CorrespondenceTurnNotification(
-                        new CorrespondenceTurnNotificationDto
-                        {
-                            MatchId = matchId,
-                            Message = "It's your turn!"
-                        });
-                }
+                await Clients.Client(nextPlayerConnection).CorrespondenceTurnNotification(
+                    new CorrespondenceTurnNotificationDto
+                    {
+                        MatchId = matchId,
+                        Message = "It's your turn!",
+                    });
             }
 
             _logger.LogInformation(

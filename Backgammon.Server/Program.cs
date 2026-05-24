@@ -188,8 +188,7 @@ builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
 // AI player management for matches (ensures consistent AI across match continuations)
 builder.Services.AddSingleton<IAiPlayerManager, AiPlayerManager>();
 
-// Player connection tracking service
-builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
+// Presence tracking is owned by the singleton IPresenceGrain ("global"); resolved via IGrainFactory.
 
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();

@@ -1,10 +1,12 @@
 using Backgammon.Server.Configuration;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
+using Orleans;
 
 namespace Backgammon.Server.Services;
 
@@ -15,7 +17,7 @@ public class FriendService : IFriendService
 {
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IPlayerConnectionService _playerConnectionService;
+    private readonly IGrainFactory _grainFactory;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly HybridCache _cache;
     private readonly CacheSettings _cacheSettings;
@@ -24,7 +26,7 @@ public class FriendService : IFriendService
     public FriendService(
         IFriendshipRepository friendshipRepository,
         IUserRepository userRepository,
-        IPlayerConnectionService playerConnectionService,
+        IGrainFactory grainFactory,
         IHubContext<GameHub, IGameHubClient> hubContext,
         HybridCache cache,
         CacheSettings cacheSettings,
@@ -32,7 +34,7 @@ public class FriendService : IFriendService
     {
         _friendshipRepository = friendshipRepository;
         _userRepository = userRepository;
-        _playerConnectionService = playerConnectionService;
+        _grainFactory = grainFactory;
         _hubContext = hubContext;
         _cache = cache;
         _cacheSettings = cacheSettings;
@@ -258,20 +260,20 @@ public class FriendService : IFriendService
                 },
                 tags: [$"friends:{userId}"]);
 
+            // Fetch the online set once rather than making N grain hops in the loop.
+            var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
+                .GetAllOnlinePlayerIdsAsync()).ToHashSet();
+
             var result = new List<FriendDto>();
 
             foreach (var friendship in friendships)
             {
-                // Check if friend is online by looking for active game sessions
-                // Note: Online status is not cached as it changes frequently
-                var isOnline = _playerConnectionService.IsPlayerConnected(friendship.FriendUserId);
-
                 result.Add(new FriendDto
                 {
                     UserId = friendship.FriendUserId,
                     Username = friendship.FriendUsername,
                     DisplayName = friendship.FriendDisplayName,
-                    IsOnline = isOnline,
+                    IsOnline = onlinePlayerIds.Contains(friendship.FriendUserId),
                     Status = friendship.Status,
                     InitiatedBy = friendship.InitiatedBy
                 });
@@ -291,6 +293,9 @@ public class FriendService : IFriendService
         try
         {
             var requests = await _friendshipRepository.GetPendingRequestsAsync(userId);
+            var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
+                .GetAllOnlinePlayerIdsAsync()).ToHashSet();
+
             var result = new List<FriendDto>();
 
             foreach (var request in requests)
@@ -300,7 +305,7 @@ public class FriendService : IFriendService
                     UserId = request.FriendUserId,
                     Username = request.FriendUsername,
                     DisplayName = request.FriendDisplayName,
-                    IsOnline = _playerConnectionService.IsPlayerConnected(request.FriendUserId),
+                    IsOnline = onlinePlayerIds.Contains(request.FriendUserId),
                     Status = request.Status,
                     InitiatedBy = request.InitiatedBy
                 });

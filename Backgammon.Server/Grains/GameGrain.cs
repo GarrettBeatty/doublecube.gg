@@ -171,9 +171,9 @@ public partial class GameGrain : Grain, IGameGrain
             playerId,
             connectionId);
 
-        // Track connection in PlayerGrain
-        var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-        await playerGrain.TrackConnectionAsync(connectionId, gameId);
+        // Track connection→game association in the presence registry
+        var presence = GrainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key);
+        await presence.SetConnectionGameAsync(connectionId, gameId);
 
         // Track in MatchGrain if part of match
         if (!string.IsNullOrEmpty(_matchId))
@@ -255,11 +255,11 @@ public partial class GameGrain : Grain, IGameGrain
         _spectatorConnections.Remove(connectionId);
         _lastActivityAt = DateTime.UtcNow;
 
-        // Remove from PlayerGrain tracking
+        // Clear connection→game association in the presence registry
         if (!string.IsNullOrEmpty(playerId))
         {
-            var playerGrain = GrainFactory.GetGrain<IPlayerGrain>(playerId);
-            await playerGrain.RemoveConnectionAsync(connectionId);
+            var presence = GrainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key);
+            await presence.ClearConnectionGameAsync(connectionId);
         }
 
         // Remove from MatchGrain if applicable

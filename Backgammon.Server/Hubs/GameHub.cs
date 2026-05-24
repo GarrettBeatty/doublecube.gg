@@ -35,7 +35,6 @@ public partial class GameHub : Hub<IGameHubClient>
     private readonly IGrainFactory _grainFactory;
     private readonly IGameRepository _gameRepository;
     private readonly IMatchService _matchService;
-    private readonly IPlayerConnectionService _playerConnectionService;
     private readonly IPlayerProfileService _playerProfileService;
     private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
@@ -53,7 +52,6 @@ public partial class GameHub : Hub<IGameHubClient>
         IGrainFactory grainFactory,
         IGameRepository gameRepository,
         IMatchService matchService,
-        IPlayerConnectionService playerConnectionService,
         IPlayerProfileService playerProfileService,
         IChatService chatService,
         ILogger<GameHub> logger,
@@ -67,7 +65,6 @@ public partial class GameHub : Hub<IGameHubClient>
         _grainFactory = grainFactory;
         _gameRepository = gameRepository;
         _matchService = matchService;
-        _playerConnectionService = playerConnectionService;
         _playerProfileService = playerProfileService;
         _chatService = chatService;
         _logger = logger;
@@ -122,6 +119,9 @@ public partial class GameHub : Hub<IGameHubClient>
                 user.UserId,
                 user.DisplayName,
                 user.IsAnonymous);
+
+            await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
+                .SetOnlineAsync(jwtUserId, connectionId);
         }
         catch (HubException)
         {
@@ -244,25 +244,24 @@ public partial class GameHub : Hub<IGameHubClient>
     }
 
     /// <summary>
-    /// Gets the game grain for the calling connection by looking up the player grain.
+    /// Gets the game grain for the calling connection via the presence registry.
     /// Returns null if the caller is not in an active game.
     /// </summary>
     private async Task<IGameGrain?> GetGameGrainForCallerAsync()
     {
-        var userId = GetAuthenticatedUserId();
-        if (userId == null) return null;
-        var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
-        var gameId = await playerGrain.GetGameIdForConnectionAsync(Context.ConnectionId);
+        if (GetAuthenticatedUserId() == null) return null;
+        var presence = _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key);
+        var gameId = await presence.GetGameIdForConnectionAsync(Context.ConnectionId);
         if (gameId == null) return null;
         return _grainFactory.GetGrain<IGameGrain>(gameId);
     }
 
     /// <summary>
-    /// Gets the connection ID for a specific player from the connection tracking service.
+    /// Gets any one connection ID for a player from the presence registry.
     /// </summary>
-    private string? GetPlayerConnection(string playerId)
+    private Task<string?> GetPlayerConnectionAsync(string playerId)
     {
-        return _playerConnectionService.GetConnectionId(playerId);
+        return _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key).GetConnectionIdAsync(playerId);
     }
 
     // ==================== Analysis Mode Helper Methods ====================

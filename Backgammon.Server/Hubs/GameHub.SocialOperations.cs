@@ -174,7 +174,7 @@ public partial class GameHub
             }
 
             var users = await _userRepository.SearchUsersAsync(query);
-            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
+            var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key).GetAllOnlinePlayerIdsAsync()).ToHashSet();
 
             // Exclude the current user from search results
             var results = users
@@ -210,7 +210,7 @@ public partial class GameHub
             var userId = GetAuthenticatedUserId();
 
             var users = await _userRepository.GetAllPlayersAsync(limit);
-            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
+            var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key).GetAllOnlinePlayerIdsAsync()).ToHashSet();
 
             // Exclude the current user from results
             var results = users
@@ -262,7 +262,7 @@ public partial class GameHub
             _logger.LogInformation("User {UserId} sent friend request to {ToUserId}", userId, toUserId);
 
             // Notify the recipient if they're online
-            var recipientConnection = GetPlayerConnection(toUserId);
+            var recipientConnection = await GetPlayerConnectionAsync(toUserId);
             if (!string.IsNullOrEmpty(recipientConnection))
             {
                 await Clients.Client(recipientConnection).FriendRequestReceived();
@@ -303,7 +303,7 @@ public partial class GameHub
             _logger.LogInformation("User {UserId} accepted friend request from {FriendUserId}", userId, friendUserId);
 
             // Notify the requester if they're online
-            var requesterConnection = GetPlayerConnection(friendUserId);
+            var requesterConnection = await GetPlayerConnectionAsync(friendUserId);
             if (!string.IsNullOrEmpty(requesterConnection))
             {
                 await Clients.Client(requesterConnection).FriendRequestAccepted();
@@ -394,7 +394,7 @@ public partial class GameHub
         try
         {
             var topPlayers = await _userRepository.GetTopPlayersByRatingAsync(limit);
-            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToHashSet();
+            var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key).GetAllOnlinePlayerIdsAsync()).ToHashSet();
 
             var leaderboard = topPlayers.Select((user, index) => new LeaderboardEntryDto
             {
@@ -431,7 +431,8 @@ public partial class GameHub
         try
         {
             var currentUserId = GetAuthenticatedUserId();
-            var onlinePlayerIds = _playerConnectionService.GetAllConnectedPlayerIds().ToList();
+            var presence = _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key);
+            var onlinePlayerIds = await presence.GetAllOnlinePlayerIdsAsync();
 
             if (!onlinePlayerIds.Any())
             {
@@ -448,12 +449,11 @@ public partial class GameHub
                 friends = friendsList.Select(f => f.UserId).ToHashSet();
             }
 
-            // Build per-user active game map via player grains
+            // Build per-user active game map via the presence registry
             var activeGameMap = new Dictionary<string, string?>();
             foreach (var user in users.Where(u => !u.IsAnonymous && u.UserId != currentUserId))
             {
-                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(user.UserId);
-                var activeGameIds = await playerGrain.GetActiveGameIdsAsync();
+                var activeGameIds = await presence.GetActiveGameIdsAsync(user.UserId);
                 activeGameMap[user.UserId] = activeGameIds.FirstOrDefault();
             }
 

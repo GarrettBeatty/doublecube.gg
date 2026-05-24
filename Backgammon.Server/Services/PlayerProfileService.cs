@@ -1,7 +1,9 @@
 using Backgammon.Server.Configuration;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Models;
 using Microsoft.Extensions.Caching.Hybrid;
 using Microsoft.Extensions.Logging;
+using Orleans;
 
 namespace Backgammon.Server.Services;
 
@@ -13,7 +15,7 @@ public class PlayerProfileService : IPlayerProfileService
     private readonly IUserRepository _userRepository;
     private readonly IGameRepository _gameRepository;
     private readonly IFriendshipRepository _friendshipRepository;
-    private readonly IPlayerConnectionService _playerConnectionService;
+    private readonly IGrainFactory _grainFactory;
     private readonly HybridCache _cache;
     private readonly CacheSettings _cacheSettings;
     private readonly ILogger<PlayerProfileService> _logger;
@@ -22,7 +24,7 @@ public class PlayerProfileService : IPlayerProfileService
         IUserRepository userRepository,
         IGameRepository gameRepository,
         IFriendshipRepository friendshipRepository,
-        IPlayerConnectionService playerConnectionService,
+        IGrainFactory grainFactory,
         HybridCache cache,
         CacheSettings cacheSettings,
         ILogger<PlayerProfileService> logger)
@@ -30,7 +32,7 @@ public class PlayerProfileService : IPlayerProfileService
         _userRepository = userRepository;
         _gameRepository = gameRepository;
         _friendshipRepository = friendshipRepository;
-        _playerConnectionService = playerConnectionService;
+        _grainFactory = grainFactory;
         _cache = cache;
         _cacheSettings = cacheSettings;
         _logger = logger;
@@ -101,18 +103,20 @@ public class PlayerProfileService : IPlayerProfileService
         var targetFriendships = await _friendshipRepository.GetFriendsAsync(targetUser.UserId);
         var friendUsers = new List<FriendDto>();
 
+        var onlinePlayerIds = (await _grainFactory.GetGrain<IPresenceGrain>(IPresenceGrain.Key)
+            .GetAllOnlinePlayerIdsAsync()).ToHashSet();
+
         foreach (var friendship in targetFriendships.Where(f => f.Status == FriendshipStatus.Accepted))
         {
             var friendUser = await _userRepository.GetByUserIdAsync(friendship.FriendUserId);
             if (friendUser != null)
             {
-                var isOnline = _playerConnectionService.IsPlayerConnected(friendship.FriendUserId);
                 friendUsers.Add(new FriendDto
                 {
                     UserId = friendUser.UserId,
                     Username = friendUser.Username,
                     DisplayName = friendUser.DisplayName,
-                    IsOnline = isOnline,
+                    IsOnline = onlinePlayerIds.Contains(friendship.FriendUserId),
                     Status = friendship.Status,
                     InitiatedBy = friendship.InitiatedBy
                 });
