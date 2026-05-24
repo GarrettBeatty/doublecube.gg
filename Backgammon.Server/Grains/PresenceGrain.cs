@@ -45,7 +45,10 @@ public class PresenceGrain : Grain, IPresenceGrain
             }
         }
 
-        _connectionToGame.Remove(connectionId);
+        // Note: connection→game mapping is cleared by GameGrain.LeaveAsync via
+        // ClearConnectionGameAsync. We don't touch it here because HandleDisconnectionAsync
+        // (which runs after SetOfflineAsync on disconnect) needs to call
+        // GetGameIdForConnectionAsync to find the game the connection was in.
         return Task.CompletedTask;
     }
 
