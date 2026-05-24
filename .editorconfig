@@ -290,3 +290,8 @@ dotnet_diagnostic.CA1716.severity = suggestion
 
 # CA2227: Collection properties should be read only
 dotnet_diagnostic.CA2227.severity = suggestion
+
+# Suppress all StyleCop/analyzer warnings in EF Core generated migration files
+[**/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

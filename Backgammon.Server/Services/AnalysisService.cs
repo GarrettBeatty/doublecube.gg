@@ -9,7 +9,7 @@ namespace Backgammon.Server.Services;
 /// <summary>
 /// Service for analyzing backgammon positions and moves
 /// </summary>
-public class AnalysisService
+public class AnalysisService : IAnalysisService
 {
     private readonly PositionEvaluatorFactory _evaluatorFactory;
     private readonly ILogger<AnalysisService> _logger;

@@ -1,21 +1,17 @@
 namespace Backgammon.Server.Services.GameModes;
 
 /// <summary>
-/// Standard multiplayer mode where two different players compete
+/// Standard multiplayer mode where two different players compete.
 /// </summary>
 public class MultiplayerMode : IGameMode
 {
+    /// <inheritdoc/>
     public bool ShouldTrackStats => true;
 
+    /// <inheritdoc/>
     public bool ShouldPersist => true;
 
-    public bool IsPlayerTurn(string connectionId, GameSession session)
-    {
-        var playerColor = session.GetPlayerColor(connectionId);
-        return playerColor.HasValue &&
-               session.Engine.CurrentPlayer?.Color == playerColor.Value;
-    }
-
+    /// <inheritdoc/>
     public GameModeFeatures GetFeatures() => new()
     {
         AllowChat = true,

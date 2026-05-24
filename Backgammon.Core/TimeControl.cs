@@ -20,7 +20,6 @@ public class TimeControlConfig
 {
     public TimeControlType Type { get; set; } = TimeControlType.None;
 
-    // Chicago Point settings (12 seconds delay per move)
     public int DelaySeconds { get; set; } = 12;
 
     /// <summary>

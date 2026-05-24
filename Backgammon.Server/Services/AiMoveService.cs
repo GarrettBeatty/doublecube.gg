@@ -50,29 +50,28 @@ public class AiMoveService : IAiMoveService
 
     /// <inheritdoc/>
     public async Task<bool> ExecuteAiTurnAsync(
-        GameSession session,
+        GameEngine engine,
+        string gameId,
         string aiPlayerId,
+        MatchContext? matchContext,
         Func<Task> broadcastUpdate,
         Func<int, int, Task>? notifyDoubleOffered = null)
     {
         var bot = _botResolver.GetBot(aiPlayerId)
             ?? throw new InvalidOperationException($"No bot found for player ID: {aiPlayerId}");
 
-        var engine = session.Engine;
-
         // Guard: Don't execute full AI turn during opening roll phase
         if (engine.IsOpeningRoll)
         {
             _logger.LogWarning(
                 "ExecuteAiTurnAsync called during opening roll phase for game {GameId}. This should not happen - opening roll should use RollDiceAsync instead.",
-                session.Id);
+                gameId);
             return false;
         }
 
-        _logger.LogInformation("Bot {BotId} starting turn in game {GameId}", bot.BotId, session.Id);
+        _logger.LogInformation("Bot {BotId} starting turn in game {GameId}", bot.BotId, gameId);
 
-        // Create match context for cube decisions
-        var matchContext = CreateMatchContext(session);
+        var effectiveMatchContext = matchContext ?? MatchContext.MoneyGame;
 
         try
         {
@@ -89,7 +88,7 @@ public class AiMoveService : IAiMoveService
                     await Task.Delay(DelayBeforeDouble);
 
                     // Ask the bot if it wants to double
-                    var shouldDouble = await bot.ShouldOfferDoubleAsync(engine, matchContext);
+                    var shouldDouble = await bot.ShouldOfferDoubleAsync(engine, effectiveMatchContext);
 
                     if (shouldDouble)
                     {
@@ -100,7 +99,7 @@ public class AiMoveService : IAiMoveService
                             _logger.LogInformation(
                                 "Bot {BotId} offered double in game {GameId}. Stakes: {Current}x → {New}x",
                                 bot.BotId,
-                                session.Id,
+                                gameId,
                                 currentValue,
                                 newValue);
 
@@ -144,7 +143,6 @@ public class AiMoveService : IAiMoveService
             }
 
             // Capture expected moves before bot executes
-            var expectedMoveCount = engine.RemainingMoves.Count;
             var originalDice = new List<int>(engine.RemainingMoves);
 
             // Execute bot moves - single unified async path
@@ -195,31 +193,13 @@ public class AiMoveService : IAiMoveService
             engine.StartTurnTimer(); // Start next player's timer
             await broadcastUpdate();
 
-            _logger.LogInformation("Bot turn completed in game {GameId}", session.Id);
+            _logger.LogInformation("Bot turn completed in game {GameId}", gameId);
             return false; // Turn completed normally
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during bot turn in game {GameId}", session.Id);
+            _logger.LogError(ex, "Error during bot turn in game {GameId}", gameId);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Creates a MatchContext from the game session for cube decision analysis.
-    /// </summary>
-    private static MatchContext CreateMatchContext(GameSession session)
-    {
-        if (!session.TargetScore.HasValue || session.TargetScore.Value <= 0)
-        {
-            // No match context available, use money game defaults
-            return MatchContext.MoneyGame;
-        }
-
-        return new MatchContext(
-            TargetScore: session.TargetScore.Value,
-            Player1Score: session.Player1Score ?? 0,
-            Player2Score: session.Player2Score ?? 0,
-            IsCrawfordGame: session.IsCrawfordGame ?? false);
     }
 }

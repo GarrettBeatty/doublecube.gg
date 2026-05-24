@@ -1,4 +1,30 @@
 services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: backgammon-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=backgammon
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    expose:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backgammon-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d backgammon"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   redis:
     image: redis:7-alpine
     container_name: backgammon-redis
@@ -50,8 +76,7 @@ services:
       - "5000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - AWS_REGION=${AWS_REGION:-us-east-1}
-      - DynamoDb__TableName=${DYNAMODB_TABLE_NAME:-backgammon-dev}
+      - ConnectionStrings__Postgres=Host=postgres;Database=backgammon;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       - Jwt__Secret=${JWT_SECRET}
       - Jwt__Issuer=BackgammonServer
       - Jwt__Audience=BackgammonClient
@@ -62,6 +87,8 @@ services:
     networks:
       - backgammon-net
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       gnubg-service:
@@ -140,3 +167,4 @@ volumes:
   caddy_data:
   caddy_config:
   redis_data:
+  postgres_data:

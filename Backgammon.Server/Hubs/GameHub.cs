@@ -1,15 +1,14 @@
 using System.Security.Claims;
 using Backgammon.Core;
 using Backgammon.Server.Extensions;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using ServerGame = Backgammon.Server.Models.Game;
-using ServerGameStatus = Backgammon.Server.Models.GameStatus;
+using Orleans;
 
 namespace Backgammon.Server.Hubs;
 
@@ -33,83 +32,50 @@ namespace Backgammon.Server.Hubs;
 /// </summary>
 public partial class GameHub : Hub<IGameHubClient>
 {
-    private readonly IGameSessionManager _sessionManager;
+    private readonly IGrainFactory _grainFactory;
     private readonly IGameRepository _gameRepository;
-    private readonly IAiMoveService _aiMoveService;
-    private readonly IAiPlayerManager _aiPlayerManager;
-    private readonly IEloRatingService _eloRatingService;
-    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IMatchService _matchService;
     private readonly IPlayerConnectionService _playerConnectionService;
-    private readonly IDoubleOfferService _doubleOfferService;
-    private readonly IGameService _gameService;
     private readonly IPlayerProfileService _playerProfileService;
-    private readonly IGameActionOrchestrator _gameActionOrchestrator;
-    private readonly IPlayerStatsService _playerStatsService;
-    private readonly IMoveQueryService _moveQueryService;
-    private readonly IGameImportExportService _gameImportExportService;
     private readonly IChatService _chatService;
     private readonly ILogger<GameHub> _logger;
-    private readonly AnalysisService _analysisService;
+    private readonly IAnalysisService _analysisService;
     private readonly IUserRepository _userRepository;
     private readonly IFriendService _friendService;
     private readonly ICorrespondenceGameService _correspondenceGameService;
-    private readonly IAuthService _authService;
     private readonly IDailyPuzzleService _dailyPuzzleService;
-    private readonly IGameCompletionService _gameCompletionService;
-    private readonly AnalysisSessionManager _analysisSessionManager;
+    private readonly IAnalysisSessionManager _analysisSessionManager;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="GameHub"/> class.
+    /// </summary>
     public GameHub(
-        IGameSessionManager sessionManager,
+        IGrainFactory grainFactory,
         IGameRepository gameRepository,
-        IAiMoveService aiMoveService,
-        IAiPlayerManager aiPlayerManager,
-        IEloRatingService eloRatingService,
-        IHubContext<GameHub, IGameHubClient> hubContext,
         IMatchService matchService,
         IPlayerConnectionService playerConnectionService,
-        IDoubleOfferService doubleOfferService,
-        IGameService gameService,
         IPlayerProfileService playerProfileService,
-        IGameActionOrchestrator gameActionOrchestrator,
-        IPlayerStatsService playerStatsService,
-        IMoveQueryService moveQueryService,
-        IGameImportExportService gameImportExportService,
         IChatService chatService,
         ILogger<GameHub> logger,
-        AnalysisService analysisService,
+        IAnalysisService analysisService,
         IUserRepository userRepository,
         IFriendService friendService,
         ICorrespondenceGameService correspondenceGameService,
-        IAuthService authService,
         IDailyPuzzleService dailyPuzzleService,
-        IGameCompletionService gameCompletionService,
-        AnalysisSessionManager analysisSessionManager)
+        IAnalysisSessionManager analysisSessionManager)
     {
-        _sessionManager = sessionManager;
+        _grainFactory = grainFactory;
         _gameRepository = gameRepository;
-        _aiMoveService = aiMoveService;
-        _aiPlayerManager = aiPlayerManager;
-        _eloRatingService = eloRatingService;
-        _hubContext = hubContext;
         _matchService = matchService;
         _playerConnectionService = playerConnectionService;
-        _doubleOfferService = doubleOfferService;
-        _gameService = gameService;
         _playerProfileService = playerProfileService;
-        _gameActionOrchestrator = gameActionOrchestrator;
-        _playerStatsService = playerStatsService;
-        _moveQueryService = moveQueryService;
-        _gameImportExportService = gameImportExportService;
         _chatService = chatService;
         _logger = logger;
         _analysisService = analysisService;
         _userRepository = userRepository;
         _friendService = friendService;
         _correspondenceGameService = correspondenceGameService;
-        _authService = authService;
         _dailyPuzzleService = dailyPuzzleService;
-        _gameCompletionService = gameCompletionService;
         _analysisSessionManager = analysisSessionManager;
     }
 
@@ -277,88 +243,30 @@ public partial class GameHub : Hub<IGameHubClient>
         return claimDisplayName;
     }
 
-    private async Task HandleDisconnection(string connectionId)
+    /// <summary>
+    /// Gets the game grain for the calling connection by looking up the player grain.
+    /// Returns null if the caller is not in an active game.
+    /// </summary>
+    private async Task<IGameGrain?> GetGameGrainForCallerAsync()
     {
-        try
-        {
-            var session = _sessionManager.GetGameByPlayer(connectionId);
-            if (session != null)
-            {
-                await Groups.RemoveFromGroupAsync(connectionId, session.Id);
-
-                // Check if this is a spectator
-                if (session.IsSpectator(connectionId))
-                {
-                    session.RemoveSpectator(connectionId);
-                    _sessionManager.RemovePlayer(connectionId); // Clean up mapping
-                    _logger.LogInformation("Spectator {ConnectionId} left game {GameId}", connectionId, session.Id);
-                }
-                else
-                {
-                    // Notify opponent
-                    await Clients.Group(session.Id).OpponentLeft();
-
-                    _sessionManager.RemovePlayer(connectionId);
-
-                    _logger.LogInformation("Player {ConnectionId} left game {GameId}", connectionId, session.Id);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error handling disconnection");
-        }
+        var userId = GetAuthenticatedUserId();
+        if (userId == null) return null;
+        var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
+        var gameId = await playerGrain.GetGameIdForConnectionAsync(Context.ConnectionId);
+        if (gameId == null) return null;
+        return _grainFactory.GetGrain<IGameGrain>(gameId);
     }
 
     /// <summary>
-    /// Get the connection ID for a specific player
+    /// Gets the connection ID for a specific player from the connection tracking service.
     /// </summary>
     private string? GetPlayerConnection(string playerId)
     {
-        // First check our connection tracking service (for lobby players)
-        var connectionId = _playerConnectionService.GetConnectionId(playerId);
-        if (connectionId != null)
-        {
-            _logger.LogDebug(
-                "GetPlayerConnection: Found playerId={PlayerId} via connection service with connectionId={ConnectionId}",
-                playerId,
-                connectionId);
-            return connectionId;
-        }
-
-        _logger.LogDebug(
-            "GetPlayerConnection: playerId={PlayerId} not found in connection service, checking game sessions",
-            playerId);
-
-        // Fall back to checking game sessions (for players in active games)
-        var sessions = _sessionManager.GetPlayerGames(playerId);
-        var session = sessions.FirstOrDefault();
-        if (session == null)
-        {
-            _logger.LogDebug(
-                "GetPlayerConnection: No game session found for playerId={PlayerId}",
-                playerId);
-            return null;
-        }
-
-        if (session.WhitePlayerId == playerId)
-        {
-            return session.WhiteConnectionId;
-        }
-
-        if (session.RedPlayerId == playerId)
-        {
-            return session.RedConnectionId;
-        }
-
-        return null;
+        return _playerConnectionService.GetConnectionId(playerId);
     }
 
     // ==================== Analysis Mode Helper Methods ====================
 
-    /// <summary>
-    /// Validates if a direct move is valid (ignores game rules, only basic constraints)
-    /// </summary>
     /// <summary>
     /// Validates if a direct move is valid (ignores game rules, only basic constraints)
     /// </summary>
@@ -413,9 +321,6 @@ public partial class GameHub : Hub<IGameHubClient>
         engine.RemainingMoves.Clear();
     }
 
-    /// <summary>
-    /// Gets the checker color at a specific point
-    /// </summary>
     /// <summary>
     /// Gets the checker color at a specific point
     /// </summary>
@@ -503,9 +408,6 @@ public partial class GameHub : Hub<IGameHubClient>
     /// <summary>
     /// Adds a checker to a point
     /// </summary>
-    /// <summary>
-    /// Adds a checker to a point
-    /// </summary>
     private void AddCheckerTo(GameEngine engine, int point, CheckerColor color)
     {
         // Bar
@@ -527,9 +429,6 @@ public partial class GameHub : Hub<IGameHubClient>
         }
     }
 
-    /// <summary>
-    /// Counts total checkers for a player (board + bar + borne off)
-    /// </summary>
     /// <summary>
     /// Counts total checkers for a player (board + bar + borne off)
     /// </summary>

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Backgammon.Core;
+using Orleans;
 using Tapper;
 
 namespace Backgammon.Server.Models;
@@ -8,29 +9,38 @@ namespace Backgammon.Server.Models;
 /// Data transfer object for turn snapshots, used for database serialization
 /// </summary>
 [TranspilationSource]
+[GenerateSerializer]
 public class TurnSnapshotDto
 {
+    [Id(0)]
     [JsonPropertyName("turnNumber")]
     public int TurnNumber { get; set; }
 
+    [Id(1)]
     [JsonPropertyName("player")]
     public string Player { get; set; } = string.Empty;
 
+    [Id(2)]
     [JsonPropertyName("diceRolled")]
     public int[] DiceRolled { get; set; } = Array.Empty<int>();
 
+    [Id(3)]
     [JsonPropertyName("positionSgf")]
     public string PositionSgf { get; set; } = string.Empty;
 
+    [Id(4)]
     [JsonPropertyName("moves")]
     public List<string> Moves { get; set; } = new();
 
+    [Id(5)]
     [JsonPropertyName("doublingAction")]
     public string? DoublingAction { get; set; }
 
+    [Id(6)]
     [JsonPropertyName("cubeValue")]
     public int CubeValue { get; set; } = 1;
 
+    [Id(7)]
     [JsonPropertyName("cubeOwner")]
     public string? CubeOwner { get; set; }
 

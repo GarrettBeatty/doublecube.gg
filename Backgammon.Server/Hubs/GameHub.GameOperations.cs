@@ -1,13 +1,12 @@
 using System.Security.Claims;
 using Backgammon.Core;
-using Backgammon.Server.Extensions;
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
 using Backgammon.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
-using ServerGameStatus = Backgammon.Server.Models.GameStatus;
 
 namespace Backgammon.Server.Hubs;
 
@@ -17,12 +16,15 @@ namespace Backgammon.Server.Hubs;
 /// </summary>
 public partial class GameHub
 {
+    /// <summary>
+    /// Join or reconnect to a game by ID.
+    /// </summary>
     public async Task JoinGame(string? gameId = null)
     {
         try
         {
             var connectionId = Context.ConnectionId;
-            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
+            var playerId = GetAuthenticatedUserId()!;
             var displayName = GetEffectiveDisplayNameAsync(playerId);
 
             _logger.LogInformation("========== JoinGame Request ==========");
@@ -38,7 +40,16 @@ public partial class GameHub
                 return;
             }
 
-            await _gameService.JoinGameAsync(connectionId, playerId, displayName, gameId);
+            // Add to SignalR group so this connection receives group broadcasts
+            await Groups.AddToGroupAsync(connectionId, gameId);
+
+            var grain = _grainFactory.GetGrain<IGameGrain>(gameId);
+            var state = await grain.JoinAsync(playerId, connectionId, displayName);
+
+            if (state != null)
+            {
+                await Clients.Caller.GameUpdate(state);
+            }
         }
         catch (Exception ex)
         {
@@ -88,19 +99,8 @@ public partial class GameHub
                     return;
                 }
 
-                // Start a turn with the dice (creates turn snapshot for history tracking)
-                _logger.LogInformation(
-                    "[SetDice] Before StartTurnWithDice - History.Turns.Count: {TurnCount}",
-                    session.Engine.History.Turns.Count);
-
                 session.Engine.StartTurnWithDice(die1, die2);
                 session.UpdateActivity();
-
-                _logger.LogInformation(
-                    "[SetDice] After StartTurnWithDice - History.Turns.Count: {TurnCount}, Dice: [{Die1}, {Die2}]",
-                    session.Engine.History.Turns.Count,
-                    die1,
-                    die2);
             }
             finally
             {
@@ -119,17 +119,22 @@ public partial class GameHub
 
     /// <summary>
     /// Create a new game against an AI opponent.
-    /// The human player is always White (moves first).
+    /// Delegates to CreateMatch with opponentType "AI".
     /// </summary>
     public async Task CreateAiGame()
     {
         try
         {
-            var connectionId = Context.ConnectionId;
-            var playerId = GetAuthenticatedUserId()!; // ! is safe - AuthenticationHubFilter ensures non-null
-            var displayName = GetAuthenticatedDisplayName();
+            var config = new MatchConfig
+            {
+                TargetScore = 1,
+                OpponentType = "AI",
+                DisplayName = GetAuthenticatedDisplayName(),
+                TimeControlType = "None",
+                IsRated = false
+            };
 
-            await _gameService.CreateAiGameAsync(connectionId, playerId, displayName);
+            await CreateMatch(config);
         }
         catch (Exception ex)
         {
@@ -139,19 +144,69 @@ public partial class GameHub
     }
 
     /// <summary>
-    /// Get list of points that have checkers that can be moved
+    /// Get list of points that have checkers that can be moved.
     /// </summary>
     public async Task<List<int>> GetValidSources()
     {
-        return _moveQueryService.GetValidSources(Context.ConnectionId);
+        try
+        {
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null) return new List<int>();
+
+            var state = await grain.GetStateAsync(Context.ConnectionId);
+            if (!state.IsYourTurn || state.RemainingMoves.Length == 0) return new List<int>();
+
+            return state.ValidMoves.Select(m => m.From).Distinct().ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting valid sources");
+            return new List<int>();
+        }
     }
 
     /// <summary>
-    /// Get list of valid destinations from a specific source point
+    /// Get list of valid destinations from a specific source point.
     /// </summary>
     public async Task<List<MoveDto>> GetValidDestinations(int fromPoint)
     {
-        return _moveQueryService.GetValidDestinations(Context.ConnectionId, fromPoint);
+        try
+        {
+            _logger.LogInformation("GetValidDestinations called for point {FromPoint}", fromPoint);
+
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
+            {
+                _logger.LogWarning("No grain found for caller");
+                return new List<MoveDto>();
+            }
+
+            var state = await grain.GetStateAsync(Context.ConnectionId);
+            if (!state.IsYourTurn || state.RemainingMoves.Length == 0)
+            {
+                _logger.LogWarning("Not player's turn or no remaining moves");
+                return new List<MoveDto>();
+            }
+
+            var moves = state.ValidMoves
+                .Where(m => m.From == fromPoint)
+                .Select(m => new MoveDto
+                {
+                    From = m.From,
+                    To = m.To,
+                    DieValue = m.DieValue,
+                    IsHit = m.IsHit
+                })
+                .ToList();
+
+            _logger.LogInformation("Filtered moves from point {FromPoint}: {Count}", fromPoint, moves.Count);
+            return moves;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting valid destinations");
+            return new List<MoveDto>();
+        }
     }
 
     /// <summary>
@@ -169,14 +224,14 @@ public partial class GameHub
                 return;
             }
 
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var result = await _gameActionOrchestrator.RollDiceAsync(session, Context.ConnectionId);
+            var result = await grain.RollDiceAsync(Context.ConnectionId);
             if (!result.Success)
             {
                 await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
@@ -204,14 +259,14 @@ public partial class GameHub
                 return;
             }
 
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var result = await _gameActionOrchestrator.MakeMoveAsync(session, Context.ConnectionId, from, to);
+            var result = await grain.MakeMoveAsync(Context.ConnectionId, from, to);
             if (!result.Success)
             {
                 await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
@@ -243,20 +298,14 @@ public partial class GameHub
                 return;
             }
 
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var result = await _gameActionOrchestrator.MakeCombinedMoveAsync(
-                session,
-                Context.ConnectionId,
-                from,
-                to,
-                intermediatePoints);
-
+            var result = await grain.MakeCombinedMoveAsync(Context.ConnectionId, from, to, intermediatePoints);
             if (!result.Success)
             {
                 await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
@@ -284,14 +333,14 @@ public partial class GameHub
                 return;
             }
 
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var result = await _gameActionOrchestrator.EndTurnAsync(session, Context.ConnectionId);
+            var result = await grain.EndTurnAsync(Context.ConnectionId);
             if (!result.Success)
             {
                 await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
@@ -319,14 +368,14 @@ public partial class GameHub
                 return;
             }
 
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var result = await _gameActionOrchestrator.UndoLastMoveAsync(session, Context.ConnectionId);
+            var result = await grain.UndoLastMoveAsync(Context.ConnectionId);
             if (!result.Success)
             {
                 await Clients.Caller.Error(result.ErrorMessage ?? "An error occurred");
@@ -346,87 +395,17 @@ public partial class GameHub
     {
         try
         {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var (success, currentValue, newValue, error) = await _doubleOfferService.OfferDoubleAsync(session, Context.ConnectionId);
-            if (!success)
+            var result = await grain.OfferDoubleAsync(Context.ConnectionId);
+            if (!result.Success)
             {
-                await Clients.Caller.Error(error ?? "Failed to offer double");
-                return;
-            }
-
-            // Notify opponent of the double offer
-            var opponentConnections = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
-                ? session.RedConnections
-                : session.WhiteConnections;
-
-            if (opponentConnections.Any(c => !string.IsNullOrEmpty(c)))
-            {
-                await _gameService.BroadcastDoubleOfferAsync(session, Context.ConnectionId, currentValue, newValue);
-                // Send full game state to both players so modals display correctly
-                await _gameService.BroadcastGameUpdateAsync(session);
-            }
-            else
-            {
-                // Opponent might be an AI (empty connection ID)
-                var opponentPlayerId = session.GetPlayerColor(Context.ConnectionId) == CheckerColor.White
-                    ? session.RedPlayerId
-                    : session.WhitePlayerId;
-
-                if (opponentPlayerId != null && _aiMoveService.IsAiPlayer(opponentPlayerId))
-                {
-                    var (accepted, winner, stakes) = await _doubleOfferService.HandleAiDoubleResponseAsync(
-                        session, opponentPlayerId, currentValue, newValue);
-
-                    if (accepted)
-                    {
-                        // AI accepted - send updated state to human player
-                        if (!string.IsNullOrEmpty(Context.ConnectionId))
-                        {
-                            var state = session.GetState(Context.ConnectionId);
-                            await Clients.Caller.DoubleAccepted(state);
-                        }
-
-                        BackgroundTaskHelper.FireAndForget(
-                            async () =>
-                            {
-                                var game = GameEngineMapper.ToGame(session);
-                                await _gameRepository.SaveGameAsync(game);
-                            },
-                            _logger,
-                            $"SaveGameState-{session.Id}");
-                    }
-                    else
-                    {
-                        // AI declined - human wins
-                        await Clients.Caller.Info("Computer declined the double. You win!");
-
-                        // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
-                        await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-
-                        if (session.GameMode.ShouldTrackStats)
-                        {
-                            var game = GameEngineMapper.ToGame(session);
-                            await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-                        }
-
-                        _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-
-                        // Broadcast GameOver AFTER database is updated
-                        if (!string.IsNullOrEmpty(Context.ConnectionId))
-                        {
-                            var finalState = session.GetState(Context.ConnectionId);
-                            await Clients.Caller.GameOver(finalState);
-                        }
-
-                        _sessionManager.RemoveGame(session.Id);
-                    }
-                }
+                await Clients.Caller.Error(result.ErrorMessage ?? "Failed to offer double");
             }
         }
         catch (Exception ex)
@@ -443,46 +422,17 @@ public partial class GameHub
     {
         try
         {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            // Determine who offered the double (the current player - the one whose turn it is)
-            var doublingPlayerId = session.Engine.CurrentPlayer?.Color == CheckerColor.White
-                ? session.WhitePlayerId
-                : session.RedPlayerId;
-
-            // Accept the double
-            await _doubleOfferService.AcceptDoubleAsync(session);
-
-            // Broadcast double accepted to both players
-            await _gameService.BroadcastDoubleAcceptedAsync(session);
-
-            // Save game state
-            BackgroundTaskHelper.FireAndForget(
-                async () =>
-                {
-                    var game = GameEngineMapper.ToGame(session);
-                    await _gameRepository.SaveGameAsync(game);
-                },
-                _logger,
-                $"SaveGameState-{session.Id}");
-
-            // If the doubling player was an AI, resume their turn (they need to roll and move)
-            if (_aiMoveService.IsAiPlayer(doublingPlayerId))
+            var result = await grain.AcceptDoubleAsync(Context.ConnectionId);
+            if (!result.Success)
             {
-                _logger.LogInformation(
-                    "Human accepted AI double in game {GameId} - resuming AI turn",
-                    session.Id);
-
-                // Execute AI turn in background (roll dice and make moves)
-                BackgroundTaskHelper.FireAndForget(
-                    async () => await _gameActionOrchestrator.ExecuteAiTurnWithBroadcastAsync(session, doublingPlayerId!),
-                    _logger,
-                    $"ResumeAiTurn-{session.Id}");
+                await Clients.Caller.Error(result.ErrorMessage ?? "Failed to accept double");
             }
         }
         catch (Exception ex)
@@ -499,81 +449,17 @@ public partial class GameHub
     {
         try
         {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var (success, winner, stakes, error) = await _doubleOfferService.DeclineDoubleAsync(session, Context.ConnectionId);
-            if (!success)
+            var result = await grain.DeclineDoubleAsync(Context.ConnectionId);
+            if (!result.Success)
             {
-                await Clients.Caller.Error(error ?? "Failed to decline double");
-                return;
-            }
-
-            // Update database and stats BEFORE broadcasting GameOver (prevents race condition)
-            await _gameRepository.UpdateGameStatusAsync(session.Id, "Completed");
-
-            if (session.GameMode.ShouldTrackStats)
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-            }
-            else
-            {
-                _logger.LogInformation("Skipping stats tracking for non-competitive game {GameId}", session.Id);
-            }
-
-            _logger.LogInformation("Updated game {GameId} to Completed status and user stats", session.Id);
-
-            // Broadcast game over AFTER database is updated
-            await _gameService.BroadcastGameOverAsync(session);
-
-            // Handle match score update if this is a match game
-            if (!string.IsNullOrEmpty(session.MatchId))
-            {
-                var winnerId = winner?.Color == CheckerColor.White ? session.WhitePlayerId : session.RedPlayerId;
-                var winType = session.Engine.DetermineWinType();
-                var gameResult = new GameResult(winnerId ?? string.Empty, winType, session.Engine.DoublingCube.Value);
-
-                await _matchService.CompleteGameAsync(session.Id, gameResult);
-
-                var match = await _matchService.GetMatchAsync(session.MatchId);
-                if (match != null)
-                {
-                    // Broadcast match score update
-                    await Clients.Group(session.Id).MatchUpdate(new MatchUpdateDto
-                    {
-                        MatchId = match.MatchId,
-                        Player1Score = match.Player1Score,
-                        Player2Score = match.Player2Score,
-                        TargetScore = match.TargetScore,
-                        IsCrawfordGame = match.IsCrawfordGame,
-                        MatchComplete = match.Status == "Completed",
-                        MatchWinner = match.WinnerId,
-                        NextGameId = match.CurrentGameId
-                    });
-
-                    _logger.LogInformation(
-                        "Updated match {MatchId} scores after declined double in game {GameId}. Score: {P1Score}-{P2Score}",
-                        match.MatchId,
-                        session.Id,
-                        match.Player1Score,
-                        match.Player2Score);
-                }
-
-                // Keep match game in memory for continuation
-                _logger.LogInformation(
-                    "Keeping match game {GameId} in memory for continuation (declined double)",
-                    session.Id);
-            }
-            else
-            {
-                // Remove from memory only for non-match games
-                _sessionManager.RemoveGame(session.Id);
-                _logger.LogInformation("Removed completed game {GameId} from memory (declined double)", session.Id);
+                await Clients.Caller.Error(result.ErrorMessage ?? "Failed to decline double");
             }
         }
         catch (Exception ex)
@@ -590,182 +476,17 @@ public partial class GameHub
     {
         try
         {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            // Determine abandoning player and opponent
-            var abandoningColor = session.GetPlayerColor(Context.ConnectionId);
-            if (abandoningColor == null)
+            var result = await grain.AbandonAsync(Context.ConnectionId);
+            if (!result.Success)
             {
-                await Clients.Caller.Error("You are not a player in this game");
-                return;
-            }
-
-            // Check if game is still waiting for opponent
-            var currentState = session.GetState();
-            var isWaitingForPlayer = currentState.Status == ServerGameStatus.WaitingForPlayer;
-
-            if (isWaitingForPlayer)
-            {
-                // No opponent yet - just cancel the game
-                var gameId = session.Id;
-
-                // Remove player from group
-                await Groups.RemoveFromGroupAsync(Context.ConnectionId, gameId);
-
-                // Remove game completely from session manager
-                _sessionManager.RemoveGame(gameId);
-
-                // Update game status in DynamoDB (game was persisted at match creation)
-                await _gameRepository.UpdateGameStatusAsync(gameId, "Abandoned");
-
-                // If this is a match game, abandon the match as well
-                if (!string.IsNullOrEmpty(session.MatchId))
-                {
-                    var playerId = GetAuthenticatedUserId()!;
-                    await _matchService.AbandonMatchAsync(session.MatchId, playerId);
-                    _logger.LogInformation(
-                        "Match {MatchId} abandoned by player {PlayerId} while waiting for opponent",
-                        session.MatchId,
-                        playerId);
-                }
-
-                _logger.LogInformation("Game {GameId} cancelled by player while waiting for opponent (removed from memory)", gameId);
-
-                // Notify the caller so the client can navigate away
-                await Clients.Caller.Info("Game cancelled");
-
-                return;
-            }
-
-            var abandoningPlayer = abandoningColor == CheckerColor.White
-                ? session.Engine.WhitePlayer
-                : session.Engine.RedPlayer;
-            var opponentPlayer = abandoningColor == CheckerColor.White
-                ? session.Engine.RedPlayer
-                : session.Engine.WhitePlayer;
-
-            // Check if game is already over
-            if (session.Engine.GameOver)
-            {
-                _logger.LogWarning("Game {GameId} is already over, cannot forfeit", session.Id);
-                await Clients.Caller.Error("Game is already finished");
-                return;
-            }
-
-            // Forfeit the game - opponent wins
-            session.Engine.ForfeitGame(opponentPlayer);
-
-            // Get stakes from doubling cube and determine win type
-            var stakes = session.Engine.GetGameResult();
-
-            _logger.LogInformation(
-                "Game {GameId} forfeited by {Player}. Winner: {Winner} (Stakes: {Stakes})",
-                session.Id,
-                abandoningPlayer.Name,
-                opponentPlayer.Name,
-                stakes);
-
-            // Save complete game state (including Winner, WinType, Stakes)
-            var completedGame = GameEngineMapper.ToGame(session);
-            await _gameRepository.SaveGameAsync(completedGame);
-
-            // Update match scores if this is a match game
-            if (!string.IsNullOrEmpty(session.MatchId))
-            {
-                var winnerPlayerId = abandoningColor == CheckerColor.White ? session.RedPlayerId : session.WhitePlayerId;
-                var winnerColor = abandoningColor == CheckerColor.White ? CheckerColor.Red : CheckerColor.White;
-
-                var gameResult = new GameResult(winnerPlayerId!, session.Engine.DetermineWinType(), session.Engine.DoublingCube.Value)
-                {
-                    WinnerColor = winnerColor,
-                    MoveHistory = session.Engine.MoveHistory.ToList()
-                };
-
-                await _matchService.CompleteGameAsync(session.Id, gameResult);
-                _logger.LogInformation(
-                    "Updated match {MatchId} scores after game {GameId} was forfeited",
-                    session.MatchId,
-                    session.Id);
-            }
-
-            // Skip stats update for non-competitive games
-            if (session.GameMode.ShouldTrackStats)
-            {
-                var game = GameEngineMapper.ToGame(session);
-                await _playerStatsService.UpdateStatsAfterGameCompletionAsync(game);
-            }
-            else
-            {
-                _logger.LogInformation("Skipping stats tracking for analysis game {GameId}", session.Id);
-            }
-
-            // Mark session as completed so status is correctly set in GetState()
-            // Note: ForfeitGame already sets Engine.Winner and Engine.GameOver
-            session.MarkCompleted();
-
-            _logger.LogInformation("Game {GameId} completed (forfeited)", session.Id);
-
-            // Broadcast game over AFTER database is updated
-            var finalState = session.GetState();
-            await Clients.Group(session.Id).GameOver(finalState);
-
-            // Handle match continuation (if this is a match game)
-            if (!string.IsNullOrEmpty(session.MatchId))
-            {
-                var match = await _matchService.GetMatchAsync(session.MatchId);
-                if (match != null)
-                {
-                    // Broadcast match score update - next game will be created when players click "Continue"
-                    await Clients.Group(session.Id).MatchUpdate(new MatchUpdateDto
-                    {
-                        MatchId = match.MatchId,
-                        Player1Score = match.Player1Score,
-                        Player2Score = match.Player2Score,
-                        TargetScore = match.TargetScore,
-                        IsCrawfordGame = match.IsCrawfordGame,
-                        MatchComplete = match.Status == "Completed",
-                        MatchWinner = match.WinnerId,
-                        NextGameId = match.CurrentGameId // Current game for reference
-                    });
-
-                    if (!match.CoreMatch.IsMatchComplete())
-                    {
-                        _logger.LogInformation(
-                            "Match {MatchId} continues after abandoned game. Score: {P1Score}-{P2Score}. Waiting for players to continue.",
-                            match.MatchId,
-                            match.Player1Score,
-                            match.Player2Score);
-                    }
-                    else
-                    {
-                        _logger.LogInformation(
-                            "Match {MatchId} complete after abandoned game. Winner: {WinnerId}",
-                            match.MatchId,
-                            match.WinnerId);
-                    }
-
-                    _logger.LogInformation(
-                        "Broadcasted match update for match {MatchId}: {P1Score}-{P2Score}",
-                        match.MatchId,
-                        match.Player1Score,
-                        match.Player2Score);
-
-                    // Keep completed match game in memory for continuation (will be cleaned up when next game starts)
-                    _logger.LogInformation(
-                        "Keeping abandoned match game {GameId} in memory for continuation",
-                        session.Id);
-                }
-            }
-            else
-            {
-                // Remove from memory to prevent memory leak (only for non-match games)
-                _sessionManager.RemoveGame(session.Id);
-                _logger.LogInformation("Removed abandoned game {GameId} from memory", session.Id);
+                await Clients.Caller.Error(result.ErrorMessage ?? "Failed to abandon game");
             }
         }
         catch (Exception ex)
@@ -782,14 +503,14 @@ public partial class GameHub
     {
         try
         {
-            var session = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-            if (session == null)
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
             {
                 await Clients.Caller.Error("Not in a game");
                 return;
             }
 
-            var state = session.GetState(Context.ConnectionId);
+            var state = await grain.GetStateAsync(Context.ConnectionId);
             await Clients.Caller.GameUpdate(state);
         }
         catch (Exception ex)
@@ -804,7 +525,7 @@ public partial class GameHub
     /// </summary>
     public async Task LeaveGame()
     {
-        await HandleDisconnection(Context.ConnectionId);
+        await HandleDisconnectionAsync(Context.ConnectionId);
     }
 
     /// <summary>
@@ -813,7 +534,6 @@ public partial class GameHub
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Remove from player connections tracking
-        // Note: User might disconnect before authenticating, so null check is needed here
         var playerId = GetAuthenticatedUserId();
         if (!string.IsNullOrEmpty(playerId))
         {
@@ -823,7 +543,7 @@ public partial class GameHub
         // Clean up chat rate limit history
         _chatService.CleanupConnection(Context.ConnectionId);
 
-        await HandleDisconnection(Context.ConnectionId);
+        await HandleDisconnectionAsync(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }
 
@@ -831,7 +551,7 @@ public partial class GameHub
     /// Export the current position (base64-encoded SGF - used for URLs).
     /// Works for both analysis sessions and game sessions.
     /// </summary>
-    public Task<string> ExportPosition()
+    public async Task<string> ExportPosition()
     {
         // Check analysis session first
         var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
@@ -839,42 +559,41 @@ public partial class GameHub
         {
             var sgf = SgfSerializer.ExportPosition(analysisSession.Engine);
             var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
-            return Task.FromResult(base64);
+            return base64;
         }
 
-        // Check game session
-        var gameSession = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-        if (gameSession != null)
+        // Check game grain
+        var grain = await GetGameGrainForCallerAsync();
+        if (grain != null)
         {
-            var sgf = SgfSerializer.ExportPosition(gameSession.Engine);
-            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sgf));
-            return Task.FromResult(base64);
+            var exported = await grain.ExportPositionAsync();
+            return exported ?? string.Empty;
         }
 
-        return Task.FromResult(string.Empty);
+        return string.Empty;
     }
 
     /// <summary>
     /// Export full game SGF with move history.
     /// Works for both analysis sessions and game sessions.
     /// </summary>
-    public Task<string> ExportGameSgf()
+    public async Task<string> ExportGameSgf()
     {
         // Check analysis session first
         var analysisSession = _analysisSessionManager.GetSessionByConnection(Context.ConnectionId);
         if (analysisSession != null)
         {
-            return Task.FromResult(analysisSession.Engine.GameSgf);
+            return analysisSession.Engine.GameSgf;
         }
 
-        // Check game session
-        var gameSession = _sessionManager.GetGameByPlayer(Context.ConnectionId);
-        if (gameSession != null)
+        // Check game grain
+        var grain = await GetGameGrainForCallerAsync();
+        if (grain != null)
         {
-            return Task.FromResult(gameSession.Engine.GameSgf);
+            return await grain.ExportGameSgfAsync() ?? string.Empty;
         }
 
-        return Task.FromResult(string.Empty);
+        return string.Empty;
     }
 
     /// <summary>
@@ -1010,6 +729,9 @@ public partial class GameHub
     // Analysis Operations
     // ============================================
 
+    /// <summary>
+    /// Evaluate the current position for an analysis session.
+    /// </summary>
     public async Task<PositionEvaluationDto> AnalyzePosition(string sessionId, string? evaluatorType)
     {
         var session = _analysisSessionManager.GetSession(sessionId);
@@ -1117,6 +839,36 @@ public partial class GameHub
         {
             _logger.LogWarning(ex, "Failed to parse game SGF");
             return Task.FromResult<GameHistoryDto?>(null);
+        }
+    }
+
+    // ==================== Private helpers ====================
+
+    private async Task HandleDisconnectionAsync(string connectionId)
+    {
+        try
+        {
+            var userId = GetAuthenticatedUserId();
+            if (string.IsNullOrEmpty(userId)) return;
+
+            // Tell the player grain to remove this connection
+            var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(userId);
+            var gameId = await playerGrain.GetGameIdForConnectionAsync(connectionId);
+
+            if (!string.IsNullOrEmpty(gameId))
+            {
+                await Groups.RemoveFromGroupAsync(connectionId, gameId);
+                var grain = _grainFactory.GetGrain<IGameGrain>(gameId);
+                await grain.LeaveAsync(connectionId);
+                _logger.LogInformation("Player {PlayerId} left game {GameId} (connection {ConnectionId})", userId, gameId, connectionId);
+            }
+
+            // Clean up analysis session if present
+            _analysisSessionManager.RemoveConnection(connectionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling disconnection for connection {ConnectionId}", connectionId);
         }
     }
 

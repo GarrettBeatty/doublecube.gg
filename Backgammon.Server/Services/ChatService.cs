@@ -30,7 +30,6 @@ public class ChatService : IChatService
 
     private static readonly TimeSpan RateLimitWindow = TimeSpan.FromMinutes(RateLimitWindowMinutes);
 
-    private readonly IGameSessionManager _sessionManager;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IMatchChatStorage _matchChatStorage;
     private readonly ILogger<ChatService> _logger;
@@ -44,24 +43,21 @@ public class ChatService : IChatService
     /// <summary>
     /// Initializes a new instance of the <see cref="ChatService"/> class.
     /// </summary>
-    /// <param name="sessionManager">The game session manager.</param>
     /// <param name="hubContext">The SignalR hub context.</param>
     /// <param name="matchChatStorage">The match chat storage.</param>
     /// <param name="logger">The logger instance.</param>
     public ChatService(
-        IGameSessionManager sessionManager,
         IHubContext<GameHub, IGameHubClient> hubContext,
         IMatchChatStorage matchChatStorage,
         ILogger<ChatService> logger)
     {
-        _sessionManager = sessionManager;
         _hubContext = hubContext;
         _matchChatStorage = matchChatStorage;
         _logger = logger;
     }
 
     /// <inheritdoc />
-    public async Task SendChatMessageAsync(string connectionId, string message)
+    public async Task SendChatMessageAsync(string connectionId, string gameId, string? matchId, string senderName, CheckerColor senderColor, string message)
     {
         // Validate message is not empty
         if (string.IsNullOrWhiteSpace(message))
@@ -88,35 +84,16 @@ public class ChatService : IChatService
                 connectionId);
         }
 
-        // Sanitize message content (HTML encode to prevent XSS)
+        // Sanitize message content
         message = SanitizeMessage(message);
-
-        // Get the game session
-        var session = _sessionManager.GetGameByPlayer(connectionId);
-        if (session == null)
-        {
-            await _hubContext.Clients.Client(connectionId).Error("Not in a game");
-            return;
-        }
-
-        // Determine sender's color and name
-        var senderColor = session.GetPlayerColor(connectionId);
-        if (senderColor == null)
-        {
-            return;
-        }
-
-        var senderName = senderColor == CheckerColor.White
-            ? (session.WhitePlayerName ?? "White")
-            : (session.RedPlayerName ?? "Red");
 
         // Record message for rate limiting
         RecordMessage(connectionId);
 
         // Store message in match chat storage if this is a match game
-        if (!string.IsNullOrEmpty(session.MatchId))
+        if (!string.IsNullOrEmpty(matchId))
         {
-            _matchChatStorage.AddMessage(session.MatchId, new ChatMessage
+            _matchChatStorage.AddMessage(matchId, new ChatMessage
             {
                 SenderName = senderName,
                 Message = message,
@@ -125,16 +102,13 @@ public class ChatService : IChatService
             });
         }
 
-        // Broadcast to all players in the game
-        await _hubContext.Clients.Group(session.Id).ReceiveChatMessage(
-            senderName,
-            message,
-            connectionId);
+        // Broadcast to all players in the game group
+        await _hubContext.Clients.Group(gameId).ReceiveChatMessage(senderName, message, connectionId);
 
         _logger.LogInformation(
             "Chat message from {Sender} in game {GameId}",
             senderName,
-            session.Id);
+            gameId);
     }
 
     /// <inheritdoc />
@@ -159,7 +133,6 @@ public class ChatService : IChatService
     /// <summary>
     /// Sanitizes a message by trimming whitespace.
     /// Note: XSS prevention is handled by React's automatic escaping when rendering text in JSX.
-    /// HTML encoding here would cause double-encoding (e.g., ' becomes &#39; displayed literally).
     /// </summary>
     /// <param name="message">The raw message.</param>
     /// <returns>The sanitized message.</returns>

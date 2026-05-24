@@ -13,7 +13,7 @@ public class PlayerProfileService : IPlayerProfileService
     private readonly IUserRepository _userRepository;
     private readonly IGameRepository _gameRepository;
     private readonly IFriendshipRepository _friendshipRepository;
-    private readonly IGameSessionManager _sessionManager;
+    private readonly IPlayerConnectionService _playerConnectionService;
     private readonly HybridCache _cache;
     private readonly CacheSettings _cacheSettings;
     private readonly ILogger<PlayerProfileService> _logger;
@@ -22,7 +22,7 @@ public class PlayerProfileService : IPlayerProfileService
         IUserRepository userRepository,
         IGameRepository gameRepository,
         IFriendshipRepository friendshipRepository,
-        IGameSessionManager sessionManager,
+        IPlayerConnectionService playerConnectionService,
         HybridCache cache,
         CacheSettings cacheSettings,
         ILogger<PlayerProfileService> logger)
@@ -30,7 +30,7 @@ public class PlayerProfileService : IPlayerProfileService
         _userRepository = userRepository;
         _gameRepository = gameRepository;
         _friendshipRepository = friendshipRepository;
-        _sessionManager = sessionManager;
+        _playerConnectionService = playerConnectionService;
         _cache = cache;
         _cacheSettings = cacheSettings;
         _logger = logger;
@@ -106,7 +106,7 @@ public class PlayerProfileService : IPlayerProfileService
             var friendUser = await _userRepository.GetByUserIdAsync(friendship.FriendUserId);
             if (friendUser != null)
             {
-                var isOnline = _sessionManager.IsPlayerOnline(friendship.FriendUserId);
+                var isOnline = _playerConnectionService.IsPlayerConnected(friendship.FriendUserId);
                 friendUsers.Add(new FriendDto
                 {
                     UserId = friendUser.UserId,

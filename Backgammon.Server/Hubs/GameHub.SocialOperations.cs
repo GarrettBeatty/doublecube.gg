@@ -1,3 +1,4 @@
+using Backgammon.Server.Grains.Interfaces;
 using Backgammon.Server.Hubs.Interfaces;
 using Backgammon.Server.Models;
 using Backgammon.Server.Models.SignalR;
@@ -17,7 +18,31 @@ public partial class GameHub
     {
         try
         {
-            await _chatService.SendChatMessageAsync(Context.ConnectionId, message);
+            var grain = await GetGameGrainForCallerAsync();
+            if (grain == null)
+            {
+                await Clients.Caller.Error("Not in a game");
+                return;
+            }
+
+            var state = await grain.GetStateAsync(Context.ConnectionId);
+            if (state.YourColor == null)
+            {
+                await Clients.Caller.Error("Not a player in this game");
+                return;
+            }
+
+            var senderName = state.YourColor == Backgammon.Core.CheckerColor.White
+                ? state.WhitePlayerName ?? "White"
+                : state.RedPlayerName ?? "Red";
+
+            await _chatService.SendChatMessageAsync(
+                Context.ConnectionId,
+                state.GameId,
+                state.MatchId,
+                senderName,
+                state.YourColor.Value,
+                message);
         }
         catch (Exception ex)
         {
@@ -423,22 +448,28 @@ public partial class GameHub
                 friends = friendsList.Select(f => f.UserId).ToHashSet();
             }
 
+            // Build per-user active game map via player grains
+            var activeGameMap = new Dictionary<string, string?>();
+            foreach (var user in users.Where(u => !u.IsAnonymous && u.UserId != currentUserId))
+            {
+                var playerGrain = _grainFactory.GetGrain<IPlayerGrain>(user.UserId);
+                var activeGameIds = await playerGrain.GetActiveGameIdsAsync();
+                activeGameMap[user.UserId] = activeGameIds.FirstOrDefault();
+            }
+
             var onlinePlayers = users
                 .Where(u => !u.IsAnonymous && u.UserId != currentUserId)
                 .Select(user =>
                 {
-                    // Check if user is in a game
-                    var playerGames = _sessionManager.GetPlayerGames(user.UserId);
-                    var activeGame = playerGames.FirstOrDefault(g => !g.Engine.GameOver);
-
+                    activeGameMap.TryGetValue(user.UserId, out var activeGameId);
                     return new OnlinePlayerDto
                     {
                         UserId = user.UserId,
                         Username = user.Username,
                         DisplayName = user.DisplayName,
                         Rating = user.Rating,
-                        Status = activeGame != null ? OnlinePlayerStatus.InGame : OnlinePlayerStatus.Available,
-                        CurrentGameId = activeGame?.Id,
+                        Status = activeGameId != null ? OnlinePlayerStatus.InGame : OnlinePlayerStatus.Available,
+                        CurrentGameId = activeGameId,
                         IsFriend = friends.Contains(user.UserId)
                     };
                 })

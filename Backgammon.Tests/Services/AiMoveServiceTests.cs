@@ -175,7 +175,6 @@ public class AiMoveServiceTests
     [Fact]
     public async Task ExecuteAiTurnAsync_CompletesWithoutError()
     {
-        // Arrange - create a real bot resolver with actual bots
         var services = new ServiceCollection();
         services.AddSingleton<GreedyBot>();
         services.AddSingleton<RandomBot>();
@@ -183,30 +182,17 @@ public class AiMoveServiceTests
         var botResolver = new BotResolver(serviceProvider);
         var service = new AiMoveService(botResolver, _mockLogger.Object);
 
-        var session = new GameSession("game-123");
-        // Add players - White first, then Red
-        session.AddPlayer("ai_greedy_123", string.Empty);
-        session.AddPlayer("human-player", "conn-123");
-        session.Engine.StartNewGame();
+        var engine = new GameEngine();
+        engine.StartNewGame();
 
-        // Complete opening roll so AI can take a normal turn
-        // Keep rolling until there's no tie
-        while (session.Engine.IsOpeningRoll)
+        while (engine.IsOpeningRoll)
         {
-            session.Engine.RollOpening(CheckerColor.White);
-            session.Engine.RollOpening(CheckerColor.Red);
+            engine.RollOpening(CheckerColor.White);
+            engine.RollOpening(CheckerColor.Red);
         }
 
-        // Clear remaining moves first
-        session.Engine.RemainingMoves.Clear();
-
-        // Ensure it's the AI's turn - if not, swap current player
-        var aiColor = session.WhitePlayerId == "ai_greedy_123" ? CheckerColor.White : CheckerColor.Red;
-        if (session.Engine.CurrentPlayer?.Color != aiColor)
-        {
-            // Swap to make it AI's turn
-            session.Engine.EndTurn();
-        }
+        engine.RemainingMoves.Clear();
+        engine.SetCurrentPlayer(CheckerColor.White);
 
         var broadcastCallCount = 0;
         Func<Task> broadcastUpdate = () =>
@@ -215,17 +201,14 @@ public class AiMoveServiceTests
             return Task.CompletedTask;
         };
 
-        // Act - use the AI player ID we set up
-        await service.ExecuteAiTurnAsync(session, "ai_greedy_123", broadcastUpdate);
+        await service.ExecuteAiTurnAsync(engine, "game-123", "ai_greedy_123", null, broadcastUpdate);
 
-        // Assert - verify broadcast was called at least once (for dice roll)
         Assert.True(broadcastCallCount > 0);
     }
 
     [Fact]
     public async Task ExecuteAiTurnAsync_WithRandomAi_CompletesWithoutError()
     {
-        // Arrange - create a real bot resolver with actual bots
         var services = new ServiceCollection();
         services.AddSingleton<GreedyBot>();
         services.AddSingleton<RandomBot>();
@@ -233,30 +216,17 @@ public class AiMoveServiceTests
         var botResolver = new BotResolver(serviceProvider);
         var service = new AiMoveService(botResolver, _mockLogger.Object);
 
-        var session = new GameSession("game-123");
-        // Add players - White first, then Red
-        session.AddPlayer("ai_random_456", string.Empty);
-        session.AddPlayer("human-player", "conn-123");
-        session.Engine.StartNewGame();
+        var engine = new GameEngine();
+        engine.StartNewGame();
 
-        // Complete opening roll so AI can take a normal turn
-        // Keep rolling until there's no tie
-        while (session.Engine.IsOpeningRoll)
+        while (engine.IsOpeningRoll)
         {
-            session.Engine.RollOpening(CheckerColor.White);
-            session.Engine.RollOpening(CheckerColor.Red);
+            engine.RollOpening(CheckerColor.White);
+            engine.RollOpening(CheckerColor.Red);
         }
 
-        // Clear remaining moves first
-        session.Engine.RemainingMoves.Clear();
-
-        // Ensure it's the AI's turn - if not, swap current player
-        var aiColor = session.WhitePlayerId == "ai_random_456" ? CheckerColor.White : CheckerColor.Red;
-        if (session.Engine.CurrentPlayer?.Color != aiColor)
-        {
-            // Swap to make it AI's turn
-            session.Engine.EndTurn();
-        }
+        engine.RemainingMoves.Clear();
+        engine.SetCurrentPlayer(CheckerColor.White);
 
         var broadcastCallCount = 0;
         Func<Task> broadcastUpdate = () =>
@@ -265,10 +235,8 @@ public class AiMoveServiceTests
             return Task.CompletedTask;
         };
 
-        // Act - use the AI player ID we set up
-        await service.ExecuteAiTurnAsync(session, "ai_random_456", broadcastUpdate);
+        await service.ExecuteAiTurnAsync(engine, "game-123", "ai_random_456", null, broadcastUpdate);
 
-        // Assert
         Assert.True(broadcastCallCount > 0);
     }
 }

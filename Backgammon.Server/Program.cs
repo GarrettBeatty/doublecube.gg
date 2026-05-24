@@ -9,18 +9,22 @@ using Backgammon.Core;
 using Backgammon.Plugins.Extensions;
 using Backgammon.Plugins.Registration;
 using Backgammon.Server.Configuration;
+using Backgammon.Server.Data;
 using Backgammon.Server.Hubs;
 using Backgammon.Server.Models;
 using Backgammon.Server.Services;
+using Backgammon.Server.Services.Postgres;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Orleans;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,8 +37,40 @@ builder.Services.AddSingleton(sp =>
 // Add Aspire service defaults (telemetry, health checks, service discovery)
 builder.AddServiceDefaults();
 
+// ========== ORLEANS CONFIGURATION ==========
+// Grain state is persisted via AdoNet against the same Postgres instance used for game history.
+// The Orleans schema (OrleansQuery, OrleansStorage) is bootstrapped at startup by
+// OrleansSchemaInitializer.EnsureSchemaAsync before the silo activates any grain.
+//
+// Clustering is injected by Aspire when running under AppHost; standalone runs fall back
+// to localhost clustering so dotnet run still works.
+var postgresConnectionString = builder.Configuration.GetConnectionString("Postgres")
+    ?? throw new InvalidOperationException("Postgres connection string is required for Orleans grain persistence");
+
+builder.UseOrleans(silo =>
+{
+    if (string.IsNullOrEmpty(builder.Configuration["Orleans:ClusterId"]))
+    {
+        silo.UseLocalhostClustering();
+    }
+
+    silo.AddAdoNetGrainStorageAsDefault(options =>
+    {
+        options.Invariant = "Npgsql";
+        options.ConnectionString = postgresConnectionString;
+    });
+
+    // PubSubStore is used by Orleans Streams (not currently used in this app). Keep in
+    // memory — switching to persistent here would require additional schema and gives
+    // us nothing today.
+    silo.AddMemoryGrainStorage("PubSubStore");
+});
+// ========== END ORLEANS CONFIGURATION ==========
+
 // Add services to the container
-var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+// Aspire injects as ConnectionStrings__redis; fall back to manual appsettings key
+var redisConnectionString = builder.Configuration.GetConnectionString("redis")
+    ?? builder.Configuration["Redis:ConnectionString"];
 // Register authentication filter globally for all SignalR hubs
 builder.Services.AddSingleton<IHubFilter, Backgammon.Server.Hubs.Filters.AuthenticationHubFilter>();
 
@@ -68,9 +104,7 @@ else
     Console.WriteLine("=============================================\n");
 }
 
-builder.Services.AddSingleton<IGameSessionManager, GameSessionManager>();
-builder.Services.AddSingleton<IGameSessionFactory, GameSessionFactory>();
-builder.Services.AddSingleton<AnalysisSessionManager>();
+builder.Services.AddSingleton<IAnalysisSessionManager, AnalysisSessionManager>();
 
 // Add memory cache for profile caching
 builder.Services.AddMemoryCache();
@@ -110,44 +144,32 @@ builder.Services.AddHybridCache(options =>
     };
 });
 
-// ========== DYNAMODB CONFIGURATION ==========
-Console.WriteLine("=== DynamoDB Configuration ===");
-Console.WriteLine($"Environment: {builder.Environment.EnvironmentName}");
+// ========== POSTGRESQL CONFIGURATION ==========
+// DbContextFactory is used instead of DbContext so that repositories can create
+// short-lived contexts per operation (safe for concurrent use and long-lived services).
+builder.Services.AddDbContextFactory<BackgammonDbContext>(options =>
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("Postgres"),
+        npgsql => npgsql.EnableRetryOnFailure(maxRetryCount: 3)));
 
-var dynamoDbTableName = builder.Configuration["DynamoDb:TableName"];
-var awsEndpointUrl = Environment.GetEnvironmentVariable("AWS_ENDPOINT_URL_DYNAMODB");
-var awsRegion = builder.Configuration["AWS:Region"] ?? Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1";
+// Register PostgreSQL repositories
+builder.Services.AddSingleton<IGameRepository, PostgresGameRepository>();
+builder.Services.AddSingleton<IFriendshipRepository, PostgresFriendshipRepository>();
+builder.Services.AddSingleton<IMatchRepository, PostgresMatchRepository>();
+builder.Services.AddSingleton<IThemeRepository, PostgresThemeRepository>();
+builder.Services.AddSingleton<IPuzzleRepository, PostgresPuzzleRepository>();
 
-Console.WriteLine($"DynamoDb:TableName = {dynamoDbTableName ?? "NULL"}");
-Console.WriteLine($"AWS_ENDPOINT_URL_DYNAMODB = {awsEndpointUrl ?? "NULL"}");
-Console.WriteLine($"AWS_REGION = {awsRegion}");
-Console.WriteLine("=====================================\n");
-// ========== END CONFIGURATION ==========
-
-// DynamoDB client configuration
-// AWS SDK automatically detects local endpoint via AWS_ENDPOINT_URL_DYNAMODB environment variable
-builder.Services.AddSingleton<Amazon.DynamoDBv2.IAmazonDynamoDB>(sp =>
-{
-    // No configuration needed - AWS SDK automatically picks up:
-    // - AWS_ENDPOINT_URL_DYNAMODB for local development (set by Aspire)
-    // - AWS credentials and region from environment/config
-    return new Amazon.DynamoDBv2.AmazonDynamoDBClient();
-});
-
-// Register DynamoDB services
-builder.Services.AddSingleton<IGameRepository, Backgammon.Server.Services.DynamoDb.DynamoDbGameRepository>();
-builder.Services.AddSingleton<Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+// User repository is wrapped in a caching layer
+builder.Services.AddSingleton<PostgresUserRepository>();
 builder.Services.AddSingleton<IUserRepository>(sp =>
 {
-    var dynamoDbUserRepo = sp.GetRequiredService<Backgammon.Server.Services.DynamoDb.DynamoDbUserRepository>();
+    var pgUserRepo = sp.GetRequiredService<PostgresUserRepository>();
     var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Hybrid.HybridCache>();
     var cacheSettings = sp.GetRequiredService<CacheSettings>();
     var logger = sp.GetRequiredService<ILogger<CachedUserService>>();
-    return new CachedUserService(dynamoDbUserRepo, cache, cacheSettings, logger);
+    return new CachedUserService(pgUserRepo, cache, cacheSettings, logger);
 });
-builder.Services.AddSingleton<IFriendshipRepository, Backgammon.Server.Services.DynamoDb.DynamoDbFriendshipRepository>();
-builder.Services.AddSingleton<IMatchRepository, Backgammon.Server.Services.DynamoDb.DynamoDbMatchRepository>();
-builder.Services.AddSingleton<IThemeRepository, Backgammon.Server.Services.DynamoDb.DynamoDbThemeRepository>();
+// ========== END POSTGRESQL CONFIGURATION ==========
 
 // User and authentication services
 builder.Services.AddSingleton<IAuthService, AuthService>();
@@ -159,9 +181,6 @@ builder.Services.AddSingleton<IMatchService, MatchService>();
 // Correspondence game service
 builder.Services.AddSingleton<ICorrespondenceGameService, CorrespondenceGameService>();
 
-// Correspondence timeout background service (checks hourly for expired games)
-builder.Services.AddHostedService<CorrespondenceTimeoutService>();
-
 // AI opponent service
 builder.Services.AddSingleton<IBotResolver, BotResolver>();
 builder.Services.AddSingleton<IAiMoveService, AiMoveService>();
@@ -172,19 +191,9 @@ builder.Services.AddSingleton<IAiPlayerManager, AiPlayerManager>();
 // Player connection tracking service
 builder.Services.AddSingleton<IPlayerConnectionService, PlayerConnectionService>();
 
-// GameHub extracted services
-builder.Services.AddSingleton<IDoubleOfferService, DoubleOfferService>();
-builder.Services.AddSingleton<IGameService, GameService>();  // Consolidated GameCreationService + GameStateService
 builder.Services.AddSingleton<IPlayerProfileService, PlayerProfileService>();
 builder.Services.AddSingleton<IPlayerStatsService, PlayerStatsService>();
 
-// Game action orchestration - refactored into focused services
-builder.Services.AddSingleton<IGameBroadcastService, GameBroadcastService>();
-builder.Services.AddSingleton<IGameCompletionService, GameCompletionService>();
-builder.Services.AddSingleton<IGameActionOrchestrator, GameActionOrchestrator>();
-
-builder.Services.AddSingleton<IMoveQueryService, MoveQueryService>();
-builder.Services.AddSingleton<IGameImportExportService, GameImportExportService>();
 builder.Services.AddSingleton<IMatchChatStorage, MatchChatStorage>();
 builder.Services.AddSingleton<IChatService, ChatService>();
 
@@ -200,7 +209,7 @@ builder.Services.Configure<Backgammon.Analysis.Configuration.GnubgSettings>(
 builder.Services.AddSingleton<PositionEvaluatorFactory>();
 
 // Register AnalysisService (now uses factory for evaluator)
-builder.Services.AddSingleton<AnalysisService>();
+builder.Services.AddSingleton<IAnalysisService, AnalysisService>();
 // ========== END ANALYSIS CONFIGURATION ==========
 
 // ========== PLUGIN SYSTEM CONFIGURATION ==========
@@ -220,7 +229,7 @@ builder.Services.Configure<Backgammon.Server.Configuration.PuzzleSettings>(
     builder.Configuration.GetSection(Backgammon.Server.Configuration.PuzzleSettings.SectionName));
 
 // Register puzzle repository
-builder.Services.AddSingleton<IPuzzleRepository, Backgammon.Server.Services.DynamoDb.DynamoDbPuzzleRepository>();
+builder.Services.AddSingleton<IPuzzleRepository, PostgresPuzzleRepository>();
 
 // Register puzzle services
 builder.Services.AddSingleton<RandomPositionGenerator>();
@@ -347,21 +356,17 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-// Initialize DynamoDB table if needed (local development only)
-if (!string.IsNullOrEmpty(awsEndpointUrl))
+// Apply any pending EF Core migrations on startup
+await using (var scope = app.Services.CreateAsyncScope())
 {
-    Console.WriteLine("=== Initializing DynamoDB table ===");
-    var dynamoDb = app.Services.GetRequiredService<Amazon.DynamoDBv2.IAmazonDynamoDB>();
-    await EnsureTableExistsAsync(dynamoDb, dynamoDbTableName ?? "backgammon-local");
-    Console.WriteLine("=== DynamoDB initialization complete ===\n");
+    var db = scope.ServiceProvider.GetRequiredService<BackgammonDbContext>();
+    await db.Database.MigrateAsync();
 }
 
-// Load active games from database on startup (restore from previous session)
-Console.WriteLine("=== Loading active games from database ===");
-var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
-var gameRepository = app.Services.GetRequiredService<IGameRepository>();
-await sessionManager.LoadActiveGamesAsync(gameRepository);
-Console.WriteLine("=== Game loading complete ===\n");
+// Bootstrap Orleans grain storage schema (idempotent — uses IF NOT EXISTS and ON CONFLICT)
+await OrleansSchemaInitializer.EnsureSchemaAsync(
+    postgresConnectionString,
+    app.Services.GetRequiredService<ILogger<Program>>());
 
 // Seed default themes
 Console.WriteLine("=== Seeding default themes ===");
@@ -389,32 +394,25 @@ app.MapGet("/", () => "Backgammon SignalR Server Running - Connect via /gamehub"
 app.MapGet("/health", () => new { status = "healthy", timestamp = DateTime.UtcNow }).RequireCors(selectedCorsPolicy);
 
 // Game statistics endpoint
-app.MapGet("/stats", async (IGameSessionManager sessionManager, IGameRepository gameRepository) =>
+app.MapGet("/stats", async (IGameRepository gameRepository) =>
 {
-    // Get counts from DATABASE (source of truth for persisted games)
-    var totalGames = await gameRepository.GetTotalGameCountAsync(null); // All statuses
+    var totalGames = await gameRepository.GetTotalGameCountAsync(null);
     var activeGamesCount = await gameRepository.GetTotalGameCountAsync("InProgress");
     var completedGamesCount = await gameRepository.GetTotalGameCountAsync("Completed");
     var abandonedGamesCount = await gameRepository.GetTotalGameCountAsync("Abandoned");
 
-    // Get waiting games from MEMORY (not yet persisted)
-    var memoryGames = sessionManager.GetAllGames().ToList();
-    var waitingGamesCount = memoryGames.Count(g => !g.IsFull);
-
     return new
     {
-        totalGames = totalGames + waitingGamesCount, // DB + waiting
+        totalGames,
         activeGames = activeGamesCount,
-        waitingGames = waitingGamesCount,
         completedGames = completedGamesCount,
         abandonedGames = abandonedGamesCount
     };
 }).RequireCors(selectedCorsPolicy);
 
-// Game list endpoint - returns list of games available to join
-app.MapGet("/api/games", async (IGameSessionManager sessionManager, IGameRepository gameRepository) =>
+// Game list endpoint - returns list of active games from DB
+app.MapGet("/api/games", async (IGameRepository gameRepository) =>
 {
-    // Get active games from DATABASE (source of truth)
     var dbActiveGames = await gameRepository.GetActiveGamesAsync();
     var activeGamesList = dbActiveGames.Select(g => new
     {
@@ -427,48 +425,14 @@ app.MapGet("/api/games", async (IGameSessionManager sessionManager, IGameReposit
         createdAt = g.CreatedAt
     }).ToList();
 
-    // Get waiting games from MEMORY (not yet persisted to DB)
-    var memoryGames = sessionManager.GetAllGames().ToList();
-    var waitingGamesList = memoryGames
-        .Where(g => !g.IsFull && g.Engine.Winner == null)
-        .Select(g => new
-        {
-            gameId = g.Id,
-            playerName = g.WhitePlayerName ?? g.RedPlayerName ?? "Waiting player",
-            playerUsername = g.WhitePlayerName ?? g.RedPlayerName,
-            waitingSince = g.CreatedAt,
-            minutesWaiting = (int)(DateTime.UtcNow - g.CreatedAt).TotalMinutes
-        })
-        .ToList();
-
-    return new
-    {
-        activeGames = activeGamesList,
-        waitingGames = waitingGamesList
-    };
+    return new { activeGames = activeGamesList };
 }).RequireCors(selectedCorsPolicy);
 
-// My games endpoint - returns active games for a specific player
-app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameRepository gameRepository, IGameSessionManager sessionManager) =>
+// My games endpoint - returns active games for a specific player (DB-only, grains auto-activate)
+app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameRepository gameRepository) =>
 {
-    // 1. Get waiting games from memory (not yet saved to DB)
-    var memoryGames = sessionManager.GetPlayerGames(playerId)
-        .Where(g => !g.IsFull) // Only waiting games
-        .Select(g => new
-        {
-            gameId = g.Id,
-            myColor = g.WhitePlayerId == playerId ? "White" : "Red",
-            opponent = "Waiting for opponent",
-            isFull = false,
-            isMyTurn = false,
-            createdAt = g.CreatedAt,
-            lastActivity = g.LastActivityAt
-        })
-        .ToList();
-
-    // 2. Get in-progress games from database
     var dbGames = await gameRepository.GetPlayerGamesAsync(playerId, "InProgress", limit: 50);
-    var dbGameList = dbGames.Select(g => new
+    return dbGames.Select(g => new
     {
         gameId = g.GameId,
         myColor = g.WhitePlayerId == playerId ? "White" : "Red",
@@ -480,37 +444,25 @@ app.MapGet("/api/player/{playerId}/active-games", async (string playerId, IGameR
         createdAt = g.CreatedAt,
         lastActivity = g.LastUpdatedAt
     })
+    .OrderByDescending(g => g.lastActivity)
     .ToList();
-
-    // Combine and return sorted by most recent activity
-    return memoryGames.Concat(dbGameList)
-        .OrderByDescending(g => g.lastActivity)
-        .ToList();
 }).RequireCors(selectedCorsPolicy);
 
-// Bot games endpoint - returns active bot games for spectating
-app.MapGet("/api/bot-games", (IGameSessionManager sessionManager) =>
+// Bot games endpoint - returns active bot games for spectating (DB-based)
+app.MapGet("/api/bot-games", async (IGameRepository gameRepository) =>
 {
-    var botGames = sessionManager.GetAllGames()
-        .Where(g => g.IsBotGame && !g.Engine.GameOver)
-        .Select(g =>
+    var botGames = await gameRepository.GetActiveGamesAsync();
+    return botGames
+        .Where(g => g.IsAiOpponent)
+        .Select(g => new
         {
-            var state = g.GetState(null);  // null = spectator view
-            return new
-            {
-                gameId = g.Id,
-                whitePlayer = g.WhitePlayerName,
-                redPlayer = g.RedPlayerName,
-                currentPlayer = g.Engine.CurrentPlayer?.Color.ToString() ?? "Unknown",
-                whitePipCount = state.WhitePipCount,
-                redPipCount = state.RedPipCount,
-                status = state.Status.ToString(),
-                spectatorCount = g.SpectatorConnections.Count
-            };
+            gameId = g.GameId,
+            whitePlayer = g.WhitePlayerName,
+            redPlayer = g.RedPlayerName,
+            currentPlayer = g.CurrentPlayer ?? "Unknown",
+            status = g.Status
         })
         .ToList();
-
-    return botGames;
 }).RequireCors(selectedCorsPolicy);
 
 // Available bots endpoint - returns list of registered AI bots
@@ -1138,61 +1090,14 @@ app.MapGet("/api/themes/search", async (string q, IThemeRepository themeReposito
     return Results.Ok(themes);
 }).RequireCors(selectedCorsPolicy);
 
-// Cleanup background service for inactive games
+// Cleanup background service for stale DB records
 var cleanupTask = Task.Run(async () =>
 {
     while (true)
     {
         await Task.Delay(TimeSpan.FromMinutes(30));
 
-        var sessionManager = app.Services.GetRequiredService<IGameSessionManager>();
         var gameRepository = app.Services.GetRequiredService<IGameRepository>();
-
-        // Remove completed games from memory after 5 minutes
-        var allGames = sessionManager.GetAllGames();
-        var completedGamesCutoff = DateTime.UtcNow - TimeSpan.FromMinutes(5);
-        var completedGames = allGames
-            .Where(g => g.Engine.Winner != null && g.LastActivityAt < completedGamesCutoff)
-            .ToList();
-
-        foreach (var game in completedGames)
-        {
-            try
-            {
-                // Completed game already saved to DB, just remove from memory
-                sessionManager.RemoveGame(game.Id);
-
-                Console.WriteLine($"[Cleanup] Removed completed game {game.Id} from memory (winner: {game.Engine.Winner?.Name})");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Cleanup] Failed to remove completed game {game.Id}: {ex.Message}");
-            }
-        }
-
-        // Evict from memory after 6 hours of inactivity (but keep in DB as "InProgress")
-        var evictionCutoff = DateTime.UtcNow - TimeSpan.FromHours(6);
-        var inactiveGames = allGames
-            .Where(g => g.LastActivityAt < evictionCutoff && g.Engine.Winner == null)
-            .ToList();
-
-        foreach (var game in inactiveGames)
-        {
-            try
-            {
-                // Save current state before eviction
-                await gameRepository.SaveGameAsync(GameEngineMapper.ToGame(game));
-
-                // Remove from memory (status stays "InProgress" in DB!)
-                sessionManager.RemoveGame(game.Id);
-
-                Console.WriteLine($"[Cleanup] Evicted game {game.Id} from memory (still resumable in DB)");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[Cleanup] Failed to evict game {game.Id}: {ex.Message}");
-            }
-        }
 
         // True abandonment: 90 days without activity
         var abandonmentCutoff = DateTime.UtcNow - TimeSpan.FromDays(90);
@@ -1214,105 +1119,6 @@ var cleanupTask = Task.Run(async () =>
 });
 
 app.Run();
-
-// Helper method to ensure DynamoDB table exists (local development only)
-static async Task EnsureTableExistsAsync(Amazon.DynamoDBv2.IAmazonDynamoDB dynamoDb, string tableName)
-{
-    try
-    {
-        // Check if table exists
-        await dynamoDb.DescribeTableAsync(tableName);
-        Console.WriteLine($"Table '{tableName}' already exists");
-        return;
-    }
-    catch (Amazon.DynamoDBv2.Model.ResourceNotFoundException)
-    {
-        Console.WriteLine($"Table '{tableName}' not found, creating...");
-    }
-
-    // Create table with single-table design
-    var request = new Amazon.DynamoDBv2.Model.CreateTableRequest
-    {
-        TableName = tableName,
-        KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
-        {
-            new() { AttributeName = "PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
-            new() { AttributeName = "SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
-        },
-        AttributeDefinitions = new List<Amazon.DynamoDBv2.Model.AttributeDefinition>
-        {
-            new() { AttributeName = "PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI1PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI1SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI2PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI2SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI3PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI3SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI4PK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S },
-            new() { AttributeName = "GSI4SK", AttributeType = Amazon.DynamoDBv2.ScalarAttributeType.S }
-        },
-        BillingMode = Amazon.DynamoDBv2.BillingMode.PAY_PER_REQUEST,
-        GlobalSecondaryIndexes = new List<Amazon.DynamoDBv2.Model.GlobalSecondaryIndex>
-        {
-            new()
-            {
-                IndexName = "GSI1",
-                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
-                {
-                    new() { AttributeName = "GSI1PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
-                    new() { AttributeName = "GSI1SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
-                },
-                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
-            },
-            new()
-            {
-                IndexName = "GSI2",
-                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
-                {
-                    new() { AttributeName = "GSI2PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
-                    new() { AttributeName = "GSI2SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
-                },
-                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
-            },
-            new()
-            {
-                IndexName = "GSI3",
-                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
-                {
-                    new() { AttributeName = "GSI3PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
-                    new() { AttributeName = "GSI3SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
-                },
-                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
-            },
-            new()
-            {
-                IndexName = "GSI4",
-                KeySchema = new List<Amazon.DynamoDBv2.Model.KeySchemaElement>
-                {
-                    new() { AttributeName = "GSI4PK", KeyType = Amazon.DynamoDBv2.KeyType.HASH },
-                    new() { AttributeName = "GSI4SK", KeyType = Amazon.DynamoDBv2.KeyType.RANGE }
-                },
-                Projection = new Amazon.DynamoDBv2.Model.Projection { ProjectionType = Amazon.DynamoDBv2.ProjectionType.ALL }
-            }
-        }
-    };
-
-    await dynamoDb.CreateTableAsync(request);
-    Console.WriteLine($"Table '{tableName}' created successfully");
-
-    // Wait for table to become active
-    for (int i = 0; i < 30; i++)
-    {
-        await Task.Delay(1000);
-        var response = await dynamoDb.DescribeTableAsync(tableName);
-        if (response.Table.TableStatus == Amazon.DynamoDBv2.TableStatus.ACTIVE)
-        {
-            Console.WriteLine($"Table '{tableName}' is now active");
-            return;
-        }
-    }
-}
 
 // Expose Program class for integration testing
 public partial class Program

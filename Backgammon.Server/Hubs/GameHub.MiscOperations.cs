@@ -116,7 +116,7 @@ public partial class GameHub
             // For friend matches, notify the friend if they're online
             if (config.OpponentType == "Friend"
                 && !string.IsNullOrEmpty(config.OpponentId)
-                && _sessionManager.IsPlayerOnline(config.OpponentId))
+                && !string.IsNullOrEmpty(GetPlayerConnection(config.OpponentId)))
             {
                 var opponentConnection = GetPlayerConnection(config.OpponentId);
                 if (!string.IsNullOrEmpty(opponentConnection))
@@ -153,7 +153,7 @@ public partial class GameHub
             await _correspondenceGameService.HandleTurnCompletedAsync(matchId, nextPlayerId);
 
             // Notify next player if they're online
-            if (_sessionManager.IsPlayerOnline(nextPlayerId))
+            if (!string.IsNullOrEmpty(GetPlayerConnection(nextPlayerId)))
             {
                 var nextPlayerConnection = GetPlayerConnection(nextPlayerId);
                 if (!string.IsNullOrEmpty(nextPlayerConnection))

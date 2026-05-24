@@ -1,23 +1,21 @@
-using Backgammon.Core;
 using Backgammon.Server.Configuration;
-using Backgammon.Server.Hubs;
-using Backgammon.Server.Hubs.Interfaces;
-using Microsoft.AspNetCore.SignalR;
+using Backgammon.Server.Grains.Interfaces;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans;
 
 namespace Backgammon.Server.Services;
 
 /// <summary>
 /// Background service that manages always-running bot vs bot games.
 /// Maintains 1-2 bot games at all times, cycling through different AI matchups.
+/// Game state is managed by Orleans grains — this service only creates and monitors games.
 /// </summary>
 public class BotGameService : BackgroundService
 {
-    private readonly IGameSessionManager _sessionManager;
+    private readonly IGrainFactory _grainFactory;
     private readonly IAiMoveService _aiMoveService;
-    private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly IOptions<FeatureFlags> _features;
     private readonly ILogger<BotGameService> _logger;
 
@@ -26,30 +24,25 @@ public class BotGameService : BackgroundService
     {
         ("greedy", "greedy"),  // Greedy vs Greedy
         ("greedy", "random"),  // Greedy vs Random
-        ("random", "random") // Random vs Random
+        ("random", "random")   // Random vs Random
     };
 
-    // Track active bot game IDs
-    private readonly List<string> _activeBotGameIds = new();
     private int _currentMatchupIndex = 0;
 
     public BotGameService(
-        IGameSessionManager sessionManager,
+        IGrainFactory grainFactory,
         IAiMoveService aiMoveService,
-        IHubContext<GameHub, IGameHubClient> hubContext,
         IOptions<FeatureFlags> features,
         ILogger<BotGameService> logger)
     {
-        _sessionManager = sessionManager;
+        _grainFactory = grainFactory;
         _aiMoveService = aiMoveService;
-        _hubContext = hubContext;
         _features = features;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // Check if bot games are enabled
         if (!_features.Value.BotGamesEnabled)
         {
             _logger.LogInformation("Bot games disabled via feature flag (BotGamesEnabled=false)");
@@ -65,15 +58,13 @@ public class BotGameService : BackgroundService
         for (int i = 0; i < _features.Value.MaxBotGames; i++)
         {
             await StartBotGameAsync(stoppingToken);
-            // Small delay between starting games to avoid simultaneous initialization
             await Task.Delay(500, stoppingToken);
         }
 
-        // Keep service running (games manage themselves via autonomous loops)
+        // Keep service running (games manage themselves via grain timers)
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-            _logger.LogDebug("Bot game service heartbeat. Active games: {Count}", _activeBotGameIds.Count);
         }
 
         _logger.LogInformation("Bot game service stopping");
@@ -83,37 +74,34 @@ public class BotGameService : BackgroundService
     {
         try
         {
-            // Select next matchup
             var (white, red) = _matchups[_currentMatchupIndex];
-            var whiteAi = white;
-            var redAi = red;
             _currentMatchupIndex = (_currentMatchupIndex + 1) % _matchups.Length;
 
-            // Create game session
-            var session = _sessionManager.CreateGame();
-            session.IsBotGame = true;
+            var gameId = Guid.NewGuid().ToString();
+            var grain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
-            // Add AI players
-            var whitePlayerId = _aiMoveService.GenerateAiPlayerId(whiteAi);
-            var redPlayerId = _aiMoveService.GenerateAiPlayerId(redAi);
+            var whitePlayerId = _aiMoveService.GenerateAiPlayerId(white);
+            var redPlayerId = _aiMoveService.GenerateAiPlayerId(red);
+            var whiteName = GetBotName(white, "White");
+            var redName = GetBotName(red, "Red");
 
-            session.AddPlayer(whitePlayerId, string.Empty);  // Empty connection ID for bots
-            session.AddPlayer(redPlayerId, string.Empty);
+            // Configure the game as a bot game (unrated, no match context)
+            await grain.SetAiGameAsync(isBotGame: true);
+            await grain.SetWhitePlayerAsync(whitePlayerId, whiteName);
+            await grain.SetRedPlayerAsync(redPlayerId, redName);
 
-            // Set friendly names
-            session.SetPlayerName(whitePlayerId, GetBotName(whiteAi, "White"));
-            session.SetPlayerName(redPlayerId, GetBotName(redAi, "Red"));
-
-            _activeBotGameIds.Add(session.Id);
+            // Join both AI players with empty connection IDs — grain handles AI execution internally
+            await grain.JoinAsync(whitePlayerId, string.Empty, whiteName);
+            await grain.JoinAsync(redPlayerId, string.Empty, redName);
 
             _logger.LogInformation(
                 "Started bot game {GameId}: {White} vs {Red}",
-                session.Id,
-                session.WhitePlayerName,
-                session.RedPlayerName);
+                gameId,
+                whiteName,
+                redName);
 
-            // Start autonomous game loop (non-blocking)
-            _ = Task.Run(() => ExecuteBotGameLoopAsync(session, ct), ct);
+            // Monitor game completion in background and restart when done
+            _ = Task.Run(() => MonitorBotGameAsync(gameId, ct), ct);
         }
         catch (Exception ex)
         {
@@ -121,75 +109,28 @@ public class BotGameService : BackgroundService
         }
     }
 
-    private async Task ExecuteBotGameLoopAsync(GameSession session, CancellationToken ct)
+    private async Task MonitorBotGameAsync(string gameId, CancellationToken ct)
     {
         try
         {
-            var engine = session.Engine;
+            var grain = _grainFactory.GetGrain<IGameGrain>(gameId);
 
-            _logger.LogInformation("Bot game loop started for {GameId}", session.Id);
-
-            // Game loop - alternate turns between AI players
-            while (!engine.GameOver && !ct.IsCancellationRequested)
+            // Poll until game is no longer in progress
+            while (!ct.IsCancellationRequested)
             {
-                var currentPlayerId = engine.CurrentPlayer.Color == CheckerColor.White
-                    ? session.WhitePlayerId
-                    : session.RedPlayerId;
-
-                if (currentPlayerId == null)
+                await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                var status = await grain.GetStatusAsync();
+                if (status == Models.SessionStatus.Completed)
                 {
-                    _logger.LogError("Current player ID is null in bot game {GameId}", session.Id);
+                    _logger.LogInformation("Bot game {GameId} completed", gameId);
                     break;
                 }
-
-                // Execute AI turn with spectator broadcasting
-                await _aiMoveService.ExecuteAiTurnAsync(session, currentPlayerId, async () =>
-                {
-                    // Broadcast to all spectators
-                    var state = session.GetState(null);  // null = spectator view
-                    foreach (var spectatorId in session.SpectatorConnections)
-                    {
-                        await _hubContext.Clients.Client(spectatorId).GameUpdate(state);
-                    }
-                });
             }
 
-            // Game over
-            var winner = engine.Winner;
-            if (winner != null)
-            {
-                var winnerName = winner.Color == CheckerColor.White ? session.WhitePlayerName : session.RedPlayerName;
-                var stakes = engine.GetGameResult();
+            // Wait before restarting to allow spectators to see results
+            var delayMs = _features.Value.BotGameRestartDelaySeconds * 1000;
+            await Task.Delay(delayMs, ct);
 
-                _logger.LogInformation(
-                    "Bot game {GameId} completed. Winner: {Winner} (Stakes: {Stakes})",
-                    session.Id,
-                    winnerName,
-                    stakes);
-
-                // Broadcast final state to spectators
-                var finalState = session.GetState(null);
-                foreach (var spectatorId in session.SpectatorConnections)
-                {
-                    await _hubContext.Clients.Client(spectatorId).GameOver(finalState);
-                }
-
-                // Wait before restarting (allow spectators to see results)
-                var delayMs = _features.Value.BotGameRestartDelaySeconds * 1000;
-                _logger.LogInformation("Waiting {Delay}ms before restarting bot game {GameId}", delayMs, session.Id);
-                await Task.Delay(delayMs, ct);
-            }
-            else
-            {
-                _logger.LogWarning("Bot game {GameId} ended without winner (cancelled?)", session.Id);
-            }
-
-            // Cleanup
-            _activeBotGameIds.Remove(session.Id);
-            _sessionManager.RemoveGame(session.Id);
-            _logger.LogInformation("Bot game {GameId} cleaned up", session.Id);
-
-            // Start new bot game (if not cancelled)
             if (!ct.IsCancellationRequested)
             {
                 await StartBotGameAsync(ct);
@@ -197,23 +138,15 @@ public class BotGameService : BackgroundService
         }
         catch (OperationCanceledException)
         {
-            _logger.LogInformation("Bot game loop cancelled for {GameId}", session.Id);
-            // Cleanup on cancellation
-            _activeBotGameIds.Remove(session.Id);
-            _sessionManager.RemoveGame(session.Id);
+            _logger.LogInformation("Bot game monitor cancelled for {GameId}", gameId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in bot game loop for {GameId}", session.Id);
-            // Cleanup on error
-            _activeBotGameIds.Remove(session.Id);
-            _sessionManager.RemoveGame(session.Id);
+            _logger.LogError(ex, "Error monitoring bot game {GameId}", gameId);
 
-            // Attempt to restart if not cancelled
             if (!ct.IsCancellationRequested)
             {
-                _logger.LogInformation("Attempting to restart bot game after error");
-                await Task.Delay(5000, ct);  // Wait 5 seconds before retry
+                await Task.Delay(5000, ct);
                 await StartBotGameAsync(ct);
             }
         }

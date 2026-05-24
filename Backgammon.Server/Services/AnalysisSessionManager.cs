@@ -6,7 +6,7 @@ namespace Backgammon.Server.Services;
 /// Manages analysis sessions. Unlike GameSessionManager, this handles
 /// single-user analysis sessions that are ephemeral and not persisted.
 /// </summary>
-public class AnalysisSessionManager
+public class AnalysisSessionManager : IAnalysisSessionManager
 {
     /// <summary>
     /// Default timeout for inactive analysis sessions (30 minutes).

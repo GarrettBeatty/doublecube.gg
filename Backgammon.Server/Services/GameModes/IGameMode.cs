@@ -6,22 +6,17 @@ namespace Backgammon.Server.Services.GameModes;
 public interface IGameMode
 {
     /// <summary>
-    /// Whether this mode should track player statistics
+    /// Whether this mode should track player statistics.
     /// </summary>
     bool ShouldTrackStats { get; }
 
     /// <summary>
-    /// Whether this mode should persist games to the database
+    /// Whether this mode should persist games to the database.
     /// </summary>
     bool ShouldPersist { get; }
 
     /// <summary>
-    /// Determines if the given connection has control in the current game state
-    /// </summary>
-    bool IsPlayerTurn(string connectionId, GameSession session);
-
-    /// <summary>
-    /// Get UI features available in this mode
+    /// Get UI features available in this mode.
     /// </summary>
     GameModeFeatures GetFeatures();
 }

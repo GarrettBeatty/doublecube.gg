@@ -1,3 +1,4 @@
+using Backgammon.Core;
 using Backgammon.Server.Models;
 
 namespace Backgammon.Server.Services;
@@ -12,8 +13,12 @@ public interface IChatService
     /// Messages are validated for length (max 500 chars), rate limited (10/min), and sanitized.
     /// </summary>
     /// <param name="connectionId">The SignalR connection ID of the sender.</param>
+    /// <param name="gameId">The game ID (used as the SignalR group name).</param>
+    /// <param name="matchId">Optional match ID for persistent chat storage.</param>
+    /// <param name="senderName">Display name of the sender.</param>
+    /// <param name="senderColor">The sender's checker color.</param>
     /// <param name="message">The message to send.</param>
-    Task SendChatMessageAsync(string connectionId, string message);
+    Task SendChatMessageAsync(string connectionId, string gameId, string? matchId, string senderName, CheckerColor senderColor, string message);
 
     /// <summary>
     /// Cleans up rate limit history for a disconnected connection.

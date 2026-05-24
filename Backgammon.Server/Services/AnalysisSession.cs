@@ -10,7 +10,7 @@ namespace Backgammon.Server.Services;
 /// Unlike GameSession, this is a lightweight session for position analysis
 /// where one user controls both sides of the board.
 /// </summary>
-public class AnalysisSession : IGameSession
+public class AnalysisSession
 {
     private readonly HashSet<string> _connections = new();
     private readonly SemaphoreSlim _gameActionLock = new(1, 1);

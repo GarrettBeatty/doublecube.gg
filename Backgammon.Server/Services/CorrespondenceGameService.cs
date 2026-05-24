@@ -10,7 +10,6 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 {
     private readonly IMatchRepository _matchRepository;
     private readonly IGameRepository _gameRepository;
-    private readonly IGameSessionManager _gameSessionManager;
     private readonly IUserRepository _userRepository;
     private readonly IPlayerStatsService _playerStatsService;
     private readonly ILogger<CorrespondenceGameService> _logger;
@@ -18,14 +17,12 @@ public class CorrespondenceGameService : ICorrespondenceGameService
     public CorrespondenceGameService(
         IMatchRepository matchRepository,
         IGameRepository gameRepository,
-        IGameSessionManager gameSessionManager,
         IUserRepository userRepository,
         IPlayerStatsService playerStatsService,
         ILogger<CorrespondenceGameService> logger)
     {
         _matchRepository = matchRepository;
         _gameRepository = gameRepository;
-        _gameSessionManager = gameSessionManager;
         _userRepository = userRepository;
         _playerStatsService = playerStatsService;
         _logger = logger;
@@ -195,20 +192,6 @@ public class CorrespondenceGameService : ICorrespondenceGameService
             match.LastUpdatedAt = DateTime.UtcNow;
             await _matchRepository.UpdateMatchAsync(match);
 
-            // Create game session (for state management, though players may not be connected yet)
-            var session = _gameSessionManager.CreateGame(game.GameId);
-            session.WhitePlayerName = match.Player1Name;
-            session.RedPlayerName = match.Player2Name ?? "Waiting...";
-            session.MatchId = match.MatchId;
-            session.TargetScore = match.TargetScore;
-            session.Player1Score = match.Player1Score;
-            session.Player2Score = match.Player2Score;
-            session.IsCrawfordGame = match.IsCrawfordGame;
-            session.IsRated = isRated;
-            session.IsCorrespondence = true;
-            session.TimePerMoveDays = match.TimePerMoveDays;
-            session.TurnDeadline = match.TurnDeadline;
-
             _logger.LogInformation(
                 "Created first game {GameId} for correspondence match {MatchId}",
                 game.GameId,
@@ -337,7 +320,7 @@ public class CorrespondenceGameService : ICorrespondenceGameService
 
             // For correspondence games, we don't set CurrentTurnPlayerId during initialization
             // because both players need to roll opening dice. The turn tracking will be set
-            // properly after the opening roll completes in GameActionOrchestrator.
+            // properly after the opening roll completes in the game grain.
             // We just set the deadline for the opening roll phase.
 
             var turnDeadline = DateTime.UtcNow.AddDays(match.TimePerMoveDays);

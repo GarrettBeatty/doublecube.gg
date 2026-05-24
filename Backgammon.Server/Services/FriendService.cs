@@ -15,7 +15,7 @@ public class FriendService : IFriendService
 {
     private readonly IFriendshipRepository _friendshipRepository;
     private readonly IUserRepository _userRepository;
-    private readonly IGameSessionManager _sessionManager;
+    private readonly IPlayerConnectionService _playerConnectionService;
     private readonly IHubContext<GameHub, IGameHubClient> _hubContext;
     private readonly HybridCache _cache;
     private readonly CacheSettings _cacheSettings;
@@ -24,7 +24,7 @@ public class FriendService : IFriendService
     public FriendService(
         IFriendshipRepository friendshipRepository,
         IUserRepository userRepository,
-        IGameSessionManager sessionManager,
+        IPlayerConnectionService playerConnectionService,
         IHubContext<GameHub, IGameHubClient> hubContext,
         HybridCache cache,
         CacheSettings cacheSettings,
@@ -32,7 +32,7 @@ public class FriendService : IFriendService
     {
         _friendshipRepository = friendshipRepository;
         _userRepository = userRepository;
-        _sessionManager = sessionManager;
+        _playerConnectionService = playerConnectionService;
         _hubContext = hubContext;
         _cache = cache;
         _cacheSettings = cacheSettings;
@@ -264,7 +264,7 @@ public class FriendService : IFriendService
             {
                 // Check if friend is online by looking for active game sessions
                 // Note: Online status is not cached as it changes frequently
-                var isOnline = _sessionManager.IsPlayerOnline(friendship.FriendUserId);
+                var isOnline = _playerConnectionService.IsPlayerConnected(friendship.FriendUserId);
 
                 result.Add(new FriendDto
                 {
@@ -300,7 +300,7 @@ public class FriendService : IFriendService
                     UserId = request.FriendUserId,
                     Username = request.FriendUsername,
                     DisplayName = request.FriendDisplayName,
-                    IsOnline = _sessionManager.IsPlayerOnline(request.FriendUserId),
+                    IsOnline = _playerConnectionService.IsPlayerConnected(request.FriendUserId),
                     Status = request.Status,
                     InitiatedBy = request.InitiatedBy
                 });
@@ -323,18 +323,6 @@ public class FriendService : IFriendService
             if (!await _friendshipRepository.AreFriendsAsync(userId, friendUserId))
             {
                 return (false, "Not friends with this user");
-            }
-
-            // Verify the game exists and has room
-            var session = _sessionManager.GetSession(gameId);
-            if (session == null)
-            {
-                return (false, "Game not found");
-            }
-
-            if (session.IsFull)
-            {
-                return (false, "Game is full");
             }
 
             // Get user info for the notification

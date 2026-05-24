@@ -10,10 +10,7 @@ public class MatchService : IMatchService
 {
     private readonly IMatchRepository _matchRepository;
     private readonly IGameRepository _gameRepository;
-    private readonly IGameSessionManager _gameSessionManager;
-    private readonly IGameSessionFactory _sessionFactory;
     private readonly IUserRepository _userRepository;
-    private readonly IAiMoveService _aiMoveService;
     private readonly IAiPlayerManager _aiPlayerManager;
     private readonly ICorrespondenceGameService _correspondenceGameService;
     private readonly IChatService _chatService;
@@ -22,10 +19,7 @@ public class MatchService : IMatchService
     public MatchService(
         IMatchRepository matchRepository,
         IGameRepository gameRepository,
-        IGameSessionManager gameSessionManager,
-        IGameSessionFactory sessionFactory,
         IUserRepository userRepository,
-        IAiMoveService aiMoveService,
         IAiPlayerManager aiPlayerManager,
         ICorrespondenceGameService correspondenceGameService,
         IChatService chatService,
@@ -33,10 +27,7 @@ public class MatchService : IMatchService
     {
         _matchRepository = matchRepository;
         _gameRepository = gameRepository;
-        _gameSessionManager = gameSessionManager;
-        _sessionFactory = sessionFactory;
         _userRepository = userRepository;
-        _aiMoveService = aiMoveService;
         _aiPlayerManager = aiPlayerManager;
         _correspondenceGameService = correspondenceGameService;
         _chatService = chatService;
@@ -162,10 +153,6 @@ public class MatchService : IMatchService
             // Update in-memory state to match what's in DB
             match.CurrentGameId = game.GameId;
 
-            // Create game session using factory
-            // Factory now sets player IDs from match (Player1 = White, Player2 = Red)
-            var session = _sessionFactory.CreateMatchGameSession(match, game.GameId);
-
             _logger.LogInformation(
                 "Created first game {GameId} for match {MatchId}",
                 game.GameId,
@@ -228,9 +215,6 @@ public class MatchService : IMatchService
 
             // Update match with new game
             await _matchRepository.AddGameToMatchAsync(matchId, gameId);
-
-            // Create game session using factory
-            var session = _sessionFactory.CreateMatchGameSession(match, gameId);
 
             return game;
         }
