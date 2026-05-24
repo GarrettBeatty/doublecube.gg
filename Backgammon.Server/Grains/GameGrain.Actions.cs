@@ -55,9 +55,12 @@ public partial class GameGrain
                 _engine.StartTurnTimer();
                 StartTimeUpdates();
 
-                // Update correspondence turn tracking
+                // Update correspondence turn tracking. MatchGrain noops if the match
+                // isn't actually correspondence — no need to gate here on the GameGrain
+                // mirror of _isCorrespondence (which may not yet be populated on first
+                // activation if the game was created post-Phase-4b but loaded from DB).
                 var firstPlayerId = GetCurrentPlayerId();
-                if (!string.IsNullOrEmpty(_matchId) && !string.IsNullOrEmpty(firstPlayerId) && _isCorrespondence)
+                if (!string.IsNullOrEmpty(_matchId) && !string.IsNullOrEmpty(firstPlayerId))
                 {
                     var capturedMatchId = _matchId;
                     var capturedPlayerId = firstPlayerId;
@@ -222,16 +225,21 @@ public partial class GameGrain
         await SaveGameAsync();
         await BroadcastGameUpdateAsync();
 
-        // Correspondence turn tracking
-        if (!string.IsNullOrEmpty(_matchId) && _isCorrespondence)
+        // Correspondence turn tracking. MatchGrain decides whether to act; we always
+        // forward end-of-turn for match games and keep our local deadline mirror fresh
+        // when the match is correspondence (so the client state DTO stays current
+        // without waiting for the next round-trip from MatchGrain).
+        if (!string.IsNullOrEmpty(_matchId))
         {
-            var newDeadline = DateTime.UtcNow.AddDays(_timePerMoveDays ?? 3);
-            _turnDeadline = newDeadline;
-
             var capturedMatchId = _matchId;
             var capturedNextPlayerId = GetCurrentPlayerId();
             if (!string.IsNullOrEmpty(capturedNextPlayerId))
             {
+                if (_isCorrespondence)
+                {
+                    _turnDeadline = DateTime.UtcNow.AddDays(_timePerMoveDays ?? 3);
+                }
+
                 BackgroundTaskHelper.FireAndForget(async () =>
                 {
                     var matchGrain = GrainFactory.GetGrain<IMatchGrain>(capturedMatchId);

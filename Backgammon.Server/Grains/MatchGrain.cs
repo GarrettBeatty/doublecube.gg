@@ -658,6 +658,18 @@ public class MatchGrain : Grain, IMatchGrain
             timedOutPlayerId);
     }
 
+    /// <inheritdoc/>
+    public Task<MatchCorrespondenceInfo> GetCorrespondenceInfoAsync()
+    {
+        var s = _state.State;
+        return Task.FromResult(new MatchCorrespondenceInfo
+        {
+            IsCorrespondence = s.IsCorrespondence,
+            TimePerMoveDays = s.TimePerMoveDays,
+            TurnDeadline = s.TurnDeadline,
+        });
+    }
+
     // ==================== Connection tracking (ephemeral) ====================
 
     /// <inheritdoc/>

@@ -130,13 +130,26 @@ public partial class GameGrain : Grain, IGameGrain
                 if (game != null && game.Status == "InProgress")
                 {
                     LoadFromGame(game);
+
+                    // The Game record doesn't carry correspondence flags; fetch from the
+                    // owning MatchGrain so the client state DTO and correspondence callbacks
+                    // see the right values on the very first activation.
+                    if (!string.IsNullOrEmpty(_matchId))
+                    {
+                        var info = await GrainFactory.GetGrain<IMatchGrain>(_matchId).GetCorrespondenceInfoAsync();
+                        _isCorrespondence = info.IsCorrespondence;
+                        _timePerMoveDays = info.TimePerMoveDays > 0 ? info.TimePerMoveDays : null;
+                        _turnDeadline = info.TurnDeadline;
+                    }
+
                     CaptureToState();
                     await _state.WriteStateAsync();
                     _logger.LogInformation(
-                        "GameGrain {GameId} restored from DB (migrated to Orleans state): White={White}, Red={Red}",
+                        "GameGrain {GameId} restored from DB (migrated to Orleans state): White={White}, Red={Red}, Correspondence={IsCorr}",
                         gameId,
                         _whitePlayerId,
-                        _redPlayerId);
+                        _redPlayerId,
+                        _isCorrespondence);
                 }
             }
             catch (Exception ex)

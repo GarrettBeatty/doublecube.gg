@@ -65,6 +65,12 @@ public interface IMatchGrain : IGrainWithStringKey
     /// </summary>
     Task HandleTimeoutAsync();
 
+    /// <summary>
+    /// Get correspondence-specific state for the match. Returned values are zero/false
+    /// for non-correspondence matches.
+    /// </summary>
+    Task<MatchCorrespondenceInfo> GetCorrespondenceInfoAsync();
+
     // ==================== Connection tracking (in-memory) ====================
 
     /// <summary>Get the current game ID for this match.</summary>
