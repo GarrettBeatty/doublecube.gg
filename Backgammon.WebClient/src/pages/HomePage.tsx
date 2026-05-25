@@ -21,7 +21,6 @@ import { Footer } from '@/components/home/Footer'
 
 export function HomePage() {
   const navigate = useNavigate()
-  const { onPlayChoice } = usePlayActions()
   const { yourTurnGames, waitingGames, totalYourTurn: corrYourTurn } = useCorrespondenceGames()
   const { games: liveGames, yourTurnCount: liveYourTurn } = useActiveGames()
 
