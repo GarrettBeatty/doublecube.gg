@@ -59,7 +59,6 @@ doublecube.gg/
 │   └── HeuristicEvaluator.cs   # Built-in heuristic evaluator
 ├── Backgammon.Plugins/         # Plugin system for bots and evaluators
 ├── Backgammon.Tests/           # xUnit test project
-├── Backgammon.IntegrationTests/ # Integration tests
 ├── infra/                      # AWS CDK infrastructure
 ├── documentation/              # Docusaurus documentation site
 └── docs/                       # Additional documentation

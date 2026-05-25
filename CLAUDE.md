@@ -119,7 +119,7 @@ dotnet test
 # Run tests with detailed output
 dotnet test --verbosity normal
 
-# Run with Aspire (all-in-one: DynamoDB Local + Redis + Backend + Frontend)
+# Run with Aspire (all-in-one: Postgres + Redis + Backend + Frontend)
 cd Backgammon.AppHost && dotnet run
 
 # Run console game
@@ -146,49 +146,56 @@ pnpm docs:build                                # Build docs for production
 
 - **Backgammon.Core** - Pure game logic library (no dependencies). Contains `GameEngine`, `Board`, `Player`, `Dice`, `Move`, `DoublingCube`, `Match`, `GameHistory`, `TurnSnapshot`.
 - **Backgammon.Console** - Text-based UI using Spectre.Console
-- **Backgammon.Server** - SignalR multiplayer server with DynamoDB persistence. Contains `GameHub`, `GameSession`, `GameSessionManager`, `MatchService`, `EloRatingService`, `CorrespondenceGameService`, `DailyPuzzleService`, `ChatService`, `AnalysisService`.
+- **Backgammon.Server** - SignalR multiplayer server. State lives in Orleans grains (`GameGrain`, `MatchGrain`, `PresenceGrain`, `MatchChatGrain`, `AnalysisSessionGrain`) with grain state persisted to Postgres via Orleans AdoNet. `GameHub` is a thin dispatch layer over the grains. Postgres also stores game history / users / friendships via the `Postgres*Repository` classes. Remaining services include `MatchService` (read-only query facade), `EloRatingService`, `DailyPuzzleService`, `AnalysisService`.
 - **Backgammon.WebClient** - React + TypeScript + Vite frontend with real-time SignalR communication. Uses shadcn/ui, TailwindCSS, Zustand for state management.
 - **Backgammon.AI** - Pluggable AI framework. Implements `IBackgammonAI` interface with `RandomAI`, `GreedyAI`, and heuristic-based bots.
 - **Backgammon.Analysis** - Position evaluation and analysis. Integrates with GNU Backgammon (`GnubgEvaluator`) and provides `HeuristicEvaluator`.
 - **Backgammon.Plugins** - Plugin registry for bots and evaluators. Provides `IPluginRegistry`, `BotMetadata`, `EvaluatorMetadata`.
-- **Backgammon.AppHost** - .NET Aspire orchestrator (manages DynamoDB Local, Redis, services)
+- **Backgammon.AppHost** - .NET Aspire orchestrator (manages Postgres, Redis, services)
 - **Backgammon.ServiceDefaults** - Shared Aspire configuration for observability and health checks
 - **Backgammon.Tests** - xUnit test project
-- **Backgammon.IntegrationTests** - Integration test suite
 
-## Database: DynamoDB
+## Persistence: Postgres + Orleans Grain State
 
-The application uses **AWS DynamoDB** with a **single-table design** pattern for optimal performance and cost-efficiency.
+The server uses **Postgres** for both EF Core domain persistence and Orleans grain state, plus **Redis** for caching and the SignalR backplane.
 
 ### Local Development
-- DynamoDB Local runs in a Docker container via Aspire
-- Table auto-created on startup by `DynamoDbInitializer`
-- Connection: http://localhost:8000
-- Table name: `backgammon-local`
+- Postgres + Redis run in Docker containers managed by Aspire
+- EF Core migrations live under `Backgammon.Server/Data/Migrations` (`BackgammonDbContext`)
+- Orleans schema (`OrleansQuery`, `OrleansStorage`) is bootstrapped at startup by `OrleansSchemaInitializer.EnsureSchemaAsync` from embedded SQL under `Backgammon.Server/Data/OrleansSchema/`
+- Same Postgres instance backs both EF Core and Orleans AdoNet grain storage
 
-### Single-Table Design
-All entities stored in one table with composite PK/SK:
-- **Users**: `PK=USER#{userId}`, `SK=PROFILE`
-- **Games**: `PK=GAME#{gameId}`, `SK=METADATA`
-- **Player-Game Index**: `PK=USER#{playerId}`, `SK=GAME#{reversedTimestamp}#{gameId}`
-- **Matches**: `PK=MATCH#{matchId}`, `SK=METADATA`
-- **Player-Match Index**: `PK=USER#{playerId}`, `SK=MATCH#{reversedTimestamp}#{matchId}`
-- **Friendships**: `PK=USER#{userId}`, `SK=FRIEND#{status}#{friendUserId}`
-- **Themes**: `PK=THEME#{themeId}`, `SK=PROFILE`
-- **Puzzles**: `PK=PUZZLE#{puzzleId}`, `SK=METADATA`
-- **Match Chat**: `PK=MATCH#{matchId}`, `SK=MESSAGE#{timestamp}#{messageId}`
+### Repositories (Postgres via EF Core)
+All under `Backgammon.Server/Services/Postgres/`:
+- `PostgresUserRepository`
+- `PostgresGameRepository` — game history
+- `PostgresMatchRepository` — match records
+- `PostgresFriendshipRepository`
+- `PostgresPuzzleRepository`
+- `PostgresThemeRepository`
 
-### Global Secondary Indexes (GSIs)
-1. **GSI1**: Username lookups - `GSI1PK=USERNAME#{normalized}`, `GSI1SK=PROFILE`
-2. **GSI2**: Email lookups - `GSI2PK=EMAIL#{normalized}`, `GSI2SK=PROFILE`
-3. **GSI3**: Game/Match status queries - `GSI3PK=GAME_STATUS#{status}`, `GSI3SK={timestamp}`
-4. **GSI4**: Correspondence "My Turn" index - `GSI4PK=PLAYER#{playerId}`, `GSI4SK=CORRESPONDENCE#{reversed_timestamp}`
+### Orleans Grain Storage
+- `IPersistentState<TState>` with `AddAdoNetGrainStorageAsDefault` (Invariant: `Npgsql`)
+- Grain state types are `[GenerateSerializer]`-decorated with `[Id(N)]` on every field (runtime-validated — see [Orleans serializer note](#))
+- `PubSubStore` (for Orleans Streams) is in-memory; Streams aren't currently used
 
-### AWS Production Deployment
+### Production Deployment
 - Deployed to AWS Lightsail Instance running `docker-compose` (see `DEPLOYMENT.md`)
 - Images published to GitHub Container Registry (`ghcr.io/garrettbeatty/backgammon-*`)
 - Postgres + Redis run as containers on the instance; data persists in Docker volumes
 - Snapshots scheduled via Lightsail console
+
+## Orleans Grains
+
+State and lifecycle that used to live in singleton services now live in Orleans grains. Hub methods dispatch into grains via `IGrainFactory`.
+
+- **`GameGrain`** (key = gameId) — owns the live `GameEngine` for an in-progress game. State persisted via `IPersistentState<GameGrainState>`. Self-healing fallback to `IGameRepository` for games created before grain-state migration.
+- **`MatchGrain`** (key = matchId) — owns match lifecycle (`CreateMatchAsync`, `CreateCorrespondenceMatchAsync`, `JoinAsync`, `EnsureNextGameAsync`, `CompleteGameAsync`, `AbandonAsync`) plus correspondence turn/timeout handling. State persisted via `IPersistentState<MatchGrainState>`. Dual-writes to `IMatchRepository` so HTTP query endpoints stay live.
+- **`PresenceGrain`** (well-known key = `"global"`) — owns presence (playerId↔connection set) and connection→game association. Ephemeral; no persisted state.
+- **`MatchChatGrain`** (key = matchId) — FIFO chat history (capped at 500) plus per-connection rate-limit timestamps. Replaces the old `ChatService` + `IMatchChatStorage`.
+- **`AnalysisSessionGrain`** (key = userId) — owns the user's analysis sessions and connection→session map. Single-threaded (grain serialization replaces the old `SemaphoreSlim`).
+
+Read-only query facades that still exist as services: `MatchService` (queries match data), `GameService`, `CorrespondenceGameService` (queries only — lifecycle moved into `MatchGrain`).
 
 ## Frontend Architecture (WebClient)
 
@@ -280,8 +287,9 @@ The application supports multi-game matches with proper match scoring and Crawfo
 - `MatchStatus` enum - InProgress, Completed, Abandoned
 
 **Server Layer** (`Backgammon.Server`):
-- `MatchService` - Orchestrates match lifecycle (create, start games, complete)
-- `DynamoDbMatchRepository` - Persists matches and games to DynamoDB
+- `MatchGrain` - Owns match lifecycle (create, join, start games, complete, abandon, correspondence turn handling). State via `IPersistentState<MatchGrainState>`.
+- `MatchService` - Read-only query facade over `IMatchRepository` (match lookups for HTTP endpoints; lifecycle lives on `MatchGrain`)
+- `PostgresMatchRepository` - Persists matches and games to Postgres (dual-written by `MatchGrain`)
 - `Match` (server model) - Wraps `Core.Match` with server metadata (lobby status, opponent type, duration)
 
 **Key Match Patterns**:
@@ -309,34 +317,11 @@ if (match.IsCrawfordGame) {
 
 The server supports **multiple browser tabs** per player in the same game:
 
-**GameSession Architecture:**
-- `_whiteConnections: HashSet<string>` - Tracks all White player's connections
-- `_redConnections: HashSet<string>` - Tracks all Red player's connections
-- `WhiteConnectionId` / `RedConnectionId` - Legacy properties (return first connection for backward compatibility)
-- `GetPlayerColor(connectionId)` - Checks if connection belongs to a player
-- `AddPlayer(playerId, connectionId)` - Adds connection to player's set (multiple connections allowed)
+- `PresenceGrain` tracks the set of connection IDs per player and the connection→game association
+- `GameGrain` broadcasts to all connections owned by each player, not just one
+- Reconnects: when a connection joins an in-progress game, the grain sends current state to the new connection only; new games broadcast `GameStart` to everyone
 
-**Broadcast Pattern:**
-All game update methods iterate through all connections:
-```csharp
-foreach (var connectionId in session.WhiteConnections)
-{
-    var state = session.GetState(connectionId);
-    await _hubContext.Clients.Client(connectionId).SendAsync("GameUpdate", state);
-}
-```
-
-**Reconnection Detection:**
-When a player joins an already-in-progress game:
-1. Check if `session.Engine.GameStarted` is true
-2. If yes → Reconnection → Send current state to new connection only
-3. If no → New game → Broadcast GameStart to all connections
-
-This allows players to:
-- Open same game in multiple tabs
-- Make moves from any tab
-- See real-time updates in all tabs
-- Seamlessly reconnect after network issues
+End result: players can open the same game in multiple tabs, make moves from any tab, see updates in all tabs, and reconnect after network issues without manual recovery.
 
 ### Board Representation
 - 24 points (positions 1-24) as `Point[]` array
@@ -395,7 +380,7 @@ The server implements an ELO-based rating system for player skill tracking:
 **Key Components:**
 - `EloRatingService` - Calculates rating changes after matches
 - `PlayerStatsService` - Tracks wins, losses, rating history
-- Rating stored per user in DynamoDB
+- Rating stored per user in Postgres
 
 **Rating Flow:**
 1. Match completes → `EloRatingService.CalculateNewRatings()`
@@ -427,15 +412,15 @@ See `docs/GNUBG_SETUP.md` for GNU Backgammon configuration.
 The server supports turn-based asynchronous games:
 
 **Key Components:**
-- `CorrespondenceGameService` - Manages correspondence match lifecycle
-- `CorrespondenceTimeoutService` - Background service checking for expired turns
-- `GSI4` - "My Turn" index for efficient turn-based queries
+- `MatchGrain.CreateCorrespondenceMatchAsync` / `HandleTurnCompletedAsync` / `HandleTimeoutAsync` - Lifecycle lives on the grain
+- `CorrespondenceGameService` - Read-only query facade ("my turn" / "waiting" lists)
+- `CorrespondenceTimeoutService` - Background service checking for expired turns (slated to move to an Orleans reminder in a future phase)
 
 **Flow:**
-1. Player creates correspondence match via `CreateCorrespondenceMatch()`
-2. Game state persisted to DynamoDB after each turn
+1. Player creates correspondence match via `CreateCorrespondenceMatch()` (dispatched to `MatchGrain`)
+2. Grain state + game state persisted via Orleans grain storage (AdoNet → Postgres) after each turn
 3. Opponent notified via `CorrespondenceTurnNotification` event
-4. `GetCorrespondenceGames()` returns games awaiting player's turn
+4. `GetCorrespondenceGames()` queries Postgres via `CorrespondenceGameService` to return games awaiting player's turn
 
 ## Daily Puzzle System
 
@@ -445,7 +430,7 @@ Daily puzzles using GNU Backgammon for position generation:
 - `DailyPuzzleService` - Retrieves/validates daily puzzles
 - `DailyPuzzleGenerationService` - Background service generating puzzles
 - `RandomPositionGenerator` - Creates random positions for evaluation
-- `DynamoDbPuzzleRepository` - Puzzle persistence
+- `PostgresPuzzleRepository` - Puzzle persistence
 
 **Puzzle Flow:**
 1. Background service generates puzzle at configured time

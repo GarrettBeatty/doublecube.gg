@@ -19,8 +19,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.AppHost", "Backg
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.ServiceDefaults", "Backgammon.ServiceDefaults\Backgammon.ServiceDefaults.csproj", "{928D9070-0F38-42C3-9F10-C8D28C3A2BD4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.IntegrationTests", "Backgammon.IntegrationTests\Backgammon.IntegrationTests.csproj", "{A1B2C3D4-1234-5678-ABCD-1234567890AB}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Analysis", "Backgammon.Analysis\Backgammon.Analysis.csproj", "{7FA25FCC-BF6D-4A0A-8DF3-CDB37C100186}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backgammon.Plugins", "Backgammon.Plugins\Backgammon.Plugins.csproj", "{93FE511F-FBDF-4830-91B8-174CAB292407}"

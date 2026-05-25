@@ -48,7 +48,6 @@ doublecube.gg/
 ├── Backgammon.Analysis/        # Position evaluation
 ├── Backgammon.Plugins/         # Plugin system for bots and evaluators
 ├── Backgammon.Tests/           # xUnit test project
-├── Backgammon.IntegrationTests/ # Integration tests
 └── documentation/              # This documentation site
 ```
 

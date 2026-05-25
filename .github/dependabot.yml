@@ -11,8 +11,6 @@ updates:
           - "*"
         exclude-patterns:
           - "*.Tests"
-          - "*.IntegrationTests"
       test-dependencies:
         patterns:
           - "*.Tests"
-          - "*.IntegrationTests"
