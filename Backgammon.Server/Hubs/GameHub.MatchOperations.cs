@@ -327,6 +327,23 @@ public partial class GameHub
                     }
                 }
 
+                var board = game.BoardState
+                    .Select(p => new
+                    {
+                        position = p.Position,
+                        color = p.Color,
+                        count = p.Count
+                    })
+                    .ToArray();
+
+                int[]? dice = null;
+                if (game.Die1 > 0 && game.Die2 > 0)
+                {
+                    dice = game.Die1 == game.Die2
+                        ? new[] { game.Die1, game.Die1, game.Die1, game.Die1 }
+                        : new[] { game.Die1, game.Die2 };
+                }
+
                 activeGames.Add(new
                 {
                     matchId = game.MatchId ?? string.Empty,
@@ -345,12 +362,12 @@ public partial class GameHub
                     cubeOwner,
                     isCrawford,
                     viewers = 0,
-                    board = (object[]?)null,
-                    whiteCheckersOnBar = 0,
-                    redCheckersOnBar = 0,
-                    whiteBornOff = 0,
-                    redBornOff = 0,
-                    dice = (int[]?)null
+                    board,
+                    whiteCheckersOnBar = game.WhiteCheckersOnBar,
+                    redCheckersOnBar = game.RedCheckersOnBar,
+                    whiteBornOff = game.WhiteBornOff,
+                    redBornOff = game.RedBornOff,
+                    dice
                 });
             }
 
