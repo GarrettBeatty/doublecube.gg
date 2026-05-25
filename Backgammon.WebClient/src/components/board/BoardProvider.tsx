@@ -18,7 +18,7 @@ interface BoardProviderProps {
   display: Required<BoardDisplayOptions>
   highlights: PointHighlight[]
   interaction?: InteractionCallbacks
-  svgRef: React.RefObject<SVGSVGElement>
+  svgRef: React.RefObject<SVGSVGElement | null>
 }
 
 export function BoardProvider({

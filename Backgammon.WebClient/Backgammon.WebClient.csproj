@@ -21,8 +21,8 @@
 
   <!-- Build Vite app before .NET publish in Release mode -->
   <Target Name="BuildViteApp" BeforeTargets="Build" Condition="'$(Configuration)' == 'Release'">
-    <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
-    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="pnpm install --frozen-lockfile" WorkingDirectory="$(SpaRoot)" />
+    <Exec Command="pnpm run build" WorkingDirectory="$(SpaRoot)" />
   </Target>
 
   <!-- Clean Vite output on Clean -->

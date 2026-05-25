@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'wwwroot'] },
+  { ignores: ['dist', 'wwwroot', 'src/types/generated/**'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -19,6 +19,12 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // New strict rules in eslint-plugin-react-hooks v7 flag patterns
+      // (resetting state in effects, etc.) that this codebase uses intentionally.
+      // Re-enable incrementally as components are refactored.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/immutability': 'off',
+      'react-hooks/refs': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
