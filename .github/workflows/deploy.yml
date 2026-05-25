@@ -15,7 +15,7 @@ env:
 
 jobs:
   build-server:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -38,7 +38,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build \
-            --platform linux/arm64 \
+            --platform linux/amd64 \
             --push \
             -f Backgammon.Server/Dockerfile \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-server:$IMAGE_TAG \
@@ -46,7 +46,7 @@ jobs:
             .
 
   build-webclient:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -69,7 +69,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build \
-            --platform linux/arm64 \
+            --platform linux/amd64 \
             --push \
             -f Backgammon.WebClient/Dockerfile \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-webclient:$IMAGE_TAG \
@@ -77,7 +77,7 @@ jobs:
             .
 
   build-gnubg:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write
@@ -100,7 +100,7 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker buildx build \
-            --platform linux/arm64 \
+            --platform linux/amd64 \
             --push \
             -f gnubg-service/Dockerfile \
             -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/backgammon-gnubg:$IMAGE_TAG \
@@ -109,7 +109,7 @@ jobs:
 
   deploy:
     needs: [build-server, build-webclient, build-gnubg]
-    runs-on: ubuntu-24.04-arm
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
