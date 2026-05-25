@@ -78,9 +78,10 @@ public partial class GameGrain
                     await BroadcastGameUpdateAsync();
 
                     var capturedFirstPlayerId = firstPlayerId;
+                    var selfRef = GrainFactory.GetGrain<IGameGrain>(gameId);
                     BackgroundTaskHelper.FireAndForget(async () =>
                     {
-                        await ExecuteAiTurnAsync(capturedFirstPlayerId!);
+                        await selfRef.TriggerAiTurnAsync(capturedFirstPlayerId!);
                     }, _logger, $"AiOpeningTurn-{gameId}");
 
                     return ActionResult.Ok();
@@ -93,10 +94,11 @@ public partial class GameGrain
                 {
                     await SaveGameAsync();
                     await BroadcastGameUpdateAsync();
+                    var selfRef = GrainFactory.GetGrain<IGameGrain>(gameId);
                     BackgroundTaskHelper.FireAndForget(async () =>
                     {
                         await Task.Delay(500);
-                        await RollDiceAsync(string.Empty);
+                        await selfRef.RollDiceAsync(string.Empty);
                     }, _logger, $"AiOpeningRoll-White-{gameId}");
                     return ActionResult.Ok();
                 }
@@ -105,10 +107,11 @@ public partial class GameGrain
                 {
                     await SaveGameAsync();
                     await BroadcastGameUpdateAsync();
+                    var selfRef = GrainFactory.GetGrain<IGameGrain>(gameId);
                     BackgroundTaskHelper.FireAndForget(async () =>
                     {
                         await Task.Delay(500);
-                        await RollDiceAsync(string.Empty);
+                        await selfRef.RollDiceAsync(string.Empty);
                     }, _logger, $"AiOpeningRoll-Red-{gameId}");
                     return ActionResult.Ok();
                 }
@@ -253,9 +256,10 @@ public partial class GameGrain
         if (_aiMoveService.IsAiPlayer(nextPlayerId))
         {
             var capturedPlayerId = nextPlayerId;
+            var selfRef = GrainFactory.GetGrain<IGameGrain>(this.GetPrimaryKeyString());
             BackgroundTaskHelper.FireAndForget(async () =>
             {
-                await ExecuteAiTurnAsync(capturedPlayerId!);
+                await selfRef.TriggerAiTurnAsync(capturedPlayerId!);
             }, _logger, $"AiTurn-{this.GetPrimaryKeyString()}");
         }
 
@@ -364,7 +368,8 @@ public partial class GameGrain
         }
     }
 
-    private async Task ExecuteAiTurnAsync(string aiPlayerId)
+    /// <inheritdoc/>
+    public async Task TriggerAiTurnAsync(string aiPlayerId)
     {
         try
         {

@@ -66,6 +66,15 @@ public interface IGameGrain : IGrainWithStringKey
     Task<ActionResult> AbandonAsync(string connectionId);
     Task MarkCompletedAsync();
 
+    /// <summary>
+    /// Run an AI player's full turn on the activation. Invoked from background
+    /// continuations via a grain reference so Orleans schedules execution on
+    /// the activation context (calling the private implementation directly
+    /// from a fire-and-forget task would run on a thread-pool thread and
+    /// throw an activation-access-violation on state access).
+    /// </summary>
+    Task TriggerAiTurnAsync(string aiPlayerId);
+
     // ===== Analysis mode (study/analysis sessions only) =====
     Task<ActionResult> SetDiceAsync(string connectionId, int die1, int die2);
     Task<ActionResult> MoveCheckerDirectlyAsync(string connectionId, int from, int to);
