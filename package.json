@@ -5,6 +5,6 @@
     "docs:serve": "cd documentation && pnpm serve"
   },
   "devDependencies": {
-    "shadcn": "^3.6.2"
+    "shadcn": "^4.8.0"
   }
 }
