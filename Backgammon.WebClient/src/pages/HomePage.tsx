@@ -58,7 +58,7 @@ export function HomePage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
               <div>
                 <TabsContent value="lobby" className="mt-0">
-                  <GameLobby onCreateGame={() => onPlayChoice('quick')} />
+                  <GameLobby />
                 </TabsContent>
 
                 <TabsContent value="your-games" className="mt-0">

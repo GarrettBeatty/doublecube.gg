@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Clock, User, Dice6, Filter, Users, Plus } from "lucide-react";
+import { Clock, User, Dice6, Filter, Users } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
@@ -13,11 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { mapMatchLobbyToLobbyGame } from "@/utils/mappers";
 import type { LobbyGame } from "@/types/home.types";
 
-interface GameLobbyProps {
-  onCreateGame?: () => void;
-}
-
-export function GameLobby({ onCreateGame }: GameLobbyProps) {
+export function GameLobby() {
   const { lobbies, isLoading } = useMatchLobbies();
   const { hub } = useSignalR();
   const { toast } = useToast();
@@ -247,24 +243,18 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
             {lobbyGames.length === 0 ? (
-              <>
-                <div>
-                  <p className="font-medium text-lg">No open games yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Be the first to create a game and others will join!
-                  </p>
-                </div>
-                <Button onClick={onCreateGame} className="mt-4">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create a Game
-                </Button>
-              </>
+              <div>
+                <p className="font-medium text-lg">No open games yet</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Check back soon for new games to join.
+                </p>
+              </div>
             ) : (
               <>
                 <div>
                   <p className="font-medium text-lg">No matching lobbies</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active. Try adjusting your filters or create a new game.
+                    {activeFilterCount} filter{activeFilterCount !== 1 ? 's' : ''} active. Try adjusting your filters.
                   </p>
                 </div>
                 <div className="flex gap-2 justify-center">
@@ -278,10 +268,6 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
                     }}
                   >
                     Clear Filters
-                  </Button>
-                  <Button onClick={onCreateGame}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Game
                   </Button>
                 </div>
               </>
@@ -332,13 +318,8 @@ export function GameLobby({ onCreateGame }: GameLobbyProps) {
                 </Button>
               </div>
             ))}
-            {/* Show count and create option after list */}
-            <div className="pt-4 flex items-center justify-between text-sm text-muted-foreground border-t mt-4">
+            <div className="pt-4 text-sm text-muted-foreground border-t mt-4">
               <span>{filteredLobbies.length} game{filteredLobbies.length !== 1 ? 's' : ''} available</span>
-              <Button variant="ghost" size="sm" onClick={onCreateGame}>
-                <Plus className="h-4 w-4 mr-1" />
-                Create your own
-              </Button>
             </div>
           </div>
         )}
