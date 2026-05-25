@@ -6,14 +6,12 @@ interface LayoutProps {
   children: ReactNode
   onLoginClick: () => void
   onSignupClick: () => void
-  onCreateLobbyClick?: () => void
 }
 
 export const Layout: React.FC<LayoutProps> = ({
   children,
   onLoginClick,
   onSignupClick,
-  onCreateLobbyClick,
 }) => {
   const [showDebugPanel, setShowDebugPanel] = useState(false)
 
@@ -27,7 +25,6 @@ export const Layout: React.FC<LayoutProps> = ({
         onLoginClick={onLoginClick}
         onSignupClick={onSignupClick}
         onDebugToggle={handleDebugToggle}
-        onCreateLobbyClick={onCreateLobbyClick}
       />
       <main>{children}</main>
       <DebugPanel isVisible={showDebugPanel} />

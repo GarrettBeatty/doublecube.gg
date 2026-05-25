@@ -7,7 +7,7 @@ import { useSignalREvents } from './hooks/useSignalREvents'
 import { Layout } from './components/layout/Layout'
 import { LoginModal } from './components/modals/LoginModal'
 import { RegisterModal } from './components/modals/RegisterModal'
-import { CreateMatchModal } from './components/modals/CreateMatchModal'
+import { PlayActionsProvider } from './contexts/PlayActionsProvider'
 import { HomePage } from './pages/HomePage'
 import { GamePage } from './pages/GamePage'
 import { MatchResultsPage } from './pages/MatchResultsPage'
@@ -39,7 +39,6 @@ function SignalREventHandler() {
 function AppContent() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showRegisterModal, setShowRegisterModal] = useState(false)
-  const [showCreateMatchModal, setShowCreateMatchModal] = useState(false)
 
   // Initialize audio service and dark mode
   useEffect(() => {
@@ -65,14 +64,10 @@ function AppContent() {
     setShowLoginModal(true)
   }
 
-  const handleCreateLobbyClick = () => {
-    setShowCreateMatchModal(true)
-  }
-
   return (
-    <>
+    <PlayActionsProvider>
       <SignalREventHandler />
-      <Layout onLoginClick={handleLoginClick} onSignupClick={handleSignupClick} onCreateLobbyClick={handleCreateLobbyClick}>
+      <Layout onLoginClick={handleLoginClick} onSignupClick={handleSignupClick}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/match/:matchId/game/:gameId" element={<GamePage />} />
@@ -106,15 +101,9 @@ function AppContent() {
         onSwitchToLogin={handleSwitchToLogin}
       />
 
-      <CreateMatchModal
-        isOpen={showCreateMatchModal}
-        onClose={() => setShowCreateMatchModal(false)}
-        defaultOpponentType="OpenLobby"
-      />
-
       <Toaster />
       <FriendsWidget />
-    </>
+    </PlayActionsProvider>
   )
 }
 

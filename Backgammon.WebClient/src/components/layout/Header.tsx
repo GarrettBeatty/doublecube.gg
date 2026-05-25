@@ -12,21 +12,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { ConnectionState } from '@/types/signalr.types'
-import { Gamepad2, Trophy, Users, Settings, Wrench, ChevronDown, BarChart3, Upload, Search, UserPlus, User } from 'lucide-react'
+import { Gamepad2, Trophy, Users, Settings, Wrench, ChevronDown, BarChart3, Upload, Search, User } from 'lucide-react'
 import { ImportGameModal } from '@/components/modals/ImportGameModal'
+import { PlayMenuItems } from '@/components/PlayMenuItems'
+import { usePlayActions } from '@/hooks/usePlayActions'
 
 interface HeaderProps {
   onLoginClick: () => void
   onSignupClick: () => void
   onDebugToggle?: () => void
-  onCreateLobbyClick?: () => void
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onLoginClick,
   onSignupClick,
-  onCreateLobbyClick,
 }) => {
+  const { onPlayChoice } = usePlayActions()
   const navigate = useNavigate()
   const { user, isAuthenticated, logout } = useAuth()
   const { connectionState } = useSignalR()
@@ -107,10 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  <DropdownMenuItem onClick={onCreateLobbyClick}>
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Create game lobby
-                  </DropdownMenuItem>
+                  <PlayMenuItems onChoose={onPlayChoice} variant="compact" />
                 </DropdownMenuContent>
               </DropdownMenu>
 
